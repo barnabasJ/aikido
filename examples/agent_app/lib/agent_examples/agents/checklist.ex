@@ -23,32 +23,13 @@ defmodule AgentExamples.Checklist do
     action :add, Aikido.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :item, :string, allow_nil?: false
-
-      run fn input, _context ->
-        state = input.arguments.state
-        Aikido.ActionResult.new(state: %{state | items: state.items ++ [input.arguments.item]})
-      end
+      run {AgentExamples.Checklist.Implementation, action: :add}
     end
 
     action :complete, Aikido.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :item, :string, allow_nil?: false
-
-      run fn input, _context ->
-        %{state: state, item: item} = input.arguments
-
-        if item in state.items do
-          Aikido.ActionResult.new(
-            state: %{
-              state
-              | items: List.delete(state.items, item),
-                completed: state.completed + 1
-            }
-          )
-        else
-          {:error, "Unknown checklist item: #{item}"}
-        end
-      end
+      run {AgentExamples.Checklist.Implementation, action: :complete}
     end
   end
 end

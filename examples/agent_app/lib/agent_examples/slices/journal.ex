@@ -9,19 +9,13 @@ defmodule AgentExamples.Journal do
   actions do
     action :append, Aikido.ActionResult do
       argument :state, :map, allow_nil?: false
-
       argument :text, :string, allow_nil?: false
-
-      run fn input, _context ->
-        state = input.arguments.state
-        Aikido.ActionResult.new(state: %{entries: state.entries ++ [input.arguments.text]})
-      end
+      run AgentExamples.Journal.Implementation
     end
   end
 
   slice do
     name "example_journal"
-
     route "journal.append", :append
   end
 end

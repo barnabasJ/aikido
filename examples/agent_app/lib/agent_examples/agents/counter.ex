@@ -16,11 +16,7 @@ defmodule AgentExamples.Counter do
     action :add, Aikido.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :amount, :integer, allow_nil?: false
-
-      run fn input, _context ->
-        state = input.arguments.state
-        Aikido.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
-      end
+      run AgentExamples.Counter.Implementation
     end
   end
 end

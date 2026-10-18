@@ -47,6 +47,11 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert definition.code =~ "action :failed, Aikido.ActionResult"
     assert definition.open?
 
+    implementation = Enum.find(worker, &(&1.module == AgentExamples.Worker.Implementation))
+    assert implementation.code =~ "use Ash.Resource.Actions.Implementation"
+    assert implementation.code =~ "Aikido.Directives.async_task"
+    refute implementation.open?
+
     assert Enum.any?(
              AgentExamples.Source.for_example(Catalog.find("research-team")),
              &String.starts_with?(&1.code, "defimpl Aikido.AgentServer.DirectiveExec")

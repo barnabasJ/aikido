@@ -6,10 +6,12 @@ defmodule AgentExamples.Source do
              "examples/agent_app/lib/agent_examples/agents/*.ex",
              "examples/agent_app/lib/agent_examples/slices/*.ex",
              "examples/agent_app/lib/agent_examples/ai/*.ex",
+             "examples/agent_app/lib/agent_examples/**/implementation.ex",
              "examples/agent_app/lib/agent_examples/agents.ex",
              "examples/agent_app/lib/agent_examples/ai.ex",
              "lib/aikido/slices/ai_react.ex",
              "lib/aikido/slices/ai_worker.ex",
+             "lib/aikido/slices/ai_worker/**/implementation.ex",
              "lib/aikido/slices/ai_react/**/*.ex",
              "lib/aikido/ash/ai.ex",
              "lib/aikido/ash/team/engine.ex"
@@ -38,6 +40,9 @@ defmodule AgentExamples.Source do
 
                      category =
                        cond do
+                         String.ends_with?(name, ".Implementation") ->
+                           :action
+
                          String.contains?(file, "/agents/") ->
                            :agent
 
@@ -101,6 +106,7 @@ defmodule AgentExamples.Source do
   @ai_names [
     AgentExamples.AI,
     AgentExamples.AI.Tools,
+    AgentExamples.AI.Tools.Implementation,
     AgentExamples.AI.LuaSurface,
     AgentExamples.AI.ScriptedClient,
     Aikido.Ash.AI,
@@ -115,6 +121,8 @@ defmodule AgentExamples.Source do
           example.resource,
           AgentExamples.Agents
         ]
+
+    modules = modules ++ Enum.map(modules, &Module.concat(&1, Implementation))
 
     Enum.filter(@definitions, fn entry ->
       entry.module in modules ||

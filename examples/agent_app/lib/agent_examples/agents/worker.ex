@@ -25,49 +25,23 @@ defmodule AgentExamples.Worker do
     action :work, Aikido.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :text, :string, allow_nil?: false
-
-      run fn input, _context ->
-        state = input.arguments.state
-
-        if state.status == :working do
-          {:error, "Worker is already busy"}
-        else
-          directive =
-            Aikido.Directives.async_task({__MODULE__, :uppercase, [input.arguments.text]},
-              success_type: "worker.completed",
-              error_type: "worker.failed"
-            )
-
-          Aikido.ActionResult.new(
-            state: %{state | status: :working, result: nil, error: nil},
-            directives: [directive]
-          )
-        end
-      end
+      run {AgentExamples.Worker.Implementation, action: :work}
     end
 
     action :completed, Aikido.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :result, :string, allow_nil?: false
-
-      run fn input, _context ->
-        Aikido.ActionResult.new(
-          state: %{input.arguments.state | status: :completed, result: input.arguments.result}
-        )
-      end
+      run {AgentExamples.Worker.Implementation, action: :completed}
     end
 
     action :failed, Aikido.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :reason, :term, allow_nil?: false
-
-      run fn input, _context ->
-        Aikido.ActionResult.new(
-          state: %{input.arguments.state | status: :failed, error: input.arguments.reason}
-        )
-      end
+      run {AgentExamples.Worker.Implementation, action: :failed}
     end
   end
 
-  def uppercase(text), do: {:ok, String.upcase(text)}
+  def uppercase(text) do
+    {:ok, String.upcase(text)}
+  end
 end
