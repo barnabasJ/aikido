@@ -1,0 +1,142 @@
+defmodule AikidoTest.Case do
+  @moduledoc """
+  Test case module that provides isolated Aikido instances for testing.
+
+  ## Usage
+
+      defmodule MyTest do
+        use AikidoTest.Case, async: true
+        
+        test "my test", %{aikido: aikido} do
+          {:ok, pid} = Aikido.start_agent(aikido, MyAgent)
+          # ...
+        end
+      end
+
+  Each test gets a unique Aikido instance that is automatically started before
+  the test and stopped after it completes. This ensures complete test isolation.
+
+  ## Context
+
+  The following keys are available in the test context:
+
+  - `:aikido` - The name of the Aikido instance (atom)
+  - `:aikido_pid` - The PID of the Aikido supervisor
+
+  ## Helper Functions
+
+  The module also provides helper functions:
+
+  - `start_test_agent/2` - Starts an agent under the test's Aikido instance
+  - `test_registry/1` - Returns the registry name for the test's Aikido instance
+  - `unique_id/1` - Generates a unique ID with optional prefix
+  - `signal/3` - Creates a test signal with sensible defaults
+  - `start_server/3` - Starts an agent server with automatic cleanup
+  """
+
+  use ExUnit.CaseTemplate
+
+  using do
+    quote do
+      import AikidoTest.Case
+      import AikidoTest.Eventually
+      import AikidoTest.AgentWait
+
+      @doc """
+      Starts an agent under this test's Aikido instance.
+      """
+      def start_test_agent(context, agent, opts \\ []) do
+        Aikido.start_agent(context.aikido, agent, opts)
+      end
+
+      @doc """
+      Returns the registry for this test's Aikido instance.
+      """
+      def test_registry(context) do
+        Aikido.registry_name(context.aikido)
+      end
+
+      @doc """
+      Returns the task supervisor for this test's Aikido instance.
+      """
+      def test_task_supervisor(context) do
+        Aikido.task_supervisor_name(context.aikido)
+      end
+
+      @doc """
+      Returns the agent supervisor for this test's Aikido instance.
+      """
+      def test_agent_supervisor(context) do
+        Aikido.agent_supervisor_name(context.aikido)
+      end
+    end
+  end
+
+  @doc """
+  Generates a unique ID with an optional prefix.
+
+  ## Examples
+
+      unique_id()        # "test-12345"
+      unique_id("agent") # "agent-12346"
+  """
+  def unique_id(prefix \\ "test") do
+    "#{prefix}-#{System.unique_integer([:positive])}"
+  end
+
+  @doc """
+  Creates a test signal with sensible defaults.
+
+  ## Examples
+
+      signal("increment")
+      signal("record", %{message: "hello"})
+      signal("test", %{}, source: "/custom")
+  """
+  def signal(type, data \\ %{}, opts \\ []) do
+    source = Keyword.get(opts, :source, "/test")
+    Jido.Signal.new!(type, data, source: source)
+  end
+
+  @doc """
+  Starts an agent server with automatic cleanup on test exit.
+
+  ## Options
+
+  All options are passed to `Aikido.AgentServer.start_link/1`, with defaults:
+
+    * `:aikido` - Uses the test context's aikido instance
+    * `:id` - Generates a unique ID if not provided
+
+  ## Examples
+
+      pid = start_server(context, MyAgent)
+      pid = start_server(context, MyAgent, id: "custom-id")
+  """
+  def start_server(context, agent, opts \\ []) do
+    opts = Keyword.put_new(opts, :aikido, context.aikido)
+    opts = Keyword.put_new(opts, :id, unique_id())
+    {:ok, pid} = Aikido.AgentServer.start_link([agent_module: agent] ++ opts)
+
+    ExUnit.Callbacks.on_exit(fn ->
+      if Process.alive?(pid) do
+        try do
+          GenServer.stop(pid, :normal, 100)
+        catch
+          :exit, _ -> :ok
+        end
+      end
+    end)
+
+    pid
+  end
+
+  setup context do
+    test_id = System.unique_integer([:positive])
+    aikido_name = :"aikido_test_#{test_id}"
+
+    {:ok, aikido_pid} = Aikido.start_link(name: aikido_name)
+
+    {:ok, Map.merge(context, %{aikido: aikido_name, aikido_pid: aikido_pid})}
+  end
+end

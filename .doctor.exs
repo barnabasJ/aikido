@@ -2,9 +2,9 @@
   ignore_modules: [
     # These modules use macros that generate code inside quote blocks.
     # Doctor incorrectly counts def statements inside quote as module functions.
-    Jido.Agent,
-    Jido.Plugin,
-    Jido.Skill
+    Aikido.Agent,
+    Aikido.Plugin,
+    Aikido.Skill
   ],
   ignore_paths: [],
   min_module_doc_coverage: 100,

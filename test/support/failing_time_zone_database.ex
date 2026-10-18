@@ -1,4 +1,4 @@
-defmodule JidoTest.Support.FailingTimeZoneDatabase do
+defmodule AikidoTest.Support.FailingTimeZoneDatabase do
   @moduledoc false
   @behaviour Calendar.TimeZoneDatabase
 

@@ -1,18 +1,20 @@
-defmodule JidoTest.Support.SchedulerIntegrationHarness do
+defmodule AikidoTest.Support.SchedulerIntegrationHarness do
   @moduledoc false
 
-  alias Jido.AgentServer
-  alias Jido.Directives
-  alias Jido.Scheduler
+  alias Aikido.AgentServer
+  alias Aikido.Directives
+  alias Aikido.Scheduler
   alias Jido.Signal
 
   defmodule TickAction do
     @moduledoc false
-    use Jido.Action
+    use Aikido.Action
 
     action do
-      name "cron_count"
-      schema []
+      name("cron_count")
+
+      schema do
+      end
     end
 
     def run(%Jido.Signal{data: params}, slice, _opts, _ctx) do
@@ -24,11 +26,13 @@ defmodule JidoTest.Support.SchedulerIntegrationHarness do
 
   defmodule RegisterCronAction do
     @moduledoc false
-    use Jido.Action
+    use Aikido.Action
 
     action do
-      name "register_cron"
-      schema []
+      name("register_cron")
+
+      schema do
+      end
     end
 
     def run(%Jido.Signal{data: params}, slice, _opts, _ctx) do
@@ -44,11 +48,13 @@ defmodule JidoTest.Support.SchedulerIntegrationHarness do
 
   defmodule CancelCronAction do
     @moduledoc false
-    use Jido.Action
+    use Aikido.Action
 
     action do
-      name "cancel_cron"
-      schema []
+      name("cancel_cron")
+
+      schema do
+      end
     end
 
     def run(%Jido.Signal{data: %{job_id: job_id}}, slice, _opts, _ctx) do
@@ -58,57 +64,61 @@ defmodule JidoTest.Support.SchedulerIntegrationHarness do
 
   defmodule CronAgent do
     @moduledoc false
-    use Jido.Agent
+    use Aikido.Agent
 
     agent do
-      name "scheduler_integration_agent"
-      path :domain
+      name("scheduler_integration_agent")
+      path(:domain)
 
-      schema tick_count: [type: :integer, default: 0],
-             ticks: [type: {:list, :any}, default: []]
+      schema do
+        attribute(:tick_count, :integer, default: 0)
+        attribute(:ticks, {:array, :term}, default: [])
+      end
     end
 
     signal_routes do
-      route "register_cron", RegisterCronAction
-      route "cancel_cron", CancelCronAction
-      route "cron.tick", TickAction
+      route("register_cron", RegisterCronAction)
+      route("cancel_cron", CancelCronAction)
+      route("cron.tick", TickAction)
     end
   end
 
   defmodule ScheduledCronAgent do
     @moduledoc false
-    use Jido.Agent
+    use Aikido.Agent
 
     agent do
-      name "scheduler_integration_scheduled_agent"
-      path :domain
+      name("scheduler_integration_scheduled_agent")
+      path(:domain)
 
-      schema tick_count: [type: :integer, default: 0],
-             ticks: [type: {:list, :any}, default: []]
+      schema do
+        attribute(:tick_count, :integer, default: 0)
+        attribute(:ticks, {:array, :term}, default: [])
+      end
     end
 
     schedules do
-      schedule "* * * * * * *", "cron.tick", job_id: :scheduled_heartbeat
+      schedule("* * * * * * *", "cron.tick", job_id: :scheduled_heartbeat)
     end
 
     signal_routes do
-      route "cron.tick", TickAction
+      route("cron.tick", TickAction)
     end
   end
 
   def start_cron_agent(context, opts \\ []) do
-    JidoTest.Case.start_server(
+    AikidoTest.Case.start_server(
       context,
       CronAgent,
-      Keyword.put_new(opts, :id, JidoTest.Case.unique_id("scheduler-integration"))
+      Keyword.put_new(opts, :id, AikidoTest.Case.unique_id("scheduler-integration"))
     )
   end
 
   def start_scheduled_agent(context, opts \\ []) do
-    JidoTest.Case.start_server(
+    AikidoTest.Case.start_server(
       context,
       ScheduledCronAgent,
-      Keyword.put_new(opts, :id, JidoTest.Case.unique_id("scheduler-scheduled"))
+      Keyword.put_new(opts, :id, AikidoTest.Case.unique_id("scheduler-scheduled"))
     )
   end
 
@@ -170,15 +180,19 @@ defmodule JidoTest.Support.SchedulerIntegrationHarness do
   @doc """
   Wait for `job_id` to be registered (and alive) in `state.cron_jobs`.
 
-  Subscribe-based per ADR 0021 — see `JidoTest.AgentWait.await_state_value/3`.
+  Subscribe-based per ADR 0021 — see `AikidoTest.AgentWait.await_state_value/3`.
   """
   def wait_for_job(pid, job_id, opts \\ []) do
-    JidoTest.AgentWait.await_state_value(
+    AikidoTest.AgentWait.await_state_value(
       pid,
       fn s ->
         case Map.get(s.cron_jobs, job_id) do
           job_pid when is_pid(job_pid) ->
-            if Process.alive?(job_pid), do: job_pid, else: nil
+            if Process.alive?(job_pid) do
+              job_pid
+            else
+              nil
+            end
 
           _ ->
             nil
@@ -195,11 +209,16 @@ defmodule JidoTest.Support.SchedulerIntegrationHarness do
   whose post-state the subscription evaluates. No polling.
   """
   def wait_for_tick_count(pid, count, opts \\ []) do
-    JidoTest.AgentWait.await_state_value(
+    AikidoTest.AgentWait.await_state_value(
       pid,
       fn s ->
         tick_count = s.agent.state.domain.tick_count
-        if tick_count >= count, do: tick_count, else: nil
+
+        if tick_count >= count do
+          tick_count
+        else
+          nil
+        end
       end,
       opts
     )

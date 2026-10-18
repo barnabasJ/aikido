@@ -1,4 +1,4 @@
-defmodule JidoTest.SignalCollector do
+defmodule AikidoTest.SignalCollector do
   @moduledoc false
   use GenServer
 

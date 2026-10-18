@@ -1,4 +1,4 @@
-defmodule JidoTest.AgentWait do
+defmodule AikidoTest.AgentWait do
   @moduledoc """
   Subscribe-based wait helpers for agent state changes.
 
@@ -25,12 +25,12 @@ defmodule JidoTest.AgentWait do
   ADR 0016 §2.
   """
 
-  alias Jido.AgentServer
+  alias Aikido.AgentServer
 
   @default_timeout 500
   # `"**"` is the multi-segment wildcard — matches every signal type.
   # Single `"*"` only matches one segment, so it would miss multi-segment
-  # types like `"cron.tick"` or `"jido.agent.lifecycle.ready"`.
+  # types like `"cron.tick"` or `"aikido.agent.lifecycle.ready"`.
   @default_pattern "**"
 
   @doc """
@@ -42,7 +42,7 @@ defmodule JidoTest.AgentWait do
     * `:timeout` - ms to wait (default: #{@default_timeout})
     * `:pattern` - signal pattern to subscribe on (default: `"**"` — the
       multi-segment wildcard, matches every signal type). Use a tighter
-      pattern (e.g. `"jido.agent.child.started"`) when you know exactly
+      pattern (e.g. `"aikido.agent.child.started"`) when you know exactly
       which signal advances the predicate; tighter patterns avoid a
       selector run on every unrelated signal.
 
@@ -50,20 +50,20 @@ defmodule JidoTest.AgentWait do
 
       # Wait until counter reaches 5
       counter =
-        JidoTest.AgentWait.await_state_value(pid, fn s ->
+        AikidoTest.AgentWait.await_state_value(pid, fn s ->
           if s.agent.state.domain.counter >= 5, do: s.agent.state.domain.counter
         end)
       assert counter == 5
 
       # Wait until a child appears, narrow pattern
       child_pid =
-        JidoTest.AgentWait.await_state_value(
+        AikidoTest.AgentWait.await_state_value(
           pid,
           fn s -> Map.get(s.children, :worker) end,
-          pattern: "jido.agent.child.started"
+          pattern: "aikido.agent.child.started"
         )
   """
-  @spec await_state_value(GenServer.server(), (Jido.AgentServer.State.t() -> any()), keyword()) ::
+  @spec await_state_value(GenServer.server(), (Aikido.AgentServer.State.t() -> any()), keyword()) ::
           any()
   def await_state_value(pid, value_fn, opts \\ []) when is_function(value_fn, 1) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
@@ -97,7 +97,7 @@ defmodule JidoTest.AgentWait do
 
       _ ->
         receive do
-          {:jido_subscription, ^ref, %{result: {:ok, value}}} -> value
+          {:aikido_subscription, ^ref, %{result: {:ok, value}}} -> value
         after
           timeout ->
             AgentServer.unsubscribe(pid, ref)

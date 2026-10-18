@@ -2,6 +2,118 @@
 
 <!-- changelog -->
 
+## Unreleased
+
+### Removed
+
+- Remove historical ADRs, research, task plans, legacy guides/Livebooks, review
+  notes, migrations, and stale generated DSL references. Retain current guides
+  and refresh the README and ExDoc navigation for the Ash/DurableServer API.
+
+- Remove the `Jido.Ash.Agent` data-layer behaviour. Register it as a resource
+  extension; generic agent/team actions no longer occupy the data-layer slot.
+
+- Remove the legacy pod slice, topology, and mutation runtime; use Ash teams.
+
+- Remove agent client attachment tracking, `AgentServer.attach/detach/touch`, and
+  automatic idle shutdown. Managed agents now stop explicitly; storage-backed
+  restoration remains available.
+
+### Features
+
+- Establish Aikido as an independent project in `barnabasJ/aikido`. Rename the
+  application, owned modules, configuration, runtime signals, Mix tasks, tests,
+  and examples from Jido to Aikido. Continue using the external `jido_signal`
+  dependency under its original namespace.
+
+- Accept `topology` in team start actions, including nested team graphs through
+  member initial state. Validate root graphs before activation, preserve DSL
+  defaults when omitted, and retain saved graphs on durable restoration.
+
+- Name generated domain interfaces `<agent>_<action>` so each agent's lifecycle
+  and signal actions group together, including bang variants.
+
+- Require agent signal targets as the third positional argument. Inherit routed
+  public actions from embedded Ash slices without duplicate agent declarations;
+  retain private and schedule-only actions internally.
+
+- Replace public agent/team CRUD actions with generic start, signal, inspect,
+  list and stop actions. Commands accept IDs, PIDs or references and return
+  compact receipts. Inspect state explicitly; configure running topologies with
+  `configure_topology`. Migrate the playground, AI tools and recovery tests.
+
+- Replace InstanceManager with DurableServer and its native EKV/object-storage
+  backends. Default Jido agents now use durable keyed activation and strict
+  callback synchronization; restore team topology and logical cron specs after
+  failure. Preserve agent and slice serialization callbacks. Require Elixir 1.19.
+
+- Expose example agent/team spawning, delegation, roster, stop, and removal
+  through AshLua. Carry trusted agent/resource and managing-team context into
+  native Ash AI callbacks; demonstrate AI workers spawning helpers through Lua.
+- Generate Ash signal action arguments from their routed action contracts,
+  including mounted slices, preserving native types, defaults, and constraints.
+  Remove duplicate signal action declarations from the example agents.
+- Standardize data DSLs on `schema do` and native Ash attribute declarations,
+  including action input/output, slice state/config, and sensor schemas. Compile
+  action inputs directly into Ash typed structs on the action module; use nested
+  contracts for other plain hosts and reuse existing Ash
+  agent and slice resources. Preserve native Ash/Splode validation errors.
+- Add a nested-team playground with fixed subteams, dynamically spawned squads,
+  recursive topology visuals, message delivery, and subtree removal.
+- Reuse Spark.InfoGenerator for DSL options and AshAI for tool schemas and Ash
+  action execution. Ash resource/action tools use AshAI's `input` envelope and
+  support create/read/update/destroy actions as well as generic actions.
+- Complete team lifecycle actions through a one-shot subscription registered
+  before the command starts; remove the separate late `Team.await` helper.
+
+- Use ReqLLM by default in AI example resources, allowing creation with just
+  a model and tools. Select the scripted client explicitly in offline demos,
+  playground mode, and tests.
+
+- Expose system-prompt and iteration-limit overrides in AI playground creation
+  forms, and verify model/client/prompt/iteration configuration through the
+  common public agent and team create interfaces.
+
+- Show exact agent, slice, action, directive, and supporting source definitions
+  on every example page, one independent accordion per definition. Agent and
+  slice panels start open, others closed, and live updates preserve toggles.
+
+- Add a Phoenix LiveView playground to the example app, with one page per
+  example, descriptions and workflow/state visuals, browser-scoped runs,
+  live signal and topology updates, offline/live AI selection, and lifecycle
+  controls. Start it with `mix phx.server`; no Node build is required.
+
+- Add a common Ash AI interface for agents and teams with runtime tool lists,
+  contextual Ash AI callbacks, and inherited member configuration. Add an
+  orchestrator example with fixed and dynamic workers, worker-created helpers,
+  real Ash AI/AshLua tools, an offline demo, and a z.ai entry point.
+
+- Default agent resources to the `Jido.Default` runtime, started by adding `Jido`
+  to a supervision tree. Transform `agent.schema do` Ash attribute declarations
+  into real resource attributes, deriving runtime state contracts at compile time.
+  Initial values and snapshots now use ordinary fields such as `count` rather
+  than a public `state` map.
+
+- Add a runnable Ash agent example application with a generated domain interface,
+  five agent resources, embedded slices, asynchronous work, teams, and tests.
+- Configure Spark formatting to remove DSL parentheses and use native Ash
+  TypedStruct blocks for longer contracts. Live Ash reads skip registry entries
+  whose processes have already terminated.
+- Generate and export the complete DSL formatter arities with `mix spark.formatter`,
+  and include the example app in root formatting checks.
+- Remove legacy schema translation and automatic option-contract conversion;
+  declare Ash data fields directly and Spark DSL sections explicitly.
+- Add Ash domain interfaces for process-backed agent resources, embedded slice
+  resources with routed Ash actions, and team resources with member lifecycle
+  and signal delivery. Existing runtime and pure action/directive contracts are
+  preserved. See `guides/ash-integration.md`.
+- Standardize data contracts and runtime structs on Ash types and DSL options
+  on Spark validation. Remove direct Zoi and NimbleOptions dependencies, update
+  generators and tool JSON schemas, and preserve defaults and state ownership.
+- Stabilize the existing AI fire-and-forget test by awaiting completion before
+  verifying its background task's mock.
+
+
 ## [v2.2.0](https://github.com/agentjido/jido/compare/v2.1.0...v2.2.0) (2026-03-29)
 
 

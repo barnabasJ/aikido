@@ -1,294 +1,333 @@
-# Ash Framework Integration
+# Ash domains, agents, slices, and teams
 
-<!-- covers: jido.integrations_and_migration.framework_guides -->
+<!-- covers: aikido.integrations_and_migration.framework_guides -->
 
-**After:** You can trigger Jido agents from Ash actions and resources.
+Define your public API on an Ash domain. Agents are Ash resources extended by
+`Aikido.Ash.Agent`; slices are embedded Ash resources with `Aikido.Ash.Slice`;
+teams are agent resources with `Aikido.Ash.Team`.
 
-The [`ash_jido`](https://github.com/agentjido/ash_jido) package bridges Ash Framework resources with Jido agents. It generates `Jido.Action` modules from Ash actions at compile time.
-
-## Installation
-
-Add `ash_jido` to your dependencies:
+The project uses Ash 3.36 or later. Configure Ash's required string length
+behavior in your application's `config/config.exs`:
 
 ```elixir
-# mix.exs
-def deps do
-  [
-    {:ash, "~> 3.12"},
-    {:jido, "~> 1.1"},
-    {:ash_jido, "~> 0.1"}
-  ]
+config :ash, default_string_length_count: :codepoints
+```
+
+The existing `Aikido.AgentServer` runs the processes. State changes still come
+exclusively from action return values, and directives perform runtime effects.
+The resource DSL generates the internal agent modules; consumers call the domain.
+
+## An agent resource
+
+Start a Aikido instance in your application supervision tree:
+
+```elixir
+children = [
+  Aikido
+]
+```
+
+Add `Aikido.Ash.Agent` to the resource extensions:
+
+```elixir
+defmodule MyApp.Counter do
+  use Ash.Resource,
+    domain: MyApp.Agents,
+    extensions: [Aikido.Ash.Agent]
+
+  agent do
+    name "counter"
+    schema do
+      attribute :count, :integer, default: 0, public?: true
+    end
+
+    signal :add, "counter.add", MyApp.Increment
+  end
+end
+
+defmodule MyApp.Increment do
+  use Aikido.Action
+
+  action do
+    name "increment"
+    schema do
+      attribute :amount, :integer, allow_nil?: false
+    end
+  end
+
+  def run(signal, state, _opts, _context) do
+    {:ok, %{count: state.count + signal.data.amount}, []}
+  end
 end
 ```
 
-Or use Igniter:
+`schema do` uses the same attribute declarations as Ash's `attributes do` block.
+The DSL transformer moves those declarations into real resource attributes at
+compile time. Initialize with `%{count: 4}` and inspect state explicitly after a
+command. Attributes carry Ash types, constraints, defaults, visibility and nil
+validation. Mounted slices become additional attributes. Internally the runtime
+groups the agent's own fields under `:state`; `path :other_name` changes that path.
 
-```bash
-mix igniter.install ash_jido
-```
+The generated public actions are all generic Ash actions: `start`, `stop`,
+`inspect`, `list`, and the declared signals. No CRUD actions are generated.
 
-## Basic Usage
+Adding `Aikido` to your supervision tree starts `Aikido.Default`. Resources use this
+runtime automatically. Set `instance MyApp.AgentRuntime` only when using another
+runtime, started with `{Aikido, name: MyApp.AgentRuntime}`.
 
-Add the `AshJido` extension to your Ash resource and declare which actions to expose:
+DurableServer handles process activation and configured snapshot persistence.
+The agent extension does not occupy the data-layer slot. Resources use Ash's
+standard default unless the application selects another data layer. Selecting
+AshPostgres or another layer does not automatically persist live agent snapshots
+or make process effects transactional; generic actions still use the agent runtime.
+
+The target is the third positional argument: `signal :add, "counter.add", MyApp.Increment`.
+It is required on every declaration. Mounting an embedded Ash slice automatically
+exposes its routed public actions with their existing targets and argument contracts;
+do not repeat those signals on the agent. Names come from the slice action names.
+Private actions (`public? false`) and schedule-only actions remain internal.
+Public routes require concrete signal types. Conflicting inherited names fail
+compilation; an explicit agent signal can override an inherited action name.
+
+A `signal` declaration generates a generic action with arguments inferred from
+its target Aikido action or mounted slice route. Types, constraints and defaults
+are preserved. Untyped routes accept a `data` map defaulting to `%{}`. An explicit
+`action :name, :map` may customize arguments and native preparations; omit its
+`run` implementation so the transformer installs signal delivery.
+
+Each signal action takes `agent`: a stable string ID, a current PID, or a reference
+returned by `start`. The result is a small receipt containing `id`, `pid`,
+`resource`, `signal_id` and `status: :processed`. Processing acknowledges the
+signal callback. Asynchronous work can still be pending. Team topology lifecycle
+actions subscribe once before delivery and wait for their correlated operation.
+AI `ask` returns a processing receipt; await its answer through a result subscription,
+as demonstrated by `AgentExamples.AI.ask/3`.
+
+Use IDs for durable identity: recovery may replace a PID. Neither a receipt nor
+a snapshot establishes exactly-once external effects or a durable input inbox.
+## The domain is the interface
 
 ```elixir
-defmodule MyApp.Order do
+defmodule MyApp.Agents do
+  use Ash.Domain, extensions: [Aikido.Ash.Domain]
+
+  agents do
+    agent :counter, MyApp.Counter
+  end
+end
+```
+
+Include the domain in your application's usual `:ash_domains` configuration.
+You can also declare ordinary Ash resources in the domain's `resources` block.
+Each registered agent's actions get domain interfaces named `<name>_<action>`:
+
+```elixir
+{:ok, counter} = MyApp.Agents.counter_start(%{id: "counter-1", count: 4})
+{:ok, receipt} = MyApp.Agents.counter_add(counter.id, %{amount: 3})
+{:ok, %{count: 7}} = MyApp.Agents.counter_inspect(receipt, %{fields: [:count]})
+{:ok, counters} = MyApp.Agents.counter_list(%{filter: [count: 7], sort: [id: :asc]})
+{:ok, %{status: :stopped}} = MyApp.Agents.counter_stop(counter.id)
+```
+
+Ash generates bang interfaces too. Normal actor, authorization, context and tenant
+options apply at the action boundary. `inspect` returns the resource snapshot,
+or a map restricted to `fields`. `list` explicitly enumerates live snapshots and
+accepts `filter`, `sort`, `offset` and `limit`. Snapshots are taken independently;
+they do not provide a transaction across processes. Native Ash defaults apply to
+arguments, including defaulted values passed as nil.
+
+## Embedded slice resources
+
+Slices package state and the Ash actions that operate on it:
+
+```elixir
+defmodule MyApp.CounterSlice do
   use Ash.Resource,
-    domain: MyApp.Shop,
-    extensions: [AshJido]
+    data_layer: :embedded,
+    extensions: [Aikido.Ash.Slice]
 
   attributes do
-    uuid_primary_key :id
-    attribute :status, :atom, default: :pending
-    attribute :total, :decimal
-    timestamps()
+    attribute :count, :integer, public?: true, default: 0
   end
 
   actions do
-    create :place
-    read :by_id, get_by: [:id]
-    update :confirm
-    update :ship
-  end
+    action :increment, :map do
+      argument :state, :map, allow_nil?: false
+      argument :data, :map, allow_nil?: false
 
-  jido do
-    action :place, name: "create_order"
-    action :by_id, name: "get_order"
-    action :confirm
-    action :ship
-  end
-end
-```
-
-This generates Jido actions you can call directly:
-
-```elixir
-# Create an order via the generated action
-{:ok, order} = MyApp.Order.Jido.Place.run(
-  %{total: Decimal.new("99.99")},
-  %{domain: MyApp.Shop}
-)
-
-# Update an order
-{:ok, updated} = MyApp.Order.Jido.Confirm.run(
-  %{id: order.id},
-  %{domain: MyApp.Shop, actor: current_user}
-)
-```
-
-## Using Generated Actions in Agents
-
-Wire Ash-generated actions into your Jido agent's signal routing:
-
-```elixir
-defmodule MyApp.OrderAgent do
-  use Jido.Agent
-
-  agent do
-    name "order_processor"
-    path :state
-    schema [
-      current_order_id: [type: {:or, [:string, nil]}, default: nil]
-    ]
-  end
-
-  signal_routes do
-    route "order.place", MyApp.Order.Jido.Place
-    route "order.confirm", MyApp.Order.Jido.Confirm
-    route "order.ship", MyApp.Order.Jido.Ship
-  end
-end
-```
-
-Send signals to trigger Ash actions:
-
-```elixir
-{:ok, _pid} = MyApp.Jido.start_agent(MyApp.OrderAgent, id: "order-agent-1")
-
-signal = Jido.Signal.new!("order.place", %{total: "149.99"}, source: "/api")
-{:ok, agent} = MyApp.Jido.call("order-agent-1", signal)
-```
-
-## Context Requirements
-
-The Ash `domain` is **required** in the action context. Pass it via the agent's context or action params:
-
-```elixir
-context = %{
-  domain: MyApp.Shop,      # Required
-  actor: current_user,     # Optional: for authorization
-  tenant: "org_123"        # Optional: for multi-tenancy
-}
-
-MyApp.Order.Jido.Place.run(%{total: "50.00"}, context)
-```
-
-## Triggering Agents from Ash Changes
-
-Use Ash changes to emit Jido signals when resources change:
-
-```elixir
-defmodule MyApp.Changes.NotifyAgent do
-  use Ash.Resource.Change
-
-  def change(changeset, _opts, _context) do
-    Ash.Changeset.after_action(changeset, fn _changeset, record ->
-      signal = Jido.Signal.new!(
-        "order.created",
-        %{order_id: record.id, total: record.total},
-        source: "/ash"
-      )
-
-      case MyApp.Jido.whereis("fulfillment-agent") do
-        nil -> :ok
-        pid -> Jido.AgentServer.cast(pid, signal)
+      run fn input, _context ->
+        {:ok, %{
+          state: %{count: input.arguments.state.count + input.arguments.data.amount},
+          directives: []
+        }}
       end
+    end
+  end
 
-      {:ok, record}
-    end)
+  slice do
+    name "counter_slice"
+    schema do
+      attribute :count, :integer, default: 0
+    end
+    route "counter.increment", :increment
   end
 end
-```
 
-Attach to your action:
-
-```elixir
-actions do
-  create :place do
-    change MyApp.Changes.NotifyAgent
-  end
-end
-```
-
-## Complete Example: Order Workflow
-
-A complete example showing an Ash resource that triggers a Jido agent workflow.
-
-### The Ash Resource
-
-```elixir
-defmodule MyApp.Order do
+defmodule MyApp.ComposedAgent do
   use Ash.Resource,
-    domain: MyApp.Shop,
-    extensions: [AshJido]
-
-  attributes do
-    uuid_primary_key :id
-    attribute :customer_email, :string, allow_nil?: false
-    attribute :items, {:array, :map}, default: []
-    attribute :status, :atom, default: :pending
-    attribute :total, :decimal
-    timestamps()
-  end
-
-  actions do
-    create :place do
-      accept [:customer_email, :items, :total]
-      change MyApp.Changes.StartFulfillment
-    end
-
-    update :confirm do
-      change set_attribute(:status, :confirmed)
-    end
-
-    update :ship do
-      change set_attribute(:status, :shipped)
-    end
-  end
-
-  jido do
-    action :place
-    action :confirm
-    action :ship
-  end
-end
-```
-
-### The Change That Triggers an Agent
-
-```elixir
-defmodule MyApp.Changes.StartFulfillment do
-  use Ash.Resource.Change
-
-  def change(changeset, _opts, _context) do
-    Ash.Changeset.after_action(changeset, fn _changeset, order ->
-      # Start a fulfillment agent for this order
-      {:ok, _pid} = MyApp.Jido.start_agent(
-        MyApp.FulfillmentAgent,
-        id: "fulfillment-#{order.id}",
-        state: %{order_id: order.id, customer_email: order.customer_email}
-      )
-
-      # Signal it to begin processing
-      signal = Jido.Signal.new!("fulfillment.start", %{order_id: order.id}, source: "/ash")
-      MyApp.Jido.cast("fulfillment-#{order.id}", signal)
-
-      {:ok, order}
-    end)
-  end
-end
-```
-
-### The Fulfillment Agent
-
-```elixir
-defmodule MyApp.FulfillmentAgent do
-  use Jido.Agent
+    domain: MyApp.Agents,
+    extensions: [Aikido.Ash.Agent]
 
   agent do
-    name "fulfillment"
-    path :state
-    schema [
-      order_id: [type: :string, required: true],
-      customer_email: [type: :string, required: true],
-      step: [type: :atom, default: :pending]
-    ]
-  end
+    name "composed"
 
-  signal_routes do
-    route "fulfillment.start", MyApp.Actions.BeginFulfillment
-    route "fulfillment.complete", MyApp.Actions.CompleteFulfillment
+    slice :counter, MyApp.CounterSlice
   end
 end
 ```
 
-## DSL Reference
-
-### Individual Actions
+Register `agent :composed, MyApp.ComposedAgent` in the domain. Then:
 
 ```elixir
-jido do
-  action :create
-  action :read, name: "list_users", description: "List all users"
-  action :update, tags: ["user-management"]
-  action :special, output_map?: false  # preserve Ash structs
+{:ok, agent} = MyApp.Agents.composed_start(%{})
+{:ok, agent} = MyApp.Agents.composed_increment(agent, %{data: %{amount: 2}})
+agent = MyApp.Agents.composed_inspect!(agent)
+agent.counter.count # => 2
+```
+
+Slice actions receive their current slice map as `state` and the signal payload
+as `data`. They return `%{state: new_slice_map, directives: list}`; `directives`
+may be omitted. The agent pipeline applies the returned state and executes the
+directives. Runtime action context is available under `input.context.aikido`.
+Keep these action implementations pure.
+
+Resource slices also support `subscriptions` and `schedules` sections. Sensor
+subscriptions use the existing Aikido sensor modules. Schedules reference generic
+Ash action names and send their configured data through the same action adapter:
+
+```elixir
+subscriptions do
+  subscription Aikido.Sensors.Heartbeat, %{interval: 60_000}
+end
+
+schedules do
+  schedule "*/5 * * * *", :increment, data: %{amount: 1}
 end
 ```
 
-### Bulk Exposure
+Declare ordered middleware with `middleware [MyApp.Audit]` inside the agent
+section; it wraps signals using the existing Aikido middleware contract.
+
+Existing `Aikido.Slice` modules can also be mounted during migration. Each resource
+slice gets an internal Aikido slice and action adapters; it does not start a process
+of its own. Mounting the same resource at several paths retains the existing
+slice fan-out behavior.
+
+## Teams
+
+A team is an agent resource that lists its member resources:
 
 ```elixir
-jido do
-  all_actions                          # expose all
-  all_actions except: [:destroy]       # exclude some
-  all_actions only: [:create, :read]   # include only these
+defmodule MyApp.ReviewTeam do
+  use Ash.Resource,
+    domain: MyApp.Agents,
+    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
+
+  agent do
+    name "review_team"
+  end
+
+  team do
+    member :planner, MyApp.Counter, initial_state: %{count: 1}
+    member :reviewer, MyApp.ComposedAgent
+  end
 end
 ```
 
-### Default Naming
+Register `agent :review_team, MyApp.ReviewTeam` in the domain. Start launches the
+team and waits for its members to register as children. Members have IDs scoped
+as `<team-id>/<member-name>` and must share the team's Aikido instance. The `team`
+slice tracks live member PIDs through routed child lifecycle actions.
 
-| Action Type | Pattern | Example |
-|-------------|---------|---------|
-| `:create` | `create_<resource>` | `create_user` |
-| `:read` (`:read`) | `list_<resources>` | `list_users` |
-| `:read` (`:by_id`) | `get_<resource>_by_id` | `get_user_by_id` |
-| `:update` | `update_<resource>` | `update_user` |
-| `:destroy` | `delete_<resource>` | `delete_user` |
+```elixir
+{:ok, team} = MyApp.Agents.review_team_start(%{id: "review-1"})
 
-## Next Steps
+{:ok, team} = MyApp.Agents.review_team_send(team, %{
+  data: %{member: :planner, type: "counter.add", payload: %{amount: 2}}
+})
 
-- [ash_jido GitHub](https://github.com/agentjido/ash_jido) — full source and HexDocs
-- [Getting Started Guide](https://github.com/agentjido/ash_jido/blob/main/guides/getting-started.md) — comprehensive usage
-- [Interactive Demo](https://github.com/agentjido/ash_jido/blob/main/guides/ash-jido-demo.livemd) — try in Livebook
-- [Signals](signals.md) — signal routing in Jido
-- [Actions](actions.md) — implementing custom Jido actions
+{:ok, %{status: :stopped}} = MyApp.Agents.review_team_stop(team)
+```
+
+Pass `topology` to start a caller-defined graph immediately:
+
+```elixir
+MyApp.Agents.review_team_start!(%{
+  id: "custom-review",
+  topology: %{
+    "planner" => %{resource: MyApp.Counter, initial_state: %{count: 4}},
+    "reviewer" => %{resource: MyApp.ComposedAgent, depends_on: ["planner"]}
+  }
+})
+```
+
+The supplied graph replaces the DSL graph. Omitted or nil uses the DSL defaults;
+`%{}` explicitly starts an empty team. Ownership, activation, dependencies and
+member state use the same topology format as `configure_topology`. Nested teams
+accept their own graph under the node's `initial_state: %{topology: child_graph}`.
+Start returns after the initial activation operation completes, including nested
+teams; lazy members remain inactive unless required by an eager member.
+
+A restored durable identity retains its saved topology, even if startup arguments
+contain a different graph. Use `configure_topology` to change an existing team's
+graph explicitly. Root graph structure is validated before activation; startup
+failures stop the new team through the normal lifecycle.
+
+`send` emits an asynchronous signal to a member. Use signal subscriptions to
+observe its result. Members can return the existing emit/notify-parent directives
+to communicate through the signal pipeline. Stopping the team stops its children
+through the normal parent-death lifecycle. Startup failures stop the new team;
+process side effects cannot be rolled back as a database transaction.
+
+## Migration
+
+Existing `Aikido.Agent`, `Aikido.Slice`, plugins, middleware, directives, and runtime
+APIs continue to work. Move a consumer to resource declarations and domain
+interfaces, then convert its slices to embedded resources. Internal generated
+`Runtime` and `AikidoSlice` modules are implementation details.
+
+The separate `ash_aikido` package serves the opposite integration direction: it
+exposes existing Ash resource actions as Aikido actions. It is not needed for the
+process-backed resource model described here.
+
+## Native contracts and tools
+
+Actions, slice schemas, and sensor configuration also use `schema do` with Ash
+`attribute` declarations. Action output contracts use `output_schema do`, and
+slice configuration uses `config_schema do`. No separate input module is needed.
+Action inputs become native typed structs directly on the action module through
+Spark's transformer evaluation hook. Other plain contracts use a nested
+Ash.TypedStruct. Native constructors handle literal defaults, casting, and validation. Ash agents
+and slices reuse their existing resource attributes and native changesets,
+including resource function/MFA defaults. Ash/Splode errors retain their field
+paths and nested causes.
+
+AI tool callbacks receive the process-backed resource in trusted
+`agent_resource` context. Team members also carry `parent.meta.team_resource`
+alongside their team ID. Native Ash AI callbacks receive that runtime context
+under `context.aikido`, allowing AshLua actions to find the calling agent's managing
+team without accepting team IDs or modules as model inputs. The example app's
+`agents` Lua namespace uses ordinary team lifecycle actions to spawn agents or
+teams, delegate work, list templates, and stop or remove owned subtrees.
+
+Use `AshAi.build_tools_and_registry/1` to supply Ash tools and their callbacks.
+Resource/action pairs also use AshAI for schema generation and execution; their
+arguments follow AshAI's `%{"input" => %{...}}` shape. Actor, tenant, and context
+are passed through to AshAI. Native validation remains authoritative for type
+constraints that AshAI does not currently expose in JSON Schema.
+
+Team lifecycle actions subscribe once before starting their operation and return
+a compact receipt after completion. Inspect explicitly when the caller needs the
+updated topology. `configure_topology` changes a running team's desired graph;
+`start` launches an agent or team using the same interface. Signals and directives
+perform the asynchronous work inside the team.

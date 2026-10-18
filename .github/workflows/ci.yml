@@ -3,34 +3,46 @@ name: CI
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Lint
-    uses: agentjido/github-actions/.github/workflows/elixir-lint.yml@v3
-    with:
-      otp_version: "28"
-      elixir_version: "1.20.0-rc.4"
-    secrets: inherit
-
   test:
-    name: Test
-    uses: agentjido/github-actions/.github/workflows/elixir-test.yml@v3
-    with:
-      otp_versions: '["27", "28"]'
-      elixir_versions: '["1.18", "1.19"]'
-      test_command: mix test
-
-  test_elixir_120:
-    name: Test Elixir 1.20
-    uses: agentjido/github-actions/.github/workflows/elixir-test.yml@v3
-    with:
-      otp_versions: '["28"]'
-      elixir_versions: '["1.20.0-rc.4"]'
-      test_command: mix test
+    name: Elixir ${{ matrix.elixir }} / OTP 28
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        elixir: ["1.19", "1.20"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28"
+          elixir-version: ${{ matrix.elixir }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-otp28-elixir${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+      - run: mix deps.get
+      - run: mix test
+      - name: Quality
+        if: matrix.elixir == '1.19'
+        run: mix q
+      - name: Documentation
+        if: matrix.elixir == '1.19'
+        run: mix docs --warnings-as-errors --no-open
+      - name: Example application
+        if: matrix.elixir == '1.19'
+        working-directory: examples/agent_app
+        run: |
+          mix deps.get
+          mix test

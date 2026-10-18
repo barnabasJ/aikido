@@ -1,17 +1,17 @@
-defmodule JidoTest.TestAgents do
+defmodule AikidoTest.TestAgents do
   @moduledoc """
-  Shared test agents for Jido test suite.
+  Shared test agents for Aikido test suite.
   """
 
-  Code.ensure_compiled!(JidoTest.PluginTestAction)
-  Code.ensure_compiled!(JidoTest.TestActions.IncrementAction)
+  Code.ensure_compiled!(AikidoTest.PluginTestAction)
+  Code.ensure_compiled!(AikidoTest.TestActions.IncrementAction)
 
   defmodule Minimal do
     @moduledoc false
-    use Jido.Agent
+    use Aikido.Agent
 
     agent do
-      name "minimal_agent"
+      name("minimal_agent")
     end
   end
 
@@ -26,51 +26,58 @@ defmodule JidoTest.TestAgents do
       - "slow" -> SlowAction
       - "fail" -> FailingAction
     """
-    use Jido.Agent
+    use Aikido.Agent
 
     agent do
-      name "counter_agent"
-      description "Test agent with counter and message tracking"
-      path :domain
+      name("counter_agent")
+      description("Test agent with counter and message tracking")
+      path(:domain)
 
-      schema counter: [type: :integer, default: 0],
-             messages: [type: {:list, :any}, default: []]
+      schema do
+        attribute(:counter, :integer, default: 0)
+        attribute(:messages, {:array, :term}, default: [])
+      end
     end
 
     signal_routes do
-      route "increment", JidoTest.TestActions.IncrementAction
-      route "decrement", JidoTest.TestActions.DecrementAction
-      route "record", JidoTest.TestActions.RecordAction
-      route "slow", JidoTest.TestActions.SlowAction
-      route "fail", JidoTest.TestActions.FailingAction
+      route("increment", AikidoTest.TestActions.IncrementAction)
+      route("decrement", AikidoTest.TestActions.DecrementAction)
+      route("record", AikidoTest.TestActions.RecordAction)
+      route("slow", AikidoTest.TestActions.SlowAction)
+      route("fail", AikidoTest.TestActions.FailingAction)
     end
   end
 
   defmodule Basic do
     @moduledoc false
-    use Jido.Agent
+    use Aikido.Agent
 
     agent do
-      name "basic_agent"
-      description "A basic test agent"
-      category "test"
-      tags ["test", "basic"]
-      vsn "1.0.0"
-      path :domain
+      name("basic_agent")
+      description("A basic test agent")
+      category("test")
+      tags(["test", "basic"])
+      vsn("1.0.0")
+      path(:domain)
 
-      schema counter: [type: :integer, default: 0],
-             status: [type: :atom, default: :idle]
+      schema do
+        attribute(:counter, :integer, default: 0)
+        attribute(:status, :atom, default: :idle)
+      end
     end
   end
 
   defmodule Hook do
     @moduledoc false
-    use Jido.Agent
+    use Aikido.Agent
 
     agent do
-      name "hook_agent"
-      path :domain
-      schema counter: [type: :integer, default: 0]
+      name("hook_agent")
+      path(:domain)
+
+      schema do
+        attribute(:counter, :integer, default: 0)
+      end
     end
 
     def on_after_cmd(agent, _action, directives) do
@@ -79,62 +86,66 @@ defmodule JidoTest.TestAgents do
     end
   end
 
-  defmodule ZoiSchema do
+  defmodule AshSchema do
     @moduledoc false
-    use Jido.Agent
+    use Aikido.Agent
 
     agent do
-      name "zoi_schema_agent"
-      path :domain
+      name("ash_schema_agent")
+      path(:domain)
 
-      schema(
-        Zoi.object(%{
-          status: Zoi.atom() |> Zoi.default(:idle),
-          count: Zoi.integer() |> Zoi.default(0)
-        })
-      )
+      schema do
+        attribute(:status, :atom, allow_nil?: false, default: :idle)
+        attribute(:count, :integer, allow_nil?: false, default: 0)
+      end
     end
   end
 
   defmodule TestSliceWithRoutes do
     @moduledoc false
-    use Jido.Slice
+    use Aikido.Slice
 
     slice do
-      name "test_routes_slice"
-      schema Zoi.object(%{value: Zoi.any() |> Zoi.optional()})
+      name("test_routes_slice")
+
+      schema do
+        attribute(:value, :term, allow_nil?: true)
+      end
     end
 
     signal_routes do
-      route "post", JidoTest.PluginTestAction
-      route "list", JidoTest.PluginTestAction
+      route("post", AikidoTest.PluginTestAction)
+      route("list", AikidoTest.PluginTestAction)
     end
   end
 
   defmodule TestSliceWithPriority do
     @moduledoc false
-    use Jido.Slice
+    use Aikido.Slice
 
     slice do
-      name "priority_slice"
-      schema Zoi.object(%{value: Zoi.any() |> Zoi.optional()})
+      name("priority_slice")
+
+      schema do
+        attribute(:value, :term, allow_nil?: true)
+      end
     end
 
     signal_routes do
-      route "action", JidoTest.PluginTestAction, priority: 5
+      route("action", AikidoTest.PluginTestAction, priority: 5)
     end
   end
 
   defmodule AgentWithSliceRoutes do
     @moduledoc false
-    use Jido.Agent, default_slices: false
+    use Aikido.Agent, default_slices: false
 
     agent do
-      name "agent_with_slice_routes"
+      name("agent_with_slice_routes")
     end
 
     slices do
-      slice(:test_routes, JidoTest.TestAgents.TestSliceWithRoutes)
+      slice(:test_routes, AikidoTest.TestAgents.TestSliceWithRoutes)
     end
   end
 end

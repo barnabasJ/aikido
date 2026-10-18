@@ -5,5 +5,9 @@
 
 Mimic.copy(ReqLLM.Generation)
 
+# Most runtime tests exercise the lightweight AgentServer directly. Durability
+# integration tests explicitly enable a disk-backed pool with an isolated path.
+Application.put_env(:aikido, :durable, false)
+
 ExUnit.start()
 ExUnit.configure(exclude: [:flaky, :e2e])

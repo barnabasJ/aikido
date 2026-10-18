@@ -1,363 +1,140 @@
-# Jido
+# Aikido
 
-[![Hex.pm](https://img.shields.io/hexpm/v/jido.svg)](https://hex.pm/packages/jido)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/jido/)
-[![CI](https://github.com/agentjido/jido/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido/actions/workflows/ci.yml)
-[![License](https://img.shields.io/hexpm/l/jido.svg)](https://github.com/agentjido/jido/blob/main/LICENSE)
-[![Coverage Status](https://coveralls.io/repos/github/agentjido/jido/badge.svg?branch=main)](https://coveralls.io/github/agentjido/jido?branch=main)
+[![CI](https://github.com/barnabasJ/aikido/actions/workflows/ci.yml/badge.svg)](https://github.com/barnabasJ/aikido/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-> **Jido is an autonomous agent framework for Elixir, built for workflows and multi-agent systems.**
-<!-- package.jido.framework -->
-
-Define agents, connect them to actions, signals, and directives, and run them
-with supervision and fault tolerance built in.
-
-_The name "Jido" (自動) comes from the Japanese word meaning "automatic" or "automated", where 自 (ji) means "self" and 動 (dō) means "movement"._
-
-_Learn more about Jido at [jido.run](https://jido.run)._
-
-## Overview
-
-Jido helps you build agent systems as ordinary Elixir and OTP software.
-
-- Agents hold state and implement `cmd/2`
-- Actions do work and transform that state
-- Signals route events into the system
-- Directives describe effects for the runtime to execute
-
-Use Jido when software needs to inspect context, choose among multiple steps,
-coordinate with other agents, and keep running reliably over time.
-
-AI is optional. The core package gives you the agent architecture and runtime;
-companion packages such as `jido_ai` add model integration when you need it.
-
-At the core, Jido agents are immutable data structures with a single command function:
-
-```elixir
-defmodule MyAgent do
-  use Jido.Agent
-
-  agent do
-    name "my_agent"
-    description "My custom agent"
-    path :state
-    schema [
-      count: [type: :integer, default: 0]
-    ]
-  end
-end
-
-{agent, directives} = MyAgent.cmd(agent, action)
-```
-
-State changes are pure data transformations; side effects are described as directives and executed by an OTP runtime. You get deterministic agent logic, testability without processes, and a clear path to running those agents in production.
-<!-- package.jido.pure_cmd package.jido.runtime_separation -->
-
-## The Bright Line
-
-> **Actions mutate state. Directives do I/O. Nothing else writes.**
-
-- **Actions are the sole channel for `agent.state` writes.** Reading the action tells you everything that changes.
-- **Directives are pure side effects.** They emit signals, spawn processes, schedule messages, persist to disk — and **mutate no state**: not domain (`agent.state`), not runtime (`%AgentServer.State{}`). Their results, if any, come back as signals that re-enter the pipeline.
-- **The type system enforces it.** `Jido.AgentServer.DirectiveExec.exec/3` returns `:ok | {:stop, term()}` — there is no state slot in the return shape, so a directive author cannot accidentally write one.
-- **Runtime bookkeeping** (`state.children`, `state.cron_*`, monitors, subscriptions) lives on `%AgentServer.State{}` and is written **only** by AgentServer GenServer callbacks and the signal-cascade callbacks invoked by `process_signal/2` (`maybe_track_child_started/2`, `handle_child_down/3`, …). Directives are never that channel.
-
-Sole exception: middleware may stage `ctx.agent` for I/O purposes.
-
-## The Jido Ecosystem
-
-Jido is the core package of the Jido ecosystem. The ecosystem is built around the core Jido Agent behavior and offer several opt-in packages to extend the core behavior.
-
-| Package                                                 | Description                                                                                   |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| [req_llm](https://github.com/agentjido/req_llm)         | HTTP client for LLM APIs                                                                      |
-| [jido_action](https://github.com/agentjido/jido_action) | Composable, validated actions with AI tool integration                                        |
-| [jido_signal](https://github.com/agentjido/jido_signal) | CloudEvents-based message envelope and supporting utilities for routing and pub/sub messaging |
-| [jido](https://github.com/agentjido/jido)               | Core agent framework with state management, directives, and runtime                           |
-| [jido_ai](https://github.com/agentjido/jido_ai)         | AI/LLM integration for agents                                                                 |
-
-For demos and examples of what you can build with the Jido Ecosystem, see [https://jido.run](https://jido.run).
-
-## Why Jido?
-
-OTP primitives are excellent. You can build agent systems with raw GenServer. But when building *multiple cooperating agents*, you'll reinvent:
-
-| Raw OTP                             | Jido Formalizes                         |
-| ----------------------------------- | --------------------------------------- |
-| Ad-hoc message shapes per GenServer | Signals as standard envelope            |
-| Business logic mixed in callbacks   | Actions as reusable command pattern     |
-| Implicit effects scattered in code  | Directives as typed effect descriptions |
-| Custom child tracking per server    | Built-in parent/child hierarchy         |
-| Process exit = completion           | State-based completion semantics        |
-
-Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenServer.
-
-## Key Features
-
-### Immutable Agent Architecture
-- Pure functional agent design inspired by Elm/Redux
-- `cmd/2` as the core operation: actions in, updated agent + directives out
-- Schema-validated state with NimbleOptions or Zoi
-
-### Directive-Based Effects
-- Actions transform state; directives describe external effects
-- Built-in directives: Emit, Spawn, SpawnAgent, StopChild, Schedule, Stop
-- Protocol-based extensibility for custom directives
-
-### OTP Runtime Integration
-- GenServer-based AgentServer for production deployment
-- Parent-child agent hierarchies with lifecycle management
-- Signal routing with configurable strategies
-- Instance-scoped supervision plus logical partitions for multi-tenant deployments
-
-### Composable Plugins
-- Reusable capability modules that extend agents
-- State isolation per plugin with automatic schema merging
-- Lifecycle hooks for initialization and signal handling
-
-### Execution Strategies
-- Direct execution for simple workflows
-- FSM (Finite State Machine) strategy for state-driven workflows
-- Extensible strategy protocol for custom execution patterns
-
-### Multi-Agent Orchestration
-- Multi-agent workflows with configurable strategies
-- Plan-based orchestration for complex workflows
-- Durable groups of agents with named topology, hierarchical runtime ownership, nested pod nodes, and partition-safe tenancy boundaries
+Aikido builds agent systems with Ash resources, typed actions, signals, and an OTP
+runtime. Agents and teams share a generic Ash action interface; AI agents use
+ReqLLM with dynamically supplied tools. DurableServer provides keyed activation,
+snapshots, and recovery.
 
 ## Installation
 
-### Using Igniter (Recommended)
-
-The fastest way to get started is with [Igniter](https://hex.pm/packages/igniter):
-
-```bash
-mix igniter.install jido
-```
-
-This automatically:
-- Adds Jido to your dependencies
-- Creates a `MyApp.Jido` instance module (`use Jido, otp_app: :my_app`)
-- Creates configuration in `config/config.exs`
-- Adds `MyApp.Jido` to your supervision tree
-
-Generate an example agent to get started:
-
-```bash
-mix igniter.install jido --example
-```
-
-### Manual Installation
-
-Add `jido` to your list of dependencies in `mix.exs`:
+Aikido requires Elixir 1.19 and OTP 28 or later.
 
 ```elixir
-def deps do
-  [
-    {:jido, "~> 2.0"}
-  ]
+{:aikido, git: "git@github.com:barnabasJ/aikido.git", branch: "main"}
+```
+
+Start the default runtime in your supervision tree:
+
+```elixir
+children = [Aikido]
+```
+
+## An agent and its public interface
+
+Define the action's input with Ash attributes. Actions return the next state and
+pure effect descriptors:
+
+```elixir
+defmodule MyApp.Add do
+  use Aikido.Action
+
+  action do
+    name "add"
+
+    schema do
+      attribute :amount, :integer, allow_nil?: false
+    end
+  end
+
+  def run(signal, state, _options, _context) do
+    {:ok, %{state | count: state.count + signal.data.amount}, []}
+  end
 end
-```
 
-Then define a Jido instance module and add it to your supervision tree:
-
-```elixir
-# In lib/my_app/jido.ex
-defmodule MyApp.Jido do
-  use Jido, otp_app: :my_app
-end
-```
-
-```elixir
-# In config/config.exs
-config :my_app, MyApp.Jido,
-  max_tasks: 1000,
-  agent_pools: []
-```
-
-```elixir
-# In your application.ex
-children = [
-  MyApp.Jido
-]
-
-Supervisor.start_link(children, strategy: :one_for_one)
-```
-
-## Quick Start
-
-### 1. Define an Agent
-
-```elixir
-defmodule MyApp.CounterAgent do
-  use Jido.Agent
+defmodule MyApp.Counter do
+  use Ash.Resource,
+    domain: MyApp.Agents,
+    extensions: [Aikido.Ash.Agent]
 
   agent do
     name "counter"
-    description "A simple counter agent"
-    path :state
-    schema [
-      count: [type: :integer, default: 0]
-    ]
-  end
 
-  signal_routes do
-    route "increment", MyApp.Actions.Increment
+    schema do
+      attribute :count, :integer, allow_nil?: false, default: 0, public?: true
+    end
+
+    signal :add, "counter.add", MyApp.Add
+  end
+end
+
+defmodule MyApp.Agents do
+  use Ash.Domain, otp_app: :my_app, extensions: [Aikido.Ash.Domain]
+
+  agents do
+    agent :counter, MyApp.Counter
   end
 end
 ```
 
-### 2. Define an Action
+Register the domain in your application configuration:
 
 ```elixir
-defmodule MyApp.Actions.Increment do
-  use Jido.Action
-
-  action do
-    name "increment"
-    description "Increments the counter by a given amount"
-    path :state
-    schema [
-      amount: [type: :integer, default: 1]
-    ]
-  end
-
-  def run(params, context) do
-    current = context.state[:count] || 0
-    {:ok, %{count: current + params.amount}}
-  end
-end
+config :my_app, ash_domains: [MyApp.Agents]
+config :ash, default_string_length_count: :codepoints
 ```
 
-### 3. Execute Commands
+Use the generated `<agent>_<action>` domain functions:
 
 ```elixir
-# Create an agent
-agent = MyApp.CounterAgent.new()
-
-# Execute an action - returns updated agent + directives
-{agent, directives} = MyApp.CounterAgent.cmd(agent, {MyApp.Actions.Increment, %{amount: 5}})
-
-# Check the state
-agent.state.state.count
-# => 5
+counter = MyApp.Agents.counter_start!(%{count: 0})
+receipt = MyApp.Agents.counter_add!(counter.id, %{amount: 3})
+MyApp.Agents.counter_inspect!(receipt, %{fields: [:count]})
+# %{count: 3}
+MyApp.Agents.counter_stop!(counter.id)
 ```
 
-### 4. Run with AgentServer
+Start returns a reference containing the stable ID, current PID, and resource.
+Signal actions accept a reference, ID, or PID and return processing receipts.
+Inspect state explicitly; asynchronous effects and AI answers complete through
+signals and subscriptions. Mounted embedded Ash slices contribute their routed
+public actions automatically.
 
-```elixir
-# Start the agent server
-{:ok, pid} = MyApp.Jido.start_agent(MyApp.CounterAgent, id: "counter-1")
+## Teams, AI, and persistence
 
-# Send signals to the running agent (synchronous)
-# Signal types must be declared in signal_routes
-{:ok, agent} = Jido.AgentServer.call(pid, Jido.Signal.new!("increment", %{amount: 10}, source: "/user"))
+Add `Aikido.Ash.Team` for fixed members, dynamic workers, ownership, dependencies,
+and nested teams. A team can accept its initial `topology` in the start call.
+Add `Aikido.Ash.AI` for model turns; pass the model, tools, and optional prompt and
+iteration settings at runtime. AshAI and AshLua tools can expose management and
+delegation capabilities to AI agents.
 
-# Look up the agent by ID
-pid = MyApp.Jido.whereis("counter-1")
+The default runtime uses DurableServer. Configure a persistent data directory or
+backend for the deployment. Snapshot recovery preserves logical agent state and
+team topology; it rebuilds runtime membership and monitors. IDs remain stable
+when PIDs change. Agent and slice serialization callbacks remain available.
 
-# List all running agents
-agents = MyApp.Jido.list_agents()
-```
+`Aikido.Ash.Agent` is a resource extension. Choosing a separate Ash data layer does
+not automatically persist live agent state or make process effects transactional.
 
-## Core Concepts
+## State and effects
 
-### The `cmd/2` Contract
+Actions are the sole channel for domain state changes. Directives perform I/O
+and mutate no domain or runtime state. Their results return as signals, which
+enter another action. Middleware may stage an agent for I/O; runtime bookkeeping
+belongs to runtime callbacks. Use Ash types for data contracts and Spark for DSL
+and configuration validation.
 
-The fundamental operation in Jido:
+## Guides and examples
 
-```elixir
-{agent, directives} = MyAgent.cmd(agent, action)
-```
-
-Key invariants:
-- The returned `agent` is always complete — no "apply directives" step needed
-- `directives` are pure I/O descriptions — they never modify state of any kind (domain or runtime); see [The Bright Line](#the-bright-line)
-- `cmd/2` is a pure function — same inputs always produce same outputs
-
-### Actions vs Directives
-
-| Actions                                              | Directives                                                  |
-| ---------------------------------------------------- | ----------------------------------------------------------- |
-| Mutate state — sole channel for `agent.state` writes | Pure I/O — emit signals, spawn processes, schedule messages |
-| Return updated state + directives from `cmd/2`       | Bare structs emitted by agents; runtime interprets them     |
-| May call APIs, read files, query databases           | Mutate no state — domain or runtime                         |
-
-See [The Bright Line](#the-bright-line) for the full rule.
-
-### Directive Types
-
-| Directive    | Purpose                                          |
-| ------------ | ------------------------------------------------ |
-| `Emit`       | Dispatch a signal via configured adapters        |
-| `Error`      | Signal an error from cmd/2                       |
-| `Spawn`      | Spawn a generic BEAM child process               |
-| `SpawnAgent` | Spawn a tracked child Jido agent (`restart: :transient` by default) |
-| `StopChild`  | Gracefully stop and remove a tracked child agent                      |
-| `Schedule`   | Schedule a delayed message                       |
-| `Stop`       | Stop the agent process                           |
-
-## Documentation
-
-**Start here:**
-- [Quick Start](guides/getting-started.livemd) - Build your first agent in 5 minutes
-- [Core Loop](guides/core-loop.md) - Understand the mental model
-
-**Guides:**
-- [Building Agents](guides/agents.md) - Agent definitions and state management
-- [Signals & Routing](guides/signals.md) - Signal-based communication
-- [Agent Directives](guides/directives.md) - Effect descriptions for the runtime
-- [Runtime and AgentServer](guides/runtime.md) - Process-based agent execution
-- [Choosing a Runtime Pattern](guides/runtime-patterns.md) - When to use `SpawnAgent`, `InstanceManager`, `Pod`, and `partition`
-- [Pods](guides/pods.md) - Durable groups of agents with named topology, lazy activation, nested pods, and live add/remove mutation
-- [Multi-Tenancy](guides/multi-tenancy.md) - Shared-instance tenancy with partitions and Pod-first durable workspaces
-- [Persistence & Storage](guides/storage.md) - Hibernate, thaw, and InstanceManager lifecycle
-- [Scheduling](guides/scheduling.md) - Declarative and dynamic cron scheduling
-- [Plugins](guides/plugins.md) - Composable capability bundles
-
-**Advanced:**
-- [Worker Pools](guides/worker-pools.md) - Pre-warmed agent pools for throughput
-- [Testing Agents](guides/testing.md) - Testing patterns and best practices
-
-**API Reference:** [hexdocs.pm/jido](https://hexdocs.pm/jido)
+- [Ash domains, agents, slices, and teams](guides/ash-integration.md)
+- [Team topology and lifecycle](guides/teams.md)
+- [Runtime patterns and durability](guides/runtime-patterns.md)
+- [Partitions and multi-tenancy](guides/multi-tenancy.md)
+- [Runnable Phoenix/LiveView examples](examples/agent_app/README.md)
+- [AI tools and orchestration examples](examples/agent_app/AI.md)
 
 ## Development
 
-### Prerequisites
-
-- Elixir 1.17+
-- Erlang/OTP 26+
-
-### Running Tests
-
 ```bash
+mix deps.get
 mix test
+mix q
+mix docs
 ```
 
-### Quality Checks
+See [Contributing](CONTRIBUTING.md) and [Changelog](CHANGELOG.md).
 
-```bash
-mix quality  # Runs formatter, dialyzer, and credo
-```
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
-
-- Setting up your development environment
-- Running tests and quality checks
-- Submitting pull requests
-- Code style guidelines
-
-## License
-
-Copyright 2024-2025 Mike Hostetler
-
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
-
-## Links
-
-- **Documentation**: [https://hexdocs.pm/jido](https://hexdocs.pm/jido)
-- **GitHub**: [https://github.com/agentjido/jido](https://github.com/agentjido/jido)
-- **AgentJido**: [https://jido.run](https://jido.run)
-- **Jido Workbench**: [https://github.com/agentjido/jido_workbench](https://github.com/agentjido/jido_workbench)
+Aikido is derived from Jido and is developed independently. Original copyright
+notices and the Apache 2.0 license are retained.

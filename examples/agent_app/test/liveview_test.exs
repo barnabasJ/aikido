@@ -1,0 +1,337 @@
+defmodule AgentExamplesWeb.LiveViewTest do
+  use ExUnit.Case, async: false
+  import Phoenix.ConnTest
+  import Phoenix.LiveViewTest
+  alias AgentExamples.{Catalog, Playground}
+  @endpoint AgentExamplesWeb.Endpoint
+
+  setup do
+    Playground.subscribe()
+    %{conn: build_conn() |> Plug.Test.init_test_session(%{browser_id: Aikido.Util.generate_id()})}
+  end
+
+  test "the index links to a descriptive LiveView page for every example", %{conn: conn} do
+    {:ok, index, _} = live(conn, "/")
+
+    for example <- Catalog.all() do
+      assert has_element?(index, "#example-#{example.slug}", example.title)
+      {:ok, page, html} = live(conn, "/examples/#{example.slug}")
+      assert has_element?(page, "h1", example.title)
+      assert has_element?(page, "#start-form")
+      assert html =~ example.description
+      assert has_element?(page, ".flow")
+    end
+  end
+
+  test "every example shows one source panel per definition with the requested defaults", %{
+    conn: conn
+  } do
+    for example <- Catalog.all() do
+      {:ok, view, _} = live(conn, "/examples/#{example.slug}")
+      definitions = AgentExamples.Source.for_example(example)
+      assert Enum.any?(definitions, &(&1.module == example.resource))
+      assert length(Enum.uniq_by(definitions, & &1.id)) == length(definitions)
+
+      for definition <- definitions do
+        assert has_element?(view, "##{definition.id} summary", definition.name)
+        assert has_element?(view, "##{definition.id} summary", definition.path)
+        assert has_element?(view, "##{definition.id} code", "def")
+        assert has_element?(view, "##{definition.id}[open]") == definition.open?
+      end
+    end
+
+    worker = Catalog.find("worker") |> AgentExamples.Source.for_example()
+    work = Enum.find(worker, &(&1.module == AgentExamples.Actions.Work))
+    result = Enum.find(worker, &(&1.module == AgentExamples.Actions.WorkResult))
+    refute work.code =~ "defmodule AgentExamples.Actions.WorkResult"
+    refute result.code =~ "defmodule AgentExamples.Actions.Work do"
+
+    assert Enum.any?(
+             AgentExamples.Source.for_example(Catalog.find("research-team")),
+             &String.starts_with?(&1.code, "defimpl Aikido.AgentServer.DirectiveExec")
+           )
+  end
+
+  test "counter commands update its visual and stop releases its process", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/counter")
+    owner = start(view, "counter")
+    view |> form("#counter-form", %{amount: "7"}) |> render_submit()
+    await(owner, "counter", &(&1.snapshot.own.count == 7))
+    assert has_element?(view, "#counter-value", "7")
+    assert has_element?(view, "#events", "counter.add")
+    record = Playground.get(owner, "counter").record
+    view |> element("#stop-example") |> render_click()
+    assert Playground.get(owner, "counter").status == :stopped
+    assert Aikido.whereis(Aikido.Default, record.id) == nil
+    assert has_element?(view, "#start-form")
+  end
+
+  test "checklist and notebook controls change the appropriate state", %{conn: conn} do
+    {:ok, checklist, _} = live(conn, "/examples/checklist")
+    owner = start(checklist, "checklist")
+    checklist |> form("#checklist-form", %{item: "Try LiveView"}) |> render_submit()
+    await(owner, "checklist", &(&1.snapshot.own.items == ["Try LiveView"]))
+    assert has_element?(checklist, "#checklist", "Try LiveView")
+    checklist |> element("button[phx-click=complete]") |> render_click()
+    await(owner, "checklist", &(&1.snapshot.own.completed == 1))
+    assert has_element?(checklist, "#completed-count", "1 completed")
+
+    {:ok, notebook, _} = live(conn, "/examples/notebook")
+    owner = start(notebook, "notebook")
+    notebook |> form("#notebook-form", %{text: "A slice owns this note"}) |> render_submit()
+    await(owner, "notebook", &(&1.snapshot.journal == ["A slice owns this note"]))
+    assert has_element?(notebook, "#journal", "A slice owns this note")
+  end
+
+  test "background task results arrive without blocking the LiveView", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/worker")
+    owner = start(view, "worker")
+    view |> form("#worker-form", %{text: "hello browser"}) |> render_submit()
+    await(owner, "worker", &(&1.snapshot.own.status == :completed))
+    assert has_element?(view, "#worker-result", "HELLO BROWSER")
+  end
+
+  test "a fixed team shows live member state", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/team")
+    owner = start(view, "team")
+    assert has_element?(view, "#member-count", "3 members")
+    view |> element("#team-add") |> render_click()
+    await(owner, "team", &(&1.snapshot.children["counter"].own.count == 11))
+    assert has_element?(view, ".member-state", "count: 11")
+  end
+
+  test "the AI team page runs orchestration, Lua, and dynamic helpers", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/research-team")
+    owner = start(view, "research-team", %{mode: "offline", lua: "true"})
+    assert has_element?(view, "#member-count", "2 members")
+
+    view
+    |> form("#prompt-form", %{query: "orchestrate: Signals carry results"})
+    |> render_submit()
+
+    await(owner, "research-team", &(&1.status == :completed), 30_000)
+    assert has_element?(view, "#messages", "Words: 3")
+    assert has_element?(view, "#messages", "Lua:")
+    assert has_element?(view, ".subworker", "analyst-helper")
+    assert has_element?(view, "#member-count", "4 members")
+    assert has_element?(view, "#tasks", "completed")
+
+    {:ok, reloaded, _} = live(conn, "/examples/research-team")
+    assert has_element?(reloaded, "#member-count", "4 members")
+    assert has_element?(reloaded, "#messages", "Lua:")
+    refute Playground.get("another-browser", "research-team")
+  end
+
+  test "nested teams expose fixed and dynamic subtrees and remove all descendants", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/nested-teams")
+    owner = start(view, "nested-teams")
+    assert has_element?(view, "#member-count", "2 members")
+    assert has_element?(view, "#tree-form option", "home / counter (agent)")
+    assert has_element?(view, "#tree-form option", "home / notebook (agent)")
+    view |> element("button[phx-click=squad_add][phx-value-member=home]") |> render_click()
+
+    await(
+      owner,
+      "nested-teams",
+      &(&1.snapshot.children["home"].children["counter"].own.count == 11)
+    )
+
+    assert Playground.get(owner, "nested-teams").snapshot.children["home"].children["counter"].own.count ==
+             11
+
+    view |> element("#spawn-squad") |> render_click()
+    await(owner, "nested-teams", &Map.has_key?(&1.snapshot.children, "squad-1"))
+    assert has_element?(view, "#member-count", "3 members")
+    squad = Playground.get(owner, "nested-teams").snapshot.children["squad-1"]
+    monitors = Enum.map(squad.members, &{&1.pid, Process.monitor(&1.pid)})
+
+    squad_pid =
+      Enum.find(Playground.get(owner, "nested-teams").snapshot.members, &(&1.name == "squad-1")).pid
+
+    squad_ref = Process.monitor(squad_pid)
+
+    view |> element("button[phx-click=squad_add][phx-value-member=squad-1]") |> render_click()
+
+    await(
+      owner,
+      "nested-teams",
+      &(&1.snapshot.children["squad-1"].children["counter"].own.count == 11)
+    )
+
+    assert has_element?(view, ".member-state", "count: 11")
+
+    view |> element("button[phx-click=remove_squad]") |> render_click()
+    await(owner, "nested-teams", &(length(&1.snapshot.members) == 2))
+    assert_receive {:DOWN, ^squad_ref, :process, ^squad_pid, _}, 5_000
+    for {pid, ref} <- monitors, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 5_000)
+
+    assert Playground.get(owner, "nested-teams").snapshot.children["home"].children["counter"].own.count ==
+             11
+  end
+
+  test "one tree mixes agent-owned agents and teams with recursively nested dynamic teams", %{
+    conn: conn
+  } do
+    {:ok, view, _} = live(conn, "/examples/nested-teams")
+    owner = start(view, "nested-teams")
+
+    spawn = fn path, kind, name ->
+      view
+      |> form("#tree-form", %{parent: Jason.encode!(path), kind: kind, name: name})
+      |> render_submit()
+
+      await(owner, "nested-teams", fn run ->
+        Enum.any?(Playground.tree_options(run), fn {_, encoded} ->
+          List.last(Jason.decode!(encoded)) == name
+        end)
+      end)
+
+      render(view)
+    end
+
+    spawn.(["lead"], "agent", "helper")
+    spawn.(["helper"], "team", "branch")
+    spawn.(["branch"], "team", "inner")
+    spawn.(["branch", "inner"], "team", "deeper")
+    spawn.(["home"], "agent", "home-worker")
+    spawn.(["home", "counter"], "agent", "counter-helper")
+
+    snapshot = Playground.get(owner, "nested-teams").snapshot
+    assert Enum.find(snapshot.members, &(&1.name == "helper")).owner == "lead"
+    assert Enum.find(snapshot.members, &(&1.name == "branch")).owner == "helper"
+    assert snapshot.children["branch"].children["inner"].children["deeper"].team?
+    assert snapshot.children["home"].children["home-worker"].resource == AgentExamples.Worker
+
+    assert Enum.find(snapshot.children["home"].members, &(&1.name == "counter-helper")).owner ==
+             "counter"
+
+    assert has_element?(
+             view,
+             "[data-node=lead] [data-node=helper] [data-node=branch] [data-node=inner] [data-node=deeper]"
+           )
+
+    refs = Enum.map(tree_pids(snapshot), &{&1, Process.monitor(&1)})
+    view |> element("#stop-example") |> render_click()
+    for {pid, ref} <- refs, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 5_000)
+  end
+
+  test "spawn errors stay visible and parent selections survive tree updates", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/nested-teams")
+    owner = start(view, "nested-teams")
+    input = %{parent: Jason.encode!(["lead"]), kind: "agent", name: "invalid name"}
+    view |> form("#tree-form", input) |> render_change()
+    view |> form("#tree-form", input) |> render_submit()
+    assert has_element?(view, "#error")
+
+    assert has_element?(view, "#tree-form option[selected]", "lead (agent)")
+    assert length(Playground.get(owner, "nested-teams").snapshot.members) == 2
+  end
+
+  test "successful spawning clears the name and duplicate names have an actionable error", %{
+    conn: conn
+  } do
+    {:ok, view, _} = live(conn, "/examples/nested-teams")
+    owner = start(view, "nested-teams")
+    input = %{parent: Jason.encode!(["home"]), kind: "agent", name: "home-worker"}
+    view |> form("#tree-form", input) |> render_submit()
+
+    await(
+      owner,
+      "nested-teams",
+      &Map.has_key?(&1.snapshot.children["home"].children, "home-worker")
+    )
+
+    assert has_element?(view, "#tree-form input[name=name][value='']")
+    assert has_element?(view, "#tree-form option[selected]", "home (team)")
+
+    view |> form("#tree-form", input) |> render_submit()
+    assert has_element?(view, "#error", "already exists in this team. Choose another name.")
+    refute render(view) =~ "Execution Error"
+    assert has_element?(view, "#tree-form input[name=name][value=home-worker]")
+    assert length(Playground.get(owner, "nested-teams").snapshot.children["home"].members) == 4
+
+    view |> form("#tree-form", %{input | name: "another-worker"}) |> render_submit()
+
+    await(
+      owner,
+      "nested-teams",
+      &Map.has_key?(&1.snapshot.children["home"].children, "another-worker")
+    )
+
+    refute has_element?(view, "#error")
+  end
+
+  defp tree_pids(snapshot) do
+    Enum.map(snapshot.members, & &1.pid) ++
+      Enum.flat_map(snapshot.children, fn {_, child} -> tree_pids(child) end)
+  end
+
+  test "AI creation controls accept an external prompt and iteration limit", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/research-team")
+
+    owner =
+      start(view, "research-team", %{
+        mode: "offline",
+        system_prompt: "User-provided orchestration",
+        max_iterations: "4"
+      })
+
+    reference = Playground.get(owner, "research-team").record
+    record = Aikido.Ash.inspect!(reference.resource, reference)
+    assert record.system_prompt == "User-provided orchestration"
+    assert record.max_iterations == 4
+
+    assert {:ok, %{system_prompt: "User-provided orchestration", max_iterations: 4}} =
+             Aikido.AgentServer.state(
+               Aikido.whereis(Aikido.Default, record.id),
+               &{:ok, Map.take(&1.agent.state.ai, [:system_prompt, :max_iterations])}
+             )
+  end
+
+  test "live mode shows an actionable configuration error without creating a run", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/assistant")
+    view |> form("#start-form", %{mode: "live"}) |> render_change()
+    view |> form("#start-form", %{mode: "live", model: "unsupported:model"}) |> render_submit()
+    render_async(view)
+    assert has_element?(view, "#error", "Live mode needs")
+  end
+
+  test "browser assets are served locally without a Node build", %{conn: conn} do
+    for path <- [
+          "/assets/app.js",
+          "/assets/app.css",
+          "/vendor/phoenix/phoenix.mjs",
+          "/vendor/live_view/phoenix_live_view.esm.js"
+        ] do
+      assert conn |> get(path) |> response(200) |> byte_size() > 0
+    end
+  end
+
+  defp start(view, slug, options \\ %{}) do
+    view |> form("#start-form", options) |> render_submit()
+    render_async(view, 15_000)
+    assert_receive {:run_updated, owner, ^slug}, 5_000
+    on_exit(fn -> Playground.stop(owner, slug) end)
+    owner
+  end
+
+  defp await(owner, slug, predicate, timeout \\ 5_000) do
+    deadline = System.monotonic_time(:millisecond) + timeout
+    wait(owner, slug, predicate, deadline)
+  end
+
+  defp wait(owner, slug, predicate, deadline) do
+    if predicate.(Playground.get(owner, slug)) do
+      :ok
+    else
+      remaining = max(deadline - System.monotonic_time(:millisecond), 0)
+
+      receive do
+        {:run_updated, ^owner, ^slug} -> wait(owner, slug, predicate, deadline)
+      after
+        remaining ->
+          flunk("Timed out waiting for #{slug}: #{inspect(Playground.get(owner, slug))}")
+      end
+    end
+  end
+end

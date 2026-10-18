@@ -1,12 +1,27 @@
 import Config
 
-config :jido, default: Jido.DefaultInstance
+config :ash, default_string_length_count: :codepoints
+
+config :spark, :formatter,
+  remove_parens?: true,
+  "Aikido.Action": [],
+  "Aikido.Agent": [],
+  "Aikido.Slice": [],
+  "Aikido.Sensor": [],
+  "Aikido.Middleware": [],
+  "Ash.Resource": [
+    extensions: [Aikido.Ash.Agent, Aikido.Ash.Slice, Aikido.Ash.Team, Aikido.Ash.AI]
+  ],
+  "Ash.Domain": [extensions: [Aikido.Ash.Domain]],
+  "Ash.TypedStruct": []
+
+config :aikido, default: Aikido.DefaultInstance
 
 # Default scheduler time zone database
-config :jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase
+config :aikido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase
 
-# Logger configuration for Jido telemetry metadata
-# These metadata keys are used by Jido.Telemetry for structured logging
+# Logger configuration for Aikido telemetry metadata
+# These metadata keys are used by Aikido.Telemetry for structured logging
 config :logger, :default_formatter,
   format: "[$level] $message $metadata\n",
   metadata: [
@@ -48,9 +63,9 @@ if config_env() == :dev do
     ]
 
   config :git_ops,
-    mix_project: Jido.MixProject,
+    mix_project: Aikido.MixProject,
     changelog_file: "CHANGELOG.md",
-    repository_url: "https://github.com/agentjido/jido",
+    repository_url: "https://github.com/barnabasJ/aikido",
     manage_mix_version?: true,
     manage_readme_version: "README.md",
     version_tag_prefix: "v",

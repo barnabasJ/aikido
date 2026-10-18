@@ -1,15 +1,15 @@
-defmodule JidoTest.Eventually do
+defmodule AikidoTest.Eventually do
   @moduledoc """
   Polling-based assertions for non-state waits.
 
-  For agent state changes, **subscribe** via `Jido.AgentServer.subscribe/4`
-  or use one of the `await_*` helpers (`Jido.AgentServer.await_ready/2`,
-  `Jido.AgentServer.await_child/3`, `Jido.Slices.Pod.Mutable.mutate_and_wait/3`).
+  For agent state changes, **subscribe** via `Aikido.AgentServer.subscribe/4`
+  or use one of the `await_*` helpers (`Aikido.AgentServer.await_ready/2`,
+  `Aikido.AgentServer.await_child/3`, the Ash team lifecycle actions).
   Polling agent state is forbidden by ADR 0021 — it hides race conditions
   and masks the signal that should be driving the wait.
 
   `eventually/2` survives for genuinely external waits: HTTP endpoints,
-  external schedulers, processes outside the Jido tree.
+  external schedulers, processes outside the Aikido tree.
 
   ## Examples
 
@@ -69,7 +69,7 @@ defmodule JidoTest.Eventually do
   """
   defmacro assert_eventually(expr, opts \\ []) do
     quote do
-      JidoTest.Eventually.eventually(fn -> unquote(expr) end, unquote(opts))
+      AikidoTest.Eventually.eventually(fn -> unquote(expr) end, unquote(opts))
     end
   end
 
@@ -80,7 +80,7 @@ defmodule JidoTest.Eventually do
   """
   defmacro refute_eventually(expr, opts \\ []) do
     quote do
-      JidoTest.Eventually.eventually(fn -> not unquote(expr) end, unquote(opts))
+      AikidoTest.Eventually.eventually(fn -> not unquote(expr) end, unquote(opts))
     end
   end
 end

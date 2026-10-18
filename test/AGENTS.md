@@ -1,11 +1,11 @@
-# AGENTS.md - Jido Test Support Guide
+# AGENTS.md - Aikido Test Support Guide
 
 ## Intent
 Provide stable, reusable testing patterns for pure agents, AgentServer runtime behavior, and multi-agent flows.
 
 ## Runtime Baseline
-- Elixir `~> 1.18`
-- OTP `27+` (release QA baseline)
+- Elixir `~> 1.19`
+- OTP `28+` (release QA baseline)
 
 ## Commands
 - `mix test`
@@ -14,10 +14,10 @@ Provide stable, reusable testing patterns for pure agents, AgentServer runtime b
 - `mix test --include example`
 
 ## Support Modules
-- `JidoTest.Case`: isolated Jido instance per test (`jido`, `jido_pid` context)
-- `JidoTest.Eventually`: polling helpers/macros for non-state waits (`eventually`, `assert_eventually`, `refute_eventually`); for agent state changes use `Jido.AgentServer.subscribe/4` or one of the `await_*` helpers per ADR 0021
-- `JidoTest.Support.TestTracer`: lightweight span capture for runtime assertions
-- `JidoTest.TestAgents` and `JidoTest.TestActions`: canonical fixtures for behavior-level tests
+- `AikidoTest.Case`: isolated Aikido instance per test (`aikido`, `aikido_pid` context)
+- `AikidoTest.Eventually`: polling helpers/macros for non-state waits (`eventually`, `assert_eventually`, `refute_eventually`); for agent state changes use `Aikido.AgentServer.subscribe/4` or one of the `await_*` helpers
+- `AikidoTest.Support.TestTracer`: lightweight span capture for runtime assertions
+- `AikidoTest.TestAgents` and `AikidoTest.TestActions`: canonical fixtures for behavior-level tests
 
 ## Standards
 - Prefer behavior assertions over implementation/log assertions
@@ -29,7 +29,7 @@ Provide stable, reusable testing patterns for pure agents, AgentServer runtime b
 - `cmd/2` immutability and directive emission semantics
 - AgentServer signal routing and runtime directive execution
 - Parent-child lifecycle (`SpawnAgent`, `StopChild`) and state synchronization
-- Slice-return action shapes — single slice via `path:`, multi-slice via `%Jido.Agent.SliceUpdate{}`
+- Slice-return action shapes — single slice via `path:`, multi-slice via `%Aikido.Agent.SliceUpdate{}`
 
 ## Release Hygiene
 - Keep test fixtures aligned with current directive/slice-return/tool contracts
@@ -40,4 +40,4 @@ Provide stable, reusable testing patterns for pure agents, AgentServer runtime b
 - `test/support/`
 - `test/examples/`
 - `../README.md`
-- https://hexdocs.pm/jido
+- https://github.com/barnabasJ/aikido

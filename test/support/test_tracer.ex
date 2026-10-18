@@ -1,6 +1,6 @@
-defmodule JidoTest.Support.TestTracer do
+defmodule AikidoTest.Support.TestTracer do
   @moduledoc false
-  @behaviour Jido.Observe.Tracer
+  @behaviour Aikido.Observe.Tracer
   use Agent
 
   def start_link(_opts \\ []), do: Agent.start_link(fn -> [] end, name: __MODULE__)
