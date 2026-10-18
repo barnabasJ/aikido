@@ -28,17 +28,14 @@ defmodule Aikido.Dsl.InstanceTest do
     assert Keyword.get(config, :extra) == :value
   end
 
-  test "registry_name/0 / agent_supervisor_name/0 / task_supervisor_name/0 / runtime_store_name/0 are derived" do
+  test "registry_name/0 / durable_supervisor_name/0 / task_supervisor_name/0 are derived" do
     assert Aikido.Dsl.InstanceTest.TestInstance.registry_name() ==
              Aikido.registry_name(Aikido.Dsl.InstanceTest.TestInstance)
 
-    assert Aikido.Dsl.InstanceTest.TestInstance.agent_supervisor_name() ==
-             Aikido.agent_supervisor_name(Aikido.Dsl.InstanceTest.TestInstance)
+    assert Aikido.Dsl.InstanceTest.TestInstance.durable_supervisor_name() ==
+             Aikido.durable_supervisor_name(Aikido.Dsl.InstanceTest.TestInstance)
 
     assert Aikido.Dsl.InstanceTest.TestInstance.task_supervisor_name() ==
              Aikido.task_supervisor_name(Aikido.Dsl.InstanceTest.TestInstance)
-
-    assert Aikido.Dsl.InstanceTest.TestInstance.runtime_store_name() ==
-             Aikido.runtime_store_name(Aikido.Dsl.InstanceTest.TestInstance)
   end
 end

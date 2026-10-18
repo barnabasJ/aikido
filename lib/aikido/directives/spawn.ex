@@ -35,8 +35,8 @@ defmodule Aikido.Directives.Spawn do
       else
         agent_sup =
           if state.aikido,
-            do: Aikido.agent_supervisor_name(state.aikido),
-            else: Aikido.AgentSupervisor
+            do: Aikido.process_supervisor_name(state.aikido),
+            else: Aikido.process_supervisor_name(Aikido.Default)
 
         DynamicSupervisor.start_child(agent_sup, child_spec)
       end

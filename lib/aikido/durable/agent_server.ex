@@ -10,7 +10,8 @@ defmodule Aikido.Durable.AgentServer do
     agent = Persister.transform_agent(agent, runtime.agent_module, :externalize)
 
     encode(%{
-      options: state.options,
+      options: Keyword.delete(state.options, :parent),
+      parent: parent_binding(runtime.parent),
       permanent: state.permanent,
       agent: serialize_agent(agent, runtime.agent_module),
       cron_specs: runtime.cron_specs
@@ -25,7 +26,10 @@ defmodule Aikido.Durable.AgentServer do
 
   @impl true
   def init(saved) do
-    options = restore_parent(saved.options)
+    options =
+      saved.options
+      |> Keyword.put(:parent, Map.get(saved, :parent, saved.options[:parent]))
+      |> restore_parent()
 
     options =
       if saved[:agent],
@@ -104,13 +108,15 @@ defmodule Aikido.Durable.AgentServer do
   defp encode(data),
     do: %{"payload" => Base.encode64(:erlang.term_to_binary(data, [:compressed]))}
 
+  defp parent_binding(nil), do: nil
+  defp parent_binding(parent), do: Map.take(parent, [:id, :partition, :tag, :meta])
+
   # Process references from an earlier incarnation never establish ownership.
   # Resolve the saved logical parent against the current runtime first.
   defp restore_parent(options) do
     case options[:parent] do
       %{id: id} = parent ->
         pid = Aikido.whereis(options[:aikido], id, partition: Map.get(parent, :partition))
-        pid = pid || live_pid(Map.get(parent, :pid))
 
         if pid do
           meta = Map.get(parent, :meta, %{})
@@ -129,11 +135,6 @@ defmodule Aikido.Durable.AgentServer do
         options
     end
   end
-
-  defp live_pid(pid) when is_pid(pid) and node(pid) == node(),
-    do: if(Process.alive?(pid), do: pid)
-
-  defp live_pid(_), do: nil
 
   defp serialize_agent(agent, runtime_module) do
     module = Persister.callback_module(runtime_module)

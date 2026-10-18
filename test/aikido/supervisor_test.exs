@@ -37,16 +37,11 @@ defmodule AikidoTest.SupervisorTest do
       Registry.unregister(reg, "test_key")
     end
 
-    test "starts AgentSupervisor (DynamicSupervisor) as child", %{aikido: aikido} do
-      agent_sup = Aikido.agent_supervisor_name(aikido)
+    test "starts the native DurableServer supervisor", %{aikido: aikido} do
+      agent_sup = Aikido.durable_supervisor_name(aikido)
       assert Process.whereis(agent_sup) != nil
 
-      assert DynamicSupervisor.count_children(agent_sup) == %{
-               active: 0,
-               specs: 0,
-               supervisors: 0,
-               workers: 0
-             }
+      assert DurableServer.Supervisor.global_members(agent_sup) == %{}
     end
   end
 end

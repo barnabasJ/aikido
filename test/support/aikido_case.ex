@@ -67,7 +67,7 @@ defmodule AikidoTest.Case do
       Returns the agent supervisor for this test's Aikido instance.
       """
       def test_agent_supervisor(context) do
-        Aikido.agent_supervisor_name(context.aikido)
+        Aikido.durable_supervisor_name(context.aikido)
       end
     end
   end
@@ -135,8 +135,19 @@ defmodule AikidoTest.Case do
     test_id = System.unique_integer([:positive])
     aikido_name = :"aikido_test_#{test_id}"
 
-    {:ok, aikido_pid} = Aikido.start_link(name: aikido_name)
+    aikido_pid = start_supervised!({Aikido, name: aikido_name, durable: durable_options()})
 
     {:ok, Map.merge(context, %{aikido: aikido_name, aikido_pid: aikido_pid})}
+  end
+
+  @doc "An isolated native DurableServer backend for one test."
+  def durable_options do
+    directory = Path.join(System.tmp_dir!(), "aikido-test-#{System.unique_integer([:positive])}")
+    ExUnit.Callbacks.on_exit(fn -> File.rm_rf!(directory) end)
+
+    [
+      data_dir: directory,
+      durable_options: [discovery_interval_ms: 100, initial_discovery_delay_ms: 0]
+    ]
   end
 end

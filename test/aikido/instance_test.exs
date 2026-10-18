@@ -75,7 +75,8 @@ end
 
   setup do
     Application.put_env(:aikido_test_instance, AikidoTest.InstanceTest.TestInstance,
-      max_tasks: 500
+      max_tasks: 500,
+      durable: AikidoTest.Case.durable_options()
     )
 
     {:ok, _pid} = start_supervised({AikidoTest.InstanceTest.RedisMock, []})
@@ -215,15 +216,9 @@ end
       assert Process.whereis(reg) != nil
     end
 
-    test "starts RuntimeStore as child" do
+    test "starts the native DurableServer supervisor" do
       {:ok, _pid} = AikidoTest.InstanceTest.TestInstance.start_link()
-      runtime_store = AikidoTest.InstanceTest.TestInstance.runtime_store_name()
-      assert Process.whereis(runtime_store) != nil
-    end
-
-    test "starts AgentSupervisor as child" do
-      {:ok, _pid} = AikidoTest.InstanceTest.TestInstance.start_link()
-      agent_sup = AikidoTest.InstanceTest.TestInstance.agent_supervisor_name()
+      agent_sup = AikidoTest.InstanceTest.TestInstance.durable_supervisor_name()
       assert Process.whereis(agent_sup) != nil
     end
   end

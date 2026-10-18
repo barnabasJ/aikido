@@ -151,17 +151,12 @@ defmodule Aikido.Dsl.Instance.Transformers.GenerateAccessors do
       @spec registry_name() :: atom()
       def registry_name, do: Aikido.registry_name(__MODULE__)
 
-      @doc "Returns the AgentSupervisor name for this Aikido instance."
-      @spec agent_supervisor_name() :: atom()
-      def agent_supervisor_name, do: Aikido.agent_supervisor_name(__MODULE__)
+      @doc "Returns the DurableServer supervisor name for this instance."
+      def durable_supervisor_name, do: Aikido.durable_supervisor_name(__MODULE__)
 
       @doc "Returns the TaskSupervisor name for this Aikido instance."
       @spec task_supervisor_name() :: atom()
       def task_supervisor_name, do: Aikido.task_supervisor_name(__MODULE__)
-
-      @doc "Returns the RuntimeStore name for this Aikido instance."
-      @spec runtime_store_name() :: atom()
-      def runtime_store_name, do: Aikido.runtime_store_name(__MODULE__)
     end
   end
 

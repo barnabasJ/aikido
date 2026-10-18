@@ -61,14 +61,14 @@ defmodule AikidoTest.DurableTest do
       Path.join(System.tmp_dir!(), "aikido-durable-#{System.unique_integer([:positive])}")
 
     instance = AikidoTest.DurableInstance
-    start_supervised!({Aikido, name: instance, durable: false})
+    start_supervised!({Aikido, name: instance, durable: []})
 
     opts = [
       name: AikidoTest.DurablePool,
       agent: AikidoTest.TestAgents.Counter,
       aikido: instance,
       data_dir: directory,
-      durable_options: [discovery_interval_ms: 100]
+      durable_options: [discovery_interval_ms: 100, initial_discovery_delay_ms: 0]
     ]
 
     start_supervised!({Aikido.Durable, opts})
@@ -207,7 +207,7 @@ defmodule AikidoTest.DurableTest do
        name: instance,
        durable: [
          data_dir: Path.join(directory, "team"),
-         durable_options: [discovery_interval_ms: 100]
+         durable_options: [discovery_interval_ms: 100, initial_discovery_delay_ms: 0]
        ]}
     )
 

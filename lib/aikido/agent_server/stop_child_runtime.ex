@@ -4,11 +4,8 @@ defmodule Aikido.AgentServer.StopChildRuntime do
   require Logger
 
   alias Aikido.AgentServer.State
-  alias Aikido.RuntimeStore
   alias Jido.Signal
   alias Aikido.Tracing.Context, as: TraceContext
-
-  @relationship_hive :relationships
 
   @spec exec(term(), term(), Signal.t(), State.t()) :: :ok
   def exec(tag, reason, %Signal{} = input_signal, %State{} = state) do
@@ -17,24 +14,10 @@ defmodule Aikido.AgentServer.StopChildRuntime do
         Logger.debug("AgentServer #{state.id} cannot stop child #{inspect(tag)}: not found")
         :ok
 
-      %{pid: pid, id: child_id, partition: child_partition} ->
+      %{pid: pid} ->
         Logger.debug(
           "AgentServer #{state.id} stopping child #{inspect(tag)} with reason #{inspect(reason)}"
         )
-
-        case RuntimeStore.delete(
-               state.aikido,
-               @relationship_hive,
-               Aikido.partition_key(child_id, child_partition)
-             ) do
-          :ok ->
-            :ok
-
-          {:error, delete_reason} ->
-            Logger.warning(
-              "AgentServer #{state.id} failed to clear relationship for child #{child_id}: #{inspect(delete_reason)}"
-            )
-        end
 
         stop_signal =
           Signal.new!(

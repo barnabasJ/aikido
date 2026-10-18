@@ -3,7 +3,6 @@ defmodule Aikido do
 
   alias Aikido.Agent.WorkerPool
   alias Aikido.Config.Defaults
-  alias Aikido.RuntimeStore
 
   @moduledoc """
   自動 (Aikido) - An autonomous agent framework for Elixir, built for workflows and
@@ -220,40 +219,27 @@ defmodule Aikido do
   @impl true
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
-    runtime_store = runtime_store_name(name)
 
     if otp_app = opts[:otp_app] do
       Aikido.Debug.maybe_enable_from_config(otp_app, name)
     end
 
-    :ok = Aikido.RuntimeStore.ensure_table(runtime_store)
-
     base_children = [
       {Task.Supervisor,
        name: task_supervisor_name(name), max_children: Keyword.get(opts, :max_tasks, 1000)},
       {Registry, keys: :unique, name: registry_name(name)},
-      {Aikido.RuntimeStore, name: runtime_store},
-      {DynamicSupervisor,
-       name: agent_supervisor_name(name),
-       strategy: :one_for_one,
-       max_restarts: 1000,
-       max_seconds: 5}
+      {DynamicSupervisor, name: process_supervisor_name(name), strategy: :one_for_one}
     ]
 
     pool_children =
       WorkerPool.build_pool_child_specs(name, Keyword.get(opts, :agent_pools, []))
 
-    durable_children =
-      case Keyword.get(opts, :durable, Application.get_env(:aikido, :durable, [])) do
-        false ->
-          []
+    durable_opts = Keyword.get(opts, :durable, Application.get_env(:aikido, :durable, []))
 
-        durable_opts when is_list(durable_opts) ->
-          [
-            {Aikido.Durable,
-             Keyword.merge(durable_opts, name: durable_supervisor_name(name), aikido: name)}
-          ]
-      end
+    durable_children = [
+      {Aikido.Durable,
+       Keyword.merge(durable_opts, name: durable_supervisor_name(name), aikido: name)}
+    ]
 
     Supervisor.init(base_children ++ durable_children ++ pool_children, strategy: :one_for_one)
   end
@@ -269,9 +255,8 @@ defmodule Aikido do
   @spec registry_name(atom()) :: atom()
   def registry_name(name), do: Module.concat(name, Registry)
 
-  @doc "Returns the AgentSupervisor name for a Aikido instance."
-  @spec agent_supervisor_name(atom()) :: atom()
-  def agent_supervisor_name(name), do: Module.concat(name, AgentSupervisor)
+  @doc "Supervisor for generic non-agent processes spawned by I/O directives."
+  def process_supervisor_name(name), do: Module.concat(name, ProcessSupervisor)
 
   @doc "Returns the DurableServer supervisor name for this instance."
   def durable_supervisor_name(name), do: Module.concat(name, DurableAgents)
@@ -279,10 +264,6 @@ defmodule Aikido do
   @doc "Returns the TaskSupervisor name for a Aikido instance."
   @spec task_supervisor_name(atom()) :: atom()
   def task_supervisor_name(name), do: Module.concat(name, TaskSupervisor)
-
-  @doc "Returns the RuntimeStore name for a Aikido instance."
-  @spec runtime_store_name(atom()) :: atom()
-  def runtime_store_name(name), do: Module.concat(name, RuntimeStore)
 
   @doc "Returns the Scheduler name for a Aikido instance."
   @spec scheduler_name(atom()) :: atom()
@@ -314,29 +295,20 @@ defmodule Aikido do
       {:ok, pid} = Aikido.start_agent(MyApp.Aikido, MyAgent)
       {:ok, pid} = Aikido.start_agent(MyApp.Aikido, MyAgent, id: "custom-id")
   """
-  @spec start_agent(atom(), module(), keyword()) :: DynamicSupervisor.on_start_child()
+  @spec start_agent(atom(), module(), keyword()) :: {:ok, pid()} | {:error, term()}
   def start_agent(aikido_instance, agent_module, opts \\ [])
       when is_atom(aikido_instance) and is_atom(agent_module) do
     {restart, opts} = Keyword.pop(opts, :restart, :permanent)
 
-    if Process.whereis(durable_supervisor_name(aikido_instance)) do
-      id = Keyword.get_lazy(opts, :id, &Aikido.generate_id/0)
+    id = Keyword.get_lazy(opts, :id, &Aikido.generate_id/0)
 
-      Aikido.Durable.ensure_started(durable_supervisor_name(aikido_instance), id,
-        agent: agent_module,
-        initial_state: Keyword.get(opts, :initial_state, %{}),
-        partition: opts[:partition],
-        agent_opts: opts,
-        permanent: restart != :temporary
-      )
-    else
-      child_spec =
-        {Aikido.AgentServer,
-         Keyword.merge(opts, agent_module: agent_module, aikido: aikido_instance)}
-        |> Supervisor.child_spec(restart: restart)
-
-      DynamicSupervisor.start_child(agent_supervisor_name(aikido_instance), child_spec)
-    end
+    Aikido.Durable.start(durable_supervisor_name(aikido_instance), id,
+      agent: agent_module,
+      initial_state: Keyword.get(opts, :initial_state, %{}),
+      partition: opts[:partition],
+      agent_opts: opts,
+      permanent: restart != :temporary
+    )
   end
 
   @doc """
@@ -360,7 +332,7 @@ defmodule Aikido do
            end) do
       cond do
         is_nil(pool) ->
-          DynamicSupervisor.terminate_child(agent_supervisor_name(aikido_instance), pid)
+          GenServer.stop(pid, :normal)
 
         keep_snapshot? ->
           DurableServer.Supervisor.terminate_child_permanent(pool, pid)
@@ -430,9 +402,8 @@ defmodule Aikido do
   @doc """
   Fetches the persisted logical parent binding for a child agent.
 
-  This is the stable runtime relationship lookup API for orchestration layers
-  that need to inspect the live parent/child graph without depending on raw
-  `RuntimeStore` hive layout.
+  Reads the current runtime binding for an active child, or its DurableServer
+  snapshot when stopped. Reading a stopped binding does not activate the child.
 
   Returns `{:ok, binding}` when present, or `:error` when no binding exists.
 
@@ -450,13 +421,25 @@ defmodule Aikido do
   @spec parent_binding(atom(), String.t(), keyword()) :: {:ok, map()} | :error
   def parent_binding(aikido_instance, child_id, opts)
       when is_atom(aikido_instance) and is_binary(child_id) and is_list(opts) do
-    case RuntimeStore.fetch(
-           aikido_instance,
-           :relationships,
-           partition_key(child_id, Keyword.get(opts, :partition))
-         ) do
-      {:ok, binding} -> normalize_parent_binding(binding)
-      :error -> :error
+    case whereis(aikido_instance, child_id, opts) do
+      pid when is_pid(pid) ->
+        Aikido.AgentServer.state(pid, fn runtime ->
+          case runtime.parent do
+            nil ->
+              :error
+
+            parent ->
+              normalize_parent_binding(%{
+                parent_id: parent.id,
+                parent_partition: parent.partition,
+                tag: parent.tag,
+                meta: parent.meta
+              })
+          end
+        end)
+
+      nil ->
+        Aikido.Durable.parent_binding(durable_supervisor_name(aikido_instance), child_id, opts)
     end
   end
 

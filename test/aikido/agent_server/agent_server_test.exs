@@ -11,9 +11,9 @@ end
 defmodule AikidoTest.AgentServerTest.EmitTestAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "emit_test"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :emit_test, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServerTest.EmitTestAction.Implementation, action: :run}
     end
@@ -37,9 +37,9 @@ end
 defmodule AikidoTest.AgentServerTest.ScheduleTestAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "schedule_test"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :schedule_test, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServerTest.ScheduleTestAction.Implementation, action: :run}
     end
@@ -58,9 +58,9 @@ end
 defmodule AikidoTest.AgentServerTest.StopTestAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "stop_test"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :stop_test, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServerTest.StopTestAction.Implementation, action: :run}
     end
@@ -84,9 +84,9 @@ end
 defmodule AikidoTest.AgentServerTest.ErrorTestAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "error_test"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :error_test, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServerTest.ErrorTestAction.Implementation, action: :run}
     end
@@ -131,9 +131,9 @@ end
 defmodule AikidoTest.AgentServerTest.ScheduledAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "scheduled_action"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :scheduled_action, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServerTest.ScheduledAction.Implementation, action: :run}
     end
@@ -246,7 +246,7 @@ defmodule AikidoTest.AgentServerTest do
   end
 
   describe("start/1") do
-    test("starts under DynamicSupervisor", %{aikido: aikido}) do
+    test("starts under DurableServer", %{aikido: aikido}) do
       {:ok, pid} =
         Aikido.AgentServer.start(
           agent_module: AikidoTest.AgentServerTest.TestAgent,
@@ -256,10 +256,10 @@ defmodule AikidoTest.AgentServerTest do
 
       assert Process.alive?(pid)
       assert Aikido.AgentServer.whereis(Aikido.registry_name(aikido), "dynamic-test") == pid
-      DynamicSupervisor.terminate_child(Aikido.agent_supervisor_name(aikido), pid)
+      Aikido.stop_agent(aikido, pid)
     end
 
-    test("retains permanent restart semantics for directly started agents", %{aikido: aikido}) do
+    test("recovers directly started durable agents after a crash", %{aikido: aikido}) do
       id = "dynamic-restart-test"
 
       {:ok, pid} =
@@ -270,20 +270,23 @@ defmodule AikidoTest.AgentServerTest do
         )
 
       ref = Process.monitor(pid)
-      GenServer.stop(pid, :normal)
-      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 500
+      Process.exit(pid, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :killed}, 500
 
-      eventually(fn ->
-        case Aikido.AgentServer.whereis(Aikido.registry_name(aikido), id) do
-          new_pid when is_pid(new_pid) -> new_pid != pid and Process.alive?(new_pid)
-          _ -> false
-        end
-      end)
+      eventually(
+        fn ->
+          case Aikido.AgentServer.whereis(Aikido.registry_name(aikido), id) do
+            new_pid when is_pid(new_pid) -> new_pid != pid and Process.alive?(new_pid)
+            _ -> false
+          end
+        end,
+        timeout: 10_000
+      )
 
       restarted_pid = Aikido.AgentServer.whereis(Aikido.registry_name(aikido), id)
       assert is_pid(restarted_pid)
       refute restarted_pid == pid
-      DynamicSupervisor.terminate_child(Aikido.agent_supervisor_name(aikido), restarted_pid)
+      Aikido.stop_agent(aikido, restarted_pid)
     end
   end
 
@@ -362,9 +365,9 @@ defmodule AikidoTest.AgentServerTest do
         defmodule Elixir.AikidoTest.AgentServerTest.InlineSlowAction do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "inline_slow"}}
+
           actions do
-            action :run, Aikido.ActionResult do
+            action :inline_slow, Aikido.ActionResult do
               argument :state, :term
               run {AikidoTest.AgentServerTest.InlineSlowAction.Implementation, action: :run}
             end
@@ -435,9 +438,9 @@ defmodule AikidoTest.AgentServerTest do
         defmodule Elixir.AikidoTest.AgentServerTest.BufferedSlowAction do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "buffered_slow"}}
+
           actions do
-            action :run, Aikido.ActionResult do
+            action :buffered_slow, Aikido.ActionResult do
               argument :state, :term
               run {AikidoTest.AgentServerTest.BufferedSlowAction.Implementation, action: :run}
             end
@@ -460,9 +463,9 @@ defmodule AikidoTest.AgentServerTest do
         defmodule Elixir.AikidoTest.AgentServerTest.BufferedIncrementAction do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "buffered_increment"}}
+
           actions do
-            action :run, Aikido.ActionResult do
+            action :buffered_increment, Aikido.ActionResult do
               argument :state, :term
 
               run {AikidoTest.AgentServerTest.BufferedIncrementAction.Implementation,
@@ -827,7 +830,7 @@ defmodule AikidoTest.AgentServerTest do
       ref = Process.monitor(pid)
       signal = Jido.Signal.new!("aikido.agent.stop", %{reason: :shutdown}, source: "/test")
       assert :ok = Aikido.AgentServer.cast(pid, signal)
-      assert_receive {:DOWN, ^ref, :process, ^pid, :shutdown}, 1000
+      assert_receive {:DOWN, ^ref, :process, ^pid, {:shutdown, :permanent}}, 1000
     end
   end
 
@@ -923,9 +926,9 @@ defmodule AikidoTest.AgentServerTest do
         defmodule Elixir.AikidoTest.AgentServerTest.StartScheduleAction do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "start_schedule"}}
+
           actions do
-            action :run, Aikido.ActionResult do
+            action :start_schedule, Aikido.ActionResult do
               argument :state, :term
               run {AikidoTest.AgentServerTest.StartScheduleAction.Implementation, action: :run}
             end
@@ -948,9 +951,9 @@ defmodule AikidoTest.AgentServerTest do
         defmodule Elixir.AikidoTest.AgentServerTest.ScheduledPingAction do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "scheduled_ping"}}
+
           actions do
-            action :run, Aikido.ActionResult do
+            action :scheduled_ping, Aikido.ActionResult do
               argument :state, :term
               run {AikidoTest.AgentServerTest.ScheduledPingAction.Implementation, action: :run}
             end
@@ -1026,9 +1029,9 @@ defmodule AikidoTest.AgentServerTest do
         defmodule Elixir.AikidoTest.AgentServerTest.ScheduleManyAction do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "schedule_many"}}
+
           actions do
-            action :run, Aikido.ActionResult do
+            action :schedule_many, Aikido.ActionResult do
               argument :state, :term
               run {AikidoTest.AgentServerTest.ScheduleManyAction.Implementation, action: :run}
             end
@@ -1057,9 +1060,9 @@ defmodule AikidoTest.AgentServerTest do
         defmodule Elixir.AikidoTest.AgentServerTest.TickAction do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "tick"}}
+
           actions do
-            action :run, Aikido.ActionResult do
+            action :tick, Aikido.ActionResult do
               argument :state, :term
               run {AikidoTest.AgentServerTest.TickAction.Implementation, action: :run}
             end
@@ -1131,9 +1134,9 @@ defmodule AikidoTest.AgentServerTest do
         defmodule Elixir.AikidoTest.AgentServerTest.ScheduleAtomAction do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "schedule_atom"}}
+
           actions do
-            action :run, Aikido.ActionResult do
+            action :schedule_atom, Aikido.ActionResult do
               argument :state, :term
               run {AikidoTest.AgentServerTest.ScheduleAtomAction.Implementation, action: :run}
             end
@@ -1160,9 +1163,9 @@ defmodule AikidoTest.AgentServerTest do
         defmodule Elixir.AikidoTest.AgentServerTest.AikidoScheduledAction do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "aikido_scheduled"}}
+
           actions do
-            action :run, Aikido.ActionResult do
+            action :aikido_scheduled, Aikido.ActionResult do
               argument :state, :term
               run {AikidoTest.AgentServerTest.AikidoScheduledAction.Implementation, action: :run}
             end
@@ -1432,9 +1435,9 @@ defmodule AikidoTest.AgentServerTest do
         defmodule Elixir.AikidoTest.AgentServerTest.SlowAction2 do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "slow"}}
+
           actions do
-            action :run, Aikido.ActionResult do
+            action :slow, Aikido.ActionResult do
               argument :state, :term
               run {AikidoTest.AgentServerTest.SlowAction2.Implementation, action: :run}
             end

@@ -9,7 +9,7 @@ defmodule Aikido.AgentServer do
 
   ## Architecture
 
-  - Single GenServer per agent under `Aikido.AgentSupervisor`
+  - One DurableServer process per supervised agent
   - Signals process inline inside the triggering handler; the Erlang
     mailbox is the only queue
   - Registry-based naming via `Aikido.Registry`
@@ -22,7 +22,7 @@ defmodule Aikido.AgentServer do
 
   ## Public API
 
-  - `start/1` - Start under DynamicSupervisor
+  - `start/1` - Start under DurableServer
   - `start_link/1` - Start linked to caller
   - `call/4` - Synchronous signal processing with selector projection
   - `cast/3` - Asynchronous signal processing
@@ -149,9 +149,9 @@ defmodule Aikido.AgentServer do
   `Aikido.Directives.adopt_child/3`, which refreshes the child's live parent
   reference and monitoring relationship.
 
-  Relationship bindings are mirrored into `Aikido.RuntimeStore`, so when a child
-  later restarts it rehydrates its current logical parent from instance runtime
-  state instead of falling back to stale startup metadata.
+  DurableServer snapshots save the current logical parent ID, partition, tag,
+  and metadata. Recovery resolves that ID to its current PID. Adoption and
+  detachment replace the saved binding, including an explicit nil for orphans.
 
   ## Waiting Primitives
 
@@ -200,7 +200,6 @@ defmodule Aikido.AgentServer do
   }
 
   alias Aikido.Config.Defaults
-  alias Aikido.RuntimeStore
   alias Jido.Signal
   alias Jido.Signal.Router, as: AikidoRouter
   alias Aikido.Telemetry.Formatter
@@ -209,36 +208,22 @@ defmodule Aikido.AgentServer do
   @type server :: pid() | atom() | {:via, module(), term()} | String.t()
   @cron_restart_base_ms 500
   @cron_restart_max_ms 30000
-  @relationship_hive :relationships
   # ---------------------------------------------------------------------------
   # Public API
   # ---------------------------------------------------------------------------
   @doc """
-  Starts an AgentServer under `Aikido.AgentSupervisor`.
+  Starts an agent through the instance DurableServer supervisor.
 
   ## Examples
 
       {:ok, pid} = Aikido.AgentServer.start(agent: MyAgent)
       {:ok, pid} = Aikido.AgentServer.start(agent: MyAgent, id: "my-agent")
   """
-  @spec start(keyword() | map()) :: DynamicSupervisor.on_start_child()
+  @spec start(keyword() | map()) :: {:ok, pid()} | {:error, term()}
   def start(opts) do
-    child_spec = {__MODULE__, opts}
-
-    aikido_instance =
-      if is_list(opts) do
-        Keyword.get(opts, :aikido)
-      else
-        Map.get(opts, :aikido)
-      end
-
-    supervisor =
-      case aikido_instance do
-        nil -> Aikido.AgentSupervisor
-        instance -> Aikido.agent_supervisor_name(instance)
-      end
-
-    DynamicSupervisor.start_child(supervisor, child_spec)
+    opts = Enum.into(opts, [])
+    {agent, opts} = Keyword.pop!(opts, :agent_module)
+    Aikido.start_agent(Keyword.get(opts, :aikido, Aikido.Default), agent, opts)
   end
 
   @doc """
@@ -1004,7 +989,6 @@ defmodule Aikido.AgentServer do
     {restored_cron, opts} = Keyword.pop(opts, :restored_cron_specs, %{})
 
     with {:ok, options} <- Options.new(opts),
-         {:ok, options} <- hydrate_parent_from_runtime_store(options),
          agent_module = options.agent_module,
          chain = build_middleware_chain(agent_module, options),
          agent = restored_agent || build_agent(agent_module, options),
@@ -1088,7 +1072,6 @@ defmodule Aikido.AgentServer do
   def handle_continue(:post_init, state) do
     state = register_slice_schedules(state)
     state = register_restored_cron_specs(state)
-    state = maybe_persist_parent_binding(state)
     notify_parent_of_startup(state)
     state = emit_through_chain(state, lifecycle_ready_signal(state))
     state = State.set_status(state, :idle)
@@ -1197,34 +1180,28 @@ defmodule Aikido.AgentServer do
         {:reply, {:error, :invalid_parent}, state}
 
       true ->
-        case persist_parent_binding(state.aikido, state.id, state.partition, parent_ref) do
-          :ok ->
-            new_state =
-              state
-              |> State.attach_parent(parent_ref)
-              |> maybe_monitor_parent()
-              |> State.record_debug_event(:parent_adopted, %{
-                parent_id: parent_ref.id,
-                tag: parent_ref.tag
-              })
+        new_state =
+          state
+          |> State.attach_parent(parent_ref)
+          |> maybe_monitor_parent()
+          |> State.record_debug_event(:parent_adopted, %{
+            parent_id: parent_ref.id,
+            tag: parent_ref.tag
+          })
 
-            # Runtime adoption converges on the same observable signal as
-            # boot-time adoption (`handle_continue(:post_init, ...)`). This
-            # lets slices/signal_routes react to "a new child is now mine"
-            # without needing a separate hook for `AdoptChild` directives.
-            notify_parent_of_startup(new_state)
+        # Runtime adoption converges on the same observable signal as
+        # boot-time adoption (`handle_continue(:post_init, ...)`). This
+        # lets slices/signal_routes react to "a new child is now mine"
+        # without needing a separate hook for `AdoptChild` directives.
+        notify_parent_of_startup(new_state)
 
-            {:reply,
-             {:ok,
-              %{
-                id: new_state.id,
-                agent_module: new_state.agent_module,
-                partition: new_state.partition
-              }}, new_state}
-
-          {:error, reason} ->
-            {:reply, {:error, reason}, state}
-        end
+        {:reply,
+         {:ok,
+          %{
+            id: new_state.id,
+            agent_module: new_state.agent_module,
+            partition: new_state.partition
+          }}, new_state}
     end
   end
 
@@ -2481,7 +2458,6 @@ defmodule Aikido.AgentServer do
          _pid,
          reason
        ) do
-    _ = clear_parent_binding(state.aikido, state.id, state.partition)
     state = emit_parent_died(state, former_parent, reason)
     stop_reason = wrap_parent_down_reason(reason)
 
@@ -2631,8 +2607,6 @@ defmodule Aikido.AgentServer do
   end
 
   defp transition_to_orphan(%State{parent: %ParentRef{} = former_parent} = state, reason) do
-    _ = clear_parent_binding(state.aikido, state.id, state.partition)
-
     orphaned_state =
       state
       |> State.orphan_parent()
@@ -2643,88 +2617,6 @@ defmodule Aikido.AgentServer do
       })
 
     {former_parent, orphaned_state}
-  end
-
-  defp hydrate_parent_from_runtime_store(%Options{} = options) do
-    case Aikido.parent_binding(options.aikido, options.id, partition: options.partition) do
-      {:ok, %{parent_id: parent_id, parent_partition: parent_partition, tag: tag, meta: meta}} ->
-        parent =
-          case Aikido.whereis(options.aikido, parent_id, partition: parent_partition) do
-            pid when is_pid(pid) ->
-              ParentRef.new!(%{
-                pid: pid,
-                id: parent_id,
-                partition: parent_partition,
-                tag: tag,
-                meta: normalize_parent_meta(meta)
-              })
-
-            nil ->
-              _ = clear_parent_binding(options.aikido, options.id, options.partition)
-              nil
-          end
-
-        {:ok, %{options | parent: parent}}
-
-      :error ->
-        {:ok, options}
-    end
-  end
-
-  defp maybe_persist_parent_binding(%State{parent: %ParentRef{} = parent} = state) do
-    case Aikido.parent_binding(state.aikido, state.id, partition: state.partition) do
-      {:ok, _binding} ->
-        state
-
-      :error ->
-        case persist_parent_binding(state.aikido, state.id, state.partition, parent) do
-          :ok ->
-            state
-
-          {:error, reason} ->
-            Logger.warning(
-              "AgentServer #{state.id} failed to persist parent binding: #{inspect(reason)}"
-            )
-
-            state
-        end
-    end
-  end
-
-  defp maybe_persist_parent_binding(state) do
-    state
-  end
-
-  defp persist_parent_binding(aikido, child_id, child_partition, %ParentRef{} = parent_ref)
-       when is_atom(aikido) and is_binary(child_id) do
-    RuntimeStore.put(
-      aikido,
-      @relationship_hive,
-      Aikido.partition_key(child_id, child_partition),
-      %{
-        parent_id: parent_ref.id,
-        parent_partition: parent_ref.partition,
-        tag: parent_ref.tag,
-        meta: normalize_parent_meta(parent_ref.meta)
-      }
-    )
-  end
-
-  defp clear_parent_binding(aikido, child_id, child_partition)
-       when is_atom(aikido) and is_binary(child_id) do
-    RuntimeStore.delete(
-      aikido,
-      @relationship_hive,
-      Aikido.partition_key(child_id, child_partition)
-    )
-  end
-
-  defp normalize_parent_meta(meta) when is_map(meta) do
-    meta
-  end
-
-  defp normalize_parent_meta(_meta) do
-    %{}
   end
 
   # ---------------------------------------------------------------------------

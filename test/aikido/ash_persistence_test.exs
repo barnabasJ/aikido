@@ -53,7 +53,10 @@ defmodule AikidoTest.AshPersistenceTest do
     start_supervised!(
       {Aikido,
        name: instance,
-       durable: [data_dir: directory, durable_options: [discovery_interval_ms: 100]]}
+       durable: [
+         data_dir: directory,
+         durable_options: [discovery_interval_ms: 100, initial_discovery_delay_ms: 0]
+       ]}
     )
 
     on_exit(fn -> File.rm_rf!(directory) end)

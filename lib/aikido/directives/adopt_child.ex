@@ -9,8 +9,8 @@ defmodule Aikido.Directives.AdoptChild do
   Adoption is explicit. Aikido does not automatically reconnect children
   when a logical parent restarts.
 
-  Adoption updates the live runtime and the instance `Aikido.RuntimeStore`
-  binding, so later child restarts rehydrate the adopted parent relationship.
+  Adoption updates the child runtime. Its DurableServer callback persists the
+  updated parent binding before returning, so recovery restores that relationship.
 
   ## Fields
 

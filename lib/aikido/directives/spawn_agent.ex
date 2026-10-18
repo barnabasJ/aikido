@@ -14,8 +14,8 @@ defmodule Aikido.Directives.SpawnAgent do
   The logical relationship is independent from OTP supervisory ancestry. If
   the child later becomes orphaned, `ctx.parent` becomes `nil` and the child
   must be explicitly reattached with `AdoptChild`. The active logical
-  binding is mirrored into `Aikido.RuntimeStore`, so child restarts continue
-  to use the current parent relationship instead of stale startup metadata.
+  binding is saved in the child's DurableServer snapshot, so recovery restores
+  the current relationship instead of stale startup metadata.
 
   ## Fields
 
@@ -78,8 +78,8 @@ defmodule Aikido.Directives.SpawnAgent do
   end
 
   @doc """
-  Pure I/O directive: spawns the child via the agent supervisor and
-  persists the parent ⇒ child relationship in `Aikido.RuntimeStore`. The
+  Pure I/O directive: starts the child through DurableServer with its logical
+  parent binding. The
   child's own `notify_parent_of_startup/1` then casts
   `aikido.agent.child.started` back to this agent, where
   `maybe_track_child_started/2` records the `%ChildInfo{}` and creates
@@ -91,13 +91,10 @@ defmodule Aikido.Directives.SpawnAgent do
   immediately.
   """
 
-  alias Aikido.AgentServer
   alias Aikido.Directives
-  alias Aikido.RuntimeStore
 
   require Logger
 
-  @relationship_hive :relationships
   @reserved_child_opts [:agent, :agent_module, :id, :aikido, :parent, :partition]
 
   @impl true
@@ -143,58 +140,22 @@ defmodule Aikido.Directives.SpawnAgent do
       |> maybe_put_aikido(state.aikido)
       |> Map.to_list()
 
-    child_spec = Supervisor.child_spec({AgentServer, child_opts}, restart: restart)
-
-    supervisor =
-      if state.aikido,
-        do: Aikido.agent_supervisor_name(state.aikido),
-        else: Aikido.AgentSupervisor
-
-    case DynamicSupervisor.start_child(supervisor, child_spec) do
-      {:ok, pid} ->
-        case persist_relationship(state, child_id, child_partition, tag, meta) do
-          :ok ->
-            Logger.debug(
-              "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
-            )
-
-            :ok
-
-          {:error, reason} ->
-            _ = DynamicSupervisor.terminate_child(supervisor, pid)
-
-            Logger.error(
-              "AgentServer #{state.id} failed to persist relationship for child #{child_id}: #{inspect(reason)}"
-            )
-
-            :ok
-        end
+    case Aikido.start_agent(
+           state.aikido || Aikido.Default,
+           agent_module,
+           Keyword.put(child_opts, :restart, restart)
+         ) do
+      {:ok, _pid} ->
+        :ok
 
       {:error, reason} ->
         Logger.error(
-          "AgentServer #{state.id} failed to spawn child with restart #{inspect(restart)}: #{inspect(reason)}"
+          "AgentServer #{state.id} failed to spawn child #{child_id}: #{inspect(reason)}"
         )
 
         :ok
     end
   end
-
-  defp persist_relationship(state, child_id, child_partition, tag, meta) do
-    RuntimeStore.put(
-      state.aikido,
-      @relationship_hive,
-      Aikido.partition_key(child_id, child_partition),
-      %{
-        parent_id: state.id,
-        parent_partition: state.partition,
-        tag: tag,
-        meta: normalize_meta(meta)
-      }
-    )
-  end
-
-  defp normalize_meta(meta) when is_map(meta), do: meta
-  defp normalize_meta(_meta), do: %{}
 
   defp maybe_put_aikido(opts, nil), do: opts
   defp maybe_put_aikido(opts, aikido), do: Map.put(opts, :aikido, aikido)

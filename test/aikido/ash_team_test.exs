@@ -4,7 +4,10 @@ defmodule AikidoTest.AshTeamTest do
   alias Aikido.Ash.Team.Topology
 
   setup do
-    start_supervised!({Aikido, name: AikidoTest.AshFixtures.Instance})
+    start_supervised!(
+      {Aikido, name: AikidoTest.AshFixtures.Instance, durable: AikidoTest.Case.durable_options()}
+    )
+
     :ok
   end
 

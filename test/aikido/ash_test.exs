@@ -2,7 +2,10 @@ defmodule AikidoTest.AshTest do
   use AikidoTest.Case, async: false
 
   setup do
-    start_supervised!({Aikido, name: AikidoTest.AshFixtures.Instance})
+    start_supervised!(
+      {Aikido, name: AikidoTest.AshFixtures.Instance, durable: AikidoTest.Case.durable_options()}
+    )
+
     :ok
   end
 

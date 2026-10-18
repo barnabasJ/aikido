@@ -82,7 +82,11 @@ defmodule Aikido.Durable do
     Supervisor.init(stores ++ [{DurableServer.Supervisor, durable_opts}], strategy: :rest_for_one)
   end
 
-  def ensure_started(name, key, opts \\ []) do
+  def start(name, key, opts \\ []), do: activate(name, key, opts, :start_child)
+
+  def ensure_started(name, key, opts \\ []), do: activate(name, key, opts, :ensure_started_child)
+
+  defp activate(name, key, opts, operation) do
     config = config(name)
     partition = Keyword.get(opts, :partition, config.partition)
     agent = Keyword.get(opts, :agent, config.agent)
@@ -104,10 +108,9 @@ defmodule Aikido.Durable do
 
     initial = %{options: agent_opts, permanent: Keyword.get(opts, :permanent, config.permanent)}
 
-    case DurableServer.Supervisor.ensure_started_child(
-           name,
-           {Aikido.Durable.AgentServer, key: key(key, partition), initial_state: initial}
-         ) do
+    spec = {Aikido.Durable.AgentServer, key: key(key, partition), initial_state: initial}
+
+    case apply(DurableServer.Supervisor, operation, [name, spec]) do
       {:ok, {pid, _}} -> {:ok, pid}
       {:error, _} = error -> error
     end
@@ -147,11 +150,27 @@ defmodule Aikido.Durable do
 
     with :ok <- validate_delete_target(name, storage_key, opts[:agent]),
          :ok <- DurableServer.Supervisor.terminate_and_delete_child(name, storage_key) do
-      Aikido.RuntimeStore.delete(
-        config.aikido,
-        :relationships,
-        Aikido.partition_key(id(logical_key), partition)
-      )
+      :ok
+    end
+  end
+
+  @doc "Read a saved logical parent without activating the child."
+  def parent_binding(name, logical_key, opts \\ []) do
+    partition = Keyword.get(opts, :partition, config(name).partition)
+
+    with {:ok, info} <-
+           DurableServer.Supervisor.get_server_info(name, key(logical_key, partition)),
+         saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state),
+         %{id: parent_id} = parent <- Map.get(saved, :parent) do
+      {:ok,
+       %{
+         parent_id: parent_id,
+         parent_partition: parent.partition,
+         tag: parent.tag,
+         meta: parent.meta
+       }}
+    else
+      _ -> :error
     end
   end
 

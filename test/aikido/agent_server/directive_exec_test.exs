@@ -17,9 +17,9 @@ end
 defmodule AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "emit_directive"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :emit_directive, Aikido.ActionResult do
       argument :state, :term
       argument :directive, :term, allow_nil?: false
 
@@ -84,9 +84,9 @@ end
 defmodule AikidoTest.AgentServer.DirectiveExecTest.StopOnSignalAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "stop_on_signal"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :stop_on_signal, Aikido.ActionResult do
       argument :state, :term
       argument :reason, :term, default: :normal
 
@@ -133,9 +133,9 @@ end
 defmodule AikidoTest.AgentServer.DirectiveExecTest.RunInstructionSuccessAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "run_instruction_success"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :run_instruction_success, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.AgentServer.DirectiveExecTest.RunInstructionSuccessAction.Implementation,
@@ -156,9 +156,9 @@ end
 defmodule AikidoTest.AgentServer.DirectiveExecTest.RunInstructionFailureAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "run_instruction_failure"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :run_instruction_failure, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.AgentServer.DirectiveExecTest.RunInstructionFailureAction.Implementation,
@@ -194,9 +194,9 @@ end
 defmodule AikidoTest.AgentServer.DirectiveExecTest.CaptureResultAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "capture_result_action"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :capture_result_action, Aikido.ActionResult do
       argument :state, :term
       argument :status, :atom, allow_nil?: false
       argument :result, :map, default: %{}
@@ -226,9 +226,9 @@ end
 defmodule AikidoTest.AgentServer.DirectiveExecTest.CaptureResultEmitAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "capture_result_emit_action"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :capture_result_emit_action, Aikido.ActionResult do
       argument :state, :term
       argument :status, :atom, allow_nil?: false
       argument :result, :map, default: %{}
@@ -721,7 +721,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       stop_directive = %Aikido.Directives.StopChild{tag: :stop_signal_child, reason: :shutdown}
       Aikido.AgentServer.cast(parent_pid, signal_carrying_directive(stop_directive))
       assert_receive {:signal, %{type: "test.child.stopping", data: %{reason: :shutdown}}}, 1000
-      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, :shutdown}, 1000
+      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, {:shutdown, :permanent}}, 1000
     end
 
     test("wraps custom stop reasons as clean shutdowns", %{aikido: aikido}) do
@@ -747,7 +747,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
                       %{type: "test.child.stopping", data: %{reason: {:shutdown, :cleanup}}}},
                      1000
 
-      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, {:shutdown, :cleanup}}, 1000
+      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, {:shutdown, :permanent}}, 1000
     end
 
     test("stops existing child", %{aikido: aikido}) do
