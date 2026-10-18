@@ -360,6 +360,81 @@ defmodule Aikido.AgentServer do
   end
 
   @doc """
+  Sends a command and waits for a matching signal to satisfy `selector`.
+
+  Registers a one-shot subscription before dispatch. `:skip` keeps waiting;
+  `{:ok, value}` or `{:error, reason}` completes the request. A pipeline error
+  returns immediately. A stopped server returns `{:error, {:server_stopped, reason}}`.
+
+  `:timeout` bounds the whole request (default 5 seconds). Timeout does not undo
+  an accepted command. Waiting uses an isolated process so late subscription
+  replies cannot leak into the caller's mailbox. This is an external-client
+  convenience; do not wait for agent workflows inside directive execution.
+  """
+  @spec call_until(server(), Signal.t(), String.t(), subscribe_selector(), keyword()) ::
+          {:ok, term()} | {:error, term()}
+  def call_until(server, %Signal{} = signal, pattern, selector, opts \\ [])
+      when is_binary(pattern) and is_function(selector, 1) do
+    timeout = Keyword.get(opts, :timeout, Defaults.agent_server_call_timeout_ms())
+    caller = self()
+    request = make_ref()
+
+    {waiter, monitor} =
+      spawn_monitor(fn ->
+        result = wait_for_command_result(server, signal, pattern, selector, timeout)
+        send(caller, {request, result})
+      end)
+
+    receive do
+      {^request, result} ->
+        Process.demonitor(monitor, [:flush])
+        result
+
+      {:DOWN, ^monitor, :process, ^waiter, reason} ->
+        {:error, {:waiter_stopped, reason}}
+    after
+      timeout ->
+        Process.exit(waiter, :kill)
+
+        receive do
+          {:DOWN, ^monitor, :process, ^waiter, _reason} -> :ok
+        end
+
+        receive do
+          {^request, _result} -> :ok
+        after
+          0 -> :ok
+        end
+
+        {:error, :timeout}
+    end
+  end
+
+  defp wait_for_command_result(server, signal, pattern, selector, timeout) do
+    with {:ok, pid} <- resolve_server(server),
+         {:ok, ref} <- subscribe(pid, pattern, selector, once: true) do
+      monitor = Process.monitor(pid)
+
+      try do
+        with {:ok, :accepted} <- call(pid, signal, fn _ -> {:ok, :accepted} end, timeout: timeout) do
+          receive do
+            {:aikido_subscription, ^ref, %{result: result}} -> result
+            {:DOWN, ^monitor, :process, ^pid, reason} -> {:error, {:server_stopped, reason}}
+          after
+            timeout -> {:error, :timeout}
+          end
+        end
+      after
+        Process.demonitor(monitor, [:flush])
+        unsubscribe(pid, ref)
+      end
+    end
+  catch
+    :exit, {:timeout, _} -> {:error, :timeout}
+    :exit, reason -> {:error, {:server_stopped, reason}}
+  end
+
+  @doc """
   Asynchronously sends a signal for processing.
 
   Returns immediately. The signal is processed in the background.

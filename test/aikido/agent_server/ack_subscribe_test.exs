@@ -3,6 +3,99 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
 
   alias Aikido.AgentServer
 
+  describe "call_until/5" do
+    test "subscribes before a command that completes in the same turn", %{aikido: aikido} do
+      pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.TestAgent)
+      :ok = AgentServer.await_ready(pid)
+
+      assert {:ok, 7} =
+               AgentServer.call_until(pid, signal("write", %{value: 7}), "write", fn runtime ->
+                 {:ok, runtime.agent.state.app.value}
+               end)
+
+      assert {:ok, 0} = AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)})
+    end
+
+    test "skip waits for a later signal without polling state", %{aikido: aikido} do
+      pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.TestAgent)
+      :ok = AgentServer.await_ready(pid)
+      caller = self()
+
+      task =
+        Task.async(fn ->
+          AgentServer.call_until(
+            pid,
+            signal("write", %{value: 1}),
+            "write",
+            fn runtime ->
+              case runtime.agent.state.app.value do
+                1 ->
+                  send(caller, :waiting_for_second_write)
+                  :skip
+
+                value ->
+                  {:ok, value}
+              end
+            end, timeout: 1_000)
+        end)
+
+      assert_receive :waiting_for_second_write
+
+      assert {:ok, :processed} =
+               AgentServer.call(pid, signal("write", %{value: 2}), fn _ -> {:ok, :processed} end)
+
+      assert {:ok, 2} = Task.await(task)
+    end
+
+    test "pipeline errors return immediately and remove the subscription", %{aikido: aikido} do
+      pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.TestAgent)
+      :ok = AgentServer.await_ready(pid)
+
+      assert {:error, %Aikido.Error.ExecutionError{}} =
+               AgentServer.call_until(pid, signal("fail"), "**", fn _ -> :skip end)
+
+      assert_eventually(fn ->
+        AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)}) == {:ok, 0}
+      end)
+    end
+
+    test "timeout releases subscriptions and isolates late replies", %{aikido: aikido} do
+      pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.TestAgent)
+      :ok = AgentServer.await_ready(pid)
+
+      assert {:error, :timeout} =
+               AgentServer.call_until(
+                 pid,
+                 signal("write", %{value: 1}),
+                 "write",
+                 fn _ -> :skip end, timeout: 20)
+
+      assert_eventually(fn ->
+        AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)}) == {:ok, 0}
+      end)
+
+      assert {:ok, 2} =
+               AgentServer.call(pid, signal("write", %{value: 2}), fn runtime ->
+                 {:ok, runtime.agent.state.app.value}
+               end)
+
+      refute_receive {:aikido_subscription, _, _}
+    end
+
+    test "server shutdown returns an error instead of exiting the caller", %{aikido: aikido} do
+      pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.TestAgent)
+      :ok = AgentServer.await_ready(pid)
+
+      assert {:error, {:server_stopped, _reason}} =
+               AgentServer.call_until(
+                 pid,
+                 signal("aikido.agent.stop", %{reason: :normal}),
+                 "**",
+                 fn _ -> :skip end
+               )
+    end
+  end
+
   defmodule WriteAction do
     @moduledoc false
     use Aikido.Action

@@ -102,24 +102,8 @@ defmodule Aikido.Ash.Team do
       end
     end
 
-    with {:ok, ref} <-
-           Aikido.AgentServer.subscribe(pid, "aikido.ash.team.**", selector, once: true) do
-      monitor = Process.monitor(pid)
-
-      try do
-        with {:ok, :accepted} <-
-               Aikido.AgentServer.call(pid, signal, fn _ -> {:ok, :accepted} end) do
-          receive do
-            {:aikido_subscription, ^ref, %{result: result}} -> result
-            {:DOWN, ^monitor, :process, ^pid, reason} -> {:error, {:team_stopped, reason}}
-          after
-            resource.__aikido_team_config__().timeout + 1_000 -> {:error, :timeout}
-          end
-        end
-      after
-        Process.demonitor(monitor, [:flush])
-        Aikido.AgentServer.unsubscribe(pid, ref)
-      end
-    end
+    Aikido.AgentServer.call_until(pid, signal, "aikido.ash.team.**", selector,
+      timeout: resource.__aikido_team_config__().timeout + 1_000
+    )
   end
 end
