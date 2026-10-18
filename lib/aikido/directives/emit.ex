@@ -50,6 +50,6 @@ defmodule Aikido.Directives.Emit do
   @type t :: %__MODULE__{}
 
   @doc "Returns the Ash type for Emit."
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 end

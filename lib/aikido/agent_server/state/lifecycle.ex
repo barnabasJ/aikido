@@ -21,12 +21,15 @@ defmodule Aikido.AgentServer.State.Lifecycle do
   defoverridable cast_input: 2
   @impl Ash.Type
   def cast_input(nil, _constraints), do: {:ok, nil}
-  def cast_input(value, _constraints), do: Aikido.Schema.cast(__MODULE__, value)
+  def cast_input(value, _constraints) do
+    values = Map.merge(Map.from_struct(struct(__MODULE__)), Map.new(value))
+    Ash.Type.apply_constraints(:struct, values, __MODULE__.subtype_constraints())
+  end
 
   @type t :: %__MODULE__{}
 
   @doc false
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 
   @doc """
@@ -39,6 +42,6 @@ defmodule Aikido.AgentServer.State.Lifecycle do
       pool_key: Keyword.get(opts, :pool_key)
     }
 
-    Aikido.Schema.cast(@schema, attrs)
+    super(attrs)
   end
 end

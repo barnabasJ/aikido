@@ -48,12 +48,19 @@ defmodule Aikido.Slices.Thread.Entry do
   end
 
   defoverridable new!: 1
-  def new!(value), do: Aikido.Schema.cast!(__MODULE__, value)
+  def new!(value) do
+    value
+    |> then(&Ash.Type.cast_input(__MODULE__, &1))
+    |> Ash.Helpers.unwrap_or_raise!()
+  end
 
   defoverridable cast_input: 2
   @impl Ash.Type
   def cast_input(nil, _constraints), do: {:ok, nil}
-  def cast_input(value, _constraints), do: Aikido.Schema.cast(__MODULE__, value)
+  def cast_input(value, _constraints) do
+    values = Map.merge(Map.from_struct(struct(__MODULE__)), Map.new(value))
+    Ash.Type.apply_constraints(:struct, values, __MODULE__.subtype_constraints())
+  end
 
   @type t :: %__MODULE__{}
 

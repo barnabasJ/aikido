@@ -101,7 +101,7 @@ defmodule Aikido.Dsl.Agent do
     args: [:type, :action],
     schema: [
       type: [type: :string, required: true],
-      action: [type: {:or, [:atom, :mfa]}, required: true],
+      action: [type: :any, required: true],
       priority: [type: :integer, default: 0],
       match: [type: {:fun, 1}],
       static: [type: :map]

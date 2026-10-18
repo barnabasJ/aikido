@@ -1,13 +1,12 @@
 defmodule AikidoTest.Thread.SliceTest do
   use ExUnit.Case, async: true
-
   alias Aikido.Dsl.Agent.Info, as: AgentInfo
   alias Aikido.Dsl.Slice.Info, as: SliceInfo
   alias Aikido.Slices.Thread, as: ThreadSlice
   alias Aikido.Slices.Thread.Actions
   alias Aikido.Slices.Thread.State
 
-  describe "slice metadata" do
+  describe("slice metadata") do
     test "name is thread" do
       assert Map.get(SliceInfo.slice_options(ThreadSlice), :name) == "thread"
     end
@@ -24,7 +23,11 @@ defmodule AikidoTest.Thread.SliceTest do
 
       assert MapSet.equal?(
                action_set,
-               MapSet.new([Actions.Ensure, Actions.Append, Actions.Clear])
+               MapSet.new([
+                 {Aikido.Slices.Thread.Actions, :ensure},
+                 {Aikido.Slices.Thread.Actions, :append},
+                 {Aikido.Slices.Thread.Actions, :clear}
+               ])
              )
     end
 
@@ -47,12 +50,9 @@ defmodule AikidoTest.Thread.SliceTest do
     end
   end
 
-  describe "Persist.Transform implementation" do
+  describe("Persist.Transform implementation") do
     test "externalize/1 strips a Thread struct to a {id, rev} pointer" do
-      thread =
-        State.new(id: "t-1")
-        |> State.append(%{kind: :message, payload: %{text: "hello"}})
-
+      thread = State.new(id: "t-1") |> State.append(%{kind: :message, payload: %{text: "hello"}})
       assert %{id: "t-1", rev: 1} = ThreadSlice.externalize(thread)
     end
 
@@ -76,21 +76,20 @@ defmodule AikidoTest.Thread.SliceTest do
     end
   end
 
-  describe "agent integration" do
+  describe("agent integration") do
     defmodule AgentWithThread do
       use Aikido.Agent
 
       agent do
-        name "thread_slice_test_agent"
+        name("thread_slice_test_agent")
       end
     end
 
     defmodule AgentWithoutThread do
-      use Aikido.Agent,
-        default_slices: %{thread: false}
+      use Aikido.Agent, default_slices: %{thread: false}
 
       agent do
-        name "thread_slice_test_no_thread"
+        name("thread_slice_test_no_thread")
       end
     end
 
@@ -109,7 +108,10 @@ defmodule AikidoTest.Thread.SliceTest do
 
     test "thread can be attached after creation via Ensure action" do
       agent = AgentWithThread.new()
-      {:ok, agent, []} = AgentWithThread.cmd(agent, {Aikido.Slices.Thread.Actions.Ensure, %{}})
+
+      {:ok, agent, []} =
+        AgentWithThread.cmd(agent, {{Aikido.Slices.Thread.Actions, :ensure}, %{}})
+
       assert %State{} = agent.state[:thread]
     end
 
@@ -119,7 +121,8 @@ defmodule AikidoTest.Thread.SliceTest do
       {:ok, agent, []} =
         AgentWithThread.cmd(
           agent,
-          {Actions.Append, %{entry: %{kind: :message, payload: %{text: "hi"}}}}
+          {{Aikido.Slices.Thread.Actions, :append},
+           %{entry: %{kind: :message, payload: %{text: "hi"}}}}
         )
 
       assert State.entry_count(agent.state.thread) == 1

@@ -1,6 +1,5 @@
 defmodule AikidoTest.Support.SchedulerIntegrationHarness do
   @moduledoc false
-
   alias Aikido.AgentServer
   alias Aikido.Directives
   alias Aikido.Scheduler
@@ -8,16 +7,33 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
 
   defmodule TickAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "cron_count"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name("cron_count")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(%Jido.Signal{data: params}, slice, _opts, _ctx) do
+    defp reduce(%Jido.Signal{data: params}, slice, _opts, _ctx) do
       count = Map.get(slice, :tick_count, 0)
       ticks = Map.get(slice, :ticks, [])
       {:ok, %{tick_count: count + 1, ticks: ticks ++ [params]}, []}
@@ -26,21 +42,37 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
 
   defmodule RegisterCronAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "register_cron"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name("register_cron")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(%Jido.Signal{data: params}, slice, _opts, _ctx) do
+    defp reduce(%Jido.Signal{data: params}, slice, _opts, _ctx) do
       cron_expr = Map.get(params, :cron)
       job_id = Map.get(params, :job_id)
       timezone = Map.get(params, :timezone)
       message = Map.get(params, :message, Signal.new!(%{type: "cron.tick", source: "/test"}))
-
       directive = Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
       {:ok, slice, [directive]}
     end
@@ -48,16 +80,33 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
 
   defmodule CancelCronAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "cancel_cron"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name("cancel_cron")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(%Jido.Signal{data: %{job_id: job_id}}, slice, _opts, _ctx) do
+    defp reduce(%Jido.Signal{data: %{job_id: job_id}}, slice, _opts, _ctx) do
       {:ok, slice, [Directives.cron_cancel(job_id)]}
     end
   end
@@ -167,21 +216,11 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
   end
 
   def cancel_cron(pid, job_id) do
-    signal =
-      Signal.new!(%{
-        type: "cancel_cron",
-        source: "/test",
-        data: %{job_id: job_id}
-      })
-
+    signal = Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: job_id}})
     AgentServer.cast(pid, signal)
   end
 
-  @doc """
-  Wait for `job_id` to be registered (and alive) in `state.cron_jobs`.
-
-  Subscribe-based per ADR 0021 — see `AikidoTest.AgentWait.await_state_value/3`.
-  """
+  @doc "Wait for `job_id` to be registered (and alive) in `state.cron_jobs`.\n\nSubscribe-based per ADR 0021 — see `AikidoTest.AgentWait.await_state_value/3`.\n"
   def wait_for_job(pid, job_id, opts \\ []) do
     AikidoTest.AgentWait.await_state_value(
       pid,
@@ -202,12 +241,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
     )
   end
 
-  @doc """
-  Wait for the agent's domain `tick_count` to reach `count`.
-
-  Subscribe-based per ADR 0021 — each `cron.tick` triggers a pipeline
-  whose post-state the subscription evaluates. No polling.
-  """
+  @doc "Wait for the agent's domain `tick_count` to reach `count`.\n\nSubscribe-based per ADR 0021 — each `cron.tick` triggers a pipeline\nwhose post-state the subscription evaluates. No polling.\n"
   def wait_for_tick_count(pid, count, opts \\ []) do
     AikidoTest.AgentWait.await_state_value(
       pid,
@@ -225,16 +259,12 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
   end
 
   def tick_count(pid) do
-    {:ok, count} =
-      AgentServer.state(pid, fn s -> {:ok, s.agent.state.domain.tick_count} end)
-
+    {:ok, count} = AgentServer.state(pid, fn s -> {:ok, s.agent.state.domain.tick_count} end)
     count
   end
 
   def ticks(pid) do
-    {:ok, ticks} =
-      AgentServer.state(pid, fn s -> {:ok, s.agent.state.domain.ticks} end)
-
+    {:ok, ticks} = AgentServer.state(pid, fn s -> {:ok, s.agent.state.domain.ticks} end)
     ticks
   end
 end

@@ -2,30 +2,29 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
   use ExUnit.Case, async: true
 
   defmodule Defaults do
-    use Aikido.Action
+    use Ash.TypedStruct
 
-    action do
-      name "schema_defaults"
-
-      schema do
-        attribute :enabled, :boolean, default: false
-        attribute :value, :term
-      end
+    typed_struct do
+      field(:enabled, :boolean, default: false)
+      field(:value, :term)
     end
-
-    def run(_signal, slice, _opts, _ctx), do: {:ok, slice, []}
   end
 
   defmodule ResourceDefaults do
     use Ash.Resource, data_layer: :embedded
 
     attributes do
-      attribute :token, :string, default: &Aikido.Util.generate_id/0, public?: true
-      attribute :time, :integer, default: {System, :system_time, [:millisecond]}, public?: true
+      attribute(:token, :string, default: &Aikido.Util.generate_id/0, public?: true)
+      attribute(:time, :integer, default: {System, :system_time, [:millisecond]}, public?: true)
     end
 
     actions do
-      defaults create: :*
+      defaults(create: :*)
+
+      action :check_enabled, :boolean do
+        argument :enabled, :boolean, allow_nil?: false
+        run fn input, _context -> {:ok, input.arguments.enabled} end
+      end
     end
   end
 
@@ -33,22 +32,16 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
     use Ash.TypedStruct
 
     typed_struct do
-      field :count, :integer, default: 3
+      field(:count, :integer, default: 3)
     end
   end
 
   defmodule NestedDefaults do
-    use Aikido.Action
+    use Ash.TypedStruct
 
-    action do
-      name "nested_defaults"
-
-      schema do
-        attribute :nested, Nested, default: %{}
-      end
+    typed_struct do
+      field(:nested, Nested, default: %{})
     end
-
-    def run(_signal, slice, _opts, _ctx), do: {:ok, slice, []}
   end
 
   test "Ash casts values and enforces bounds" do
@@ -60,7 +53,7 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
   end
 
   test "false and nil defaults are retained" do
-    schema = Aikido.Dsl.Action.Info.schema(Defaults)
+    schema = Defaults
     assert Aikido.Schema.defaults(schema) == %{enabled: false}
     assert {:ok, %{enabled: false, value: nil}} = Aikido.Schema.cast(schema, %{})
   end
@@ -77,15 +70,17 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
 
   test "native validation errors retain their Splode identity at the action boundary" do
     assert {:error, %Ash.Error.Invalid{} = error} =
-             Defaults.validate_params(%{enabled: "invalid"})
+             ResourceDefaults
+             |> Ash.ActionInput.for_action(:check_enabled, %{enabled: "invalid"})
+             |> Ash.run_action()
 
     assert Aikido.Error.splode_error?(error)
     assert Aikido.Error.from_term(error) === error
     assert Aikido.Error.to_map(error).type == :validation_error
   end
 
-  test "inline action contracts compile into the action's own native typed struct" do
-    schema = Aikido.Dsl.Action.Info.schema(Defaults)
+  test "state contracts remain native typed structs" do
+    schema = Defaults
     assert schema == Defaults
     assert Ash.Type.NewType.new_type?(schema)
     refute Spark.Dsl.is?(schema, Ash.Resource)
@@ -95,8 +90,7 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
   end
 
   test "nested Ash fields apply defaults before casting" do
-    schema = Aikido.Dsl.Action.Info.schema(NestedDefaults)
-
+    schema = NestedDefaults
     assert {:ok, %{nested: %{count: 3}}} = Aikido.Schema.cast(schema, %{})
   end
 
@@ -132,7 +126,9 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
              Aikido.Schema.transform(%{}, {__MODULE__, :reject_config, []})
   end
 
-  def reject_config(_value, _context), do: {:error, :invalid_config}
+  def reject_config(_value, _context) do
+    {:error, :invalid_config}
+  end
 
   test "JSON tool schemas retain Ash constraints and enum choices" do
     schema = [

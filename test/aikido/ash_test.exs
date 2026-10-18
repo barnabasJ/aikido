@@ -101,9 +101,7 @@ defmodule AikidoTest.AshTest do
              snapshot_result(Aikido.Ash.command(record, %{amount: nil}, action: :add))
 
     assert {:ok, %{count: 11}} =
-             snapshot_result(
-               Aikido.Ash.command(record, %{data: %{amount: "4"}}, action: :with_data)
-             )
+             snapshot_result(Aikido.Ash.command(record, %{amount: "4"}, action: :with_data))
 
     assert {:ok, %{status: :stopped}} = Aikido.Ash.stop(record)
   end
@@ -262,7 +260,7 @@ defmodule AikidoTest.AshTest do
     assert [{Aikido.Sensors.Heartbeat, %{interval: 3_600_000}}] =
              Aikido.Dsl.Slice.Info.subscriptions(slice)
 
-    assert [{"0 0 1 1 *", AikidoTest.AshFixtures.CounterSlice.Actions.Tick, options}] =
+    assert [{"0 0 1 1 *", {AikidoTest.AshFixtures.CounterSlice, :tick}, options}] =
              Aikido.Dsl.Slice.Info.schedules(slice)
 
     assert options[:data] == %{amount: 1}
@@ -280,7 +278,7 @@ defmodule AikidoTest.AshTest do
     assert {:ok, updated, []} =
              runtime.cmd(
                agent,
-               {AikidoTest.AshFixtures.CounterSlice.Actions.Tick, %{amount: 4}},
+               {{AikidoTest.AshFixtures.CounterSlice, :tick}, %{amount: 4}},
                input_signal: signal
              )
 
@@ -362,7 +360,7 @@ defmodule AikidoTest.AshTest do
       )
 
     assert signal.name == :increment
-    assert signal.target == AikidoTest.AshFixtures.CounterSlice.Actions.Increment
+    assert signal.target == {AikidoTest.AshFixtures.CounterSlice, :increment}
     refute Ash.Resource.Info.action(resource, :internal)
     refute Ash.Resource.Info.action(resource, :tick)
     refute function_exported?(Domain, :composed_internal, 1)

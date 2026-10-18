@@ -110,6 +110,10 @@ defmodule Aikido.Slice.Schedules do
     }
   end
 
+  defp generate_signal_type(prefix, {resource, action}) do
+    generate_signal_type(prefix, resource) <> "." <> to_string(action)
+  end
+
   defp generate_signal_type(prefix, action) do
     action_name =
       action

@@ -1,6 +1,5 @@
 defmodule AikidoTest.AgentServer.AckSubscribeTest do
   use AikidoTest.Case, async: false
-
   alias Aikido.AgentServer
 
   describe "call_until/5" do
@@ -51,7 +50,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
       pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.TestAgent)
       :ok = AgentServer.await_ready(pid)
 
-      assert {:error, %Aikido.Error.ExecutionError{}} =
+      assert {:error, %Ash.Error.Unknown{}} =
                AgentServer.call_until(pid, signal("fail"), "**", fn _ -> :skip end)
 
       assert_eventually(fn ->
@@ -98,32 +97,66 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
 
   defmodule WriteAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "write"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name "write"
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(%Jido.Signal{data: %{value: v}}, slice, _opts, _ctx) do
+    defp reduce(%Jido.Signal{data: %{value: v}}, slice, _opts, _ctx) do
       {:ok, %{slice | value: v, status: :written}, []}
     end
   end
 
   defmodule FailingAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "fail"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name "fail"
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(_signal, _slice, _opts, _ctx) do
+    defp reduce(_signal, _slice, _opts, _ctx) do
       {:error, :intentional_action_failure}
     end
   end
@@ -133,8 +166,8 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
     use Aikido.Agent
 
     agent do
-      name "ack_subscribe_agent"
-      path :app
+      name("ack_subscribe_agent")
+      path(:app)
 
       schema do
         attribute(:value, :integer, default: 0)
@@ -143,24 +176,40 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
     end
 
     signal_routes do
-      route "write", AikidoTest.AgentServer.AckSubscribeTest.WriteAction
-      route "fail", AikidoTest.AgentServer.AckSubscribeTest.FailingAction
+      route("write", AikidoTest.AgentServer.AckSubscribeTest.WriteAction)
+      route("fail", AikidoTest.AgentServer.AckSubscribeTest.FailingAction)
     end
   end
 
   defmodule FlakyAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "flaky"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name "flaky"
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
     @counter_key {__MODULE__, :counter}
-
     def reset(name) do
       :persistent_term.put({@counter_key, name}, :counters.new(1, []))
     end
@@ -169,7 +218,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
       :counters.get(:persistent_term.get({@counter_key, name}), 1)
     end
 
-    def run(%Jido.Signal{data: %{name: name, succeed_after: succeed_after}}, slice, _, _) do
+    defp reduce(%Jido.Signal{data: %{name: name, succeed_after: succeed_after}}, slice, _, _) do
       counter = :persistent_term.get({@counter_key, name})
       :counters.add(counter, 1, 1)
       n = :counters.get(counter, 1)
@@ -188,8 +237,8 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
       middleware: [{Aikido.Middlewares.Retry, %{max_attempts: 3, pattern: "flaky"}}]
 
     agent do
-      name "retrying_agent"
-      path :app
+      name("retrying_agent")
+      path(:app)
 
       schema do
         attribute(:value, :integer, default: 0)
@@ -198,12 +247,12 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
     end
 
     signal_routes do
-      route "flaky", AikidoTest.AgentServer.AckSubscribeTest.FlakyAction
+      route("flaky", AikidoTest.AgentServer.AckSubscribeTest.FlakyAction)
     end
   end
 
-  describe "call/4" do
-    test "runs the selector after the signal completes and returns its value", %{aikido: aikido} do
+  describe("call/4") do
+    test("runs the selector after the signal completes and returns its value", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, TestAgent)
       :ok = AgentServer.await_ready(pid)
 
@@ -217,13 +266,13 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
               _ -> {:error, :not_yet}
             end
           end,
-          timeout: 5_000
+          timeout: 5000
         )
 
       assert {:ok, 7} = result
     end
 
-    test "returns {:error, reason} when the selector returns an error tuple", %{aikido: aikido} do
+    test("returns {:error, reason} when the selector returns an error tuple", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, TestAgent)
       :ok = AgentServer.await_ready(pid)
 
@@ -232,14 +281,16 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
           pid,
           signal("write", %{value: 1}),
           fn _state -> {:error, :selector_says_no} end,
-          timeout: 1_000
+          timeout: 1000
         )
 
       assert {:error, :selector_says_no} = result
     end
 
-    test "delivers {:error, %Aikido.Error{}} verbatim when the action errors; selector is skipped",
-         %{aikido: aikido} do
+    test(
+      "delivers {:error, %Aikido.Error{}} verbatim when the action errors; selector is skipped",
+      %{aikido: aikido}
+    ) do
       pid = start_server(%{aikido: aikido}, TestAgent)
       :ok = AgentServer.await_ready(pid)
 
@@ -248,16 +299,15 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
           pid,
           signal("fail"),
           fn _state -> {:ok, :selector_should_be_skipped} end,
-          timeout: 1_000
+          timeout: 1000
         )
 
-      assert {:error, %Aikido.Error.ExecutionError{}} = result
+      assert {:error, %Ash.Error.Unknown{}} = result
     end
 
-    test "subscribers' selectors run even when the chain returned {:error, _}", %{aikido: aikido} do
+    test("subscribers' selectors run even when the chain returned {:error, _}", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, TestAgent)
       :ok = AgentServer.await_ready(pid)
-
       caller = self()
 
       {:ok, ref} =
@@ -272,16 +322,16 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
         )
 
       :ok = AgentServer.cast(pid, signal("fail"))
-
-      assert_receive :subscriber_ran, 1_000
+      assert_receive :subscriber_ran, 1000
       :ok = AgentServer.unsubscribe(pid, ref)
     end
 
-    test "Retry middleware re-invokes next on {:error, _}; selector fires once with the eventual success",
-         %{aikido: aikido} do
+    test(
+      "Retry middleware re-invokes next on {:error, _}; selector fires once with the eventual success",
+      %{aikido: aikido}
+    ) do
       pid = start_server(%{aikido: aikido}, RetryingAgent)
       :ok = AgentServer.await_ready(pid)
-
       key = {:flaky, System.unique_integer([:positive])}
       FlakyAction.reset(key)
 
@@ -298,7 +348,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
               _ -> {:error, :not_yet}
             end
           end,
-          timeout: 2_000
+          timeout: 2000
         )
 
       # Eventual success crosses the boundary as a single reply
@@ -307,29 +357,32 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
       assert FlakyAction.attempts(key) >= 4
     end
 
-    test "Retry middleware exhausts max_attempts; caller receives the final {:error, _}",
-         %{aikido: aikido} do
+    test(
+      "Retry middleware exhausts max_attempts; caller receives the final {:error, _}",
+      %{aikido: aikido}
+    ) do
       pid = start_server(%{aikido: aikido}, RetryingAgent)
       :ok = AgentServer.await_ready(pid)
-
       key = {:flaky, System.unique_integer([:positive])}
       FlakyAction.reset(key)
 
       result =
         AgentServer.call(
           pid,
-          signal("flaky", %{name: key, succeed_after: 9_999}),
+          signal("flaky", %{name: key, succeed_after: 9999}),
           fn _state -> {:ok, :should_be_skipped} end,
-          timeout: 2_000
+          timeout: 2000
         )
 
-      assert {:error, %Aikido.Error.ExecutionError{}} = result
+      assert {:error, %Ash.Error.Unknown{}} = result
       # Three middleware attempts, each may also Exec-retry, so >= 3.
       assert FlakyAction.attempts(key) >= 3
     end
 
-    test "raising selector surfaces as {:error, {:selector_raised, _, _}}; agent stays alive",
-         %{aikido: aikido} do
+    test(
+      "raising selector surfaces as {:error, {:selector_raised, _, _}}; agent stays alive",
+      %{aikido: aikido}
+    ) do
       pid = start_server(%{aikido: aikido}, TestAgent)
       :ok = AgentServer.await_ready(pid)
 
@@ -338,7 +391,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
           pid,
           signal("write", %{value: 9}),
           fn _state -> raise "selector boom" end,
-          timeout: 1_000
+          timeout: 1000
         )
 
       assert {:error, {:selector_raised, %RuntimeError{message: "selector boom"}, _stacktrace}} =
@@ -348,8 +401,8 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
     end
   end
 
-  describe "subscribe/4" do
-    test "delivers a result on the first matching signal when once: true", %{aikido: aikido} do
+  describe("subscribe/4") do
+    test("delivers a result on the first matching signal when once: true", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, TestAgent)
       :ok = AgentServer.await_ready(pid)
 
@@ -357,23 +410,19 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
         AgentServer.subscribe(
           pid,
           "write",
-          fn %AgentServer.State{agent: agent} ->
-            {:ok, agent.state.app.value}
-          end,
+          fn %AgentServer.State{agent: agent} -> {:ok, agent.state.app.value} end,
           once: true
         )
 
       :ok = AgentServer.cast(pid, signal("write", %{value: 42}))
-
-      assert_receive {:aikido_subscription, ^ref, %{result: {:ok, 42}}}, 5_000
+      assert_receive {:aikido_subscription, ^ref, %{result: {:ok, 42}}}, 5000
     end
 
-    test "with :skip return, keeps the subscription alive across multiple signals", %{
+    test("with :skip return, keeps the subscription alive across multiple signals", %{
       aikido: aikido
-    } do
+    }) do
       pid = start_server(%{aikido: aikido}, TestAgent)
       :ok = AgentServer.await_ready(pid)
-
       caller = self()
 
       {:ok, ref} =
@@ -389,27 +438,21 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
 
       :ok = AgentServer.cast(pid, signal("write", %{value: 1}))
       :ok = AgentServer.cast(pid, signal("write", %{value: 2}))
-
-      assert_receive {:saw_value, 1}, 5_000
-      assert_receive {:saw_value, 2}, 5_000
-
+      assert_receive {:saw_value, 1}, 5000
+      assert_receive {:saw_value, 2}, 5000
       :ok = AgentServer.unsubscribe(pid, ref)
     end
 
-    test "unsubscribe/2 stops the subscription", %{aikido: aikido} do
+    test("unsubscribe/2 stops the subscription", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, TestAgent)
       :ok = AgentServer.await_ready(pid)
-
-      {:ok, ref} =
-        AgentServer.subscribe(pid, "write", fn _s -> {:ok, :received} end, [])
-
+      {:ok, ref} = AgentServer.subscribe(pid, "write", fn _s -> {:ok, :received} end, [])
       :ok = AgentServer.unsubscribe(pid, ref)
       :ok = AgentServer.cast(pid, signal("write", %{value: 99}))
-
       refute_receive {:aikido_subscription, ^ref, _}, 200
     end
 
-    test "ignores signals that don't match the pattern", %{aikido: aikido} do
+    test("ignores signals that don't match the pattern", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, TestAgent)
       :ok = AgentServer.await_ready(pid)
 
@@ -417,7 +460,6 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
         AgentServer.subscribe(pid, "specific.path", fn _ -> {:ok, :hit} end, once: true)
 
       :ok = AgentServer.cast(pid, signal("write", %{value: 1}))
-
       refute_receive {:aikido_subscription, ^ref, _}, 200
       :ok = AgentServer.unsubscribe(pid, ref)
     end

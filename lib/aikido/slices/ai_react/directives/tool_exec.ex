@@ -124,10 +124,14 @@ defimpl Aikido.AgentServer.DirectiveExec, for: Aikido.Slices.AiReact.Directives.
   end
 
   defp invoke(module, args, context) do
-    params = ActionTool.convert_params_using_schema(args, Aikido.Dsl.Action.Info.schema(module))
+    params = ActionTool.convert_params_using_schema(args, Aikido.ActionRef.schema(module))
     Aikido.Exec.run(module, params, context, [])
   end
 
+  defp format_error(%{errors: errors}) when is_list(errors),
+    do: Enum.map_join(errors, "; ", &format_error/1)
+
+  defp format_error(%Ash.Error.Unknown.UnknownError{error: error}), do: format_error(error)
   defp format_error(%_{} = err) when is_exception(err), do: Exception.message(err)
   defp format_error(reason) when is_binary(reason), do: reason
   defp format_error(reason), do: inspect(reason)

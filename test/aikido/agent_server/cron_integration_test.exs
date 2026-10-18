@@ -1,27 +1,41 @@
 defmodule AikidoTest.AgentServer.CronIntegrationTest do
   use AikidoTest.Case, async: false
-
   import ExUnit.CaptureLog
-
   @moduletag :integration
   @moduletag capture_log: true
-
   alias Aikido.AgentServer
   alias Aikido.Directives
   alias Jido.Signal
 
   defmodule CronCountAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "cron_count"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name("cron_count")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(%Jido.Signal{data: params}, slice, _opts, _ctx) do
+    defp reduce(%Jido.Signal{data: params}, slice, _opts, _ctx) do
       count = Map.get(slice, :tick_count, 0)
       ticks = Map.get(slice, :ticks, [])
       {:ok, %{tick_count: count + 1, ticks: ticks ++ [params]}, []}
@@ -30,21 +44,37 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
   defmodule RegisterCronAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "register_cron"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name("register_cron")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(%Jido.Signal{data: params}, _slice, _opts, _ctx) do
+    defp reduce(%Jido.Signal{data: params}, _slice, _opts, _ctx) do
       cron_expr = Map.get(params, :cron)
       job_id = Map.get(params, :job_id)
       message = Map.get(params, :message, Signal.new!(%{type: "cron.tick", source: "/test"}))
       timezone = Map.get(params, :timezone)
-
       directive = Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
       {:ok, %{}, [directive]}
     end
@@ -52,16 +82,33 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
   defmodule CancelCronAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "cancel_cron"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name("cancel_cron")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(%Jido.Signal{data: %{job_id: job_id}}, _slice, _opts, _ctx) do
+    defp reduce(%Jido.Signal{data: %{job_id: job_id}}, _slice, _opts, _ctx) do
       {:ok, %{}, [Directives.cron_cancel(job_id)]}
     end
   end
@@ -87,8 +134,8 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
     end
   end
 
-  describe "cron job registration" do
-    test "agent can register a cron job", %{aikido: aikido} do
+  describe("cron job registration") do
+    test("agent can register a cron job", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-1", aikido: aikido)
 
@@ -96,23 +143,17 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         Signal.new!(%{
           type: "register_cron",
           source: "/test",
-          data: %{
-            job_id: :heartbeat,
-            cron: "* * * * *"
-          }
+          data: %{job_id: :heartbeat, cron: "* * * * *"}
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-
       job_pid = await_state_value(pid, fn s -> Map.get(s.cron_jobs, :heartbeat) end)
-
       assert is_pid(job_pid)
       assert Process.alive?(job_pid)
-
       GenServer.stop(pid)
     end
 
-    test "agent can register multiple cron jobs", %{aikido: aikido} do
+    test("agent can register multiple cron jobs", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-2", aikido: aikido)
 
@@ -146,7 +187,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       GenServer.stop(pid)
     end
 
-    test "registering same job_id updates existing job (upsert)", %{aikido: aikido} do
+    test("registering same job_id updates existing job (upsert)", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-3", aikido: aikido)
 
@@ -158,7 +199,6 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal1)
-
       first_job_pid = await_state_value(pid, fn s -> Map.get(s.cron_jobs, :updatable) end)
       assert is_pid(first_job_pid)
 
@@ -181,13 +221,11 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       assert map_size(cron_jobs) == 1
       second_job_pid = cron_jobs[:updatable]
       assert is_pid(second_job_pid)
-
       refute first_job_pid == second_job_pid
-
       GenServer.stop(pid)
     end
 
-    test "failed upsert preserves the existing runtime job and durable spec", %{aikido: aikido} do
+    test("failed upsert preserves the existing runtime job and durable spec", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: CronTestAgent,
@@ -229,11 +267,10 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
       assert Process.alive?(job_pid)
       assert cron_spec_after.cron_expression == "* * * * *"
-
       GenServer.stop(pid)
     end
 
-    test "invalid dynamic cron input logs and preserves the agent", %{aikido: aikido} do
+    test("invalid dynamic cron input logs and preserves the agent", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: CronTestAgent,
@@ -264,11 +301,10 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
       assert Process.alive?(pid)
       assert log =~ "failed to register cron job :invalid_type"
-
       GenServer.stop(pid)
     end
 
-    test "rejects non-durable cron messages during registration", %{aikido: aikido} do
+    test("rejects non-durable cron messages during registration", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: CronTestAgent,
@@ -298,11 +334,10 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         end)
 
       assert log =~ "invalid_message"
-
       GenServer.stop(pid)
     end
 
-    test "cron job with timezone", %{aikido: aikido} do
+    test("cron job with timezone", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-4", aikido: aikido)
 
@@ -310,22 +345,16 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         Signal.new!(%{
           type: "register_cron",
           source: "/test",
-          data: %{
-            job_id: :timezone_test,
-            cron: "0 9 * * *",
-            timezone: "Etc/UTC"
-          }
+          data: %{job_id: :timezone_test, cron: "0 9 * * *", timezone: "Etc/UTC"}
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-
       job_pid = await_state_value(pid, fn s -> Map.get(s.cron_jobs, :timezone_test) end)
       assert is_pid(job_pid)
-
       GenServer.stop(pid)
     end
 
-    test "invalid cron directive is isolated and agent survives", %{aikido: aikido} do
+    test("invalid cron directive is isolated and agent survives", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-4b", aikido: aikido)
 
@@ -335,14 +364,10 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         Signal.new!(%{
           type: "register_cron",
           source: "/test",
-          data: %{
-            job_id: :invalid_cron,
-            cron: "definitely-not-a-cron"
-          }
+          data: %{job_id: :invalid_cron, cron: "definitely-not-a-cron"}
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-
       eventually(fn -> Process.alive?(pid) end)
 
       {:ok, %{cron_jobs: cron_jobs, cron_specs: cron_specs}} =
@@ -353,11 +378,10 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       refute Map.has_key?(cron_jobs, :invalid_cron)
       refute Map.has_key?(cron_specs, :invalid_cron)
       refute_received {:DOWN, ^ref, :process, ^pid, _}
-
       GenServer.stop(pid)
     end
 
-    test "invalid timezone directive is isolated and agent survives", %{aikido: aikido} do
+    test("invalid timezone directive is isolated and agent survives", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-4c", aikido: aikido)
 
@@ -367,15 +391,10 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         Signal.new!(%{
           type: "register_cron",
           source: "/test",
-          data: %{
-            job_id: :invalid_tz,
-            cron: "0 9 * * *",
-            timezone: "Invalid/Nowhere"
-          }
+          data: %{job_id: :invalid_tz, cron: "0 9 * * *", timezone: "Invalid/Nowhere"}
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-
       eventually(fn -> Process.alive?(pid) end)
 
       {:ok, %{cron_jobs: cron_jobs, cron_specs: cron_specs}} =
@@ -386,20 +405,15 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       refute Map.has_key?(cron_jobs, :invalid_tz)
       refute Map.has_key?(cron_specs, :invalid_tz)
       refute_received {:DOWN, ^ref, :process, ^pid, _}
-
       GenServer.stop(pid)
     end
 
-    test "auto-generates job_id if not provided", %{aikido: aikido} do
+    test("auto-generates job_id if not provided", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-5", aikido: aikido)
 
       register_signal =
-        Signal.new!(%{
-          type: "register_cron",
-          source: "/test",
-          data: %{cron: "* * * * *"}
-        })
+        Signal.new!(%{type: "register_cron", source: "/test", data: %{cron: "* * * * *"}})
 
       :ok = AgentServer.cast(pid, register_signal)
 
@@ -412,13 +426,12 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
       [job_id] = Map.keys(cron_jobs)
       assert is_reference(job_id)
-
       GenServer.stop(pid)
     end
   end
 
-  describe "runtime failure isolation and recovery" do
-    test "abnormal cron job death does not kill agent and job restarts", %{aikido: aikido} do
+  describe("runtime failure isolation and recovery") do
+    test("abnormal cron job death does not kill agent and job restarts", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-9a", aikido: aikido)
 
@@ -432,11 +445,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-
       original_job_pid = await_state_value(pid, fn s -> Map.get(s.cron_jobs, :restartable) end)
       assert is_pid(original_job_pid)
       assert Process.alive?(original_job_pid)
-
       Process.exit(original_job_pid, :kill)
 
       restarted_job_pid =
@@ -455,11 +466,10 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       refute restarted_job_pid == original_job_pid
       assert Process.alive?(pid)
       refute_received {:DOWN, ^server_ref, :process, ^pid, _}
-
       GenServer.stop(pid)
     end
 
-    test "cancel removes durable spec even when runtime pid is already gone", %{aikido: aikido} do
+    test("cancel removes durable spec even when runtime pid is already gone", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-9b", aikido: aikido)
 
@@ -471,10 +481,8 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-
       job_pid = await_state_value(pid, fn s -> Map.get(s.cron_jobs, :gone_runtime) end)
       assert is_pid(job_pid)
-
       Process.exit(job_pid, :shutdown)
 
       await_state_value(
@@ -489,11 +497,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       )
 
       cancel_signal =
-        Signal.new!(%{
-          type: "cancel_cron",
-          source: "/test",
-          data: %{job_id: :gone_runtime}
-        })
+        Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :gone_runtime}})
 
       :ok = AgentServer.cast(pid, cancel_signal)
 
@@ -512,8 +516,8 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
     end
   end
 
-  describe "cron job cancellation" do
-    test "agent can cancel a cron job", %{aikido: aikido} do
+  describe("cron job cancellation") do
+    test("agent can cancel a cron job", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-6", aikido: aikido)
 
@@ -525,17 +529,12 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-
       job_pid = await_state_value(pid, fn s -> Map.get(s.cron_jobs, :cancellable) end)
       assert is_pid(job_pid)
       assert Process.alive?(job_pid)
 
       cancel_signal =
-        Signal.new!(%{
-          type: "cancel_cron",
-          source: "/test",
-          data: %{job_id: :cancellable}
-        })
+        Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :cancellable}})
 
       :ok = AgentServer.cast(pid, cancel_signal)
 
@@ -546,20 +545,15 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       end)
 
       eventually(fn -> not Process.alive?(job_pid) end)
-
       GenServer.stop(pid)
     end
 
-    test "cancelling non-existent job is safe", %{aikido: aikido} do
+    test("cancelling non-existent job is safe", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-7", aikido: aikido)
 
       cancel_signal =
-        Signal.new!(%{
-          type: "cancel_cron",
-          source: "/test",
-          data: %{job_id: :nonexistent}
-        })
+        Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :nonexistent}})
 
       :ok = AgentServer.cast(pid, cancel_signal)
 
@@ -572,7 +566,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       GenServer.stop(pid)
     end
 
-    test "can cancel and re-register same job_id", %{aikido: aikido} do
+    test("can cancel and re-register same job_id", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-8", aikido: aikido)
 
@@ -592,11 +586,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       end)
 
       cancel_signal =
-        Signal.new!(%{
-          type: "cancel_cron",
-          source: "/test",
-          data: %{job_id: :toggle}
-        })
+        Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :toggle}})
 
       :ok = AgentServer.cast(pid, cancel_signal)
 
@@ -614,16 +604,14 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal2)
-
       job_pid = await_state_value(pid, fn s -> Map.get(s.cron_jobs, :toggle) end)
       assert is_pid(job_pid)
-
       GenServer.stop(pid)
     end
   end
 
-  describe "cleanup on agent termination" do
-    test "cron jobs are cleaned up when agent stops normally", %{aikido: aikido} do
+  describe("cleanup on agent termination") do
+    test("cron jobs are cleaned up when agent stops normally", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-10", aikido: aikido)
 
@@ -635,17 +623,14 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-
       job_pid = await_state_value(pid, fn s -> Map.get(s.cron_jobs, :cleanup_test) end)
       assert is_pid(job_pid)
       assert Process.alive?(job_pid)
-
       GenServer.stop(pid)
-
       eventually(fn -> not Process.alive?(job_pid) end)
     end
 
-    test "multiple cron jobs are all cleaned up on termination", %{aikido: aikido} do
+    test("multiple cron jobs are all cleaned up on termination", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-11", aikido: aikido)
 
@@ -684,8 +669,8 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
     end
   end
 
-  describe "job scoping" do
-    test "different agents can use same job_id without collision", %{aikido: aikido} do
+  describe("job scoping") do
+    test("different agents can use same job_id without collision", %{aikido: aikido}) do
       {:ok, pid1} =
         AgentServer.start_link(agent_module: CronTestAgent, id: "cron-test-12a", aikido: aikido)
 
@@ -705,11 +690,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
       job_pid1 = await_state_value(pid1, fn s -> Map.get(s.cron_jobs, :shared_name) end)
       job_pid2 = await_state_value(pid2, fn s -> Map.get(s.cron_jobs, :shared_name) end)
-
       refute job_pid1 == job_pid2
       assert Process.alive?(job_pid1)
       assert Process.alive?(job_pid2)
-
       GenServer.stop(pid1)
       GenServer.stop(pid2)
     end

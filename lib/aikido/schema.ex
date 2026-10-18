@@ -13,28 +13,33 @@ defmodule Aikido.Schema do
   @type t :: keyword() | module()
 
   def fields(schema) when is_list(schema) do
-    if Enum.all?(schema, fn entry -> match?({_, opts} when is_list(opts), entry) end) do
-      schema
-    else
-      []
+    cond do
+      Enum.all?(schema, fn entry -> match?({_, opts} when is_list(opts), entry) end) ->
+        schema
+
+      Enum.all?(schema, &is_struct/1) ->
+        Enum.map(schema, fn field ->
+          {field.name,
+           field
+           |> Map.from_struct()
+           |> Map.take([:type, :constraints, :default, :allow_nil?, :description])
+           |> Enum.reject(fn {_key, value} -> is_nil(value) end)}
+        end)
+
+      true ->
+        []
     end
   end
 
   def fields(module) when is_atom(module) and not is_nil(module) do
     cond do
       Spark.Dsl.is?(module, Ash.Resource) ->
-        Aikido.Ash.Attributes.fields(Ash.Resource.Info.attributes(module))
+        fields(Ash.Resource.Info.attributes(module))
 
       Spark.Dsl.is?(module, Ash.TypedStruct) ->
         module
         |> Spark.Dsl.Extension.get_entities([:typed_struct])
-        |> Enum.map(fn field ->
-          {field.name,
-           field
-           |> Map.from_struct()
-           |> Map.take([:type, :constraints, :default, :allow_nil?, :description])
-           |> Map.to_list()}
-        end)
+        |> fields()
 
       true ->
         if function_exported?(module, :__ash_fields__, 0), do: module.__ash_fields__(), else: []

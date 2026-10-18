@@ -1,6 +1,5 @@
 defmodule AikidoTest.AgentServer.SignalRouterTest do
   use ExUnit.Case, async: true
-
   alias Aikido.AgentServer.SignalRouter
   alias Aikido.AgentServer.State
   alias Aikido.AgentServer.State.Lifecycle
@@ -8,30 +7,68 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
 
   defmodule TestAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "test_action"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name "test_action"
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(_signal, _slice, _opts, _ctx), do: {:ok, %{}, []}
+    defp reduce(_signal, _slice, _opts, _ctx) do
+      {:ok, %{}, []}
+    end
   end
 
   defmodule AnotherAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "another_action"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name "another_action"
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(_signal, _slice, _opts, _ctx), do: {:ok, %{}, []}
+    defp reduce(_signal, _slice, _opts, _ctx) do
+      {:ok, %{}, []}
+    end
   end
 
   defmodule SliceWithRoutes do
@@ -39,15 +76,15 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
     use Aikido.Slice
 
     slice do
-      name "slice_with_routes"
+      name("slice_with_routes")
 
       schema do
       end
     end
 
     signal_routes do
-      route "slice.custom", AikidoTest.AgentServer.SignalRouterTest.TestAction
-      route "slice.priority", AikidoTest.AgentServer.SignalRouterTest.TestAction, priority: -20
+      route("slice.custom", AikidoTest.AgentServer.SignalRouterTest.TestAction)
+      route("slice.priority", AikidoTest.AgentServer.SignalRouterTest.TestAction, priority: -20)
     end
   end
 
@@ -56,12 +93,12 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
     use Aikido.Agent
 
     agent do
-      name "agent_with_routes"
+      name("agent_with_routes")
     end
 
     signal_routes do
-      route "agent.action", AikidoTest.AgentServer.SignalRouterTest.TestAction
-      route "agent.priority", AikidoTest.AgentServer.SignalRouterTest.TestAction, priority: 10
+      route("agent.action", AikidoTest.AgentServer.SignalRouterTest.TestAction)
+      route("agent.priority", AikidoTest.AgentServer.SignalRouterTest.TestAction, priority: 10)
     end
   end
 
@@ -70,11 +107,11 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
     use Aikido.Agent
 
     agent do
-      name "agent_with_configured_routes"
+      name("agent_with_configured_routes")
     end
 
     signal_routes do
-      route "agent.configured", AikidoTest.AgentServer.SignalRouterTest.TestAction
+      route("agent.configured", AikidoTest.AgentServer.SignalRouterTest.TestAction)
     end
   end
 
@@ -83,7 +120,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
     use Aikido.Agent
 
     agent do
-      name "agent_without_routes"
+      name("agent_without_routes")
     end
   end
 
@@ -92,7 +129,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
     use Aikido.Agent
 
     agent do
-      name "agent_with_slices"
+      name("agent_with_slices")
     end
 
     slices do
@@ -138,7 +175,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
     }
   end
 
-  describe "build/1 — agent routes" do
+  describe("build/1 — agent routes") do
     test "collects routes declared via use Aikido.Agent, signal_routes:" do
       router = SignalRouter.build(build_state(AgentWithConfiguredRoutes))
       assert {:ok, [TestAction]} = AikidoRouter.route(router, signal("agent.configured"))
@@ -156,15 +193,11 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
     end
   end
 
-  describe "build/1 — slice routes" do
+  describe("build/1 — slice routes") do
     test "collects routes from slices using their declared (absolute) paths" do
       router = SignalRouter.build(build_state(AgentWithSlices))
-
-      assert {:ok, [TestAction]} =
-               AikidoRouter.route(router, signal("slice.custom"))
-
-      assert {:ok, [TestAction]} =
-               AikidoRouter.route(router, signal("slice.priority"))
+      assert {:ok, [TestAction]} = AikidoRouter.route(router, signal("slice.custom"))
+      assert {:ok, [TestAction]} = AikidoRouter.route(router, signal("slice.priority"))
     end
 
     test "non-matching signals fall through to error" do
@@ -173,7 +206,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
     end
   end
 
-  describe "build/1 — built-in routes" do
+  describe("build/1 — built-in routes") do
     test "every agent has the aikido.agent.query.children built-in route" do
       router = SignalRouter.build(build_state(AgentWithoutRoutes))
 

@@ -148,7 +148,7 @@ defmodule Aikido.Instruction do
     field :action, Aikido.Types.Validated,
       allow_nil?: false,
       constraints: [
-        type: :atom,
+        type: :term,
         constraints: [],
         validation: {__MODULE__, :validate_action_module, []}
       ],
@@ -163,7 +163,6 @@ defmodule Aikido.Instruction do
     field :opts, {:array, :term}, allow_nil?: false, default: [], description: "Runtime options"
   end
 
-  @schema __MODULE__
   defoverridable new!: 1
 
   @type t :: %__MODULE__{}
@@ -177,7 +176,7 @@ defmodule Aikido.Instruction do
   @doc false
   def validate_action_module(value, _opts \\ []) do
     cond do
-      not is_atom(value) ->
+      not (is_atom(value) or (is_tuple(value) and tuple_size(value) == 2)) ->
         {:error, "must be an atom"}
 
       is_nil(value) ->
@@ -312,6 +311,11 @@ defmodule Aikido.Instruction do
     {:ok, %{instruction | context: Map.merge(instruction.context, context), opts: merged_opts}}
   end
 
+  def normalize_single({resource, action} = reference, context, opts)
+      when is_atom(resource) and is_atom(action) and not is_nil(action) do
+    {:ok, new!(%{action: reference, params: %{}, context: context || %{}, opts: opts})}
+  end
+
   # Single action module
   def normalize_single(action, context, opts) when is_atom(action) do
     context = context || %{}
@@ -319,7 +323,8 @@ defmodule Aikido.Instruction do
   end
 
   # Action tuple with params
-  def normalize_single({action, params}, context, opts) when is_atom(action) do
+  def normalize_single({action, params}, context, opts)
+      when is_atom(action) or (is_tuple(action) and tuple_size(action) == 2) do
     context = context || %{}
 
     case normalize_params(params) do
@@ -332,7 +337,8 @@ defmodule Aikido.Instruction do
   end
 
   # Action tuple with context
-  def normalize_single({action, params, item_context}, context, opts) when is_atom(action) do
+  def normalize_single({action, params, item_context}, context, opts)
+      when is_atom(action) or (is_tuple(action) and tuple_size(action) == 2) do
     context = context || %{}
     item_context = item_context || %{}
     merged_context = Map.merge(item_context, context)
@@ -354,7 +360,7 @@ defmodule Aikido.Instruction do
 
   # Action tuple with context and opts
   def normalize_single({action, params, item_context, item_opts}, context, opts)
-      when is_atom(action) do
+      when is_atom(action) or (is_tuple(action) and tuple_size(action) == 2) do
     context = context || %{}
     item_context = item_context || %{}
     merged_context = Map.merge(item_context, context)
@@ -500,7 +506,7 @@ defmodule Aikido.Instruction do
     if Enum.empty?(unregistered) do
       :ok
     else
-      unregistered_str = Enum.join(unregistered, ", ")
+      unregistered_str = Enum.map_join(unregistered, ", ", &inspect/1)
 
       {:error,
        Error.config_error("Actions not allowed: #{unregistered_str}", %{
@@ -518,7 +524,9 @@ defmodule Aikido.Instruction do
   end
 
   defp validate_action_is_atom(attrs) do
-    if is_atom(Map.get(attrs, :action)), do: :ok, else: {:error, :invalid_action}
+    if is_atom(Map.get(attrs, :action)) or is_tuple(Map.get(attrs, :action)),
+      do: :ok,
+      else: {:error, :invalid_action}
   end
 
   defp apply_defaults(attrs) do
@@ -530,7 +538,7 @@ defmodule Aikido.Instruction do
   end
 
   defp cast_with_ash(attrs_with_defaults) do
-    case Aikido.Schema.cast(@schema, attrs_with_defaults) do
+    case Ash.Type.apply_constraints(:struct, attrs_with_defaults, __MODULE__.subtype_constraints()) do
       {:ok, validated_struct} ->
         {:ok, validated_struct}
 

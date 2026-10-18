@@ -241,7 +241,7 @@ defmodule Aikido.Dsl.Agent.Transformers.GenerateAccessors do
       end
 
       defp __resolve_slice_paths__(action)
-           when is_atom(action) and not is_nil(action) do
+           when not is_nil(action) do
         # Resolution order:
         #   1. Every mount that owns the action via its `signal_routes`,
         #      plus the agent's own path if the action is also declared on
@@ -265,7 +265,7 @@ defmodule Aikido.Dsl.Agent.Transformers.GenerateAccessors do
         do: [Map.get(Aikido.Dsl.Agent.Info.agent_options(__MODULE__), :path)]
 
       defp __fallback_slice_path__(action) do
-        case Map.get(Aikido.Dsl.Action.Info.action_options(action), :path) do
+        case Map.get(Aikido.ActionRef.action_options(action), :path) do
           path when is_atom(path) and not is_nil(path) -> path
           _ -> Map.get(Aikido.Dsl.Agent.Info.agent_options(__MODULE__), :path)
         end

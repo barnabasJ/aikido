@@ -204,7 +204,7 @@ defmodule AikidoTest.AgentTest do
     test "all-or-nothing batch: middle instruction errors halts the batch and returns the input agent unchanged" do
       agent = TestAgents.Basic.new(state: %{counter: 0})
 
-      assert {:error, %Aikido.Error.ExecutionError{}} =
+      assert {:error, %Ash.Error.Unknown{}} =
                TestAgents.Basic.cmd(agent, [
                  {TestActions.Add, %{value: 5, amount: 3}},
                  {TestActions.FailingAction, %{reason: "halted"}},

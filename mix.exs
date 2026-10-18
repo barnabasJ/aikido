@@ -176,7 +176,7 @@ defmodule Aikido.MixProject do
   defp aliases do
     dsl_extensions =
       Enum.join(
-        ~w(Aikido.Dsl.Agent Aikido.Dsl.Slice Aikido.Dsl.Middleware Aikido.Dsl.Action
+        ~w(Aikido.Dsl.Agent Aikido.Dsl.Slice Aikido.Dsl.Middleware
            Aikido.Dsl.Sensor Aikido.Dsl.Instance Aikido.Ash.Agent Aikido.Ash.Slice
            Aikido.Ash.Team Aikido.Ash.AI Aikido.Ash.Domain Aikido.Slices.AiReact
            Aikido.Slices.Memory Aikido.Slices.Identity Aikido.Slices.Thread Ash.TypedStruct.Dsl),

@@ -1,13 +1,5 @@
 defmodule Aikido.Slices.AiWorker do
-  @moduledoc """
-  Bridges the team task protocol to an AiReact slice mounted at `:ai`.
-
-  Mount at a separate path, e.g. `slice :work, Aikido.Slices.AiWorker`. A task
-  is accepted on `harness.task`, launches a model turn by signal, and reports
-  a correlated result to the assigning team. Observation is deferred to a
-  separate signal so it sees the committed AiReact transition regardless of
-  routing order. Each action writes only its own slice.
-  """
+  @moduledoc "Bridges the team task protocol to an AiReact slice mounted at `:ai`.\n\nMount at a separate path, e.g. `slice :work, Aikido.Slices.AiWorker`. A task\nis accepted on `harness.task`, launches a model turn by signal, and reports\na correlated result to the assigning team. Observation is deferred to a\nseparate signal so it sees the committed AiReact transition regardless of\nrouting order. Each action writes only its own slice.\n"
   use Aikido.Slice
 
   slice do
@@ -28,21 +20,38 @@ end
 
 defmodule Aikido.Slices.AiWorker.Accept do
   @moduledoc false
-  use Aikido.Action
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "accept_ai_task"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      argument :task_id, :string, allow_nil?: false
+      argument :member, :term, allow_nil?: false
+      argument :attempt, :string, allow_nil?: false
+      argument :reply_to, :term, allow_nil?: false
+      argument :text, :string, allow_nil?: false
 
-  action do
-    name "accept_ai_task"
+      run fn input, _context ->
+        runtime = input.context[:aikido] || %{}
+        params = Map.delete(input.arguments, :state)
+        signal = Map.fetch!(runtime, :signal)
+        signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-    schema do
-      attribute :task_id, :string, allow_nil?: false
-      attribute :member, :term, allow_nil?: false
-      attribute :attempt, :string, allow_nil?: false
-      attribute :reply_to, :term, allow_nil?: false
-      attribute :text, :string, allow_nil?: false
+        case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+          {:ok, state, directives} ->
+            Aikido.ActionResult.new(state: state, directives: directives)
+
+          {:error, _} = error ->
+            error
+
+          other ->
+            {:error, "Unexpected return shape: #{inspect(other)}"}
+        end
+      end
     end
   end
 
-  def run(%{data: data}, state, _opts, context) do
+  defp reduce(%{data: data}, state, _opts, context) do
     if state.pending || context.agent.state.ai.status == :running do
       failure =
         Jido.Signal.new!(
@@ -67,16 +76,33 @@ end
 
 defmodule Aikido.Slices.AiWorker.Observe do
   @moduledoc false
-  use Aikido.Action
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "observe_ai_task"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
 
-  action do
-    name "observe_ai_task"
+      run fn input, _context ->
+        runtime = input.context[:aikido] || %{}
+        params = Map.delete(input.arguments, :state)
+        signal = Map.fetch!(runtime, :signal)
+        signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-    schema do
+        case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+          {:ok, state, directives} ->
+            Aikido.ActionResult.new(state: state, directives: directives)
+
+          {:error, _} = error ->
+            error
+
+          other ->
+            {:error, "Unexpected return shape: #{inspect(other)}"}
+        end
+      end
     end
   end
 
-  def run(_signal, state, _opts, context) do
+  defp reduce(_signal, state, _opts, context) do
     if state.pending do
       observe = Jido.Signal.new!("harness.ai.observe", %{task_id: state.pending.task_id})
       {:ok, state, [Aikido.Directives.emit_to_pid(observe, context.agent_pid)]}
@@ -88,27 +114,51 @@ end
 
 defmodule Aikido.Slices.AiWorker.Settle do
   @moduledoc false
-  use Aikido.Action
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "settle_ai_task"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
 
-  action do
-    name "settle_ai_task"
+      run fn input, _context ->
+        runtime = input.context[:aikido] || %{}
+        params = Map.delete(input.arguments, :state)
+        signal = Map.fetch!(runtime, :signal)
+        signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-    schema do
+        case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+          {:ok, state, directives} ->
+            Aikido.ActionResult.new(state: state, directives: directives)
+
+          {:error, _} = error ->
+            error
+
+          other ->
+            {:error, "Unexpected return shape: #{inspect(other)}"}
+        end
+      end
     end
   end
 
-  def run(signal, state, _opts, context) do
+  defp reduce(signal, state, _opts, context) do
     ai = context.agent.state.ai
     pending = state.pending
 
     if pending && signal.data.task_id == pending.task_id && ai.request_id == pending.task_id &&
          ai.status in [:completed, :failed] do
       type =
-        if ai.status == :completed,
-          do: "aikido.ash.team.task.completed",
-          else: "aikido.ash.team.task.failed"
+        if ai.status == :completed do
+          "aikido.ash.team.task.completed"
+        else
+          "aikido.ash.team.task.failed"
+        end
 
-      result = if ai.status == :completed, do: ai.result, else: ai.error
+      result =
+        if ai.status == :completed do
+          ai.result
+        else
+          ai.error
+        end
 
       reply =
         Jido.Signal.new!(

@@ -1,27 +1,6 @@
 defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
-  @moduledoc """
-  Per ADR 0019 §1 / task 0015, directives mutate **no** state — neither
-  `agent.state` (domain) nor `%AgentServer.State{}` (runtime). The
-  `DirectiveExec.exec/3` contract enforces this in the type system
-  (return is `:ok | {:stop, term()}` only).
-
-  This module tests the runtime end of the rule for the Step-1
-  violators (SpawnAgent, AdoptChild, Cron, CronCancel,
-  RunInstruction):
-
-  1. Apply the directive **inside the agent process** via a `state/3`
-     selector, capturing pre/post state. Asserts byte-equality — the
-     directive's `exec/3` does not mutate.
-  2. Separately, assert that the natural cascade
-     (`maybe_track_child_started`, `maybe_track_cron_*`, or the routed
-     handler action for RunInstruction) eventually populates the
-     relevant field via subscription-based `await_state_value/3`.
-
-  StartNode/StopNode have their own test in
-  `test/aikido/ash_team_test.exs`.
-  """
+  @moduledoc "Per ADR 0019 §1 / task 0015, directives mutate **no** state — neither\n`agent.state` (domain) nor `%AgentServer.State{}` (runtime). The\n`DirectiveExec.exec/3` contract enforces this in the type system\n(return is `:ok | {:stop, term()}` only).\n\nThis module tests the runtime end of the rule for the Step-1\nviolators (SpawnAgent, AdoptChild, Cron, CronCancel,\nRunInstruction):\n\n1. Apply the directive **inside the agent process** via a `state/3`\n   selector, capturing pre/post state. Asserts byte-equality — the\n   directive's `exec/3` does not mutate.\n2. Separately, assert that the natural cascade\n   (`maybe_track_child_started`, `maybe_track_cron_*`, or the routed\n   handler action for RunInstruction) eventually populates the\n   relevant field via subscription-based `await_state_value/3`.\n\nStartNode/StopNode have their own test in\n`test/aikido/ash_team_test.exs`.\n"
   use AikidoTest.Case, async: true
-
   alias Aikido.AgentServer
   alias Aikido.AgentServer.DirectiveExec
   alias Aikido.Directives
@@ -29,17 +8,34 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
 
   defmodule EmitDirectiveAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "emit_directive"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
+        argument(:directive, :term, allow_nil?: false)
 
-    action do
-      name("emit_directive")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
-        attribute(:directive, :term, allow_nil?: false)
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(%Jido.Signal{data: %{directive: directive}}, slice, _opts, _ctx) do
+    defp reduce(%Jido.Signal{data: %{directive: directive}}, slice, _opts, _ctx) do
       {:ok, slice || %{}, [directive]}
     end
   end
@@ -64,35 +60,72 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
 
   defmodule SuccessAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "strict_success"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name("strict_success")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
+
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
+      end
     end
 
-    def run(_signal, _slice, _opts, _ctx) do
+    defp reduce(_signal, _slice, _opts, _ctx) do
       {:ok, %{ran: true}, []}
     end
   end
 
   defmodule CaptureAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "strict_capture"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
+        argument(:status, :atom, allow_nil?: false)
+        argument(:result, :map, default: %{})
+        argument(:reason, :term, default: nil)
+        argument(:effects, :term, default: [])
+        argument(:instruction, :term, default: nil)
+        argument(:meta, :map, default: %{})
 
-    action do
-      name("strict_capture")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
-        attribute(:status, :atom, allow_nil?: false)
-        attribute(:result, :map, default: %{})
-        attribute(:reason, :term, default: nil)
-        attribute(:effects, :term, default: [])
-        attribute(:instruction, :term, default: nil)
-        attribute(:meta, :map, default: %{})
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(%Jido.Signal{data: params}, slice, _opts, _ctx) do
+    defp reduce(%Jido.Signal{data: params}, slice, _opts, _ctx) do
       slice = slice || %{}
       {:ok, Map.put(slice, :captured, params.status), []}
     end
@@ -128,17 +161,10 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
     Signal.new!(%{type: "test.directive", source: "/test", data: %{directive: directive}})
   end
 
-  describe "SpawnAgent" do
-    test "directive does not write state.children; cascade does", %{aikido: aikido} do
+  describe("SpawnAgent") do
+    test("directive does not write state.children; cascade does", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, HarnessAgent, id: "strict-spawn")
-
-      directive = %Directives.SpawnAgent{
-        agent: HarnessAgent,
-        tag: :worker,
-        opts: %{},
-        meta: %{}
-      }
-
+      directive = %Directives.SpawnAgent{agent: HarnessAgent, tag: :worker, opts: %{}, meta: %{}}
       assert_no_runtime_mutation(pid, directive, fn s -> s.children end)
 
       child_info =
@@ -153,17 +179,11 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
     end
   end
 
-  describe "AdoptChild" do
-    test "directive does not write state.children; cascade does", %{aikido: aikido} do
+  describe("AdoptChild") do
+    test("directive does not write state.children; cascade does", %{aikido: aikido}) do
       parent_pid = start_server(%{aikido: aikido}, HarnessAgent, id: "strict-adopt-parent")
       orphan_pid = start_server(%{aikido: aikido}, HarnessAgent, id: "strict-adopt-orphan")
-
-      directive = %Directives.AdoptChild{
-        child: orphan_pid,
-        tag: :adopted,
-        meta: %{}
-      }
-
+      directive = %Directives.AdoptChild{child: orphan_pid, tag: :adopted, meta: %{}}
       assert_no_runtime_mutation(parent_pid, directive, fn s -> s.children end)
 
       child_info =
@@ -178,8 +198,8 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
     end
   end
 
-  describe "Cron" do
-    test "directive does not write state.cron_*; cascade does", %{aikido: aikido} do
+  describe("Cron") do
+    test("directive does not write state.cron_*; cascade does", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, HarnessAgent, id: "strict-cron")
 
       directive = %Directives.Cron{
@@ -232,8 +252,8 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
     end
   end
 
-  describe "CronCancel" do
-    test "directive does not write state.cron_*; cascade does", %{aikido: aikido} do
+  describe("CronCancel") do
+    test("directive does not write state.cron_*; cascade does", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, HarnessAgent, id: "strict-cron-cancel")
 
       AgentServer.cast(
@@ -299,10 +319,9 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
     end
   end
 
-  describe "RunInstruction" do
-    test "directive does not write agent.state; the routed action does", %{aikido: aikido} do
+  describe("RunInstruction") do
+    test("directive does not write agent.state; the routed action does", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, RoutedAgent, id: "strict-run-instr")
-
       instruction = Aikido.Instruction.new!(%{action: SuccessAction})
 
       directive =

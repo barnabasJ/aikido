@@ -161,7 +161,7 @@ defmodule Aikido.AgentServer.State do
   @type t :: %__MODULE__{}
 
   @doc false
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 
   @doc """
@@ -230,7 +230,7 @@ defmodule Aikido.AgentServer.State do
         debug_max_events: Aikido.Observe.Config.debug_max_events(opts.aikido)
       }
 
-      Aikido.Schema.cast(@schema, attrs)
+      Ash.Type.apply_constraints(:struct, attrs, __MODULE__.subtype_constraints())
     end
   end
 

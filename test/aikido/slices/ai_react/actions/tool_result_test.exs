@@ -1,9 +1,8 @@
 defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
   use ExUnit.Case, async: true
-
   alias Aikido.AI.TestActions.TestAdd
   alias Aikido.Slices.AiReact
-  alias Aikido.Slices.AiReact.Actions.ToolResult
+  nil
   alias Aikido.Slices.AiReact.Directives.LLMCall
   alias ReqLLM.Context
 
@@ -43,12 +42,17 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
     slice = slice_with_pending(calls)
 
     {:ok, new_slice, directives} =
-      ToolResult.run(signal("req_1", "call_1", "test_add", "{\"result\":3}"), slice, %{}, %{})
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :tool_result},
+        signal("req_1", "call_1", "test_add", "{\"result\":3}"),
+        slice,
+        %{},
+        %{}
+      )
 
     assert directives == []
     assert length(new_slice.tool_results_received) == 1
     assert new_slice.pending_tool_calls == calls
-
     messages = Context.to_list(new_slice.context)
     assert List.last(messages).role == :tool
   end
@@ -58,12 +62,17 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
     slice = slice_with_pending(calls)
 
     {:ok, new_slice, [%LLMCall{} = directive]} =
-      ToolResult.run(signal("req_1", "call_1", "test_add", "{\"result\":3}"), slice, %{}, %{})
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :tool_result},
+        signal("req_1", "call_1", "test_add", "{\"result\":3}"),
+        slice,
+        %{},
+        %{}
+      )
 
     assert new_slice.pending_tool_calls == []
     assert new_slice.tool_results_received == []
     assert new_slice.previous_tool_signature == AiReact.tool_call_signature(calls)
-
     assert directive.context == new_slice.context
     assert directive.model == slice.model
     assert directive.tools == slice.tools
@@ -74,16 +83,20 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
   test "appends the cycle warning when the batch repeats the previous signature" do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
     previous_signature = AiReact.tool_call_signature(calls)
-
     slice = slice_with_pending(calls, previous_tool_signature: previous_signature)
 
     {:ok, new_slice, [%LLMCall{} = directive]} =
-      ToolResult.run(signal("req_1", "call_1", "test_add", "{\"result\":3}"), slice, %{}, %{})
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :tool_result},
+        signal("req_1", "call_1", "test_add", "{\"result\":3}"),
+        slice,
+        %{},
+        %{}
+      )
 
     messages = Context.to_list(new_slice.context)
     last = List.last(messages)
     assert last.role == :user
-
     text = last.content |> hd() |> Map.get(:text)
     assert text == AiReact.cycle_warning()
     assert directive.context == new_slice.context
@@ -94,7 +107,13 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
     slice = slice_with_pending(calls, previous_tool_signature: nil)
 
     {:ok, new_slice, [%LLMCall{}]} =
-      ToolResult.run(signal("req_1", "call_1", "test_add", "{\"result\":3}"), slice, %{}, %{})
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :tool_result},
+        signal("req_1", "call_1", "test_add", "{\"result\":3}"),
+        slice,
+        %{},
+        %{}
+      )
 
     messages = Context.to_list(new_slice.context)
     refute List.last(messages).role == :user
@@ -105,7 +124,13 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
     slice = slice_with_pending(calls, request_id: "req_active")
 
     {:ok, returned, []} =
-      ToolResult.run(signal("req_old", "call_1", "test_add", "{}"), slice, %{}, %{})
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :tool_result},
+        signal("req_old", "call_1", "test_add", "{}"),
+        slice,
+        %{},
+        %{}
+      )
 
     assert returned == slice
   end
@@ -115,7 +140,13 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
     slice = %{slice_with_pending(calls) | status: :completed, result: "earlier"}
 
     {:ok, returned, []} =
-      ToolResult.run(signal("req_1", "call_1", "test_add", "{}"), slice, %{}, %{})
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :tool_result},
+        signal("req_1", "call_1", "test_add", "{}"),
+        slice,
+        %{},
+        %{}
+      )
 
     assert returned == slice
   end

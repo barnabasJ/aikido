@@ -1,20 +1,36 @@
 defmodule AikidoTest.AgentServer.IdentitySignalsTest do
   use AikidoTest.Case, async: false
-
   alias Aikido.AgentServer
 
   defmodule WatcherAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "identity_watcher"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name("identity_watcher")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(%Jido.Signal{type: type, data: data}, slice, _opts, _ctx) do
+    defp reduce(%Jido.Signal{type: type, data: data}, slice, _opts, _ctx) do
       events = Map.get(slice, :identity_events, [])
       {:ok, %{slice | identity_events: events ++ [%{type: type, data: data}]}, []}
     end
@@ -41,8 +57,8 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest do
     end
   end
 
-  describe "partition_assigned signal" do
-    test "emits at startup with the configured partition", %{aikido: aikido} do
+  describe("partition_assigned signal") do
+    test("emits at startup with the configured partition", %{aikido: aikido}) do
       pid =
         start_server(%{aikido: aikido}, WatcherAgent,
           id: "identity-1",
@@ -50,9 +66,7 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest do
         )
 
       :ok = AgentServer.await_ready(pid)
-
-      {:ok, events} =
-        AgentServer.state(pid, fn s -> {:ok, s.agent.state.app.identity_events} end)
+      {:ok, events} = AgentServer.state(pid, fn s -> {:ok, s.agent.state.app.identity_events} end)
 
       assert Enum.any?(events, fn e ->
                e.type == "aikido.agent.identity.partition_assigned" and
@@ -60,16 +74,13 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest do
              end)
     end
 
-    test "emits with nil partition when none is set", %{aikido: aikido} do
+    test("emits with nil partition when none is set", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, WatcherAgent, id: "identity-2")
       :ok = AgentServer.await_ready(pid)
-
-      {:ok, events} =
-        AgentServer.state(pid, fn s -> {:ok, s.agent.state.app.identity_events} end)
+      {:ok, events} = AgentServer.state(pid, fn s -> {:ok, s.agent.state.app.identity_events} end)
 
       assert Enum.any?(events, fn e ->
-               e.type == "aikido.agent.identity.partition_assigned" and
-                 e.data[:partition] == nil
+               e.type == "aikido.agent.identity.partition_assigned" and e.data[:partition] == nil
              end)
     end
   end

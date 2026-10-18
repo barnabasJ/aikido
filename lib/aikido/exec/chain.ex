@@ -92,6 +92,11 @@ defmodule Aikido.Exec.Chain do
 
   @spec process_action(chain_action(), map(), map(), keyword()) ::
           {:cont, ok_t()} | {:halt, chain_result()}
+  defp process_action({resource, name} = action, params, context, opts)
+       when is_atom(resource) and is_atom(name) do
+    run_action(action, params, context, opts)
+  end
+
   defp process_action(action, params, context, opts) when is_atom(action) do
     run_action(action, params, context, opts)
   end
@@ -99,7 +104,8 @@ defmodule Aikido.Exec.Chain do
   @spec process_action({module(), keyword()} | {module(), map()}, map(), map(), keyword()) ::
           {:cont, ok_t()} | {:halt, chain_result()}
   defp process_action({action, action_opts}, params, context, opts)
-       when is_atom(action) and (is_list(action_opts) or is_map(action_opts)) do
+       when (is_atom(action) or is_tuple(action)) and
+              (is_list(action_opts) or is_map(action_opts)) do
     case validate_action_params(action_opts) do
       {:ok, action_params} ->
         merged_params = Map.merge(params, action_params)

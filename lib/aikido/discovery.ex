@@ -64,7 +64,7 @@ defmodule Aikido.Discovery do
   All processes can read concurrently without contention.
   """
 
-  alias Aikido.Dsl.Action.Info, as: ActionInfo
+  alias Aikido.ActionRef, as: ActionInfo
   alias Aikido.Dsl.Agent.Info, as: AgentInfo
   alias Aikido.Dsl.Sensor.Info, as: SensorInfo
   alias Aikido.Dsl.Slice.Info, as: SliceInfo
@@ -229,7 +229,7 @@ defmodule Aikido.Discovery do
     %{
       last_updated: DateTime.utc_now(),
       components: %{
-        actions: discover_spark_hosts(Aikido.Action, &action_metadata/1),
+        actions: discover_native_actions(),
         sensors: discover_spark_hosts(Aikido.Sensor, &sensor_metadata/1),
         agents: discover_spark_hosts(Aikido.Agent, &agent_metadata/1),
         slices: discover_spark_hosts(Aikido.Slice, &slice_metadata/1),
@@ -243,6 +243,13 @@ defmodule Aikido.Discovery do
     |> Enum.flat_map(&modules_for/1)
     |> Enum.filter(&(Code.ensure_loaded?(&1) and Spark.Dsl.is?(&1, parent_dsl)))
     |> Enum.map(metadata_fn)
+  end
+
+  defp discover_native_actions do
+    loaded_applications()
+    |> Enum.flat_map(&modules_for/1)
+    |> Enum.filter(&Aikido.ActionRef.valid?/1)
+    |> Enum.map(&action_metadata/1)
   end
 
   defp discover_demos do

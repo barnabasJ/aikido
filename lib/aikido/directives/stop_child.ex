@@ -47,6 +47,6 @@ defmodule Aikido.Directives.StopChild do
   @type t :: %__MODULE__{}
 
   @doc "Returns the Ash type for StopChild."
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 end

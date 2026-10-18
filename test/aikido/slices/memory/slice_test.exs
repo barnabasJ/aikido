@@ -1,13 +1,12 @@
 defmodule AikidoTest.Memory.SliceTest do
   use ExUnit.Case, async: true
-
   alias Aikido.Dsl.Agent.Info, as: AgentInfo
   alias Aikido.Dsl.Slice.Info, as: SliceInfo
   alias Aikido.Slices.Memory, as: MemorySlice
   alias Aikido.Slices.Memory.Actions
   alias Aikido.Slices.Memory.State
 
-  describe "slice metadata" do
+  describe("slice metadata") do
     test "name is memory" do
       assert Map.get(SliceInfo.slice_options(MemorySlice), :name) == "memory"
     end
@@ -25,14 +24,14 @@ defmodule AikidoTest.Memory.SliceTest do
       assert MapSet.equal?(
                action_set,
                MapSet.new([
-                 Actions.Ensure,
-                 Actions.PutSpace,
-                 Actions.UpdateSpace,
-                 Actions.EnsureSpace,
-                 Actions.DeleteSpace,
-                 Actions.PutInSpace,
-                 Actions.DeleteFromSpace,
-                 Actions.AppendToSpace
+                 {Aikido.Slices.Memory.Actions, :ensure},
+                 {Aikido.Slices.Memory.Actions, :put_space},
+                 {Aikido.Slices.Memory.Actions, :update_space},
+                 {Aikido.Slices.Memory.Actions, :ensure_space},
+                 {Aikido.Slices.Memory.Actions, :delete_space},
+                 {Aikido.Slices.Memory.Actions, :put_in_space},
+                 {Aikido.Slices.Memory.Actions, :delete_from_space},
+                 {Aikido.Slices.Memory.Actions, :append_to_space}
                ])
              )
     end
@@ -61,21 +60,20 @@ defmodule AikidoTest.Memory.SliceTest do
     end
   end
 
-  describe "agent integration" do
+  describe("agent integration") do
     defmodule AgentWithMemory do
       use Aikido.Agent
 
       agent do
-        name "memory_slice_test_agent"
+        name("memory_slice_test_agent")
       end
     end
 
     defmodule AgentWithoutMemory do
-      use Aikido.Agent,
-        default_slices: %{memory: false}
+      use Aikido.Agent, default_slices: %{memory: false}
 
       agent do
-        name "memory_slice_test_no_memory"
+        name("memory_slice_test_no_memory")
       end
     end
 
@@ -89,7 +87,10 @@ defmodule AikidoTest.Memory.SliceTest do
 
     test "memory can be attached after creation via Ensure action" do
       agent = AgentWithMemory.new()
-      {:ok, agent, []} = AgentWithMemory.cmd(agent, {Aikido.Slices.Memory.Actions.Ensure, %{}})
+
+      {:ok, agent, []} =
+        AgentWithMemory.cmd(agent, {{Aikido.Slices.Memory.Actions, :ensure}, %{}})
+
       assert %State{} = agent.state[:memory]
     end
 
@@ -99,7 +100,8 @@ defmodule AikidoTest.Memory.SliceTest do
       {:ok, agent, []} =
         AgentWithMemory.cmd(
           agent,
-          {Actions.PutInSpace, %{space: :world, key: :temperature, value: 22}}
+          {{Aikido.Slices.Memory.Actions, :put_in_space},
+           %{space: :world, key: :temperature, value: 22}}
         )
 
       assert agent.state.memory.spaces[:world].data == %{temperature: 22}

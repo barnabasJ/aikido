@@ -1,31 +1,39 @@
 defmodule AikidoTest.Agent.SignalHandlingTest do
-  @moduledoc """
-  Tests signal routing through AgentServer.
-
-  Signal handling architecture:
-  1. Signals arrive at AgentServer
-  2. AgentServer routes signals to actions via strategy.signal_routes or default mapping
-  3. Actions are executed via Agent.cmd/2
-  4. on_before_cmd/2 can intercept actions for pre-processing
-  """
+  @moduledoc "Tests signal routing through AgentServer.\n\nSignal handling architecture:\n1. Signals arrive at AgentServer\n2. AgentServer routes signals to actions via strategy.signal_routes or default mapping\n3. Actions are executed via Agent.cmd/2\n4. on_before_cmd/2 can intercept actions for pre-processing\n"
   use AikidoTest.Case, async: true
-
   alias Aikido.Directives
   alias Jido.Signal
   alias AikidoTest.TestActions
 
   defmodule EmitTestAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "emit_test"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name("emit_test")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(_signal, _slice, _opts, _ctx) do
+    defp reduce(_signal, _slice, _opts, _ctx) do
       signal = Signal.new!("test.emitted", %{from: "agent"}, source: "/test")
       {:ok, %{}, [%Directives.Emit{signal: signal}]}
     end
@@ -87,8 +95,8 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
     end
   end
 
-  describe "signal routing via AgentServer" do
-    test "signals are routed to actions by type", %{aikido: aikido} do
+  describe("signal routing via AgentServer") do
+    test("signals are routed to actions by type", %{aikido: aikido}) do
       {:ok, pid} =
         Aikido.AgentServer.start_link(
           agent_module: ActionBasedAgent,
@@ -102,11 +110,10 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
 
       # The IncrementAction should have been called
       assert agent.state.domain.counter == 5
-
       GenServer.stop(pid)
     end
 
-    test "multiple signals processed in sequence", %{aikido: aikido} do
+    test("multiple signals processed in sequence", %{aikido: aikido}) do
       {:ok, pid} =
         Aikido.AgentServer.start_link(
           agent_module: ActionBasedAgent,
@@ -127,11 +134,10 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
         end)
 
       assert final_agent.state.domain.counter == 6
-
       GenServer.stop(pid)
     end
 
-    test "signal data is passed to action", %{aikido: aikido} do
+    test("signal data is passed to action", %{aikido: aikido}) do
       {:ok, pid} =
         Aikido.AgentServer.start_link(
           agent_module: ActionBasedAgent,
@@ -144,11 +150,10 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
 
       # Fixtures.RecordAction stores the :message value when present
       assert agent.state.domain.messages == ["hello"]
-
       GenServer.stop(pid)
     end
 
-    test "action can return directives", %{aikido: aikido} do
+    test("action can return directives", %{aikido: aikido}) do
       {:ok, pid} =
         Aikido.AgentServer.start_link(
           agent_module: ActionBasedAgent,
@@ -164,9 +169,9 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
       GenServer.stop(pid)
     end
 
-    test "unknown signal type short-circuits with {:error, _} but does not crash", %{
+    test("unknown signal type short-circuits with {:error, _} but does not crash", %{
       aikido: aikido
-    } do
+    }) do
       {:ok, pid} =
         Aikido.AgentServer.start_link(
           agent_module: ActionBasedAgent,
@@ -184,12 +189,11 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
       signal2 = Signal.new!("increment", %{amount: 1}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal2, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
-
       GenServer.stop(pid)
     end
   end
 
-  describe "direct cmd/2 usage" do
+  describe("direct cmd/2 usage") do
     test "cmd/2 works directly with action module tuples" do
       agent = ActionBasedAgent.new()
 

@@ -51,7 +51,7 @@ defmodule Aikido.Sensor.Spec do
   @type t :: %__MODULE__{}
 
   @doc "Returns the Ash type for Sensor.Spec."
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 
   @doc """
@@ -69,7 +69,7 @@ defmodule Aikido.Sensor.Spec do
   """
   @spec new(map()) :: {:ok, t()} | {:error, term()}
   def new(attrs) when is_map(attrs) do
-    Aikido.Schema.cast(@schema, attrs)
+    super(attrs)
   end
 
   def new(_), do: {:error, Aikido.Error.validation_error("Sensor.Spec requires a map")}

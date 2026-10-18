@@ -22,7 +22,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
       # With options
       tools = Aikido.Slices.AiReact.ToolAdapter.from_actions(actions,
         prefix: "myapp_",
-        filter: fn mod -> Aikido.Dsl.Action.Info.category(mod) == :search end
+        filter: fn mod -> Aikido.ActionRef.category(mod) == :search end
       )
 
       # Use in LLM call
@@ -68,7 +68,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
 
       # With filter
       tools = Aikido.Slices.AiReact.ToolAdapter.from_actions(actions,
-        filter: fn mod -> Aikido.Dsl.Action.Info.category(mod) == :math end
+        filter: fn mod -> Aikido.ActionRef.category(mod) == :math end
       )
   """
   @type action ::
@@ -162,10 +162,9 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
       Keyword.get_lazy(opts, :strict, fn -> infer_strict?(action_module) end)
 
     ReqLLM.Tool.new!(
-      name:
-        apply_prefix(Map.get(Aikido.Dsl.Action.Info.action_options(action_module), :name), prefix),
-      description: Map.get(Aikido.Dsl.Action.Info.action_options(action_module), :description),
-      parameter_schema: build_json_schema(Aikido.Dsl.Action.Info.schema(action_module)),
+      name: apply_prefix(Map.get(Aikido.ActionRef.action_options(action_module), :name), prefix),
+      description: Map.get(Aikido.ActionRef.action_options(action_module), :description),
+      parameter_schema: build_json_schema(Aikido.ActionRef.schema(action_module)),
       callback: &noop_callback/1,
       strict: strict
     )
@@ -220,7 +219,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
 
   def to_action_map(module) when is_atom(module) do
     if valid_action_module?(module) do
-      %{Map.get(Aikido.Dsl.Action.Info.action_options(module), :name) => module}
+      %{Map.get(Aikido.ActionRef.action_options(module), :name) => module}
     else
       %{}
     end
@@ -302,7 +301,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
   defp validate_action_module(module) when is_atom(module) do
     cond do
       not match?({:module, _}, Code.ensure_compiled(module)) -> {:error, :not_loaded}
-      not Spark.Dsl.is?(module, Aikido.Action) -> {:error, :not_an_action}
+      not Aikido.ActionRef.valid?(module) -> {:error, :not_an_action}
       true -> :ok
     end
   end
@@ -314,7 +313,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
   defp valid_action_module?({_, _} = tool), do: validate_action_module(tool) == :ok
 
   defp valid_action_module?(module) when is_atom(module) do
-    Code.ensure_loaded?(module) and Spark.Dsl.is?(module, Aikido.Action)
+    Code.ensure_loaded?(module) and Aikido.ActionRef.valid?(module)
   end
 
   defp valid_action_module?(_), do: false
@@ -322,7 +321,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
   defp tool_name({%ReqLLM.Tool{name: name}, _callback}), do: name
   defp tool_name(%ReqLLM.Tool{name: name}), do: name
   defp tool_name({_resource, action}), do: to_string(action)
-  defp tool_name(module), do: Map.get(Aikido.Dsl.Action.Info.action_options(module), :name)
+  defp tool_name(module), do: Map.get(Aikido.ActionRef.action_options(module), :name)
 
   # ============================================================================
   # Private Functions - Schema and Filtering

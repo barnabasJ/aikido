@@ -31,6 +31,6 @@ defmodule Aikido.Directives.Spawn do
   @type t :: %__MODULE__{}
 
   @doc "Returns the Ash type for Spawn."
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 end

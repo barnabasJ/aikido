@@ -1,13 +1,12 @@
 defmodule AikidoTest.Identity.SliceTest do
   use ExUnit.Case, async: true
-
   alias Aikido.Dsl.Agent.Info, as: AgentInfo
   alias Aikido.Dsl.Slice.Info, as: SliceInfo
   alias Aikido.Slices.Identity, as: IdentitySlice
   alias Aikido.Slices.Identity.Actions
   alias Aikido.Slices.Identity.State
 
-  describe "slice metadata" do
+  describe("slice metadata") do
     test "name is identity" do
       assert Map.get(SliceInfo.slice_options(IdentitySlice), :name) == "identity"
     end
@@ -24,7 +23,11 @@ defmodule AikidoTest.Identity.SliceTest do
 
       assert MapSet.equal?(
                action_set,
-               MapSet.new([Actions.Ensure, Actions.Evolve, Actions.UpdateProfile])
+               MapSet.new([
+                 {Aikido.Slices.Identity.Actions, :ensure},
+                 {Aikido.Slices.Identity.Actions, :evolve},
+                 {Aikido.Slices.Identity.Actions, :update_profile}
+               ])
              )
     end
 
@@ -47,21 +50,20 @@ defmodule AikidoTest.Identity.SliceTest do
     end
   end
 
-  describe "agent integration" do
+  describe("agent integration") do
     defmodule AgentWithIdentity do
       use Aikido.Agent
 
       agent do
-        name "identity_slice_test_agent"
+        name("identity_slice_test_agent")
       end
     end
 
     defmodule AgentWithoutIdentity do
-      use Aikido.Agent,
-        default_slices: %{identity: false}
+      use Aikido.Agent, default_slices: %{identity: false}
 
       agent do
-        name "identity_slice_test_no_identity"
+        name("identity_slice_test_no_identity")
       end
     end
 
@@ -82,7 +84,7 @@ defmodule AikidoTest.Identity.SliceTest do
       agent = AgentWithIdentity.new()
 
       {:ok, agent, []} =
-        AgentWithIdentity.cmd(agent, {Aikido.Slices.Identity.Actions.Ensure, %{}})
+        AgentWithIdentity.cmd(agent, {{Aikido.Slices.Identity.Actions, :ensure}, %{}})
 
       assert %State{} = agent.state[:identity]
     end
@@ -93,7 +95,7 @@ defmodule AikidoTest.Identity.SliceTest do
       {:ok, agent, []} =
         AgentWithIdentity.cmd(
           agent,
-          {Actions.UpdateProfile, %{profile: %{nickname: "Sam"}}}
+          {{Aikido.Slices.Identity.Actions, :update_profile}, %{profile: %{nickname: "Sam"}}}
         )
 
       assert agent.state.identity.profile[:nickname] == "Sam"

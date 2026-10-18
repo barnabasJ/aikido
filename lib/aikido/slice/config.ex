@@ -55,12 +55,19 @@ defmodule Aikido.Slice.Config do
     config_schema = Aikido.Dsl.Slice.Info.config_schema(slice_module)
 
     if config_schema do
-      case Aikido.Schema.cast(config_schema, config) do
+      case Ash.Type.cast_input(config_schema, config) do
         {:ok, validated} ->
-          Aikido.Schema.transform(
-            validated,
-            Spark.Dsl.Extension.get_opt(slice_module, [:slice], :config_transform)
-          )
+          values = Map.from_struct(validated)
+
+          case Spark.Dsl.Extension.get_opt(slice_module, [:slice], :config_transform) do
+            nil -> {:ok, values}
+            {module, function, args} ->
+              case apply(module, function, [values, [] | args]) do
+                {:ok, _} = result -> result
+                {:error, _} = error -> error
+                result -> {:ok, result}
+              end
+          end
 
         {:error, errors} ->
           {:error, errors}

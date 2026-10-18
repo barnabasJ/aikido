@@ -95,7 +95,7 @@ defmodule Aikido.AgentServer.Options do
   @type t :: %__MODULE__{}
 
   @doc false
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 
   @doc """
@@ -123,7 +123,7 @@ defmodule Aikido.AgentServer.Options do
         |> Map.put(:agent_module, agent_module)
         |> Map.put(:parent, parent)
 
-      Aikido.Schema.cast(@schema, attrs)
+      super(attrs)
     end
   end
 

@@ -1,7 +1,6 @@
 defmodule Aikido.Slices.AiReact.Actions.FailedTest do
   use ExUnit.Case, async: true
-
-  alias Aikido.Slices.AiReact.Actions.Failed
+  nil
 
   defp signal(request_id, reason) do
     Jido.Signal.new!("ai.react.failed", %{reason: reason, request_id: request_id})
@@ -27,7 +26,13 @@ defmodule Aikido.Slices.AiReact.Actions.FailedTest do
 
   test "settles a matching :running slice to :failed and stores the reason" do
     {:ok, new_slice, []} =
-      Failed.run(signal("req_match", :rate_limited), running_slice("req_match"), %{}, %{})
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :failed},
+        signal("req_match", :rate_limited),
+        running_slice("req_match"),
+        %{},
+        %{}
+      )
 
     assert new_slice.status == :failed
     assert new_slice.error == :rate_limited
@@ -37,7 +42,13 @@ defmodule Aikido.Slices.AiReact.Actions.FailedTest do
     slice = running_slice("req_active")
 
     {:ok, returned_slice, []} =
-      Failed.run(signal("req_old", :anything), slice, %{}, %{})
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :failed},
+        signal("req_old", :anything),
+        slice,
+        %{},
+        %{}
+      )
 
     assert returned_slice == slice
   end
@@ -46,7 +57,13 @@ defmodule Aikido.Slices.AiReact.Actions.FailedTest do
     slice = %{running_slice("req_done") | status: :completed, result: "earlier answer"}
 
     {:ok, returned_slice, []} =
-      Failed.run(signal("req_done", :late), slice, %{}, %{})
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :failed},
+        signal("req_done", :late),
+        slice,
+        %{},
+        %{}
+      )
 
     assert returned_slice == slice
   end

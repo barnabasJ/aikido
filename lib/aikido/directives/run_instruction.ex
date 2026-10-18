@@ -61,6 +61,6 @@ defmodule Aikido.Directives.RunInstruction do
   @type t :: %__MODULE__{}
 
   @doc "Returns the Ash type for RunInstruction."
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 end

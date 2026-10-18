@@ -64,7 +64,7 @@ defmodule Aikido.Directives.SpawnManagedAgent do
   @type t :: %__MODULE__{}
 
   @doc "Returns the Ash type for SpawnManagedAgent."
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 
   @doc """

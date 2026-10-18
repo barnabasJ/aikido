@@ -23,7 +23,10 @@ defmodule Aikido.Dsl.Agent.Transformers.MergeSchemas do
     own = if path && base_schema, do: [%{path: path, schema: base_schema}], else: []
 
     merged_schema =
-      Aikido.Agent.Schema.merge_with_plugins(nil, own ++ slice_pseudo_specs)
+      Transformer.get_persisted(dsl_state, :aikido_resource) ||
+        for %{path: path, schema: schema} <- own ++ slice_pseudo_specs do
+          if schema in [nil, []], do: {path, [type: :map]}, else: {path, [type: schema]}
+        end
 
     {:ok, Transformer.persist(dsl_state, :merged_schema, merged_schema)}
   end

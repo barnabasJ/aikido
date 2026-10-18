@@ -189,7 +189,7 @@ defmodule Aikido.Util do
 
   defp implements_action?(module) when is_atom(module) do
     match?({:module, _}, Code.ensure_compiled(module)) and
-      Spark.Dsl.is?(module, Aikido.Action)
+      Aikido.ActionRef.valid?(module)
   end
 
   @doc """

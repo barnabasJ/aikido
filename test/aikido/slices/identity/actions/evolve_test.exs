@@ -1,18 +1,23 @@
 defmodule AikidoTest.Identity.Actions.EvolveTest do
   use ExUnit.Case, async: true
-
   alias Jido.Signal
-  alias Aikido.Slices.Identity.Actions.Evolve
+  nil
   alias Aikido.Slices.Identity.State
 
   defp sig(data) do
     Signal.new!(%{type: "identity_evolve", source: "/test", data: data})
   end
 
-  describe "run/4" do
+  describe("run/4") do
     test "initializes identity when slice is nil" do
       assert {:ok, %State{} = evolved, []} =
-               Evolve.run(sig(%{days: 0, years: 0}), nil, %{}, %{})
+               AikidoTest.NativeAction.run(
+                 {Aikido.Slices.Identity.Actions, :evolve},
+                 sig(%{days: 0, years: 0}),
+                 nil,
+                 %{},
+                 %{}
+               )
 
       assert evolved.profile[:age] == 0
     end
@@ -21,7 +26,13 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
       identity = State.new()
 
       assert {:ok, %State{} = evolved, []} =
-               Evolve.run(sig(%{days: 0, years: 5}), identity, %{}, %{})
+               AikidoTest.NativeAction.run(
+                 {Aikido.Slices.Identity.Actions, :evolve},
+                 sig(%{days: 0, years: 5}),
+                 identity,
+                 %{},
+                 %{}
+               )
 
       assert evolved.profile[:age] == 5
     end
@@ -30,7 +41,13 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
       identity = State.new()
 
       assert {:ok, %State{} = evolved, []} =
-               Evolve.run(sig(%{days: 730, years: 0}), identity, %{}, %{})
+               AikidoTest.NativeAction.run(
+                 {Aikido.Slices.Identity.Actions, :evolve},
+                 sig(%{days: 730, years: 0}),
+                 identity,
+                 %{},
+                 %{}
+               )
 
       assert evolved.profile[:age] == 2
     end
@@ -39,7 +56,13 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
       identity = State.new()
 
       assert {:ok, %State{} = evolved, []} =
-               Evolve.run(sig(%{days: 365, years: 3}), identity, %{}, %{})
+               AikidoTest.NativeAction.run(
+                 {Aikido.Slices.Identity.Actions, :evolve},
+                 sig(%{days: 365, years: 3}),
+                 identity,
+                 %{},
+                 %{}
+               )
 
       assert evolved.profile[:age] == 4
     end
@@ -49,7 +72,13 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
       assert identity.rev == 0
 
       assert {:ok, %State{} = evolved, []} =
-               Evolve.run(sig(%{days: 0, years: 1}), identity, %{}, %{})
+               AikidoTest.NativeAction.run(
+                 {Aikido.Slices.Identity.Actions, :evolve},
+                 sig(%{days: 0, years: 1}),
+                 identity,
+                 %{},
+                 %{}
+               )
 
       assert evolved.rev == 1
     end

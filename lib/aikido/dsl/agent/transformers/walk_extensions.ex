@@ -234,7 +234,7 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
 
   defp agent_route_pairs(routes, agent_path) when is_atom(agent_path) do
     Enum.flat_map(routes, fn
-      %Aikido.Dsl.Agent.Route{action: action} when is_atom(action) and not is_nil(action) ->
+      %Aikido.Dsl.Agent.Route{action: action} when not is_nil(action) ->
         [{action, agent_path}]
 
       _ ->

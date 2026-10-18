@@ -34,7 +34,11 @@ defmodule Aikido.Ash.Agent do
     schema: [
       name: [type: :atom, required: true],
       type: [type: :string, required: true],
-      target: [type: :module, required: true, doc: "Target Aikido action, supplied positionally."]
+      target: [
+        type: :any,
+        required: true,
+        doc: "Native Ash action name or {resource, action}, supplied positionally."
+      ]
     ]
   }
   # Reuse Ash's attribute entities so types, constraints and options have exactly

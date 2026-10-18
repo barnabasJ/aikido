@@ -27,7 +27,9 @@ defmodule Aikido.Ash.Transformers.Slice do
         error("Aikido.Ash.Slice requires data_layer: :embedded")
 
       Enum.any?(routes ++ schedules, &invalid_action?(dsl, &1.action)) ->
-        error("Slice routes require generic Ash actions with :state and :data arguments")
+        error(
+          "Slice routes require generic Ash actions with a :state argument and Aikido.ActionResult return type"
+        )
 
       true ->
         generate(dsl, routes, schedules)
@@ -36,9 +38,9 @@ defmodule Aikido.Ash.Transformers.Slice do
 
   defp invalid_action?(dsl, name) do
     case Ash.Resource.Info.action(dsl, name) do
-      %{type: :action, arguments: arguments} ->
+      %{type: :action, returns: Aikido.ActionResult, arguments: arguments} ->
         names = Enum.map(arguments, & &1.name)
-        :state not in names || :data not in names
+        :state not in names
 
       _ ->
         true
@@ -48,51 +50,6 @@ defmodule Aikido.Ash.Transformers.Slice do
   defp generate(dsl, routes, schedules) do
     resource = Transformer.get_persisted(dsl, :module)
     name = Transformer.get_option(dsl, [:slice], :name)
-
-    actions =
-      (routes ++ schedules)
-      |> Enum.uniq_by(& &1.action)
-      |> Enum.map(fn route ->
-        module = Module.concat([resource, Actions, Macro.camelize(to_string(route.action))])
-        action = Ash.Resource.Info.action(dsl, route.action)
-        data = Enum.find(action.arguments, &(&1.name == :data))
-        fields = Keyword.get(data.constraints, :fields, [])
-
-        declarations =
-          for {name, options} <- fields do
-            {type, options} = Keyword.pop!(options, :type)
-            options = Keyword.take(options, [:constraints, :allow_nil?, :default, :description])
-
-            quote do
-              attribute unquote(name), unquote(type), unquote(Macro.escape(options))
-            end
-          end
-
-        quote do
-          defmodule unquote(module) do
-            import Aikido.Ash.Slice, only: []
-            use Aikido.Action
-
-            action do
-              name unquote("#{name}_#{route.action}")
-
-              schema do
-                (unquote_splicing(declarations))
-              end
-            end
-
-            def run(signal, state, _opts, context) do
-              Aikido.Ash.Slice.run(
-                unquote(resource),
-                unquote(route.action),
-                signal,
-                state,
-                context
-              )
-            end
-          end
-        end
-      end)
 
     scheduled_routes =
       schedules
@@ -107,10 +64,10 @@ defmodule Aikido.Ash.Transformers.Slice do
     # Action ownership comes from routes, including actions used only by cron.
     routing =
       Enum.map(routes ++ scheduled_routes, fn route ->
-        module = Module.concat([resource, Actions, Macro.camelize(to_string(route.action))])
+        target = {resource, route.action}
 
         quote do
-          route unquote(route.type), unquote(module)
+          route unquote(route.type), unquote(Macro.escape(target))
         end
       end)
 
@@ -123,17 +80,16 @@ defmodule Aikido.Ash.Transformers.Slice do
 
     scheduled =
       Enum.map(schedules, fn entry ->
-        module = Module.concat([resource, Actions, Macro.camelize(to_string(entry.action))])
+        target = {resource, entry.action}
 
         quote do
-          schedule unquote(entry.cron), unquote(module), data: unquote(Macro.escape(entry.data))
+          schedule unquote(entry.cron), unquote(Macro.escape(target)),
+            data: unquote(Macro.escape(entry.data))
         end
       end)
 
     block =
       quote do
-        unquote_splicing(actions)
-
         defmodule unquote(Module.concat(resource, AikidoSlice)) do
           import Aikido.Ash.Slice, only: []
           use Aikido.Slice

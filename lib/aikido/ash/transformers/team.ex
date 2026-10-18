@@ -78,33 +78,26 @@ defmodule Aikido.Ash.Transformers.Team do
 
   defp build(dsl, config) do
     resource = Transformer.get_persisted(dsl, :module)
-    action = Module.concat(resource, TeamAction)
     slice = Module.concat(resource, TeamSlice)
-    routes = for command <- @commands, do: {"aikido.ash.team.#{command}", action}
-    events = for event <- @events, do: {"aikido.ash.team.#{event}", action}
 
-    routes =
-      routes ++
-        events ++ [{"aikido.agent.child.started", action}, {"aikido.agent.child.exit", action}]
+    types =
+      Enum.map(@commands ++ @events, &"aikido.ash.team.#{&1}") ++
+        ["aikido.agent.child.started", "aikido.agent.child.exit"]
 
-    Module.create(
-      action,
-      quote do
-        use Aikido.Action
+    routes = for type <- types, do: {type, {resource, String.to_atom("__" <> type)}}
 
-        action do
-          name "ash_team_action"
+    dsl =
+      Enum.reduce(routes, dsl, fn {_type, {_resource, name}}, dsl ->
+        {:ok, dsl} =
+          Builder.add_action(dsl, :action, name,
+            public?: false,
+            returns: Aikido.ActionResult,
+            arguments: [arg(:state, :term), arg(:data, :map, default: %{})],
+            run: {Aikido.Ash.Team.Action, []}
+          )
 
-          schema do
-          end
-        end
-
-        def run(signal, state, _opts, context) do
-          Aikido.Ash.Team.Engine.handle(signal, state, context, unquote(Macro.escape(config)))
-        end
-      end,
-      Macro.Env.location(__ENV__)
-    )
+        dsl
+      end)
 
     Module.create(
       slice,
@@ -120,7 +113,7 @@ defmodule Aikido.Ash.Transformers.Team do
         signal_routes do
           (unquote_splicing(
              for {type, target} <- routes do
-               quote do: route(unquote(type), unquote(target))
+               quote do: route(unquote(type), unquote(Macro.escape(target)))
              end
            ))
         end
@@ -152,7 +145,7 @@ defmodule Aikido.Ash.Transformers.Team do
         Transformer.add_entity(dsl, [:agent], %Aikido.Ash.Agent.Signal{
           name: if(command == :start, do: :configure_topology, else: command),
           type: "aikido.ash.team.#{command}",
-          target: action
+          target: {resource, String.to_atom("__aikido.ash.team.#{command}")}
         })
 
       case Builder.add_new_action(

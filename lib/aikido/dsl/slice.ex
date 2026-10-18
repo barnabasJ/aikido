@@ -53,7 +53,7 @@ defmodule Aikido.Dsl.Slice do
     args: [:type, :action],
     schema: [
       type: [type: :string, required: true],
-      action: [type: {:or, [:atom, :mfa]}, required: true],
+      action: [type: :any, required: true],
       priority: [type: :integer, default: 0],
       match: [type: {:fun, 1}],
       static: [type: :map],
@@ -91,7 +91,7 @@ defmodule Aikido.Dsl.Slice do
     args: [:cron, :action],
     schema: [
       cron: [type: :string, required: true],
-      action: [type: :atom, required: true],
+      action: [type: :any, required: true],
       data: [type: :map, default: %{}],
       tz: [type: :string, doc: "IANA timezone for cron evaluation."],
       signal: [

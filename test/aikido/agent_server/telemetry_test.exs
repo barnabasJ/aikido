@@ -1,8 +1,6 @@
 defmodule AikidoTest.AgentServer.TelemetryTest do
   use AikidoTest.Case, async: false
-
   import ExUnit.CaptureLog
-
   alias Aikido.AgentServer
   alias Aikido.Debug
   alias Aikido.Directives
@@ -11,16 +9,33 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
   defmodule EmitDirectiveAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "emit_directive"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name "emit_directive"
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(_signal, _slice, _opts, _ctx) do
+    defp reduce(_signal, _slice, _opts, _ctx) do
       signal = Signal.new!("test.emitted", %{}, source: "/test")
       {:ok, %{}, [%Directives.Emit{signal: signal}]}
     end
@@ -28,16 +43,33 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
   defmodule ScheduleDirectiveAction do
     @moduledoc false
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "schedule_directive"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name "schedule_directive"
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(_signal, _slice, _opts, _ctx) do
+    defp reduce(_signal, _slice, _opts, _ctx) do
       {:ok, %{}, [%Directives.Schedule{delay_ms: 100, message: :tick}]}
     end
   end
@@ -47,8 +79,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
     use Aikido.Agent
 
     agent do
-      name "telemetry_agent"
-      path :domain
+      name("telemetry_agent")
+      path(:domain)
 
       schema do
         attribute(:counter, :integer, default: 0)
@@ -56,15 +88,14 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
     end
 
     signal_routes do
-      route "increment", TestActions.IncrementAction
-      route "emit_directive", EmitDirectiveAction
-      route "schedule_directive", ScheduleDirectiveAction
+      route("increment", TestActions.IncrementAction)
+      route("emit_directive", EmitDirectiveAction)
+      route("schedule_directive", ScheduleDirectiveAction)
     end
   end
 
   setup context do
     test_pid = self()
-
     handler_id = "test-telemetry-handler-#{:erlang.unique_integer()}"
 
     :telemetry.attach_many(
@@ -88,10 +119,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
     :telemetry.attach_many(
       action_handler_id,
-      [
-        [:aikido, :action, :start],
-        [:aikido, :action, :stop]
-      ],
+      [[:aikido, :action, :start], [:aikido, :action, :stop]],
       fn event, measurements, metadata, _config ->
         send(test_pid, {:action_telemetry_event, event, measurements, metadata})
       end,
@@ -106,8 +134,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
     {:ok, aikido: context.aikido}
   end
 
-  describe "signal telemetry" do
-    test "emits start and stop events for signal processing", %{aikido: aikido} do
+  describe("signal telemetry") do
+    test("emits start and stop events for signal processing", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: TelemetryAgent,
@@ -131,11 +159,10 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
       assert is_integer(measurements.duration)
       assert measurements.duration >= 0
       assert metadata.directive_count == 0
-
       GenServer.stop(pid)
     end
 
-    test "includes directive count in stop event", %{aikido: aikido} do
+    test("includes directive count in stop event", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: TelemetryAgent,
@@ -145,20 +172,16 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
       signal = Signal.new!("emit_directive", %{}, source: "/test")
       {:ok, _agent} = AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, _}
-
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], _, metadata}
-
       assert metadata.directive_count == 1
       assert metadata.directive_types == %{"Emit" => 1}
-
       GenServer.stop(pid)
     end
   end
 
-  describe "action logging integration" do
-    test "suppresses aikido_action start logs when args are not full", %{aikido: aikido} do
+  describe("action logging integration") do
+    test("suppresses aikido_action start logs when args are not full", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: TelemetryAgent,
@@ -176,11 +199,10 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
       refute log =~ "Executing AikidoTest.TestActions.IncrementAction"
       refute log =~ "with params:"
       refute_receive {:action_telemetry_event, [:aikido, :action, :start], _, _}, 50
-
       GenServer.stop(pid)
     end
 
-    test "enables verbose aikido_action logs when instance debug is verbose", %{aikido: aikido} do
+    test("enables verbose aikido_action logs when instance debug is verbose", %{aikido: aikido}) do
       Debug.enable(aikido, :verbose)
       on_exit(fn -> Debug.disable(aikido) end)
 
@@ -205,13 +227,12 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
                       %{action: AikidoTest.TestActions.IncrementAction}}
 
       assert_receive {:action_telemetry_event, [:aikido, :action, :stop], _, _}
-
       GenServer.stop(pid)
     end
   end
 
-  describe "directive telemetry" do
-    test "emits start and stop events for directive execution", %{aikido: aikido} do
+  describe("directive telemetry") do
+    test("emits start and stop events for directive execution", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: TelemetryAgent,
@@ -221,20 +242,16 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
       # Drain any lifecycle telemetry events emitted during init.
       drain_directive_events()
-
       signal = Signal.new!("emit_directive", %{}, source: "/test")
       {:ok, _agent} = AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
 
       # Signal events
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, _}
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], _, _}
-
       measurements = wait_for_directive_event(:start, "emit_directive")
       assert is_integer(measurements.system_time)
-
       measurements = wait_for_directive_event(:stop, "emit_directive")
       assert is_integer(measurements.duration)
-
       GenServer.stop(pid)
     end
 
@@ -260,7 +277,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
       end
     end
 
-    test "reports correct directive type", %{aikido: aikido} do
+    test("reports correct directive type", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: TelemetryAgent,
@@ -286,13 +303,12 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
                      500
 
       assert match?(%Directives.Schedule{}, metadata.directive)
-
       GenServer.stop(pid)
     end
   end
 
-  describe "metadata correctness" do
-    test "includes agent_id and agent_module in signal events", %{aikido: aikido} do
+  describe("metadata correctness") do
+    test("includes agent_id and agent_module in signal events", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: TelemetryAgent,
@@ -302,17 +318,14 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
       signal = Signal.new!("increment", %{}, source: "/test")
       {:ok, _agent} = AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, metadata}
-
       assert metadata.agent_id == "telemetry-metadata-test"
       assert metadata.agent_module == TelemetryAgent
       assert metadata.signal_type == "increment"
-
       GenServer.stop(pid)
     end
 
-    test "includes signal_type in directive events", %{aikido: aikido} do
+    test("includes signal_type in directive events", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: TelemetryAgent,
@@ -335,8 +348,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
     end
   end
 
-  describe "timing measurements" do
-    test "duration is positive for signal processing", %{aikido: aikido} do
+  describe("timing measurements") do
+    test("duration is positive for signal processing", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: TelemetryAgent,
@@ -346,15 +359,12 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
       signal = Signal.new!("increment", %{}, source: "/test")
       {:ok, _agent} = AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], measurements, _}
-
       assert measurements.duration >= 0
-
       GenServer.stop(pid)
     end
 
-    test "duration is positive for directive execution", %{aikido: aikido} do
+    test("duration is positive for directive execution", %{aikido: aikido}) do
       {:ok, pid} =
         AgentServer.start_link(
           agent_module: TelemetryAgent,
@@ -374,7 +384,6 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
                      500
 
       assert measurements.duration >= 0
-
       GenServer.stop(pid)
     end
   end

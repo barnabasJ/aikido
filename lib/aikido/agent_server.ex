@@ -1952,6 +1952,11 @@ defmodule Aikido.AgentServer do
 
   defp default_system_action(_signal), do: {:error, :no_matching_route}
 
+  defp target_to_action({resource, action}, %Signal{data: data})
+       when is_atom(resource) and is_atom(action) do
+    {{resource, action}, data}
+  end
+
   defp target_to_action(mod, %Signal{data: data}) when is_atom(mod) do
     {mod, data}
   end

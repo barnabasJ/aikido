@@ -10,22 +10,16 @@ defmodule AikidoTest.Agent.SchemaTest do
   end
 
   defmodule Named do
-    use Aikido.Action
+    use Ash.TypedStruct
 
-    action do
-      name "named"
-
-      schema do
-        attribute :name, :string, default: "default"
-        attribute :count, :integer, allow_nil?: false
-      end
+    typed_struct do
+      field(:name, :string, default: "default")
+      field(:count, :integer, allow_nil?: false)
     end
-
-    def run(_signal, slice, _opts, _ctx), do: {:ok, slice, []}
   end
 
   test "Ash contracts retain defaults and required fields" do
-    schema = Aikido.Dsl.Action.Info.schema(Named)
+    schema = Named
     assert Schema.known_keys(schema) == [:name, :count]
     assert Schema.defaults_from_schema(schema) == %{name: "default"}
     assert Schema.merge_with_plugins(schema, []) == schema
@@ -38,7 +32,7 @@ defmodule AikidoTest.Agent.SchemaTest do
 
   test "merging nests each slice at its declared path" do
     base = [mode: [type: :atom]]
-    slice = Aikido.Dsl.Action.Info.schema(Named)
+    slice = Named
 
     merged =
       Schema.merge_with_plugins(base, [

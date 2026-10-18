@@ -79,7 +79,6 @@ defmodule Aikido.Dsl.Slice.Info do
     module
     |> Extension.get_entities([:signal_routes])
     |> Enum.map(& &1.action)
-    |> Enum.filter(&is_atom/1)
     |> Enum.uniq()
   end
 

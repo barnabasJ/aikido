@@ -1,212 +1,187 @@
-defmodule Aikido.Dsl.ActionTest do
+defmodule Aikido.NativeActionTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Dsl.Action.Info, as: ActionInfo
+  defmodule CustomDirective do
+    defstruct [:value]
+  end
 
-  describe "sectioned DSL accessor parity" do
-    defmodule MinimalAction do
-      @moduledoc false
-      use Aikido.Action
+  defimpl Aikido.AgentServer.DirectiveExec, for: CustomDirective do
+    def exec(_directive, _signal, _state), do: :ok
+  end
 
-      action do
-        name("minimal")
-      end
+  defmodule Actions do
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-      def run(_signal, slice, _opts, _ctx) do
-        {:ok, slice, []}
-      end
-    end
+    actions do
+      action :increment, Aikido.ActionResult do
+        description "Increment typed state."
+        argument :state, :map, allow_nil?: false
+        argument :amount, :integer, allow_nil?: false, default: 1, constraints: [min: 1]
 
-    defmodule FullAction do
-      @moduledoc false
-      use Aikido.Action
-
-      action do
-        name("full")
-        description("Full action with every accessor populated.")
-        category("test")
-        tags(["a", "b"])
-        vsn("1.2.3")
-
-        schema do
-          attribute(:by, :integer, default: 1)
-        end
-
-        output_schema do
-          attribute(:count, :integer, [])
+        run fn input, _context ->
+          Aikido.ActionResult.new(
+            state: %{count: input.arguments.state.count + input.arguments.amount}
+          )
         end
       end
 
-      def run(%Jido.Signal{data: %{by: by}}, slice, _opts, _ctx) do
-        slice = slice || %{count: 0}
-        {:ok, %{slice | count: slice.count + by}, []}
+      action :emit, Aikido.ActionResult do
+        argument :state, :map, allow_nil?: false
+        argument :directive, :term, allow_nil?: false
+
+        run fn input, _context ->
+          # Deliberately return a map: the runtime must validate it too.
+          {:ok, %{state: %{count: 100}, directives: [input.arguments.directive]}}
+        end
       end
-    end
 
-    test "name/1 returns the configured name" do
-      assert Map.get(ActionInfo.action_options(FullAction), :name) == "full"
-      assert Map.get(ActionInfo.action_options(MinimalAction), :name) == "minimal"
-    end
+      action :prepared, Aikido.ActionResult do
+        argument :state, :map, allow_nil?: false
 
-    test "description/1, category/1, tags/1, vsn/1 round-trip" do
-      assert Map.get(ActionInfo.action_options(FullAction), :description) ==
-               "Full action with every accessor populated."
+        prepare fn input, _context ->
+          Ash.ActionInput.before_action(input, fn input ->
+            Ash.ActionInput.set_argument(input, :state, %{prepared: true})
+          end)
+        end
 
-      assert Map.get(ActionInfo.action_options(FullAction), :category) == "test"
-      assert Map.get(ActionInfo.action_options(FullAction), :tags) == ["a", "b"]
-      assert Map.get(ActionInfo.action_options(FullAction), :vsn) == "1.2.3"
-    end
+        run fn input, _context -> Aikido.ActionResult.new(state: input.arguments.state) end
+      end
 
-    test "tags/1 defaults to []" do
-      assert Map.get(ActionInfo.action_options(MinimalAction), :tags) == []
-    end
+      action :runtime, Aikido.ActionResult do
+        argument :state, :map, allow_nil?: false
 
-    test "schema/1 and output_schema/1 round-trip the configured value" do
-      assert Aikido.Schema.defaults(ActionInfo.schema(FullAction)) == %{by: 1}
-      assert Aikido.Schema.keys(ActionInfo.output_schema(FullAction)) == [:count]
-    end
+        run fn input, _context ->
+          runtime = input.context.aikido
 
-    test "an empty input contract still belongs to its action module" do
-      assert ActionInfo.schema(MinimalAction) == MinimalAction
-      assert {:ok, %MinimalAction{}} = MinimalAction.new(%{})
-      assert ActionInfo.output_schema(MinimalAction) == []
-    end
+          Aikido.ActionResult.new(
+            state: Map.take(runtime, [:agent_id, :signal, :slice_config, :action_opts])
+          )
+        end
+      end
 
-    test "the action itself is its native input struct and Ash type" do
-      assert ActionInfo.schema(FullAction) == FullAction
-      assert {:ok, %FullAction{by: 7}} = FullAction.new(%{by: "7"})
-      assert %FullAction{by: 1} = FullAction.new!(%{})
-      assert {:error, _} = FullAction.new(%{by: "invalid"})
-      assert Ash.Type.NewType.new_type?(FullAction)
-      assert is_boolean(FullAction.handle_change_array?())
-      assert is_boolean(FullAction.prepare_change_array?())
-    end
-
-    test "Spark.Dsl.is?(mod, Aikido.Action) is true for action modules" do
-      assert Spark.Dsl.is?(FullAction, Aikido.Action)
-    end
-
-    test "to_json/1 returns the same shape as the legacy macro emit" do
-      meta = ActionInfo.to_json(FullAction)
-      assert meta.name == "full"
-      assert meta.description == "Full action with every accessor populated."
-      assert meta.category == "test"
-      assert meta.tags == ["a", "b"]
-      assert meta.vsn == "1.2.3"
-      refute Map.has_key?(meta, :path)
-      assert Aikido.Schema.defaults(meta.schema) == %{by: 1}
-      assert Aikido.Schema.keys(meta.output_schema) == [:count]
+      action :invalid_result, Aikido.ActionResult do
+        argument :state, :map, allow_nil?: false
+        run fn _input, _context -> {:ok, %{state: %{}, directives: :invalid}} end
+      end
     end
   end
 
-  describe "schema shapes" do
-    defmodule AshSchemaAction do
-      @moduledoc false
-      use Aikido.Action
-
-      action do
-        name("ash_schema")
-
-        schema do
-          attribute(:value, :integer, allow_nil?: false)
-        end
-
-        output_schema do
-          attribute(:result, :integer, allow_nil?: false)
-        end
-      end
-
-      def run(_signal, slice, _opts, _ctx) do
-        {:ok, slice, []}
-      end
-    end
-
-    defmodule DefaultSchemaAction do
-      @moduledoc false
-      use Aikido.Action
-
-      action do
-        name("default_schema")
-
-        schema do
-          attribute(:value, :integer, default: 0)
-        end
-      end
-
-      def run(_signal, slice, _opts, _ctx) do
-        {:ok, slice, []}
-      end
-    end
-
-    test "schema/1 exposes a Ash field contract verbatim" do
-      schema = ActionInfo.schema(AshSchemaAction)
-      assert Aikido.Action.Schema.schema_type(schema) == :ash
-      assert {:ok, %{value: 7}} = Aikido.Schema.cast(schema, %{value: 7})
-    end
-
-    test "output_schema/1 exposes a Ash field contract verbatim" do
-      schema = ActionInfo.output_schema(AshSchemaAction)
-      assert Aikido.Action.Schema.schema_type(schema) == :ash
-      assert {:ok, %{result: 5}} = Aikido.Schema.cast(schema, %{result: 5})
-    end
-
-    test "schema/1 also accepts a Ash field defaults" do
-      assert Aikido.Schema.defaults(ActionInfo.schema(DefaultSchemaAction)) == %{value: 0}
-    end
+  defp run(action, params \\ %{}, context \\ %{state: %{count: 2}}) do
+    Aikido.Exec.run({Actions, action}, params, context, timeout: 0, telemetry: :silent)
   end
 
-  describe "validate_params/1 and validate_output/1" do
-    defmodule ValidatedAction do
-      @moduledoc false
-      use Aikido.Action
-
-      action do
-        name("validated")
-
-        schema do
-          attribute(:value, :integer, allow_nil?: false)
-        end
-
-        output_schema do
-          attribute(:result, :string, [])
-        end
-      end
-
-      def run(_signal, slice, _opts, _ctx) do
-        {:ok, slice, []}
-      end
-    end
-
-    test "validate_params/1 accepts known params" do
-      assert {:ok, %{value: 1}} = ValidatedAction.validate_params(%{value: 1})
-    end
-
-    test "validate_output/1 accepts a known output" do
-      assert {:ok, %{result: "ok"}} = ValidatedAction.validate_output(%{result: "ok"})
-    end
+  test "actions are native Ash definitions" do
+    assert Spark.Dsl.is?(Actions, Ash.Resource)
+    assert Ash.Resource.Info.action(Actions, :increment).type == :action
   end
 
-  describe "behaviour" do
-    test "modules use Aikido.Action implement the @behaviour" do
-      defmodule BehaviourCheckAction do
-        @moduledoc false
-        use Aikido.Action
+  test "actions have descriptive native names" do
+    assert Ash.Resource.Info.action(Actions, :increment).name == :increment
+  end
 
-        action do
-          name("behaviour_check")
-        end
+  test "descriptions are native Ash metadata" do
+    assert Ash.Resource.Info.action(Actions, :increment).description == "Increment typed state."
+  end
 
-        def run(_signal, slice, _opts, _ctx) do
-          {:ok, slice, []}
-        end
-      end
+  test "actions declare the shared result type" do
+    assert Ash.Resource.Info.action(Actions, :increment).returns == Aikido.ActionResult
+  end
 
-      behaviours =
-        BehaviourCheckAction.module_info(:attributes)
-        |> Keyword.get_values(:behaviour)
-        |> List.flatten()
+  test "payload introspection excludes runtime state" do
+    assert Keyword.keys(Aikido.ActionRef.schema({Actions, :increment})) == [:amount]
+  end
 
-      assert Aikido.Action in behaviours
-    end
+  test "arguments retain native defaults" do
+    assert Ash.Resource.Info.action(Actions, :increment).arguments
+           |> Enum.find(&(&1.name == :amount))
+           |> Map.fetch!(:default) == 1
+  end
+
+  test "native input casting coerces strings" do
+    assert {:ok, %{count: 5}, []} = run(:increment, %{amount: "3"})
+  end
+
+  test "native defaults apply when arguments are omitted" do
+    assert {:ok, %{count: 3}, []} = run(:increment)
+  end
+
+  test "native constraints reject invalid values" do
+    assert {:error, %Ash.Error.Invalid{}} = run(:increment, %{amount: 0})
+  end
+
+  test "native types reject invalid input" do
+    assert {:error, %Ash.Error.Invalid{}} = run(:increment, %{amount: "invalid"})
+  end
+
+  test "required state is checked by Ash" do
+    assert {:error, %Ash.Error.Invalid{}} = run(:increment, %{}, %{state: nil})
+  end
+
+  test "preparations and native before-action hooks execute" do
+    assert {:ok, %{prepared: true}, []} = run(:prepared)
+  end
+
+  test "results are a reusable Ash type" do
+    assert Ash.Type.NewType.new_type?(Aikido.ActionResult)
+
+    assert {:ok, %Aikido.ActionResult{state: %{count: 1}, directives: []}} =
+             Aikido.ActionResult.new(state: %{count: 1})
+  end
+
+  test "known directives validate" do
+    directive = Aikido.Directives.stop(:normal)
+
+    assert {:ok, %Aikido.ActionResult{directives: [^directive]}} =
+             Aikido.ActionResult.new(state: %{}, directives: [directive])
+  end
+
+  test "custom protocol implementations validate" do
+    directive = %CustomDirective{value: 1}
+    assert {:ok, %{count: 100}, [^directive]} = run(:emit, %{directive: directive})
+  end
+
+  test "unknown structs cannot use the Any fallback to pass validation" do
+    assert {:error, _} = run(:emit, %{directive: %URI{}})
+  end
+
+  test "plain maps are rejected as directives" do
+    assert {:error, _} = run(:emit, %{directive: %{effect: :unknown}})
+  end
+
+  test "atoms are rejected as directives" do
+    assert {:error, _} = run(:emit, %{directive: :unknown})
+  end
+
+  test "malformed directive lists are rejected at the execution boundary" do
+    assert {:error, _} = run(:invalid_result)
+  end
+
+  test "direct Ash callers can construct validated results" do
+    input = Ash.ActionInput.for_action(Actions, :increment, %{state: %{count: 2}, amount: 4})
+    assert {:ok, %Aikido.ActionResult{state: %{count: 6}}} = Ash.run_action(input)
+  end
+
+  test "invalid action references return structured errors" do
+    assert {:error, %Aikido.Action.Error.InvalidInputError{}} =
+             Aikido.Exec.run({Actions, :missing}, %{}, %{}, timeout: 0)
+  end
+
+  test "runtime context preserves signal and mount configuration" do
+    signal = Jido.Signal.new!("native.runtime", %{})
+
+    context = %{
+      state: %{},
+      signal: signal,
+      ctx: %{agent_id: "agent", slice_config: %{label: "mount"}},
+      action_opts: %{mode: :test}
+    }
+
+    assert {:ok,
+            %{
+              agent_id: "agent",
+              signal: ^signal,
+              slice_config: %{label: "mount"},
+              action_opts: %{mode: :test}
+            }, []} = run(:runtime, %{}, context)
   end
 end

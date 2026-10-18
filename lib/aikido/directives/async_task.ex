@@ -68,6 +68,6 @@ defmodule Aikido.Directives.AsyncTask do
   @type t :: %__MODULE__{}
 
   @doc "Returns the Ash type for AsyncTask."
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 end

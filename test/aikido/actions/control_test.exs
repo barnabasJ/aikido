@@ -1,6 +1,5 @@
 defmodule AikidoTest.Actions.ControlTest do
   use ExUnit.Case, async: true
-
   alias Aikido.Actions.Control
   alias Aikido.Directives
   alias Jido.Signal
@@ -9,33 +8,48 @@ defmodule AikidoTest.Actions.ControlTest do
     Signal.new!(%{type: type, source: "/test", data: data})
   end
 
-  describe "Cancel" do
+  describe("Cancel") do
     test "sets status to failed with cancelled error" do
-      {:ok, result, []} = Control.Cancel.run(sig("cancel", %{reason: :cancelled}), %{}, %{}, %{})
+      {:ok, result, []} =
+        AikidoTest.NativeAction.run(
+          Control.Cancel,
+          sig("cancel", %{reason: :cancelled}),
+          %{},
+          %{},
+          %{}
+        )
+
       assert result == %{status: :failed, error: {:cancelled, :cancelled}}
     end
 
     test "includes custom cancellation reason" do
       {:ok, result, []} =
-        Control.Cancel.run(sig("cancel", %{reason: :user_requested}), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          Control.Cancel,
+          sig("cancel", %{reason: :user_requested}),
+          %{},
+          %{},
+          %{}
+        )
 
       assert result == %{status: :failed, error: {:cancelled, :user_requested}}
     end
   end
 
-  describe "Noop" do
+  describe("Noop") do
     test "returns empty state change" do
-      {:ok, result, []} = Control.Noop.run(sig("noop"), %{}, %{}, %{})
+      {:ok, result, []} = AikidoTest.NativeAction.run(Control.Noop, sig("noop"), %{}, %{}, %{})
       assert result == %{}
     end
   end
 
-  describe "Forward" do
+  describe("Forward") do
     test "creates emit directive to target pid" do
       target = self()
       data = %{target_pid: target, signal_type: nil, payload: nil, source: nil}
 
-      {:ok, result, [directive]} = Control.Forward.run(sig("forward", data), %{}, %{}, %{})
+      {:ok, result, [directive]} =
+        AikidoTest.NativeAction.run(Control.Forward, sig("forward", data), %{}, %{}, %{})
 
       assert result == %{forwarded_to: target}
       assert %Directives.Emit{} = directive
@@ -45,34 +59,26 @@ defmodule AikidoTest.Actions.ControlTest do
 
     test "uses custom signal type when provided" do
       target = self()
+      data = %{target_pid: target, signal_type: "custom.signal", payload: nil, source: nil}
 
-      data = %{
-        target_pid: target,
-        signal_type: "custom.signal",
-        payload: nil,
-        source: nil
-      }
+      {:ok, _result, [directive]} =
+        AikidoTest.NativeAction.run(Control.Forward, sig("forward", data), %{}, %{}, %{})
 
-      {:ok, _result, [directive]} = Control.Forward.run(sig("forward", data), %{}, %{}, %{})
       assert directive.signal.type == "custom.signal"
     end
 
     test "uses custom payload when provided" do
       target = self()
+      data = %{target_pid: target, signal_type: "test", payload: %{key: "value"}, source: nil}
 
-      data = %{
-        target_pid: target,
-        signal_type: "test",
-        payload: %{key: "value"},
-        source: nil
-      }
+      {:ok, _result, [directive]} =
+        AikidoTest.NativeAction.run(Control.Forward, sig("forward", data), %{}, %{}, %{})
 
-      {:ok, _result, [directive]} = Control.Forward.run(sig("forward", data), %{}, %{}, %{})
       assert directive.signal.data == %{key: "value"}
     end
   end
 
-  describe "Broadcast" do
+  describe("Broadcast") do
     test "creates emit directive with pubsub dispatch" do
       data = %{
         topic: "workers",
@@ -81,7 +87,8 @@ defmodule AikidoTest.Actions.ControlTest do
         source: "/broadcast"
       }
 
-      {:ok, result, [directive]} = Control.Broadcast.run(sig("broadcast", data), %{}, %{}, %{})
+      {:ok, result, [directive]} =
+        AikidoTest.NativeAction.run(Control.Broadcast, sig("broadcast", data), %{}, %{}, %{})
 
       assert result == %{broadcast_to: "workers"}
       assert %Directives.Emit{} = directive
@@ -90,7 +97,7 @@ defmodule AikidoTest.Actions.ControlTest do
     end
   end
 
-  describe "Reply" do
+  describe("Reply") do
     test "replies to signal with reply_to pid" do
       reply_pid = self()
 
@@ -98,14 +105,11 @@ defmodule AikidoTest.Actions.ControlTest do
         Signal.new!(%{
           type: "query",
           source: "/test",
-          data: %{
-            signal_type: "response",
-            payload: %{answer: 42},
-            reply_to: reply_pid
-          }
+          data: %{signal_type: "response", payload: %{answer: 42}, reply_to: reply_pid}
         })
 
-      {:ok, result, [directive]} = Control.Reply.run(input, %{}, %{}, %{})
+      {:ok, result, [directive]} =
+        AikidoTest.NativeAction.run(Control.Reply, input, %{}, %{}, %{})
 
       assert result == %{replied_to: reply_pid}
       assert %Directives.Emit{} = directive
@@ -121,7 +125,7 @@ defmodule AikidoTest.Actions.ControlTest do
           data: %{signal_type: "response", payload: %{}}
         })
 
-      {:ok, result, []} = Control.Reply.run(input, %{}, %{}, %{})
+      {:ok, result, []} = AikidoTest.NativeAction.run(Control.Reply, input, %{}, %{}, %{})
       assert result == %{replied_to: nil, warning: "No reply_to found in signal"}
     end
 
@@ -133,7 +137,7 @@ defmodule AikidoTest.Actions.ControlTest do
           data: %{signal_type: "response", payload: %{}}
         })
 
-      {:ok, result, []} = Control.Reply.run(input, %{}, %{}, %{})
+      {:ok, result, []} = AikidoTest.NativeAction.run(Control.Reply, input, %{}, %{}, %{})
       assert result == %{replied_to: nil, warning: "No reply_to found in signal"}
     end
   end

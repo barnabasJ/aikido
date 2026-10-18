@@ -199,7 +199,11 @@ defmodule Aikido.Sensor.Runtime do
 
     case Aikido.Dsl.Sensor.Info.schema(sensor) do
       nil -> {:ok, config_map}
-      schema -> Aikido.Schema.cast(schema, config_map)
+      schema ->
+        case Ash.Type.cast_input(schema, config_map) do
+          {:ok, value} -> {:ok, Map.from_struct(value)}
+          error -> error
+        end
     end
   end
 

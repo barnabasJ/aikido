@@ -1,53 +1,110 @@
 defmodule AikidoTest.AshFixtures do
   defmodule Increment do
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "ash_increment"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name("ash_increment")
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(signal, state, _opts, _context) do
+    defp reduce(signal, state, _opts, _context) do
       {:ok, %{count: state.count + Map.get(signal.data, :amount, 1)}, []}
     end
   end
 
   defmodule GeneratedIncrement do
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "generated_increment"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name "generated_increment"
-
-      schema do
-        attribute :amount, :integer,
+        argument(:amount, :integer,
           allow_nil?: false,
           default: 2,
           constraints: [min: 1],
           description: "Amount to add"
+        )
+
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
+
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(signal, state, _opts, _context),
-      do: {:ok, %{state | count: state.count + signal.data.amount}, []}
+    defp reduce(signal, state, _opts, _context) do
+      {:ok, %{state | count: state.count + signal.data.amount}, []}
+    end
   end
 
   defmodule DataIncrement do
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "data_increment"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name "data_increment"
-
-      schema do
-        attribute :data, :map,
+        argument(:data, :map,
           allow_nil?: false,
           constraints: [fields: [amount: [type: :integer, allow_nil?: false]]]
+        )
+
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
+
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(signal, state, _opts, _context),
-      do: {:ok, %{state | count: state.count + signal.data.data.amount}, []}
+    defp reduce(signal, state, _opts, _context) do
+      {:ok, %{state | count: state.count + signal.data.data.amount}, []}
+    end
   end
 
   defmodule GeneratedCounter do
@@ -57,15 +114,15 @@ defmodule AikidoTest.AshFixtures do
       extensions: [Aikido.Ash.Agent]
 
     agent do
-      name "generated_counter"
-      instance AikidoTest.AshFixtures.Instance
+      name("generated_counter")
+      instance(AikidoTest.AshFixtures.Instance)
 
       schema do
-        attribute :count, :integer, allow_nil?: false, default: 0, public?: true
+        attribute(:count, :integer, allow_nil?: false, default: 0, public?: true)
       end
 
-      signal :add, "generated.add", GeneratedIncrement
-      signal :with_data, "generated.data", DataIncrement
+      signal(:add, "generated.add", GeneratedIncrement)
+      signal(:with_data, "generated.data", DataIncrement)
     end
   end
 
@@ -73,7 +130,7 @@ defmodule AikidoTest.AshFixtures do
     use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Ash.Agent]
 
     actions do
-      action :add, :map do
+      action(:add, :map) do
         argument(:amount, :integer, allow_nil?: false)
       end
     end
@@ -83,7 +140,7 @@ defmodule AikidoTest.AshFixtures do
       instance(AikidoTest.AshFixtures.Instance)
 
       schema do
-        attribute :count, :integer, allow_nil?: false, default: 0, public?: true
+        attribute(:count, :integer, allow_nil?: false, default: 0, public?: true)
       end
 
       signal(:increment, "counter.increment", Increment)
@@ -99,7 +156,7 @@ defmodule AikidoTest.AshFixtures do
     end
 
     actions do
-      action :increment, :map do
+      action(:increment, Aikido.ActionResult) do
         argument(:state, :map, allow_nil?: false)
         argument(:data, :map, allow_nil?: false)
 
@@ -113,14 +170,14 @@ defmodule AikidoTest.AshFixtures do
         end)
       end
 
-      action :internal, :map do
-        public? false
-        argument :state, :map, allow_nil?: false
-        argument :data, :map, allow_nil?: false
-        run fn input, _context -> {:ok, %{state: input.arguments.state}} end
+      action(:internal, Aikido.ActionResult) do
+        public?(false)
+        argument(:state, :map, allow_nil?: false)
+        argument(:data, :map, allow_nil?: false)
+        run(fn input, _context -> {:ok, %{state: input.arguments.state}} end)
       end
 
-      action :tick, :map do
+      action(:tick, Aikido.ActionResult) do
         argument(:state, :map, allow_nil?: false)
         argument(:data, :map, allow_nil?: false)
 
@@ -137,9 +194,8 @@ defmodule AikidoTest.AshFixtures do
 
     slice do
       name("ash_counter_slice")
-
       route("slice.increment", :increment)
-      route "slice.internal", :internal
+      route("slice.internal", :internal)
     end
 
     subscriptions do
@@ -178,16 +234,33 @@ defmodule AikidoTest.AshFixtures do
   end
 
   defmodule TaskAction do
-    use Aikido.Action
+    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+    @persist {:aikido_action_metadata, %{name: "task_echo"}}
+    actions do
+      action(:run, Aikido.ActionResult) do
+        argument(:state, :term)
 
-    action do
-      name "task_echo"
+        run(fn input, _context ->
+          runtime = input.context[:aikido] || %{}
+          params = Map.delete(input.arguments, :state)
+          signal = Map.fetch!(runtime, :signal)
+          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
 
-      schema do
+          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
+            {:ok, state, directives} ->
+              Aikido.ActionResult.new(state: state, directives: directives)
+
+            {:error, _} = error ->
+              error
+
+            other ->
+              {:error, "Unexpected return shape: #{inspect(other)}"}
+          end
+        end)
       end
     end
 
-    def run(signal, state, _opts, _context) do
+    defp reduce(signal, state, _opts, _context) do
       data = signal.data
       result = String.upcase(data.text)
 
@@ -207,14 +280,14 @@ defmodule AikidoTest.AshFixtures do
     use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Ash.Agent]
 
     agent do
-      name "task_worker"
-      instance AikidoTest.AshFixtures.Instance
+      name("task_worker")
+      instance(AikidoTest.AshFixtures.Instance)
 
       schema do
-        attribute :result, :string, public?: true
+        attribute(:result, :string, public?: true)
       end
 
-      signal :task, "harness.task", TaskAction
+      signal(:task, "harness.task", TaskAction)
     end
   end
 
@@ -224,14 +297,14 @@ defmodule AikidoTest.AshFixtures do
       extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
 
     agent do
-      name "dynamic_team"
-      instance AikidoTest.AshFixtures.Instance
+      name("dynamic_team")
+      instance(AikidoTest.AshFixtures.Instance)
     end
 
     team do
-      max_members 5
-      worker :counter, Counter, max_members: 2
-      worker :echo, TaskWorker, max_members: 2
+      max_members(5)
+      worker(:counter, Counter, max_members: 2)
+      worker(:echo, TaskWorker, max_members: 2)
     end
   end
 
@@ -241,13 +314,13 @@ defmodule AikidoTest.AshFixtures do
       extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
 
     agent do
-      name "nested_team"
-      instance AikidoTest.AshFixtures.Instance
+      name("nested_team")
+      instance(AikidoTest.AshFixtures.Instance)
     end
 
     team do
-      member :subteam, Team
-      member :lazy, Counter, activation: :lazy, owner: :subteam, depends_on: [:subteam]
+      member(:subteam, Team)
+      member(:lazy, Counter, activation: :lazy, owner: :subteam, depends_on: [:subteam])
     end
   end
 
@@ -263,7 +336,7 @@ defmodule AikidoTest.AshFixtures do
     end
 
     policies do
-      policy action(:start) do
+      policy(action(:start)) do
         authorize_if(actor_present())
       end
     end
@@ -273,17 +346,17 @@ defmodule AikidoTest.AshFixtures do
     use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Ash.Agent]
 
     agent do
-      name "default_runtime_counter"
+      name("default_runtime_counter")
 
       schema do
-        attribute :count, :integer do
-          default 0
-          allow_nil? false
-          public? true
-          constraints min: 0
+        attribute(:count, :integer) do
+          default(0)
+          allow_nil?(false)
+          public?(true)
+          constraints(min: 0)
         end
 
-        attribute :origin, :string, default: "local", writable?: false, public?: true
+        attribute(:origin, :string, default: "local", writable?: false, public?: true)
       end
     end
   end
@@ -292,14 +365,14 @@ defmodule AikidoTest.AshFixtures do
     use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
 
     agents do
-      agent :generated_counter, GeneratedCounter
-      agent :default_counter, DefaultCounter
+      agent(:generated_counter, GeneratedCounter)
+      agent(:default_counter, DefaultCounter)
       agent(:counter, Counter)
       agent(:composed, Composed)
       agent(:team, Team)
-      agent :dynamic, DynamicTeam
-      agent :nested, NestedTeam
-      agent :task_worker, TaskWorker
+      agent(:dynamic, DynamicTeam)
+      agent(:nested, NestedTeam)
+      agent(:task_worker, TaskWorker)
       agent(:protected, Protected)
     end
   end

@@ -164,7 +164,6 @@ defmodule Aikido.Agent do
                      default: %{},
                      description: "Current state"
                    ]
-    @schema __MODULE__
     @enforce_keys []
     defstruct id: nil,
               agent_module: nil,
@@ -176,17 +175,14 @@ defmodule Aikido.Agent do
               schema: [],
               state: %{}
 
-    @doc false
-    def __ash_fields__ do
-      @schema_fields
-    end
+    {:ok, struct_constraints} = Ash.Type.init(:struct,
+        instance_of: __MODULE__,
+        fields: Enum.map(@schema_fields, fn {name, options} -> {name, Keyword.delete(options, :default)} end)
+      )
+    @struct_constraints struct_constraints
   )
 
   @type t :: %__MODULE__{}
-
-  @doc "Returns the Ash field contract for Agent."
-  @spec schema() :: Aikido.Schema.t()
-  def schema, do: @schema
 
   # Action input types
   @type action :: module() | {module(), map()} | Instruction.t() | [action()]
@@ -255,7 +251,9 @@ defmodule Aikido.Agent do
   def new(attrs) when is_map(attrs) do
     attrs_with_id = normalize_agent_id(attrs)
 
-    case Aikido.Schema.cast(@schema, attrs_with_id) do
+    values = Map.merge(Map.from_struct(struct(__MODULE__)), attrs_with_id)
+
+    case Ash.Type.apply_constraints(:struct, values, @struct_constraints) do
       {:ok, agent} ->
         {:ok, agent}
 

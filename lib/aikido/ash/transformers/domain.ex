@@ -27,7 +27,10 @@ defmodule Aikido.Ash.Transformers.Domain do
     dsl =
       Enum.reduce(entries, dsl, fn entry, dsl ->
         definitions =
-          Enum.map(Ash.Resource.Info.actions(entry.resource), fn action ->
+          entry.resource
+          |> Ash.Resource.Info.actions()
+          |> Enum.filter(& &1.public?)
+          |> Enum.map(fn action ->
             %Ash.Resource.Interface{
               name: :"#{entry.name}_#{action.name}",
               action: action.name,

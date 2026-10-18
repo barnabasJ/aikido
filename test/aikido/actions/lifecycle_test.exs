@@ -1,6 +1,5 @@
 defmodule AikidoTest.Actions.LifecycleTest do
   use ExUnit.Case, async: true
-
   alias Aikido.Actions.Lifecycle
   alias Aikido.AgentServer.ParentRef
   alias Aikido.Directives
@@ -10,35 +9,46 @@ defmodule AikidoTest.Actions.LifecycleTest do
     Signal.new!(%{type: type, source: "/test", data: data})
   end
 
-  describe "NotifyParent" do
+  describe("NotifyParent") do
     test "creates emit directive to parent when ctx.parent has a pid" do
       parent_pid = self()
       parent = %ParentRef{pid: parent_pid, id: "parent-1", tag: :child, meta: %{}}
-
       data = %{signal_type: "child.done", payload: %{result: 42}, source: "/child"}
 
       {:ok, result, directives} =
-        Lifecycle.NotifyParent.run(sig("notify_parent", data), %{}, %{}, %{parent: parent})
+        AikidoTest.NativeAction.run(
+          Lifecycle.NotifyParent,
+          sig("notify_parent", data),
+          %{},
+          %{},
+          %{parent: parent}
+        )
 
       assert result == %{notified: true}
       assert [%Directives.Emit{} = emit] = directives
       assert emit.signal.type == "child.done"
       assert emit.signal.data == %{result: 42}
-      assert emit.dispatch == {:pid, [target: parent_pid]}
+      assert emit.dispatch == {:pid, target: parent_pid}
     end
 
     test "returns notified: false when ctx.parent is nil (orphaned)" do
       data = %{signal_type: "child.done", payload: %{}, source: "/child"}
 
       {:ok, result, directives} =
-        Lifecycle.NotifyParent.run(sig("notify_parent", data), %{}, %{}, %{parent: nil})
+        AikidoTest.NativeAction.run(
+          Lifecycle.NotifyParent,
+          sig("notify_parent", data),
+          %{},
+          %{},
+          %{parent: nil}
+        )
 
       assert result == %{notified: false}
       assert directives == []
     end
   end
 
-  describe "NotifyPid" do
+  describe("NotifyPid") do
     test "creates emit directive to specified pid" do
       target = self()
 
@@ -51,7 +61,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
       }
 
       {:ok, result, [directive]} =
-        Lifecycle.NotifyPid.run(sig("notify_pid", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(Lifecycle.NotifyPid, sig("notify_pid", data), %{}, %{}, %{})
 
       assert result == %{sent_to: target}
       assert %Directives.Emit{} = directive
@@ -74,7 +84,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
       }
 
       {:ok, _result, [directive]} =
-        Lifecycle.NotifyPid.run(sig("notify_pid", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(Lifecycle.NotifyPid, sig("notify_pid", data), %{}, %{}, %{})
 
       assert {:pid, opts} = directive.dispatch
       assert Keyword.get(opts, :target) == target
@@ -82,7 +92,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
     end
   end
 
-  describe "SpawnChild" do
+  describe("SpawnChild") do
     test "creates spawn_agent directive" do
       data = %{
         agent_module: SomeWorker,
@@ -93,7 +103,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
       }
 
       {:ok, result, [directive]} =
-        Lifecycle.SpawnChild.run(sig("spawn_child", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(Lifecycle.SpawnChild, sig("spawn_child", data), %{}, %{}, %{})
 
       assert result == %{spawning: :worker_1}
       assert %Directives.SpawnAgent{} = directive
@@ -114,17 +124,23 @@ defmodule AikidoTest.Actions.LifecycleTest do
       }
 
       {:ok, _result, [directive]} =
-        Lifecycle.SpawnChild.run(sig("spawn_child", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(Lifecycle.SpawnChild, sig("spawn_child", data), %{}, %{}, %{})
 
       assert directive.opts == %{}
       assert directive.restart == :transient
     end
   end
 
-  describe "StopSelf" do
+  describe("StopSelf") do
     test "creates stop directive with normal reason" do
       {:ok, result, [directive]} =
-        Lifecycle.StopSelf.run(sig("stop_self", %{reason: :normal}), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          Lifecycle.StopSelf,
+          sig("stop_self", %{reason: :normal}),
+          %{},
+          %{},
+          %{}
+        )
 
       assert result == %{stopping: true, reason: :normal}
       assert %Directives.Stop{} = directive
@@ -133,19 +149,25 @@ defmodule AikidoTest.Actions.LifecycleTest do
 
     test "supports custom stop reasons" do
       {:ok, result, [directive]} =
-        Lifecycle.StopSelf.run(sig("stop_self", %{reason: :work_complete}), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          Lifecycle.StopSelf,
+          sig("stop_self", %{reason: :work_complete}),
+          %{},
+          %{},
+          %{}
+        )
 
       assert result == %{stopping: true, reason: :work_complete}
       assert directive.reason == :work_complete
     end
   end
 
-  describe "StopChild" do
+  describe("StopChild") do
     test "creates stop_child directive" do
       data = %{tag: :worker_1, reason: :normal}
 
       {:ok, result, [directive]} =
-        Lifecycle.StopChild.run(sig("stop_child", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(Lifecycle.StopChild, sig("stop_child", data), %{}, %{}, %{})
 
       assert result == %{stopping_child: :worker_1, reason: :normal}
       assert %Directives.StopChild{} = directive
@@ -157,7 +179,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
       data = %{tag: :processor, reason: :shutdown}
 
       {:ok, _result, [directive]} =
-        Lifecycle.StopChild.run(sig("stop_child", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(Lifecycle.StopChild, sig("stop_child", data), %{}, %{}, %{})
 
       assert directive.reason == :shutdown
     end

@@ -1,8 +1,7 @@
 defmodule Aikido.Slices.AiReact.Actions.AskTest do
   use ExUnit.Case, async: true
-
   alias Aikido.AI.TestActions.TestAdd
-  alias Aikido.Slices.AiReact.Actions.Ask
+  nil
   alias Aikido.Slices.AiReact.Directives.LLMCall
   alias ReqLLM.Context
 
@@ -43,7 +42,14 @@ defmodule Aikido.Slices.AiReact.Actions.AskTest do
   end
 
   test "transitions an idle slice to :running, seeds the context, and emits LLMCall" do
-    {:ok, new_slice, [directive]} = Ask.run(ask_signal(), idle_slice(), %{}, %{})
+    {:ok, new_slice, [directive]} =
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :ask},
+        ask_signal(),
+        idle_slice(),
+        %{},
+        %{}
+      )
 
     assert new_slice.status == :running
     assert new_slice.request_id == "req_test_1"
@@ -57,7 +63,6 @@ defmodule Aikido.Slices.AiReact.Actions.AskTest do
     assert new_slice.pending_tool_calls == []
     assert new_slice.tool_results_received == []
     assert new_slice.previous_tool_signature == nil
-
     messages = Context.to_list(new_slice.context)
     assert length(messages) == 2
     assert Enum.at(messages, 0).role == :system
@@ -75,7 +80,13 @@ defmodule Aikido.Slices.AiReact.Actions.AskTest do
 
   test "omits the system message when no system_prompt is given" do
     {:ok, new_slice, [_]} =
-      Ask.run(ask_signal(%{system_prompt: nil}), idle_slice(), %{}, %{})
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :ask},
+        ask_signal(%{system_prompt: nil}),
+        idle_slice(),
+        %{},
+        %{}
+      )
 
     messages = Context.to_list(new_slice.context)
     assert length(messages) == 1
@@ -95,7 +106,14 @@ defmodule Aikido.Slices.AiReact.Actions.AskTest do
         tool_results_received: [%{id: "stale"}]
       })
 
-    {:ok, new_slice, [_]} = Ask.run(ask_signal(), slice, %{}, %{})
+    {:ok, new_slice, [_]} =
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :ask},
+        ask_signal(),
+        slice,
+        %{},
+        %{}
+      )
 
     assert new_slice.status == :running
     assert new_slice.result == nil
@@ -107,10 +125,25 @@ defmodule Aikido.Slices.AiReact.Actions.AskTest do
 
   test "rejects a concurrent ask while the slice is :running" do
     slice = %{idle_slice() | status: :running, request_id: "req_inflight"}
-    assert {:error, :busy} = Ask.run(ask_signal(), slice, %{}, %{})
+
+    assert {:error, %Ash.Error.Unknown{}} =
+             AikidoTest.NativeAction.run(
+               {Aikido.Slices.AiReact.Actions, :ask},
+               ask_signal(),
+               slice,
+               %{},
+               %{}
+             )
   end
 
   test "accepts the ask when the slice is nil (uninitialized)" do
-    {:ok, %{status: :running}, [%LLMCall{}]} = Ask.run(ask_signal(), nil, %{}, %{})
+    {:ok, %{status: :running}, [%LLMCall{}]} =
+      AikidoTest.NativeAction.run(
+        {Aikido.Slices.AiReact.Actions, :ask},
+        ask_signal(),
+        nil,
+        %{},
+        %{}
+      )
   end
 end

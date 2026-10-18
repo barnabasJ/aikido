@@ -54,10 +54,10 @@ defmodule Aikido.Action.Tool do
   @spec to_tool(module(), keyword()) :: tool()
   def to_tool(action, opts) when is_atom(action) and is_list(opts) do
     %{
-      name: Map.get(Aikido.Dsl.Action.Info.action_options(action), :name),
-      description: Map.get(Aikido.Dsl.Action.Info.action_options(action), :description),
+      name: Map.get(Aikido.ActionRef.action_options(action), :name),
+      description: Map.get(Aikido.ActionRef.action_options(action), :description),
       function: &execute_action(action, &1, &2),
-      parameters_schema: build_parameters_schema(Aikido.Dsl.Action.Info.schema(action), opts)
+      parameters_schema: build_parameters_schema(Aikido.ActionRef.schema(action), opts)
     }
   end
 
@@ -69,7 +69,7 @@ defmodule Aikido.Action.Tool do
   @spec execute_action(module(), map(), map()) :: {:ok, String.t()} | {:error, String.t()}
   def execute_action(action, params, context) do
     # Convert string keys to atom keys and handle type conversion based on schema
-    converted_params = convert_params_using_schema(params, Aikido.Dsl.Action.Info.schema(action))
+    converted_params = convert_params_using_schema(params, Aikido.ActionRef.schema(action))
     safe_context = context || %{}
 
     case Aikido.Exec.run(action, converted_params, safe_context) do

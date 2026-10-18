@@ -13,7 +13,11 @@ defmodule Aikido.Types.Union do
       matches? = Ash.Type.matches_type?(type, value, opts[:constraints] || [])
 
       if matches? do
-        case Aikido.Schema.cast_value(type, value, opts[:constraints] || []) do
+        result = with {:ok, constraints} <- Ash.Type.init(type, opts[:constraints] || []),
+                      {:ok, value} <- Ash.Type.cast_input(type, value, constraints),
+                      do: Ash.Type.apply_constraints(type, value, constraints)
+
+        case result do
           {:ok, value} -> {:halt, {:ok, value}}
           _ -> {:cont, :error}
         end

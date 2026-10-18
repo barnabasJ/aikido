@@ -1,87 +1,7 @@
 defmodule Aikido.Slices.AiReact do
-  @moduledoc """
-  ReAct strategy as a configured `Aikido.Slice`.
-
-  Attached to any `Aikido.Agent` via the agent's `extensions:` list and
-  configured through the contributed `react do … end` section:
-
-      defmodule MyApp.SupportAgent do
-        use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
-
-        agent do
-          name "support"
-        end
-
-        react do
-          model "anthropic:claude-haiku-4-5-20251001"
-          tools [MyApp.Actions.LookupOrder, MyApp.Actions.RefundOrder]
-          system_prompt "You are a support agent."
-          max_iterations 5
-        end
-
-        slices do
-          slice :ai, Aikido.Slices.AiReact
-        end
-      end
-
-  The slice owns the `:ai` key of the agent's state and contains the full
-  lifecycle of one ReAct conversation.
-
-  ## State machine
-
-      :idle ──ask──▶ :running ─┬─final answer──▶ :completed
-                               ├─tool calls + iter < max ─▶ :running (next iter)
-                               ├─tool calls + iter ≥ max ─▶ :completed (truncated)
-                               └─LLM error ──▶ :failed
-
-  Concurrent `ai.react.ask` while `:running` is rejected with
-  `{:error, :busy}` (ADR 0022 §5).
-
-  ## Slice fields
-
-    * `:status` — `:idle | :running | :completed | :failed`.
-    * `:request_id` — opaque correlation id minted by `Aikido.AI.ask/3`.
-      Every response signal carries it; mismatched signals are dropped as
-      stale.
-    * `:context` — the full `ReqLLM.Context` carried verbatim per ADR
-      0022 §3 — system + user + assistant + tool messages.
-    * `:iteration` — number of LLM calls completed so far.
-    * `:max_iterations` — cap on LLM calls; further `:tool_calls` turns
-      after this is reached truncate the run as `:completed`.
-    * `:result` — final answer text on `:completed`, or `nil`.
-    * `:error` — error term on `:failed`, or `nil`.
-    * `:pending_tool_calls` — tool calls from the last `:tool_calls` turn,
-      kept until every paired tool result has come back.
-    * `:tool_results_received` — tool results accumulated for the in-flight
-      tool batch; cleared when the batch completes and the next LLMCall
-      fires.
-    * `:previous_tool_signature` — signature of the last batch's tool
-      calls; used to detect tool-call cycles and prepend a cycle-warning
-      user message before the next LLMCall.
-    * `:model`, `:tools`, `:system_prompt`, `:llm_opts` — run config
-      seeded from the slice's `slices:` config (validated through
-      `config_schema/0`); `Aikido.Slices.AiReact.Actions.Ask` falls back to these
-      values when the opening signal omits them.
-
-  ## Config keys (`config_schema/0`)
-
-    * `:model` — any value accepted by `ReqLLM.Generation.generate_text/3`.
-      Optional; the floor enforced by the `Ask` action is `{:error, :no_model}`
-      when neither the slice config nor the per-call `Aikido.AI.ask/3` opts
-      supply a model.
-    * `:tools` — runtime tool objects, contextual callback pairs, Ash action references, or Aikido actions exposed to the model.
-    * `:system_prompt` — system message text prepended to the conversation.
-    * `:max_iterations` — cap on LLM calls per run (default 10).
-    * `:max_tokens` — folded into `:llm_opts` (default 4096).
-    * `:temperature` — folded into `:llm_opts` (default 0.2).
-    * `:llm_opts` — extra keyword list merged into per-call options
-      (last-write-wins over `:max_tokens` / `:temperature`).
-  """
-
-  alias Aikido.Slices.AiReact.Actions
+  @moduledoc "ReAct strategy as a configured `Aikido.Slice`.\n\nAttached to any `Aikido.Agent` via the agent's `extensions:` list and\nconfigured through the contributed `react do … end` section:\n\n    defmodule MyApp.SupportAgent do\n      use Aikido.Agent, extensions: [Aikido.Slices.AiReact]\n\n      agent do\n        name \"support\"\n      end\n\n      react do\n        model \"anthropic:claude-haiku-4-5-20251001\"\n        tools [MyApp.Actions.LookupOrder, MyApp.Actions.RefundOrder]\n        system_prompt \"You are a support agent.\"\n        max_iterations 5\n      end\n\n      slices do\n        slice :ai, Aikido.Slices.AiReact\n      end\n    end\n\nThe slice owns the `:ai` key of the agent's state and contains the full\nlifecycle of one ReAct conversation.\n\n## State machine\n\n    :idle ──ask──▶ :running ─┬─final answer──▶ :completed\n                             ├─tool calls + iter < max ─▶ :running (next iter)\n                             ├─tool calls + iter ≥ max ─▶ :completed (truncated)\n                             └─LLM error ──▶ :failed\n\nConcurrent `ai.react.ask` while `:running` is rejected with\n`{:error, :busy}` (ADR 0022 §5).\n\n## Slice fields\n\n  * `:status` — `:idle | :running | :completed | :failed`.\n  * `:request_id` — opaque correlation id minted by `Aikido.AI.ask/3`.\n    Every response signal carries it; mismatched signals are dropped as\n    stale.\n  * `:context` — the full `ReqLLM.Context` carried verbatim per ADR\n    0022 §3 — system + user + assistant + tool messages.\n  * `:iteration` — number of LLM calls completed so far.\n  * `:max_iterations` — cap on LLM calls; further `:tool_calls` turns\n    after this is reached truncate the run as `:completed`.\n  * `:result` — final answer text on `:completed`, or `nil`.\n  * `:error` — error term on `:failed`, or `nil`.\n  * `:pending_tool_calls` — tool calls from the last `:tool_calls` turn,\n    kept until every paired tool result has come back.\n  * `:tool_results_received` — tool results accumulated for the in-flight\n    tool batch; cleared when the batch completes and the next LLMCall\n    fires.\n  * `:previous_tool_signature` — signature of the last batch's tool\n    calls; used to detect tool-call cycles and prepend a cycle-warning\n    user message before the next LLMCall.\n  * `:model`, `:tools`, `:system_prompt`, `:llm_opts` — run config\n    seeded from the slice's `slices:` config (validated through\n    `config_schema/0`); `Aikido.Slices.AiReact.Actions.Ask` falls back to these\n    values when the opening signal omits them.\n\n## Config keys (`config_schema/0`)\n\n  * `:model` — any value accepted by `ReqLLM.Generation.generate_text/3`.\n    Optional; the floor enforced by the `Ask` action is `{:error, :no_model}`\n    when neither the slice config nor the per-call `Aikido.AI.ask/3` opts\n    supply a model.\n  * `:tools` — runtime tool objects, contextual callback pairs, Ash action references, or Aikido actions exposed to the model.\n  * `:system_prompt` — system message text prepended to the conversation.\n  * `:max_iterations` — cap on LLM calls per run (default 10).\n  * `:max_tokens` — folded into `:llm_opts` (default 4096).\n  * `:temperature` — folded into `:llm_opts` (default 0.2).\n  * `:llm_opts` — extra keyword list merged into per-call options\n    (last-write-wins over `:max_tokens` / `:temperature`).\n"
 
   @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
-
   use Aikido.Slice
 
   slice do
@@ -123,11 +43,11 @@ defmodule Aikido.Slices.AiReact do
   end
 
   signal_routes do
-    route "ai.react.ask", Actions.Ask
-    route "ai.react.llm.completed", Actions.LLMTurn
-    route "ai.react.tool.completed", Actions.ToolResult
-    route "ai.react.failed", Actions.Failed
-    route "ai.react.cancel", Actions.Cancel
+    route "ai.react.ask", {Aikido.Slices.AiReact.Actions, :ask}
+    route "ai.react.llm.completed", {Aikido.Slices.AiReact.Actions, :llm_turn}
+    route "ai.react.tool.completed", {Aikido.Slices.AiReact.Actions, :tool_result}
+    route "ai.react.failed", {Aikido.Slices.AiReact.Actions, :failed}
+    route "ai.react.cancel", {Aikido.Slices.AiReact.Actions, :cancel}
   end
 
   @react_section %Spark.Dsl.Section{
@@ -167,7 +87,6 @@ defmodule Aikido.Slices.AiReact do
       ]
     ]
   }
-
   use Spark.Dsl.Extension,
     sections: [@react_section],
     transformers: [Aikido.Slices.AiReact.Transformers.RegisterContribution]
@@ -204,21 +123,13 @@ defmodule Aikido.Slices.AiReact do
     end
   end
 
-  @doc """
-  The cycle-warning user message appended to the context when the next
-  LLMCall would otherwise repeat the previous tool-call batch verbatim.
-  """
+  @doc "The cycle-warning user message appended to the context when the next\nLLMCall would otherwise repeat the previous tool-call batch verbatim.\n"
   @spec cycle_warning() :: String.t()
   def cycle_warning do
     @cycle_warning
   end
 
-  @doc """
-  Tool-call signature for cycle detection.
-
-  Stable, sortable, and tolerant of mixed atom/string keys (different
-  ReqLLM provider adapters return one or the other).
-  """
+  @doc "Tool-call signature for cycle detection.\n\nStable, sortable, and tolerant of mixed atom/string keys (different\nReqLLM provider adapters return one or the other).\n"
   @spec tool_call_signature([map()]) :: String.t()
   def tool_call_signature(tool_calls) when is_list(tool_calls) do
     tool_calls

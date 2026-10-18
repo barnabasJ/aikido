@@ -156,7 +156,8 @@ defmodule Aikido.Exec do
 
   def run(action, params \\ %{}, context \\ %{}, opts \\ [])
 
-  def run(action, params, context, opts) when is_atom(action) and is_list(opts) do
+  def run(action, params, context, opts)
+      when (is_atom(action) or is_tuple(action)) and is_list(opts) do
     log_level = Keyword.get(opts, :log_level, :info)
 
     with {:ok, normalized_params} <- normalize_params(params),
@@ -164,7 +165,7 @@ defmodule Aikido.Exec do
          :ok <- Validator.validate_action(action),
          {:ok, validated_params} <- Validator.validate_params(action, normalized_params) do
       enhanced_context =
-        Map.put(normalized_context, :action_metadata, Aikido.Dsl.Action.Info.to_json(action))
+        Map.put(normalized_context, :action_metadata, Aikido.ActionRef.to_json(action))
 
       Telemetry.cond_log_start(log_level, action, validated_params, enhanced_context)
 
@@ -623,7 +624,35 @@ defmodule Aikido.Exec do
 
       {signal, slice, action_opts, ctx} = build_run4_args(action, params, context)
 
-      action.run(signal, slice, action_opts, ctx)
+      {resource, name} = Aikido.ActionRef.normalize(action)
+      definition = Ash.Resource.Info.action(resource, name)
+      runtime = Map.merge(ctx, %{signal: signal, action_opts: action_opts})
+
+      arguments =
+        if Enum.any?(definition.arguments, &(&1.name == :data)),
+          do: %{data: params, state: slice},
+          else: Map.put(params, :state, slice)
+
+      ash_opts = Ash.Scope.to_opts(ctx, context: %{aikido: runtime})
+
+      input =
+        Ash.ActionInput.for_action(
+          resource,
+          name,
+          arguments,
+          Keyword.put(ash_opts, :skip_unknown_inputs, [:*])
+        )
+
+      case Ash.run_action(input, ash_opts) do
+        {:ok, result} ->
+          case Aikido.ActionResult.new(result) do
+            {:ok, result} -> {:ok, result.state, result.directives}
+            {:error, error} -> {:error, Ash.Error.to_error_class(error)}
+          end
+
+        {:error, error} ->
+          {:error, error}
+      end
       |> handle_action_result(action, log_level, opts)
     rescue
       e ->
@@ -675,7 +704,7 @@ defmodule Aikido.Exec do
 
     defp synthesize_signal(action, params) do
       type =
-        case Map.get(Aikido.Dsl.Action.Info.action_options(action), :name) do
+        case Map.get(Aikido.ActionRef.action_options(action), :name) do
           nil -> Atom.to_string(action)
           name when is_binary(name) -> name
         end
@@ -734,15 +763,9 @@ defmodule Aikido.Exec do
     defp extract_error_fields(reason), do: {inspect(reason), %{}}
 
     defp validate_and_log_success(action, result, log_level, opts, dirs) do
-      case Validator.validate_output(action, result, opts) do
-        {:ok, validated_result} ->
-          Telemetry.cond_log_end(log_level, action, {:ok, validated_result, dirs})
-          {:ok, validated_result, dirs}
-
-        {:error, validation_error} ->
-          Telemetry.cond_log_validation_failure(log_level, action, validation_error)
-          {:error, validation_error}
-      end
+      _ = opts
+      Telemetry.cond_log_end(log_level, action, {:ok, result, dirs})
+      {:ok, result, dirs}
     end
 
     # Handle exceptions raised during action execution

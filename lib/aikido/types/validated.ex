@@ -16,8 +16,11 @@ defmodule Aikido.Types.Validated do
   def cast_input(nil, _constraints), do: {:ok, nil}
 
   def cast_input(value, constraints) do
-    with {:ok, value} <-
-           Aikido.Schema.cast_value(constraints[:type], value, constraints[:constraints]),
+    type = constraints[:type]
+
+    with {:ok, type_constraints} <- Ash.Type.init(type, constraints[:constraints]),
+         {:ok, value} <- Ash.Type.cast_input(type, value, type_constraints),
+         {:ok, value} <- Ash.Type.apply_constraints(type, value, type_constraints),
          {module, function, args} <- constraints[:validation] do
       # TypedStruct checks defaults while its host module is still compiling.
       # Self-hosted validators run when the completed type is cast at runtime.

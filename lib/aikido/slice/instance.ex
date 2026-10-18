@@ -34,7 +34,7 @@ defmodule Aikido.Slice.Instance do
   @type t :: %__MODULE__{}
 
   @doc "Returns the Ash type for Instance."
-  @spec schema() :: Aikido.Schema.t()
+  @spec schema() :: Ash.Type.t()
   def schema, do: @schema
 
   @doc """

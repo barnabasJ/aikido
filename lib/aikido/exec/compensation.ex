@@ -41,7 +41,7 @@ defmodule Aikido.Exec.Compensation do
   @spec enabled?(action()) :: boolean()
   def enabled?(action) do
     enabled =
-      case Map.get(Aikido.Dsl.Action.Info.action_options(action), :compensation) do
+      case Map.get(Aikido.ActionRef.action_options(action), :compensation) do
         %{enabled: enabled} -> enabled
         _ -> false
       end
@@ -85,7 +85,7 @@ defmodule Aikido.Exec.Compensation do
     @spec execute_compensation(action(), params(), context(), Exception.t(), run_opts()) ::
             exec_result
     defp execute_compensation(action, params, context, error, opts) do
-      compensation_opts = Map.get(Aikido.Dsl.Action.Info.action_options(action), :compensation)
+      compensation_opts = Map.get(Aikido.ActionRef.action_options(action), :compensation)
       timeout = get_compensation_timeout(opts, compensation_opts)
 
       current_gl = Process.group_leader()

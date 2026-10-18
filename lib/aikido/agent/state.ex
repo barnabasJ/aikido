@@ -1,100 +1,45 @@
 defmodule Aikido.Agent.State do
-  @moduledoc """
-  Internal helper module for agent state management.
+  @moduledoc false
 
-  > #### Internal Module {: .warning}
-  > This module is internal to the Agent implementation. Its API may
-  > change without notice.
+  def merge(state, changes) when is_list(changes), do: merge(state, Map.new(changes))
+  def merge(state, changes) when is_map(changes), do: DeepMerge.deep_merge(state, changes)
 
-  Handles deep merging and validation of agent state.
-  """
-
-  alias Aikido.Action.Schema
-
-  @doc """
-  Merges new attributes into existing state using deep merge semantics.
-  """
-  @spec merge(map(), map() | keyword()) :: map()
-  def merge(current_state, attrs) when is_list(attrs) do
-    merge(current_state, Map.new(attrs))
-  end
-
-  def merge(current_state, attrs) when is_map(attrs) do
-    DeepMerge.deep_merge(current_state, attrs)
-  end
-
-  @doc """
-  Validates state against an Ash field contract.
-  Returns validated state as a map.
-
-  By default (non-strict mode), extra fields not in the schema are preserved.
-  In strict mode, only schema-defined fields are kept.
-  """
-  @spec validate(map(), term(), keyword()) :: {:ok, map()} | {:error, term()}
   def validate(state, schema, opts \\ [])
+  def validate(state, schema, _opts) when schema in [nil, []], do: {:ok, state}
 
-  def validate(state, [], _opts), do: {:ok, state}
-
-  def validate(state, schema, opts) when is_list(schema) do
-    strict? = Keyword.get(opts, :strict, false)
-    known_keys = Keyword.keys(schema)
-
-    state_to_validate =
-      if strict? do
-        Map.take(state, known_keys)
-      else
-        Map.take(state, known_keys)
-      end
-
-    extra_fields = Map.drop(state, known_keys)
-
-    case Schema.validate(schema, state_to_validate) do
-      {:ok, validated} ->
-        if strict? do
-          {:ok, validated}
-        else
-          {:ok, DeepMerge.deep_merge(state, Map.merge(validated, extra_fields))}
-        end
-
-      {:error, _} = error ->
-        error
+  def validate(state, fields, opts) when is_list(fields) do
+    with {:ok, constraints} <- Ash.Type.init(:map, fields: fields),
+         {:ok, value} <- Ash.Type.cast_input(:map, state, constraints),
+         {:ok, value} <- Ash.Type.apply_constraints(:map, value, constraints) do
+      {:ok, if(opts[:strict], do: value, else: Map.merge(state, value))}
     end
   end
 
   def validate(state, schema, opts) do
-    strict? = Keyword.get(opts, :strict, false)
+    if Ash.Resource.Info.resource?(schema) do
+      path = Aikido.Ash.Runtime.option(schema, :path)
+      fields = schema.__aikido_state_fields__()
+      attributes = Map.merge(Map.take(state, (Ash.Resource.Info.attribute_names(schema) |> Enum.to_list())), Map.get(state, path, %{}))
+      action = %Ash.Resource.Actions.Create{name: :validate_state, accept: (Ash.Resource.Info.attribute_names(schema) |> Enum.to_list())}
+      changeset = schema |> Ash.Changeset.new() |> Ash.Changeset.force_change_attributes(attributes)
 
-    case Schema.validate(schema, state) do
-      {:ok, validated} ->
-        if strict? do
-          {:ok, validated}
-        else
-          known_keys = Schema.known_keys(schema)
-          extra_fields = Map.drop(state, known_keys)
-          {:ok, DeepMerge.deep_merge(state, Map.merge(validated, extra_fields))}
-        end
-
-      {:error, _} = error ->
-        error
-    end
-  end
-
-  @doc """
-  Builds initial state from schema defaults.
-  """
-  @spec defaults_from_schema(term()) :: map()
-  def defaults_from_schema([]), do: %{}
-
-  def defaults_from_schema(schema) when is_list(schema) do
-    Enum.reduce(schema, %{}, fn {key, opts}, acc ->
-      case Keyword.fetch(opts, :default) do
-        {:ok, default} -> Map.put(acc, key, default)
-        :error -> acc
+      case changeset
+           |> Ash.Changeset.for_create(action, %{}, require?: false)
+           |> Ash.Changeset.require_values(:create, false,
+             Enum.reject(Ash.Resource.Info.attributes(schema), & &1.allow_nil?))
+           |> Ash.Changeset.apply_attributes() do
+        {:ok, record} ->
+          projected = Map.take(record, Map.keys(state) -- [path])
+          {:ok, state |> Map.merge(projected) |> Map.put(path, Map.take(record, fields))}
+        {:error, error} -> {:error, Ash.Error.to_error_class(error)}
       end
-    end)
-  end
-
-  def defaults_from_schema(ash_schema) do
-    Aikido.Agent.Schema.defaults_from_schema(ash_schema)
+    else
+      case Ash.Type.cast_input(schema, state) do
+        {:ok, value} ->
+          value = if is_struct(value), do: Map.from_struct(value), else: value
+          {:ok, if(opts[:strict], do: value, else: Map.merge(state, value))}
+        error -> error
+      end
+    end
   end
 end
