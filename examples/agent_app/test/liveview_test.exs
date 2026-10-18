@@ -52,10 +52,16 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert implementation.code =~ "Aikido.Directives.async_task"
     refute implementation.open?
 
-    assert Enum.any?(
-             AgentExamples.Source.for_example(Catalog.find("research-team")),
-             &String.starts_with?(&1.code, "defimpl Aikido.AgentServer.DirectiveExec")
-           )
+    directive =
+      Catalog.find("research-team")
+      |> AgentExamples.Source.for_example()
+      |> Enum.find(&(&1.module == Aikido.Slices.AiReact.Directives.LLMCall))
+
+    assert directive.category == :directive
+    assert directive.code =~ "use Aikido.Directive"
+    assert directive.code =~ "typed_struct do"
+    assert directive.code =~ "def exec("
+    refute directive.open?
   end
 
   test "counter commands update its visual and stop releases its process", %{conn: conn} do

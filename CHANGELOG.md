@@ -6,6 +6,16 @@
 
 ### Changed
 
+- Define directives with the Spark `Aikido.Directive` host, reusing Ash typed
+  structs and requiring an `exec/3` behaviour callback on the directive module.
+  Replace protocol implementations with callbacks on the built-in directives;
+  validate their modules with Ash/Spark's behaviour constraint.
+
+- Use Ash’s native `:union` arguments for thread entries and memory space
+  defaults; remove the custom union type.
+
+- Make FSM a native `Aikido.Ash.Slice` resource that owns its `:transition`
+  action; keep `FSM.Transition` solely as the Ash action implementation.
 - Move production and example generic-action callbacks into dedicated
   `Ash.Resource.Actions.Implementation` modules; remove legacy reducer wrappers
   and show implementation sources alongside the runnable examples.

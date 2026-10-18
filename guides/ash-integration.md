@@ -115,9 +115,10 @@ as demonstrated by `AgentExamples.AI.ask/3`.
 Use IDs for durable identity: recovery may replace a PID. Neither a receipt nor
 a snapshot establishes exactly-once external effects or a durable input inbox.
 Native state transitions return `Aikido.ActionResult`, an `Ash.TypedStruct` with
-`state` and `directives`. Its directives must have a concrete
-`Aikido.AgentServer.DirectiveExec` protocol implementation; the `Any` fallback
-is rejected. The runtime validates every returned result before applying state
+`state` and `directives`. Define directives with `use Aikido.Directive`,
+Ash's `typed_struct` fields, and an `exec/3` behaviour callback in the same module.
+Directive modules are checked with Ash's native `:module` behaviour constraint,
+which delegates to Spark. The runtime validates every returned result before applying state
 or executing effects, including raw maps returned by native actions. Use
 `Aikido.ActionResult.new/1` for validation when calling an action directly with Ash.
 Ash owns arguments, defaults, constraints, preparations, authorization, and errors.

@@ -11,7 +11,7 @@ defmodule AgentExamples.Source do
              "examples/agent_app/lib/agent_examples/ai.ex",
              "lib/aikido/slices/ai_react.ex",
              "lib/aikido/slices/ai_worker.ex",
-             "lib/aikido/slices/ai_worker/**/implementation.ex",
+             "lib/aikido/slices/ai_worker/**/*.ex",
              "lib/aikido/slices/ai_react/**/*.ex",
              "lib/aikido/ash/ai.ex",
              "lib/aikido/ash/team/engine.ex"
@@ -79,25 +79,6 @@ defmodule AgentExamples.Source do
                        }
                      ]
 
-                   {:defimpl, metadata, [protocol | blocks]} ->
-                     options = Enum.reduce(blocks, [], &Keyword.merge(&2, &1))
-                     {:__aliases__, _, protocol} = protocol
-                     {:__aliases__, _, target} = options[:for]
-                     name = Enum.join(protocol ++ target, ".")
-
-                     [
-                       %{
-                         module: Module.concat(protocol ++ target),
-                         name: name,
-                         category: :directive,
-                         path: Path.relative_to(file, @root),
-                         code:
-                           lines
-                           |> Enum.slice((metadata[:line] - 1)..(metadata[:end][:line] - 1))
-                           |> Enum.join("\n")
-                       }
-                     ]
-
                    _ ->
                      []
                  end)
@@ -128,11 +109,7 @@ defmodule AgentExamples.Source do
       entry.module in modules ||
         (AgentExamples.Catalog.ai?(example) &&
            (entry.module in @ai_names || String.starts_with?(entry.name, "Aikido.Slices.AiReact.") ||
-              String.starts_with?(entry.name, "Aikido.Slices.AiWorker.") ||
-              String.starts_with?(
-                entry.name,
-                "Aikido.AgentServer.DirectiveExec.Aikido.Slices.AiReact."
-              )))
+              String.starts_with?(entry.name, "Aikido.Slices.AiWorker.")))
     end)
     |> Enum.sort_by(fn entry ->
       {if(entry.module == example.resource, do: 0, else: rank(entry.category)), entry.name}
