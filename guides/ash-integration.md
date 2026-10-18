@@ -49,13 +49,24 @@ defmodule MyApp.Counter do
       argument :state, :map, allow_nil?: false
       argument :amount, :integer, allow_nil?: false
 
-      run fn input, _context ->
-        Aikido.ActionResult.new(state: %{count: input.arguments.state.count + input.arguments.amount})
-      end
+      run MyApp.Increment
     end
   end
 end
+
+defmodule MyApp.Increment do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _opts, _context) do
+    Aikido.ActionResult.new(state: %{count: input.arguments.state.count + input.arguments.amount})
+  end
+end
 ```
+
+Keep action contracts on the resource and prefer separate implementation modules
+using `Ash.Resource.Actions.Implementation`. Ash passes the typed arguments,
+implementation options, and action context directly to `run/3`.
 
 `schema do` uses the same attribute declarations as Ash's `attributes do` block.
 The DSL transformer moves those declarations into real resource attributes at
@@ -167,16 +178,11 @@ defmodule MyApp.CounterSlice do
   end
 
   actions do
-    action :increment, :map do
+    action :increment, Aikido.ActionResult do
       argument :state, :map, allow_nil?: false
-      argument :data, :map, allow_nil?: false
+      argument :amount, :integer, allow_nil?: false
 
-      run fn input, _context ->
-        {:ok, %{
-          state: %{count: input.arguments.state.count + input.arguments.data.amount},
-          directives: []
-        }}
-      end
+      run MyApp.Increment
     end
   end
 

@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Move production and example generic-action callbacks into dedicated
+  `Ash.Resource.Actions.Implementation` modules; remove legacy reducer wrappers
+  and show implementation sources alongside the runnable examples.
 - Declare the built-in children query on a shared runtime resource and implement
   it with `Ash.Resource.Actions.Implementation`, preserving domain state.
 - Replace the custom action DSL with native Ash generic actions and a shared

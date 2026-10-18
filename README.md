@@ -48,11 +48,18 @@ defmodule MyApp.Counter do
       argument :state, :map, allow_nil?: false
       argument :amount, :integer, allow_nil?: false
 
-      run fn input, _context ->
-        state = input.arguments.state
-        Aikido.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
-      end
+      run MyApp.Increment
     end
+  end
+end
+
+defmodule MyApp.Increment do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _opts, _context) do
+    state = input.arguments.state
+    Aikido.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
   end
 end
 
