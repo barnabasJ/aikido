@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Configure agent snapshot retention with `persistence :permanent | :temporary`.
+  Temporary agents delete their saved state on stop; permanent agents retain it.
+  Add a generic `delete` action and generated domain interface for removing a
+  running or stopped agent's saved state explicitly.
+
 - Define directives with the Spark `Aikido.Directive` host, reusing Ash typed
   structs and requiring an `exec/3` behaviour callback on the directive module.
   Replace protocol implementations with callbacks on the built-in directives;

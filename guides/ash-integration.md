@@ -76,11 +76,39 @@ validation. Mounted slices become additional attributes. Internally the runtime
 groups the agent's own fields under `:state`; `path :other_name` changes that path.
 
 The generated public actions are all generic Ash actions: `start`, `stop`,
-`inspect`, `list`, and the declared signals. No CRUD actions are generated.
+`delete`, `inspect`, `list`, and the declared signals. No CRUD actions are generated.
 
 Adding `Aikido` to your supervision tree starts `Aikido.Default`. Resources use this
 runtime automatically. Set `instance MyApp.AgentRuntime` only when using another
 runtime, started with `{Aikido, name: MyApp.AgentRuntime}`.
+
+Agent resources configure snapshot retention in the `agent` block:
+
+```elixir
+agent do
+  name "scratch_worker"
+  persistence :temporary
+end
+```
+
+The default, `persistence :permanent`, retains saved state when `stop` is called.
+Starting the same ID restores that state. `persistence :temporary` deletes the
+snapshot on stop, so starting that ID again creates fresh state. Both modes
+checkpoint while running and support recovery after an unexpected crash. This
+setting controls retention after stop; it is independent of DurableServer's
+`permanent` automatic-restart option.
+
+Every resource also exposes `delete`, which stops the process and deletes its
+saved state regardless of retention. It accepts a running PID, reference, or ID;
+an ID or reference also works after stop, without activating the agent:
+
+```elixir
+{:ok, %{status: :stopped}} = MyApp.Agents.counter_stop(counter)
+{:ok, %{status: :deleted}} = MyApp.Agents.counter_delete(counter.id)
+```
+
+Deletion removes this agent's DurableServer snapshot; externally stored data
+owned by tools or application resources has its own lifecycle.
 
 DurableServer handles process activation and configured snapshot persistence.
 The agent extension does not occupy the data-layer slot. Resources use Ash's

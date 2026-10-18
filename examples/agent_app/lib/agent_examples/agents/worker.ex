@@ -4,6 +4,7 @@ defmodule AgentExamples.Worker do
 
   agent do
     name "example_worker"
+    persistence :temporary
 
     schema do
       attribute :status, :atom,
