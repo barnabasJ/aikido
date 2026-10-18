@@ -346,6 +346,7 @@ defmodule Aikido.Ash.Transformers.Agent do
         {:start, :map, arguments},
         {:inspect, :term, [reference_argument(), build_argument!(:fields, {:array, :atom}, [])]},
         {:stop, :map, [reference_argument()]},
+        {:delete, :map, [reference_argument()]},
         {:list, {:array, :term},
          [
            build_argument!(:filter, :term, []),

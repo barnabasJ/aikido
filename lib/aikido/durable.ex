@@ -134,8 +134,51 @@ defmodule Aikido.Durable do
 
   def stop(name, key, opts \\ []) do
     case lookup(name, key, opts) do
-      {:ok, pid} -> DurableServer.Supervisor.terminate_child_permanent(name, pid)
+      {:ok, pid} -> Aikido.stop_agent(config(name).aikido, pid)
       :error -> {:error, :not_found}
+    end
+  end
+
+  @doc "Stop an agent and delete its snapshot, including when the agent is already stopped."
+  def delete(name, logical_key, opts \\ []) do
+    config = config(name)
+    partition = Keyword.get(opts, :partition, config.partition)
+    storage_key = key(logical_key, partition)
+
+    with :ok <- validate_delete_target(name, storage_key, opts[:agent]),
+         :ok <- DurableServer.Supervisor.terminate_and_delete_child(name, storage_key) do
+      Aikido.RuntimeStore.delete(
+        config.aikido,
+        :relationships,
+        Aikido.partition_key(id(logical_key), partition)
+      )
+    end
+  end
+
+  defp validate_delete_target(_name, _key, nil), do: :ok
+
+  defp validate_delete_target(name, key, expected_agent) do
+    with {:ok, info} <- DurableServer.Supervisor.get_server_info(name, key),
+         true <- info.module == Aikido.Durable.AgentServer || {:error, :different_resource} do
+      saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
+
+      if saved.options[:agent_module] == expected_agent,
+        do: :ok,
+        else: {:error, :different_resource}
+    end
+  end
+
+  @doc false
+  def keep_snapshot?(agent_module) do
+    if function_exported?(agent_module, :__aikido_resource__, 0) do
+      Spark.Dsl.Extension.get_opt(
+        agent_module.__aikido_resource__(),
+        [:agent],
+        :persistence,
+        :permanent
+      ) == :permanent
+    else
+      true
     end
   end
 

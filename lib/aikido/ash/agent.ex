@@ -7,6 +7,9 @@ defmodule Aikido.Ash.Agent do
   current PID and resource. Signal actions accept that reference, an ID or PID,
   plus arguments inferred from their target's schema, and return a processing
   receipt. `inspect` and `list` explicitly read live state; `stop` confirms shutdown.
+  `persistence :permanent` (the default) keeps saved state after stop;
+  `persistence :temporary` deletes it. Both checkpoint while running for recovery.
+  `delete` always removes the process and saved state, including by a stopped ID.
 
   Commands do not return state. A processing receipt acknowledges the signal
   callback, not completion of asynchronous effects or exactly-once delivery.
@@ -54,6 +57,12 @@ defmodule Aikido.Ash.Agent do
         doc: "Runtime supervisor; defaults to Aikido.Default."
       ],
       middleware: [type: {:list, :any}, default: []],
+      persistence: [
+        type: {:in, [:permanent, :temporary]},
+        default: :permanent,
+        doc:
+          "Snapshot retention after stop. :permanent retains saved state; :temporary deletes it. Both checkpoint while running."
+      ],
       path: [type: :atom, default: :state]
     ],
     sections: [@schema],

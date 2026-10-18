@@ -342,20 +342,32 @@ defmodule Aikido do
   @doc """
   Stops an agent by pid or id.
 
+  Native agent resources with `persistence :temporary` delete their durable
+  snapshot. Permanent resources and plain agent modules retain it.
+
   ## Examples
 
       :ok = Aikido.stop_agent(MyApp.Aikido, pid)
       :ok = Aikido.stop_agent(MyApp.Aikido, "agent-id")
   """
-  @spec stop_agent(atom(), pid() | String.t()) :: :ok | {:error, :not_found}
+  @spec stop_agent(atom(), pid() | String.t()) :: :ok | {:error, term()}
   def stop_agent(aikido_instance, pid) when is_atom(aikido_instance) and is_pid(pid) do
-    if Process.whereis(durable_supervisor_name(aikido_instance)) do
-      DurableServer.Supervisor.terminate_child_permanent(
-        durable_supervisor_name(aikido_instance),
-        pid
-      )
-    else
-      DynamicSupervisor.terminate_child(agent_supervisor_name(aikido_instance), pid)
+    with {:ok, {pool, key, partition, keep_snapshot?}} <-
+           Aikido.AgentServer.state(pid, fn runtime ->
+             {:ok,
+              {runtime.lifecycle.pool, runtime.lifecycle.pool_key, runtime.partition,
+               Aikido.Durable.keep_snapshot?(runtime.agent_module)}}
+           end) do
+      cond do
+        is_nil(pool) ->
+          DynamicSupervisor.terminate_child(agent_supervisor_name(aikido_instance), pid)
+
+        keep_snapshot? ->
+          DurableServer.Supervisor.terminate_child_permanent(pool, pid)
+
+        true ->
+          Aikido.Durable.delete(pool, key, partition: partition)
+      end
     end
   end
 
@@ -366,7 +378,7 @@ defmodule Aikido do
     end
   end
 
-  @spec stop_agent(atom(), pid() | String.t(), keyword()) :: :ok | {:error, :not_found}
+  @spec stop_agent(atom(), pid() | String.t(), keyword()) :: :ok | {:error, term()}
   def stop_agent(aikido_instance, pid, _opts)
       when is_atom(aikido_instance) and is_pid(pid) do
     stop_agent(aikido_instance, pid)

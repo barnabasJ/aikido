@@ -87,15 +87,19 @@ defmodule Aikido.Durable.AgentServer do
   defp wrap({:noreply, runtime}, state), do: {:noreply, %{state | runtime: runtime}, sync: true}
 
   defp wrap({:stop, reason, runtime}, state),
-    do: {:stop, stop_reason(reason), %{state | runtime: runtime}}
+    do: {:stop, stop_reason(reason, runtime), %{state | runtime: runtime}}
 
   defp wrap({:stop, reason, reply, runtime}, state),
-    do: {:stop, stop_reason(reason), reply, %{state | runtime: runtime}}
+    do: {:stop, stop_reason(reason, runtime), reply, %{state | runtime: runtime}}
 
-  defp stop_reason(:normal), do: :permanent
-  defp stop_reason(:shutdown), do: {:shutdown, :permanent}
-  defp stop_reason({:shutdown, _}), do: {:shutdown, :permanent}
-  defp stop_reason(reason), do: {:error, reason}
+  defp stop_reason(:normal, runtime), do: stop_disposition(runtime)
+  defp stop_reason(:shutdown, runtime), do: {:shutdown, stop_disposition(runtime)}
+  defp stop_reason({:shutdown, _}, runtime), do: {:shutdown, stop_disposition(runtime)}
+  defp stop_reason(reason, _runtime), do: {:error, reason}
+
+  defp stop_disposition(runtime) do
+    if Aikido.Durable.keep_snapshot?(runtime.agent_module), do: :permanent, else: :delete
+  end
 
   defp encode(data),
     do: %{"payload" => Base.encode64(:erlang.term_to_binary(data, [:compressed]))}

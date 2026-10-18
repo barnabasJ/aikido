@@ -27,6 +27,9 @@ defmodule Aikido.Ash do
   def stop(agent, opts \\ []), do: command(agent, %{}, Keyword.put(opts, :action, :stop))
   def stop!(agent, opts \\ []), do: command!(agent, %{}, Keyword.put(opts, :action, :stop))
 
+  def delete(agent, opts \\ []), do: command(agent, %{}, Keyword.put(opts, :action, :delete))
+  def delete!(agent, opts \\ []), do: command!(agent, %{}, Keyword.put(opts, :action, :delete))
+
   def run(resource, action, arguments, opts \\ []) do
     resource |> Ash.ActionInput.for_action(action, arguments, opts) |> Ash.run_action(opts)
   end

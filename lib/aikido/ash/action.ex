@@ -11,6 +11,9 @@ defmodule Aikido.Ash.Action do
       :stop ->
         Aikido.Ash.Runtime.stop(input.resource, input.arguments.agent)
 
+      :delete ->
+        Aikido.Ash.Runtime.delete(input.resource, input.arguments.agent)
+
       :inspect ->
         with {:ok, record} <-
                Aikido.Ash.Runtime.inspect_agent(input.resource, input.arguments.agent) do

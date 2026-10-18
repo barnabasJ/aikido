@@ -47,6 +47,7 @@ spark_locals_without_parens = [
   otp_app: 1,
   owner: 1,
   path: 1,
+  persistence: 1,
   primary_key?: 1,
   priority: 1,
   public?: 1,

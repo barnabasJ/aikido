@@ -114,6 +114,50 @@ defmodule Aikido.Ash.Runtime do
     end)
   end
 
+  def delete(resource, agent) do
+    safe(fn ->
+      with {:ok, {id, target}} <- deletion_id(resource, agent),
+           :ok <- delete_process(resource, target) do
+        {:ok, %{id: id, resource: resource, status: :deleted}}
+      end
+    end)
+  end
+
+  defp deletion_id(resource, pid) when is_pid(pid) do
+    with {:ok, {id, _pid}} <- resolve(resource, pid), do: {:ok, {id, pid}}
+  end
+
+  defp deletion_id(resource, %{id: id}), do: deletion_id(resource, id)
+  defp deletion_id(_resource, id) when is_binary(id), do: {:ok, {id, id}}
+  defp deletion_id(_resource, _), do: {:error, "Expected an agent ID, PID, or reference"}
+
+  defp delete_process(resource, pid) when is_pid(pid) do
+    with {:ok, {pool, key, partition}} <-
+           AgentServer.state(pid, fn runtime ->
+             {:ok, {runtime.lifecycle.pool, runtime.lifecycle.pool_key, runtime.partition}}
+           end) do
+      if pool do
+        Aikido.Durable.delete(pool, key,
+          agent: resource.__aikido_runtime__(),
+          partition: partition
+        )
+      else
+        Aikido.stop_agent(option(resource, :instance), pid)
+      end
+    end
+  end
+
+  defp delete_process(resource, id) do
+    instance = option(resource, :instance)
+    pool = Aikido.durable_supervisor_name(instance)
+
+    if Process.whereis(pool) do
+      Aikido.Durable.delete(pool, id, agent: resource.__aikido_runtime__())
+    else
+      with {:ok, {_id, pid}} <- resolve(resource, id), do: Aikido.stop_agent(instance, pid)
+    end
+  end
+
   def inspect_agent(resource, agent) do
     safe(fn ->
       with {:ok, {_id, pid}} <- resolve(resource, agent), do: snapshot(resource, pid)
