@@ -1,23 +1,20 @@
-defmodule AikidoTest.TelemetryTest do
-  use ExUnit.Case, async: false
+defmodule AikidoTest.TelemetryTest.TestAgent do
+  @moduledoc false
+  use Aikido.Agent
 
-  import ExUnit.CaptureLog
+  agent do
+    name "telemetry_test_agent"
+    path :domain
 
-  alias Aikido.Telemetry
-
-  defmodule TestAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name "telemetry_test_agent"
-      path :domain
-
-      schema do
-        attribute(:counter, :integer, default: 0)
-      end
+    schema do
+      attribute :counter, :integer, default: 0
     end
   end
+end
+
+defmodule AikidoTest.TelemetryTest do
+  use ExUnit.Case, async: false
+  import ExUnit.CaptureLog
 
   defp with_telemetry_env(temp_value, fun) when is_function(fun, 0) do
     previous =
@@ -41,125 +38,141 @@ defmodule AikidoTest.TelemetryTest do
     end
   end
 
-  describe "setup/0" do
+  describe("setup/0") do
     test "attaches telemetry handlers idempotently" do
-      assert :ok = Telemetry.setup()
-      assert :ok = Telemetry.setup()
+      assert :ok = Aikido.Telemetry.setup()
+      assert :ok = Aikido.Telemetry.setup()
     end
   end
 
-  describe "handle_event/4" do
+  describe("handle_event/4") do
     test "handles agent cmd start event" do
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :cmd, :start],
                  %{system_time: 123},
-                 %{agent_id: "test", agent_module: TestAgent, action: :test},
+                 %{
+                   agent_id: "test",
+                   agent_module: AikidoTest.TelemetryTest.TestAgent,
+                   action: :test
+                 },
                  nil
                )
     end
 
     test "handles agent cmd stop event" do
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :cmd, :stop],
                  %{duration: 1000},
-                 %{agent_id: "test", agent_module: TestAgent, directive_count: 0},
+                 %{
+                   agent_id: "test",
+                   agent_module: AikidoTest.TelemetryTest.TestAgent,
+                   directive_count: 0
+                 },
                  nil
                )
     end
 
     test "handles agent cmd exception event" do
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :cmd, :exception],
                  %{duration: 1000},
-                 %{agent_id: "test", agent_module: TestAgent, error: :some_error},
+                 %{
+                   agent_id: "test",
+                   agent_module: AikidoTest.TelemetryTest.TestAgent,
+                   error: :some_error
+                 },
                  nil
                )
     end
 
     test "handles strategy init events" do
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :strategy, :init, :start],
                  %{system_time: 123},
-                 %{agent_id: "test", strategy: TestAgent},
+                 %{agent_id: "test", strategy: AikidoTest.TelemetryTest.TestAgent},
                  nil
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :strategy, :init, :stop],
                  %{duration: 1000},
-                 %{agent_id: "test", strategy: TestAgent},
+                 %{agent_id: "test", strategy: AikidoTest.TelemetryTest.TestAgent},
                  nil
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :strategy, :init, :exception],
                  %{duration: 1000},
-                 %{agent_id: "test", strategy: TestAgent, error: :err},
+                 %{agent_id: "test", strategy: AikidoTest.TelemetryTest.TestAgent, error: :err},
                  nil
                )
     end
 
     test "handles strategy cmd events" do
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :strategy, :cmd, :start],
                  %{system_time: 123},
-                 %{agent_id: "test", strategy: TestAgent},
+                 %{agent_id: "test", strategy: AikidoTest.TelemetryTest.TestAgent},
                  nil
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :strategy, :cmd, :stop],
                  %{duration: 1000},
-                 %{agent_id: "test", strategy: TestAgent, directive_count: 2},
+                 %{
+                   agent_id: "test",
+                   strategy: AikidoTest.TelemetryTest.TestAgent,
+                   directive_count: 2
+                 },
                  nil
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :strategy, :cmd, :exception],
                  %{duration: 1000},
-                 %{agent_id: "test", strategy: TestAgent, error: :err},
+                 %{agent_id: "test", strategy: AikidoTest.TelemetryTest.TestAgent, error: :err},
                  nil
                )
     end
 
     test "handles strategy tick events" do
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :strategy, :tick, :start],
                  %{system_time: 123},
-                 %{agent_id: "test", strategy: TestAgent},
+                 %{agent_id: "test", strategy: AikidoTest.TelemetryTest.TestAgent},
                  nil
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :strategy, :tick, :stop],
                  %{duration: 1000},
-                 %{agent_id: "test", strategy: TestAgent},
+                 %{agent_id: "test", strategy: AikidoTest.TelemetryTest.TestAgent},
                  nil
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent, :strategy, :tick, :exception],
                  %{duration: 1000},
-                 %{agent_id: "test", strategy: TestAgent, error: :err},
+                 %{agent_id: "test", strategy: AikidoTest.TelemetryTest.TestAgent, error: :err},
                  nil
                )
     end
 
     test "handles agent_server signal events" do
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :signal, :start],
                  %{system_time: 123},
                  %{agent_id: "test", signal_type: "test.signal"},
@@ -167,7 +180,7 @@ defmodule AikidoTest.TelemetryTest do
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :signal, :stop],
                  %{duration: 1000},
                  %{agent_id: "test", signal_type: "test.signal", directive_count: 1},
@@ -175,7 +188,7 @@ defmodule AikidoTest.TelemetryTest do
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :signal, :exception],
                  %{duration: 1000},
                  %{agent_id: "test", signal_type: "test.signal", error: :err},
@@ -188,9 +201,9 @@ defmodule AikidoTest.TelemetryTest do
         with_telemetry_env(:delete, fn ->
           capture_log(fn ->
             assert :ok =
-                     Telemetry.handle_event(
+                     Aikido.Telemetry.handle_event(
                        [:aikido, :agent_server, :signal, :stop],
-                       %{duration: 1_000},
+                       %{duration: 1000},
                        %{
                          agent_id: "test",
                          signal_type: "test.signal",
@@ -210,9 +223,9 @@ defmodule AikidoTest.TelemetryTest do
         with_telemetry_env([log_level: :debug], fn ->
           capture_log(fn ->
             assert :ok =
-                     Telemetry.handle_event(
+                     Aikido.Telemetry.handle_event(
                        [:aikido, :agent_server, :signal, :stop],
-                       %{duration: 1_000},
+                       %{duration: 1000},
                        %{
                          agent_id: "test",
                          signal_type: "test.signal",
@@ -231,7 +244,7 @@ defmodule AikidoTest.TelemetryTest do
 
     test "handles agent_server directive events" do
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :directive, :start],
                  %{system_time: 123},
                  %{agent_id: "test", directive_type: "Emit"},
@@ -239,7 +252,7 @@ defmodule AikidoTest.TelemetryTest do
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :directive, :stop],
                  %{duration: 1000},
                  %{agent_id: "test", directive_type: "Emit", result: :ok},
@@ -247,7 +260,7 @@ defmodule AikidoTest.TelemetryTest do
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :directive, :exception],
                  %{duration: 1000},
                  %{agent_id: "test", directive_type: "Emit", error: :err},
@@ -257,7 +270,7 @@ defmodule AikidoTest.TelemetryTest do
 
     test "handles agent_server cron events" do
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :cron, :register],
                  %{},
                  %{agent_id: "test", job_id: :job, cron_expression: "* * * * *"},
@@ -265,7 +278,7 @@ defmodule AikidoTest.TelemetryTest do
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :cron, :cancel],
                  %{},
                  %{agent_id: "test", job_id: :job},
@@ -273,7 +286,7 @@ defmodule AikidoTest.TelemetryTest do
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :cron, :restart_scheduled],
                  %{},
                  %{agent_id: "test", job_id: :job, reason: :killed, delay_ms: 500},
@@ -281,7 +294,7 @@ defmodule AikidoTest.TelemetryTest do
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :cron, :restart_succeeded],
                  %{},
                  %{agent_id: "test", job_id: :job, cron_expression: "* * * * *"},
@@ -289,7 +302,7 @@ defmodule AikidoTest.TelemetryTest do
                )
 
       assert :ok =
-               Telemetry.handle_event(
+               Aikido.Telemetry.handle_event(
                  [:aikido, :agent_server, :cron, :persist_failure],
                  %{},
                  %{agent_id: "test", job_id: :job, reason: :boom},

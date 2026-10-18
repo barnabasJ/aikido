@@ -2,7 +2,7 @@ defmodule AikidoTest.Storage.ETSTest do
   use ExUnit.Case, async: true
 
   alias Aikido.Slices.Thread.Entry
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
   alias Aikido.Storage
   alias Aikido.Storage.ETS
 
@@ -140,7 +140,7 @@ defmodule AikidoTest.Storage.ETSTest do
                ETS.append_thread(thread_id, [%{kind: :note}], Keyword.put(opts, :expected_rev, 5))
     end
 
-    test "load_thread/2 returns correct %Aikido.Slices.Thread.State{} with all entries" do
+    test "load_thread/2 returns correct %Aikido.Slices.Thread{} with all entries" do
       opts = [table: unique_table(:load_thread)]
       thread_id = "thread_#{System.unique_integer([:positive])}"
 

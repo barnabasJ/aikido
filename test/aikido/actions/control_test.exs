@@ -12,7 +12,7 @@ defmodule AikidoTest.Actions.ControlTest do
     test "sets status to failed with cancelled error" do
       {:ok, result, []} =
         AikidoTest.NativeAction.run(
-          Control.Cancel,
+          {Aikido.AgentServer.RuntimeActions, :cancel},
           sig("cancel", %{reason: :cancelled}),
           %{},
           %{},
@@ -25,7 +25,7 @@ defmodule AikidoTest.Actions.ControlTest do
     test "includes custom cancellation reason" do
       {:ok, result, []} =
         AikidoTest.NativeAction.run(
-          Control.Cancel,
+          {Aikido.AgentServer.RuntimeActions, :cancel},
           sig("cancel", %{reason: :user_requested}),
           %{},
           %{},
@@ -38,7 +38,15 @@ defmodule AikidoTest.Actions.ControlTest do
 
   describe("Noop") do
     test "returns empty state change" do
-      {:ok, result, []} = AikidoTest.NativeAction.run(Control.Noop, sig("noop"), %{}, %{}, %{})
+      {:ok, result, []} =
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :noop},
+          sig("noop"),
+          %{},
+          %{},
+          %{}
+        )
+
       assert result == %{}
     end
   end
@@ -49,7 +57,13 @@ defmodule AikidoTest.Actions.ControlTest do
       data = %{target_pid: target, signal_type: nil, payload: nil, source: nil}
 
       {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(Control.Forward, sig("forward", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :forward},
+          sig("forward", data),
+          %{},
+          %{},
+          %{}
+        )
 
       assert result == %{forwarded_to: target}
       assert %Directives.Emit{} = directive
@@ -62,7 +76,13 @@ defmodule AikidoTest.Actions.ControlTest do
       data = %{target_pid: target, signal_type: "custom.signal", payload: nil, source: nil}
 
       {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(Control.Forward, sig("forward", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :forward},
+          sig("forward", data),
+          %{},
+          %{},
+          %{}
+        )
 
       assert directive.signal.type == "custom.signal"
     end
@@ -72,7 +92,13 @@ defmodule AikidoTest.Actions.ControlTest do
       data = %{target_pid: target, signal_type: "test", payload: %{key: "value"}, source: nil}
 
       {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(Control.Forward, sig("forward", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :forward},
+          sig("forward", data),
+          %{},
+          %{},
+          %{}
+        )
 
       assert directive.signal.data == %{key: "value"}
     end
@@ -88,7 +114,13 @@ defmodule AikidoTest.Actions.ControlTest do
       }
 
       {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(Control.Broadcast, sig("broadcast", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :broadcast},
+          sig("broadcast", data),
+          %{},
+          %{},
+          %{}
+        )
 
       assert result == %{broadcast_to: "workers"}
       assert %Directives.Emit{} = directive
@@ -109,7 +141,13 @@ defmodule AikidoTest.Actions.ControlTest do
         })
 
       {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(Control.Reply, input, %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :reply},
+          input,
+          %{},
+          %{},
+          %{}
+        )
 
       assert result == %{replied_to: reply_pid}
       assert %Directives.Emit{} = directive
@@ -125,7 +163,15 @@ defmodule AikidoTest.Actions.ControlTest do
           data: %{signal_type: "response", payload: %{}}
         })
 
-      {:ok, result, []} = AikidoTest.NativeAction.run(Control.Reply, input, %{}, %{}, %{})
+      {:ok, result, []} =
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :reply},
+          input,
+          %{},
+          %{},
+          %{}
+        )
+
       assert result == %{replied_to: nil, warning: "No reply_to found in signal"}
     end
 
@@ -137,7 +183,15 @@ defmodule AikidoTest.Actions.ControlTest do
           data: %{signal_type: "response", payload: %{}}
         })
 
-      {:ok, result, []} = AikidoTest.NativeAction.run(Control.Reply, input, %{}, %{}, %{})
+      {:ok, result, []} =
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :reply},
+          input,
+          %{},
+          %{},
+          %{}
+        )
+
       assert result == %{replied_to: nil, warning: "No reply_to found in signal"}
     end
   end

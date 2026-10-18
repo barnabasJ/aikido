@@ -1,77 +1,122 @@
+defmodule Aikido.Dsl.AgentOptionalPathTest.NoOpAgent do
+  @moduledoc false
+  use Aikido.Agent, default_slices: false
+
+  agent do
+    name "noop_agent"
+    description "No own slice, no extensions, no default slices."
+  end
+end
+
+defmodule Aikido.Dsl.AgentOptionalPathTest.CompositionAgent do
+  @moduledoc false
+  use Aikido.Agent, default_slices: %{memory: false, thread: false, identity: false}
+
+  agent do
+    name "composition_agent"
+    description "Composition over a single contributed slice."
+  end
+
+  slices do
+    slice :memory, Aikido.Slices.Memory
+  end
+end
+
+defmodule Aikido.Dsl.AgentOptionalPathTest.PathLessWithDefaults do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "path_less_with_defaults"
+  end
+end
+
+defmodule Aikido.Dsl.AgentOptionalPathTest.RoutingPathLess do
+  @moduledoc false
+  use Aikido.Agent, default_slices: false
+
+  agent do
+    name "routing_path_less"
+  end
+
+  signal_routes do
+    route "ping", AikidoTest.PluginTestAction
+  end
+end
+
 defmodule Aikido.Dsl.AgentOptionalPathTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Agent
-  alias Aikido.Dsl.Agent.Info, as: AgentInfo
-
-  describe "path-less agent compiles" do
-    defmodule NoOpAgent do
-      @moduledoc false
-      use Aikido.Agent, default_slices: false
-
-      agent do
-        name "noop_agent"
-        description "No own slice, no extensions, no default slices."
-      end
-    end
+  describe("path-less agent compiles") do
+    nil
 
     test "with no extensions and default_slices disabled" do
-      assert Map.get(AgentInfo.agent_options(NoOpAgent), :name) == "noop_agent"
-      assert Map.get(AgentInfo.agent_options(NoOpAgent), :path) == nil
-      assert AgentInfo.slice_instances(NoOpAgent) == []
-      assert AgentInfo.slices(NoOpAgent) == []
+      assert Map.get(
+               Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentOptionalPathTest.NoOpAgent),
+               :name
+             ) == "noop_agent"
+
+      assert Map.get(
+               Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentOptionalPathTest.NoOpAgent),
+               :path
+             ) == nil
+
+      assert Aikido.Dsl.Agent.Info.slice_instances(Aikido.Dsl.AgentOptionalPathTest.NoOpAgent) ==
+               []
+
+      assert Aikido.Dsl.Agent.Info.slices(Aikido.Dsl.AgentOptionalPathTest.NoOpAgent) == []
     end
 
     test "new/1 produces an agent with empty state and no nil-keyed entry" do
-      agent = NoOpAgent.new()
-      assert %Agent{} = agent
+      agent = Aikido.Dsl.AgentOptionalPathTest.NoOpAgent.new()
+      assert %Aikido.Agent{} = agent
       assert agent.state == %{}
       refute Map.has_key?(agent.state, nil)
     end
 
     test "new/1 with user-state preserves keys without wrapping under nil" do
-      agent = NoOpAgent.new(state: %{anything: 1})
+      agent = Aikido.Dsl.AgentOptionalPathTest.NoOpAgent.new(state: %{anything: 1})
       refute Map.has_key?(agent.state, nil)
       assert agent.state[:anything] == 1
     end
 
     test "set/2 does not wrap flat attrs under a nil key" do
-      agent = NoOpAgent.new()
-      {:ok, agent} = NoOpAgent.set(agent, %{counter: 5})
+      agent = Aikido.Dsl.AgentOptionalPathTest.NoOpAgent.new()
+      {:ok, agent} = Aikido.Dsl.AgentOptionalPathTest.NoOpAgent.set(agent, %{counter: 5})
       refute Map.has_key?(agent.state, nil)
       assert agent.state[:counter] == 5
     end
 
-    defmodule CompositionAgent do
-      @moduledoc false
-      use Aikido.Agent,
-        default_slices: %{memory: false, thread: false, identity: false}
-
-      agent do
-        name "composition_agent"
-        description "Composition over a single contributed slice."
-      end
-
-      slices do
-        slice(:memory, Aikido.Slices.Memory)
-      end
-    end
+    nil
 
     test "with extensions: [Aikido.Slices.Memory], slice_instances/1 contains the contributed slice" do
-      assert Map.get(AgentInfo.agent_options(CompositionAgent), :path) == nil
-      paths = Enum.map(AgentInfo.slice_instances(CompositionAgent), & &1.path)
+      assert Map.get(
+               Aikido.Dsl.Agent.Info.agent_options(
+                 Aikido.Dsl.AgentOptionalPathTest.CompositionAgent
+               ),
+               :path
+             ) == nil
+
+      paths =
+        Enum.map(
+          Aikido.Dsl.Agent.Info.slice_instances(
+            Aikido.Dsl.AgentOptionalPathTest.CompositionAgent
+          ),
+          & &1.path
+        )
+
       assert :memory in paths
     end
 
     test "the agent struct's path-related state stays free of a nil-keyed entry" do
-      agent = CompositionAgent.new()
+      agent = Aikido.Dsl.AgentOptionalPathTest.CompositionAgent.new()
       refute Map.has_key?(agent.state, nil)
     end
   end
 
-  describe "PathSchemaPair verifier" do
+  describe("PathSchemaPair verifier") do
     test "compiles when both `path` and `schema` are set" do
-      defmodule BothSet do
+      defmodule Elixir.Aikido.Dsl.AgentOptionalPathTest.BothSet do
         @moduledoc false
         use Aikido.Agent
 
@@ -80,25 +125,28 @@ defmodule Aikido.Dsl.AgentOptionalPathTest do
           path :domain
 
           schema do
-            attribute(:counter, :integer, default: 0)
+            attribute :counter, :integer, default: 0
           end
         end
       end
 
-      assert Map.get(AgentInfo.agent_options(BothSet), :path) == :domain
+      assert Map.get(
+               Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentOptionalPathTest.BothSet),
+               :path
+             ) == :domain
     end
 
     test "warns when `schema` is set but `path` is not" do
       stderr =
         ExUnit.CaptureIO.capture_io(:stderr, fn ->
-          defmodule SchemaOnly do
+          defmodule Elixir.Aikido.Dsl.AgentOptionalPathTest.SchemaOnly do
             use Aikido.Agent
 
             agent do
               name "schema_only"
 
               schema do
-                attribute(:counter, :integer, default: 0)
+                attribute :counter, :integer, default: 0
               end
             end
           end
@@ -110,7 +158,7 @@ defmodule Aikido.Dsl.AgentOptionalPathTest do
     test "warns when `path` is set but `schema` is not" do
       stderr =
         ExUnit.CaptureIO.capture_io(:stderr, fn ->
-          defmodule PathOnly do
+          defmodule Elixir.Aikido.Dsl.AgentOptionalPathTest.PathOnly do
             use Aikido.Agent
 
             agent do
@@ -124,7 +172,7 @@ defmodule Aikido.Dsl.AgentOptionalPathTest do
     end
 
     test "compiles when neither `path` nor `schema` is set" do
-      defmodule NeitherSet do
+      defmodule Elixir.Aikido.Dsl.AgentOptionalPathTest.NeitherSet do
         @moduledoc false
         use Aikido.Agent, default_slices: false
 
@@ -133,49 +181,43 @@ defmodule Aikido.Dsl.AgentOptionalPathTest do
         end
       end
 
-      assert Map.get(AgentInfo.agent_options(NeitherSet), :path) == nil
+      assert Map.get(
+               Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentOptionalPathTest.NeitherSet),
+               :path
+             ) == nil
     end
   end
 
-  describe "default-slices interplay with a path-less agent" do
-    defmodule PathLessWithDefaults do
-      @moduledoc false
-      use Aikido.Agent
-
-      agent do
-        name "path_less_with_defaults"
-      end
-    end
+  describe("default-slices interplay with a path-less agent") do
+    nil
 
     test "default slices are still attached" do
-      paths = Enum.map(AgentInfo.slice_instances(PathLessWithDefaults), & &1.path)
+      paths =
+        Enum.map(
+          Aikido.Dsl.Agent.Info.slice_instances(
+            Aikido.Dsl.AgentOptionalPathTest.PathLessWithDefaults
+          ),
+          & &1.path
+        )
+
       assert :memory in paths
       assert :thread in paths
       assert :identity in paths
     end
 
     test "no nil-keyed state entry after new/1" do
-      agent = PathLessWithDefaults.new()
+      agent = Aikido.Dsl.AgentOptionalPathTest.PathLessWithDefaults.new()
       refute Map.has_key?(agent.state, nil)
     end
   end
 
-  describe "signal_routes / schedules sections work without path" do
-    defmodule RoutingPathLess do
-      @moduledoc false
-      use Aikido.Agent, default_slices: false
-
-      agent do
-        name "routing_path_less"
-      end
-
-      signal_routes do
-        route "ping", AikidoTest.PluginTestAction
-      end
-    end
+  describe("signal_routes / schedules sections work without path") do
+    nil
 
     test "signal_routes/1 returns the host-declared routes" do
-      assert {"ping", AikidoTest.PluginTestAction} in AgentInfo.signal_routes(RoutingPathLess)
+      assert {"ping", AikidoTest.PluginTestAction} in Aikido.Dsl.Agent.Info.signal_routes(
+               Aikido.Dsl.AgentOptionalPathTest.RoutingPathLess
+             )
     end
   end
 end

@@ -1,7 +1,6 @@
-defmodule Aikido.Slices.AiReact.Actions.LLMTurnTest do
+defmodule Aikido.Slices.AiReact.LLMTurnTest do
   use ExUnit.Case, async: true
   alias Aikido.AI.TestActions.TestAdd
-  nil
   alias Aikido.Slices.AiReact.Directives.ToolExec
   alias Aikido.Slices.AiReact.Turn
   alias ReqLLM.Context
@@ -40,7 +39,7 @@ defmodule Aikido.Slices.AiReact.Actions.LLMTurnTest do
     test "appends the assistant message and settles :completed with the text" do
       {:ok, new_slice, directives} =
         AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact.Actions, :llm_turn},
+          {Aikido.Slices.AiReact, :llm_turn},
           signal("req_1", final_turn("42")),
           running_slice(),
           %{},
@@ -62,7 +61,7 @@ defmodule Aikido.Slices.AiReact.Actions.LLMTurnTest do
 
       {:ok, new_slice, directives} =
         AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact.Actions, :llm_turn},
+          {Aikido.Slices.AiReact, :llm_turn},
           signal("req_1", tool_turn(calls)),
           running_slice(),
           %{},
@@ -90,7 +89,7 @@ defmodule Aikido.Slices.AiReact.Actions.LLMTurnTest do
 
       {:ok, new_slice, directives} =
         AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact.Actions, :llm_turn},
+          {Aikido.Slices.AiReact, :llm_turn},
           signal("req_1", tool_turn(calls)),
           running_slice(),
           %{},
@@ -108,7 +107,7 @@ defmodule Aikido.Slices.AiReact.Actions.LLMTurnTest do
 
       {:ok, new_slice, directives} =
         AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact.Actions, :llm_turn},
+          {Aikido.Slices.AiReact, :llm_turn},
           signal("req_1", tool_turn(calls)),
           slice,
           %{},
@@ -128,7 +127,7 @@ defmodule Aikido.Slices.AiReact.Actions.LLMTurnTest do
 
       {:ok, returned, []} =
         AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact.Actions, :llm_turn},
+          {Aikido.Slices.AiReact, :llm_turn},
           signal("req_old", final_turn("ignored")),
           slice,
           %{},
@@ -143,7 +142,7 @@ defmodule Aikido.Slices.AiReact.Actions.LLMTurnTest do
 
       {:ok, returned, []} =
         AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact.Actions, :llm_turn},
+          {Aikido.Slices.AiReact, :llm_turn},
           signal("req_1", final_turn("ignored")),
           slice,
           %{},

@@ -1,8 +1,7 @@
 defmodule AikidoTest.Identity.Actions.EvolveTest do
   use ExUnit.Case, async: true
   alias Jido.Signal
-  nil
-  alias Aikido.Slices.Identity.State
+  alias Aikido.Slices.Identity, as: State
 
   defp sig(data) do
     Signal.new!(%{type: "identity_evolve", source: "/test", data: data})
@@ -12,7 +11,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
     test "initializes identity when slice is nil" do
       assert {:ok, %State{} = evolved, []} =
                AikidoTest.NativeAction.run(
-                 {Aikido.Slices.Identity.Actions, :evolve},
+                 {Aikido.Slices.Identity, :evolve},
                  sig(%{days: 0, years: 0}),
                  nil,
                  %{},
@@ -27,7 +26,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
 
       assert {:ok, %State{} = evolved, []} =
                AikidoTest.NativeAction.run(
-                 {Aikido.Slices.Identity.Actions, :evolve},
+                 {Aikido.Slices.Identity, :evolve},
                  sig(%{days: 0, years: 5}),
                  identity,
                  %{},
@@ -42,7 +41,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
 
       assert {:ok, %State{} = evolved, []} =
                AikidoTest.NativeAction.run(
-                 {Aikido.Slices.Identity.Actions, :evolve},
+                 {Aikido.Slices.Identity, :evolve},
                  sig(%{days: 730, years: 0}),
                  identity,
                  %{},
@@ -57,7 +56,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
 
       assert {:ok, %State{} = evolved, []} =
                AikidoTest.NativeAction.run(
-                 {Aikido.Slices.Identity.Actions, :evolve},
+                 {Aikido.Slices.Identity, :evolve},
                  sig(%{days: 365, years: 3}),
                  identity,
                  %{},
@@ -73,7 +72,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
 
       assert {:ok, %State{} = evolved, []} =
                AikidoTest.NativeAction.run(
-                 {Aikido.Slices.Identity.Actions, :evolve},
+                 {Aikido.Slices.Identity, :evolve},
                  sig(%{days: 0, years: 1}),
                  identity,
                  %{},

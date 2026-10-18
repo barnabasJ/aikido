@@ -1,34 +1,199 @@
-defmodule Aikido.Slices.AiReact.ToolAdapterTest do
-  use ExUnit.Case, async: true
-  alias Aikido.Slices.AiReact.ToolAdapter
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.AshTools.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(
+        %Ash.ActionInput{action: %{name: :echo}} = input,
+        _opts,
+        context
+      ) do
+    {:ok, %{number: input.arguments.number, actor: context.actor}}
+  end
+end
 
-  defmodule AshTools do
-    use Ash.Resource, data_layer: :embedded
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.AshTools do
+  use Ash.Resource, data_layer: :embedded
 
-    attributes do
-      attribute(:count, :integer, public?: true, default: 0)
+  attributes do
+    attribute :count, :integer, public?: true, default: 0
+  end
+
+  actions do
+    defaults create: :*
+
+    action :echo, :map do
+      argument :number, :integer, allow_nil?: false, constraints: [min: 1]
+      run Aikido.Slices.AiReact.ToolAdapterTest.AshTools.Implementation
     end
+  end
+end
 
-    actions do
-      defaults(create: :*)
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    Aikido.ActionResult.new(state: %{}, directives: [])
+  end
+end
 
-      action(:echo, :map) do
-        argument(:number, :integer, allow_nil?: false, constraints: [min: 1])
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-        run(fn input, context ->
-          {:ok, %{number: input.arguments.number, actor: context.actor}}
-        end)
-      end
+  @persist {:aikido_action_metadata,
+            %{name: "empty_action", description: "An action with no parameters"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      description "An action with no parameters"
+      run {Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction.Implementation, action: :run}
+    end
+  end
+end
+
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.ParamAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    Aikido.ActionResult.new(state: %{}, directives: [])
+  end
+end
+
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.ParamAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+
+  @persist {:aikido_action_metadata,
+            %{name: "param_action", description: "An action with parameters"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      argument :query, :string, description: "Search query", allow_nil?: false
+      argument :limit, :integer, description: "Max results", default: 10
+      description "An action with parameters"
+      run {Aikido.Slices.AiReact.ToolAdapterTest.ParamAction.Implementation, action: :run}
+    end
+  end
+end
+
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.StrictAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    Aikido.ActionResult.new(state: %{}, directives: [])
+  end
+end
+
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.StrictAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+
+  @persist {:aikido_action_metadata,
+            %{
+              name: "strict_action",
+              description: "An action that explicitly opts into strict mode"
+            }}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      argument :value, :string, description: "A value", allow_nil?: false
+      description "An action that explicitly opts into strict mode"
+      run {Aikido.Slices.AiReact.ToolAdapterTest.StrictAction.Implementation, action: :run}
     end
   end
 
+  def strict? do
+    true
+  end
+end
+
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.NestedSchemaAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    Aikido.ActionResult.new(state: %{}, directives: [])
+  end
+end
+
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.NestedSchemaAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+
+  @persist {:aikido_action_metadata,
+            %{name: "nested_action", description: "An action with nested objects"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      argument :name, :string, description: "Name", allow_nil?: false
+
+      argument :config, :map,
+        description: "Configuration object",
+        allow_nil?: false,
+        constraints: [fields: [enabled: [type: :boolean]]]
+
+      argument :items, {:array, :map},
+        description: "List of objects",
+        allow_nil?: false,
+        constraints: [items: [fields: [enabled: [type: :boolean]]]]
+
+      description "An action with nested objects"
+      run {Aikido.Slices.AiReact.ToolAdapterTest.NestedSchemaAction.Implementation, action: :run}
+    end
+  end
+end
+
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.NotAnAction do
+  @moduledoc false
+  def some_function do
+    :ok
+  end
+end
+
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.DuplicateNameAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    Aikido.ActionResult.new(state: %{}, directives: [])
+  end
+end
+
+defmodule Aikido.Slices.AiReact.ToolAdapterTest.DuplicateNameAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+
+  @persist {:aikido_action_metadata,
+            %{name: "param_action", description: "Same name as ParamAction"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      description "Same name as ParamAction"
+
+      run {Aikido.Slices.AiReact.ToolAdapterTest.DuplicateNameAction.Implementation, action: :run}
+    end
+  end
+end
+
+defmodule Aikido.Slices.AiReact.ToolAdapterTest do
+  use ExUnit.Case, async: true
+
   test "Ash tools use the same input shape, casting, context and errors as AshAI" do
-    tool = ToolAdapter.from_action({AshTools, :echo})
+    tool =
+      Aikido.Slices.AiReact.ToolAdapter.from_action(
+        {Aikido.Slices.AiReact.ToolAdapterTest.AshTools, :echo}
+      )
 
     assert tool.parameter_schema["properties"]["input"]["properties"]["number"]["type"] ==
              "integer"
 
-    definition = ToolAdapter.ash_tool({AshTools, :echo})
+    definition =
+      Aikido.Slices.AiReact.ToolAdapter.ash_tool(
+        {Aikido.Slices.AiReact.ToolAdapterTest.AshTools, :echo}
+      )
 
     assert {:ok, _encoded, %{number: 4, actor: %{id: "caller"}}} =
              AshAi.Tools.execute(definition, %{"input" => %{"number" => "4"}}, %{
@@ -41,191 +206,36 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
   end
 
   test "Ash create tools reuse AshAI instead of requiring generic actions" do
-    assert :ok = ToolAdapter.validate_actions([{AshTools, :create}])
-    tool = ToolAdapter.from_action({AshTools, :create})
+    assert :ok =
+             Aikido.Slices.AiReact.ToolAdapter.validate_actions([
+               {Aikido.Slices.AiReact.ToolAdapterTest.AshTools, :create}
+             ])
+
+    tool =
+      Aikido.Slices.AiReact.ToolAdapter.from_action(
+        {Aikido.Slices.AiReact.ToolAdapterTest.AshTools, :create}
+      )
 
     assert tool.parameter_schema["properties"]["input"]["properties"]["count"]["type"] ==
              "integer"
 
-    assert {:ok, _encoded, %AshTools{count: 7}} =
+    assert {:ok, _encoded, %Aikido.Slices.AiReact.ToolAdapterTest.AshTools{count: 7}} =
              AshAi.Tools.execute(
-               ToolAdapter.ash_tool({AshTools, :create}),
+               Aikido.Slices.AiReact.ToolAdapter.ash_tool(
+                 {Aikido.Slices.AiReact.ToolAdapterTest.AshTools, :create}
+               ),
                %{"input" => %{"count" => "7"}},
                %{}
              )
   end
 
-  defmodule EmptySchemaAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-    @persist {:aikido_action_metadata,
-              %{name: "empty_action", description: "An action with no parameters"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-        description("An action with no parameters")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, _slice, _opts, _ctx) do
-      {:ok, %{}, []}
-    end
-  end
-
-  defmodule ParamAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-    @persist {:aikido_action_metadata,
-              %{name: "param_action", description: "An action with parameters"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-        argument(:query, :string, description: "Search query", allow_nil?: false)
-        argument(:limit, :integer, description: "Max results", default: 10)
-        description("An action with parameters")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, _slice, _opts, _ctx) do
-      {:ok, %{}, []}
-    end
-  end
-
-  defmodule StrictAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-    @persist {:aikido_action_metadata,
-              %{
-                name: "strict_action",
-                description: "An action that explicitly opts into strict mode"
-              }}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-        argument(:value, :string, description: "A value", allow_nil?: false)
-        description("An action that explicitly opts into strict mode")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, _slice, _opts, _ctx) do
-      {:ok, %{}, []}
-    end
-
-    def strict? do
-      true
-    end
-  end
-
-  defmodule NestedSchemaAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-    @persist {:aikido_action_metadata,
-              %{name: "nested_action", description: "An action with nested objects"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-        argument(:name, :string, description: "Name", allow_nil?: false)
-
-        argument(:config, :map,
-          description: "Configuration object",
-          allow_nil?: false,
-          constraints: [fields: [enabled: [type: :boolean]]]
-        )
-
-        argument(:items, {:array, :map},
-          description: "List of objects",
-          allow_nil?: false,
-          constraints: [items: [fields: [enabled: [type: :boolean]]]]
-        )
-
-        description("An action with nested objects")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, _slice, _opts, _ctx) do
-      {:ok, %{}, []}
-    end
-  end
-
   describe("from_action/2") do
     test "converts action to ReqLLM.Tool struct" do
-      tool = ToolAdapter.from_action(ParamAction)
+      tool =
+        Aikido.Slices.AiReact.ToolAdapter.from_action(
+          Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+        )
+
       assert %ReqLLM.Tool{} = tool
       assert tool.name == "param_action"
       assert tool.description == "An action with parameters"
@@ -233,32 +243,59 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
     end
 
     test "applies prefix to tool name" do
-      tool = ToolAdapter.from_action(ParamAction, prefix: "myapp_")
+      tool =
+        Aikido.Slices.AiReact.ToolAdapter.from_action(
+          Aikido.Slices.AiReact.ToolAdapterTest.ParamAction,
+          prefix: "myapp_"
+        )
+
       assert tool.name == "myapp_param_action"
     end
 
     test "auto-detects strict: true via strict?/0 callback" do
-      tool = ToolAdapter.from_action(StrictAction)
+      tool =
+        Aikido.Slices.AiReact.ToolAdapter.from_action(
+          Aikido.Slices.AiReact.ToolAdapterTest.StrictAction
+        )
+
       assert tool.strict == true
     end
 
     test "defaults to strict: false without strict?/0 callback" do
-      tool = ToolAdapter.from_action(ParamAction)
+      tool =
+        Aikido.Slices.AiReact.ToolAdapter.from_action(
+          Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+        )
+
       assert tool.strict == false
     end
 
     test "respects explicit strict: true override" do
-      tool = ToolAdapter.from_action(ParamAction, strict: true)
+      tool =
+        Aikido.Slices.AiReact.ToolAdapter.from_action(
+          Aikido.Slices.AiReact.ToolAdapterTest.ParamAction,
+          strict: true
+        )
+
       assert tool.strict == true
     end
 
     test "respects explicit strict: false override" do
-      tool = ToolAdapter.from_action(StrictAction, strict: false)
+      tool =
+        Aikido.Slices.AiReact.ToolAdapter.from_action(
+          Aikido.Slices.AiReact.ToolAdapterTest.StrictAction,
+          strict: false
+        )
+
       assert tool.strict == false
     end
 
     test "uses AshAI strict schemas for typed nested objects" do
-      tool = ToolAdapter.from_action(NestedSchemaAction)
+      tool =
+        Aikido.Slices.AiReact.ToolAdapter.from_action(
+          Aikido.Slices.AiReact.ToolAdapterTest.NestedSchemaAction
+        )
+
       schema = tool.parameter_schema
       assert schema["additionalProperties"] == false
       assert schema["properties"]["config"]["additionalProperties"] == false
@@ -266,7 +303,11 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
     end
 
     test "handles empty schema with valid JSON schema output" do
-      tool = ToolAdapter.from_action(EmptySchemaAction)
+      tool =
+        Aikido.Slices.AiReact.ToolAdapter.from_action(
+          Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction
+        )
+
       assert %ReqLLM.Tool{} = tool
       assert tool.name == "empty_action"
 
@@ -281,14 +322,23 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
 
   describe("from_actions/2") do
     test "converts list of actions to tools" do
-      tools = ToolAdapter.from_actions([EmptySchemaAction, ParamAction])
+      tools =
+        Aikido.Slices.AiReact.ToolAdapter.from_actions([
+          Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction,
+          Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+        ])
+
       assert length(tools) == 2
       assert Enum.all?(tools, &match?(%ReqLLM.Tool{}, &1))
     end
 
     test "applies filter function" do
       tools =
-        ToolAdapter.from_actions([EmptySchemaAction, ParamAction],
+        Aikido.Slices.AiReact.ToolAdapter.from_actions(
+          [
+            Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction,
+            Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+          ],
           filter: fn mod ->
             Map.get(Aikido.ActionRef.action_options(mod), :name) == "param_action"
           end
@@ -299,213 +349,229 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
     end
 
     test "applies prefix to all tools" do
-      tools = ToolAdapter.from_actions([EmptySchemaAction, ParamAction], prefix: "v2_")
+      tools =
+        Aikido.Slices.AiReact.ToolAdapter.from_actions(
+          [
+            Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction,
+            Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+          ],
+          prefix: "v2_"
+        )
+
       assert Enum.all?(tools, fn tool -> String.starts_with?(tool.name, "v2_") end)
     end
   end
 
   describe("lookup_action/2") do
     test "finds action by tool name" do
-      assert {:ok, ParamAction} =
-               ToolAdapter.lookup_action("param_action", [EmptySchemaAction, ParamAction])
+      assert {:ok, Aikido.Slices.AiReact.ToolAdapterTest.ParamAction} =
+               Aikido.Slices.AiReact.ToolAdapter.lookup_action("param_action", [
+                 Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction,
+                 Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+               ])
     end
 
     test "returns error for unknown tool" do
-      assert {:error, :not_found} = ToolAdapter.lookup_action("unknown", [ParamAction])
+      assert {:error, :not_found} =
+               Aikido.Slices.AiReact.ToolAdapter.lookup_action("unknown", [
+                 Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+               ])
     end
   end
 
   describe("lookup_action/3 with prefix") do
     test "finds action by prefixed tool name" do
-      assert {:ok, ParamAction} =
-               ToolAdapter.lookup_action("myapp_param_action", [EmptySchemaAction, ParamAction],
+      assert {:ok, Aikido.Slices.AiReact.ToolAdapterTest.ParamAction} =
+               Aikido.Slices.AiReact.ToolAdapter.lookup_action(
+                 "myapp_param_action",
+                 [
+                   Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction,
+                   Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+                 ],
                  prefix: "myapp_"
                )
     end
 
     test "returns error when prefix doesn't match" do
       assert {:error, :not_found} =
-               ToolAdapter.lookup_action("param_action", [ParamAction], prefix: "myapp_")
+               Aikido.Slices.AiReact.ToolAdapter.lookup_action(
+                 "param_action",
+                 [Aikido.Slices.AiReact.ToolAdapterTest.ParamAction],
+                 prefix: "myapp_"
+               )
     end
 
     test "returns error for unknown prefixed tool" do
       assert {:error, :not_found} =
-               ToolAdapter.lookup_action("myapp_unknown", [ParamAction], prefix: "myapp_")
+               Aikido.Slices.AiReact.ToolAdapter.lookup_action(
+                 "myapp_unknown",
+                 [Aikido.Slices.AiReact.ToolAdapterTest.ParamAction],
+                 prefix: "myapp_"
+               )
     end
   end
 
   describe("validate_actions/1") do
-    defmodule NotAnAction do
-      @moduledoc false
-      def some_function do
-        :ok
-      end
-    end
+    nil
 
     test "returns :ok for valid action modules" do
-      assert :ok = ToolAdapter.validate_actions([EmptySchemaAction, ParamAction])
+      assert :ok =
+               Aikido.Slices.AiReact.ToolAdapter.validate_actions([
+                 Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction,
+                 Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+               ])
     end
 
     test "returns error for invalid action module" do
-      assert {:error, {:invalid_action, NotAnAction, _reason}} =
-               ToolAdapter.validate_actions([ParamAction, NotAnAction])
+      assert {:error,
+              {:invalid_action, Aikido.Slices.AiReact.ToolAdapterTest.NotAnAction, _reason}} =
+               Aikido.Slices.AiReact.ToolAdapter.validate_actions([
+                 Aikido.Slices.AiReact.ToolAdapterTest.ParamAction,
+                 Aikido.Slices.AiReact.ToolAdapterTest.NotAnAction
+               ])
     end
 
     test "returns :not_loaded for a module that cannot be loaded" do
       assert {:error, {:invalid_action, This.Module.Does.Not.Exist, :not_loaded}} =
-               ToolAdapter.validate_actions([This.Module.Does.Not.Exist])
+               Aikido.Slices.AiReact.ToolAdapter.validate_actions([This.Module.Does.Not.Exist])
     end
   end
 
   describe("to_action_map/1") do
     test "normalizes nil to empty map" do
-      assert ToolAdapter.to_action_map(nil) == %{}
+      assert Aikido.Slices.AiReact.ToolAdapter.to_action_map(nil) == %{}
     end
 
     test "normalizes list of modules to name => module map" do
-      assert ToolAdapter.to_action_map([ParamAction]) == %{
-               Map.get(Aikido.ActionRef.action_options(ParamAction), :name) => ParamAction
+      assert Aikido.Slices.AiReact.ToolAdapter.to_action_map([
+               Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+             ]) == %{
+               Map.get(
+                 Aikido.ActionRef.action_options(
+                   Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+                 ),
+                 :name
+               ) => Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
              }
     end
 
     test "normalizes single module to map" do
-      assert ToolAdapter.to_action_map(ParamAction) == %{
-               Map.get(Aikido.ActionRef.action_options(ParamAction), :name) => ParamAction
+      assert Aikido.Slices.AiReact.ToolAdapter.to_action_map(
+               Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+             ) == %{
+               Map.get(
+                 Aikido.ActionRef.action_options(
+                   Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+                 ),
+                 :name
+               ) => Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
              }
     end
 
     test "keeps already-normalized maps intact" do
-      tools = %{Map.get(Aikido.ActionRef.action_options(ParamAction), :name) => ParamAction}
-      assert ToolAdapter.to_action_map(tools) == tools
+      tools = %{
+        Map.get(
+          Aikido.ActionRef.action_options(Aikido.Slices.AiReact.ToolAdapterTest.ParamAction),
+          :name
+        ) => Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+      }
+
+      assert Aikido.Slices.AiReact.ToolAdapter.to_action_map(tools) == tools
     end
 
     test "ignores invalid non-module atoms in module lists" do
-      assert ToolAdapter.to_action_map([ParamAction, :not_a_module]) == %{
-               Map.get(Aikido.ActionRef.action_options(ParamAction), :name) => ParamAction
+      assert Aikido.Slices.AiReact.ToolAdapter.to_action_map([
+               Aikido.Slices.AiReact.ToolAdapterTest.ParamAction,
+               :not_a_module
+             ]) == %{
+               Map.get(
+                 Aikido.ActionRef.action_options(
+                   Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
+                 ),
+                 :name
+               ) => Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
              }
     end
 
     test "returns empty map for invalid single atom input" do
-      assert ToolAdapter.to_action_map(:not_a_module) == %{}
+      assert Aikido.Slices.AiReact.ToolAdapter.to_action_map(:not_a_module) == %{}
     end
   end
 
   describe("duplicate detection") do
-    defmodule DuplicateNameAction do
-      @moduledoc false
-      use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-      @persist {:aikido_action_metadata,
-                %{name: "param_action", description: "Same name as ParamAction"}}
-      actions do
-        action(:run, Aikido.ActionResult) do
-          argument(:state, :term)
-          description("Same name as ParamAction")
-
-          run(fn input, _context ->
-            runtime = input.context[:aikido] || %{}
-            params = Map.delete(input.arguments, :state)
-            signal = Map.fetch!(runtime, :signal)
-            signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-            case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-              {:ok, state, directives} ->
-                Aikido.ActionResult.new(state: state, directives: directives)
-
-              {:error, _} = error ->
-                error
-
-              other ->
-                {:error, "Unexpected return shape: #{inspect(other)}"}
-            end
-          end)
-        end
-      end
-
-      defp reduce(_signal, _slice, _opts, _ctx) do
-        {:ok, %{}, []}
-      end
-    end
+    (
+      nil
+      nil
+    )
 
     test "from_actions raises on duplicate tool names" do
       assert_raise ArgumentError, ~r/duplicate tool names/i, fn ->
-        ToolAdapter.from_actions([ParamAction, DuplicateNameAction])
+        Aikido.Slices.AiReact.ToolAdapter.from_actions([
+          Aikido.Slices.AiReact.ToolAdapterTest.ParamAction,
+          Aikido.Slices.AiReact.ToolAdapterTest.DuplicateNameAction
+        ])
       end
     end
 
     test "from_actions raises on duplicate names after prefix" do
-      defmodule AAction do
-        @moduledoc false
-        use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-        @persist {:aikido_action_metadata, %{name: "action", description: "First action"}}
-        actions do
-          action(:run, Aikido.ActionResult) do
-            argument(:state, :term)
-            description("First action")
-
-            run(fn input, _context ->
-              runtime = input.context[:aikido] || %{}
-              params = Map.delete(input.arguments, :state)
-              signal = Map.fetch!(runtime, :signal)
-              signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-              case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-                {:ok, state, directives} ->
-                  Aikido.ActionResult.new(state: state, directives: directives)
-
-                {:error, _} = error ->
-                  error
-
-                other ->
-                  {:error, "Unexpected return shape: #{inspect(other)}"}
-              end
-            end)
+      (
+        defmodule Elixir.Aikido.Slices.AiReact.ToolAdapterTest.AAction.Implementation do
+          @moduledoc false
+          use Ash.Resource.Actions.Implementation
+          @impl true
+          def run(input, _opts, _context) do
+            Aikido.ActionResult.new(state: %{}, directives: [])
           end
         end
 
-        defp reduce(_signal, _slice, _opts, _ctx) do
-          {:ok, %{}, []}
+        defmodule Elixir.Aikido.Slices.AiReact.ToolAdapterTest.AAction do
+          @moduledoc false
+          use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+          @persist {:aikido_action_metadata, %{name: "action", description: "First action"}}
+          actions do
+            action :run, Aikido.ActionResult do
+              argument :state, :term
+              description "First action"
+              run {Aikido.Slices.AiReact.ToolAdapterTest.AAction.Implementation, action: :run}
+            end
+          end
         end
-      end
+      )
 
-      defmodule BAction do
-        @moduledoc false
-        use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-        @persist {:aikido_action_metadata,
-                  %{name: "action", description: "Second action with same name"}}
-        actions do
-          action(:run, Aikido.ActionResult) do
-            argument(:state, :term)
-            description("Second action with same name")
-
-            run(fn input, _context ->
-              runtime = input.context[:aikido] || %{}
-              params = Map.delete(input.arguments, :state)
-              signal = Map.fetch!(runtime, :signal)
-              signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-              case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-                {:ok, state, directives} ->
-                  Aikido.ActionResult.new(state: state, directives: directives)
-
-                {:error, _} = error ->
-                  error
-
-                other ->
-                  {:error, "Unexpected return shape: #{inspect(other)}"}
-              end
-            end)
+      (
+        defmodule Elixir.Aikido.Slices.AiReact.ToolAdapterTest.BAction.Implementation do
+          @moduledoc false
+          use Ash.Resource.Actions.Implementation
+          @impl true
+          def run(input, _opts, _context) do
+            Aikido.ActionResult.new(state: %{}, directives: [])
           end
         end
 
-        defp reduce(_signal, _slice, _opts, _ctx) do
-          {:ok, %{}, []}
+        defmodule Elixir.Aikido.Slices.AiReact.ToolAdapterTest.BAction do
+          @moduledoc false
+          use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+
+          @persist {:aikido_action_metadata,
+                    %{name: "action", description: "Second action with same name"}}
+          actions do
+            action :run, Aikido.ActionResult do
+              argument :state, :term
+              description "Second action with same name"
+              run {Aikido.Slices.AiReact.ToolAdapterTest.BAction.Implementation, action: :run}
+            end
+          end
         end
-      end
+      )
 
       assert_raise ArgumentError, ~r/duplicate tool names/i, fn ->
-        ToolAdapter.from_actions([AAction, BAction], prefix: "test_")
+        Aikido.Slices.AiReact.ToolAdapter.from_actions(
+          [
+            Aikido.Slices.AiReact.ToolAdapterTest.AAction,
+            Aikido.Slices.AiReact.ToolAdapterTest.BAction
+          ],
+          prefix: "test_"
+        )
       end
     end
   end

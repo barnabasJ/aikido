@@ -1,3 +1,81 @@
+defmodule Aikido.Slices.AiReactE2ETest.NoToolsAgent do
+  @moduledoc false
+  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+
+  agent do
+    name "react_e2e_no_tools"
+  end
+
+  slices do
+    slice :ai, Aikido.Slices.AiReact
+  end
+
+  react do
+    model %{
+      provider: :openai,
+      id: "google/gemma-4-26b-a4b",
+      base_url: "http://localhost:1234/v1"
+    }
+
+    tools []
+    max_iterations 3
+    max_tokens 256
+    llm_opts api_key: "lm-studio"
+  end
+end
+
+defmodule Aikido.Slices.AiReactE2ETest.EchoAgent do
+  @moduledoc false
+  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+
+  agent do
+    name "react_e2e_echo"
+  end
+
+  slices do
+    slice :ai, Aikido.Slices.AiReact
+  end
+
+  react do
+    model %{
+      provider: :openai,
+      id: "google/gemma-4-26b-a4b",
+      base_url: "http://localhost:1234/v1"
+    }
+
+    tools [Aikido.AI.TestActions.TestEcho]
+    max_iterations 5
+    max_tokens 256
+    llm_opts api_key: "lm-studio"
+  end
+end
+
+defmodule Aikido.Slices.AiReactE2ETest.AddAgent do
+  @moduledoc false
+  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+
+  agent do
+    name "react_e2e_add"
+  end
+
+  slices do
+    slice :ai, Aikido.Slices.AiReact
+  end
+
+  react do
+    model %{
+      provider: :openai,
+      id: "google/gemma-4-26b-a4b",
+      base_url: "http://localhost:1234/v1"
+    }
+
+    tools [Aikido.AI.TestActions.TestAdd]
+    max_iterations 5
+    max_tokens 256
+    llm_opts api_key: "lm-studio"
+  end
+end
+
 defmodule Aikido.Slices.AiReactE2ETest do
   @moduledoc """
   End-to-end tests for the `Aikido.Slices.AiReact` slice against a local LM
@@ -22,154 +100,53 @@ defmodule Aikido.Slices.AiReactE2ETest do
   friendly. Adjust them to point at a different local model server if
   needed.
   """
-
   use AikidoTest.Case, async: false
-
   @moduletag :e2e
   @moduletag timeout: 120_000
 
-  # Spark's `use Aikido.Agent, extensions: ...` macro requires a literal AST
-  # (`Macro.quoted_literal?`); `System.get_env/2` inside the literal
-  # defeats the check. Hardcode the LM Studio defaults here — match the
-  # `LMSTUDIO_*` env-var fallbacks the tests previously read.
-
-  defmodule NoToolsAgent do
-    @moduledoc false
-
-    use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
-
-    agent do
-      name "react_e2e_no_tools"
-    end
-
-    slices do
-      slice(:ai, Aikido.Slices.AiReact)
-    end
-
-    react do
-      model(%{
-        provider: :openai,
-        id: "google/gemma-4-26b-a4b",
-        base_url: "http://localhost:1234/v1"
-      })
-
-      tools([])
-      max_iterations(3)
-      max_tokens(256)
-      llm_opts(api_key: "lm-studio")
-    end
-  end
-
-  defmodule EchoAgent do
-    @moduledoc false
-
-    use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
-
-    agent do
-      name "react_e2e_echo"
-    end
-
-    slices do
-      slice(:ai, Aikido.Slices.AiReact)
-    end
-
-    react do
-      model(%{
-        provider: :openai,
-        id: "google/gemma-4-26b-a4b",
-        base_url: "http://localhost:1234/v1"
-      })
-
-      tools([Aikido.AI.TestActions.TestEcho])
-      max_iterations(5)
-      max_tokens(256)
-      llm_opts(api_key: "lm-studio")
-    end
-  end
-
-  defmodule AddAgent do
-    @moduledoc false
-
-    use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
-
-    agent do
-      name "react_e2e_add"
-    end
-
-    slices do
-      slice(:ai, Aikido.Slices.AiReact)
-    end
-
-    react do
-      model(%{
-        provider: :openai,
-        id: "google/gemma-4-26b-a4b",
-        base_url: "http://localhost:1234/v1"
-      })
-
-      tools([Aikido.AI.TestActions.TestAdd])
-      max_iterations(5)
-      max_tokens(256)
-      llm_opts(api_key: "lm-studio")
-    end
-  end
-
-  test "produces a final answer for a simple question without tools", ctx do
-    pid = start_server(ctx, NoToolsAgent)
-
-    assert {:ok, text} = Aikido.AI.ask_sync(pid, "What is 2 + 2?", timeout: 60_000)
-
+  test("produces a final answer for a simple question without tools", ctx) do
+    pid = start_server(ctx, Aikido.Slices.AiReactE2ETest.NoToolsAgent)
+    assert {:ok, text} = Aikido.AI.ask_sync(pid, "What is 2 + 2?", timeout: 60000)
     assert is_binary(text)
     assert text =~ "4"
   end
 
-  test "drives a tool-calling round trip when the model picks a tool", ctx do
-    pid = start_server(ctx, EchoAgent)
+  test("drives a tool-calling round trip when the model picks a tool", ctx) do
+    pid = start_server(ctx, Aikido.Slices.AiReactE2ETest.EchoAgent)
 
     assert {:ok, text} =
              Aikido.AI.ask_sync(
                pid,
                "You have a tool named test_echo that echoes a message. " <>
                  "Call it once with the message 'hello-from-aikido', then reply 'done'.",
-               timeout: 90_000
+               timeout: 90000
              )
 
     assert is_binary(text)
-
     {:ok, ai} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.agent.state.ai} end)
-
-    tool_messages =
-      ai.context
-      |> ReqLLM.Context.to_list()
-      |> Enum.filter(&(&1.role == :tool))
-
+    tool_messages = ai.context |> ReqLLM.Context.to_list() |> Enum.filter(&(&1.role == :tool))
     assert tool_messages != [], "expected the model to call test_echo at least once"
     assert hd(tool_messages).name == "test_echo"
   end
 
-  test "handles a numeric tool call without crashing", ctx do
-    pid = start_server(ctx, AddAgent)
+  test("handles a numeric tool call without crashing", ctx) do
+    pid = start_server(ctx, Aikido.Slices.AiReactE2ETest.AddAgent)
 
     assert {:ok, text} =
              Aikido.AI.ask_sync(
                pid,
                "You have a tool named test_add that adds two integers. " <>
                  "Use it to compute 4 + 7, then state the result.",
-               timeout: 90_000
+               timeout: 90000
              )
 
     assert is_binary(text)
     assert text =~ "11"
   end
 
-  test "out-of-band subscription observes every intermediate signal", ctx do
-    pid = start_server(ctx, AddAgent)
+  test("out-of-band subscription observes every intermediate signal", ctx) do
+    pid = start_server(ctx, Aikido.Slices.AiReactE2ETest.AddAgent)
 
-    # Subscribe to every ai.react.* signal *before* casting (ADR 0021).
-    # The selector projects slice status + iteration; subscribe/4's
-    # default dispatch sends `{:aikido_subscription, sub_ref, %{result:
-    # {:ok, projection}}}` to the calling process for every non-:skip
-    # selector return.
     {:ok, sub_ref} =
       Aikido.AgentServer.subscribe(pid, "ai.react.**", fn state ->
         ai = state.agent.state.ai
@@ -189,14 +166,7 @@ defmodule Aikido.Slices.AiReactE2ETest do
              )
 
     assert is_binary(request_id)
-
-    # Drain dispatches up to 90s, looking for the terminal :completed.
-    # Along the way we expect at least one :running dispatch (Ask) and
-    # at least one with iteration ≥ 1 (a tool turn landed). A :failed
-    # dispatch surfaces as a flunk with the projection — it's the
-    # canonical "model errored mid-run" signal and the test must fail
-    # loudly when it happens.
-    {max_iter, count} = drain_until_completed(sub_ref, 90_000)
+    {max_iter, count} = drain_until_completed(sub_ref, 90000)
 
     assert max_iter >= 1,
            "expected the model to drive at least one tool turn (iteration >= 1); got #{max_iter}"

@@ -8,30 +8,27 @@ defmodule Aikido.Slices.AiWorker do
   separate signal so it sees the committed AiReact transition regardless of
   routing order. Each action writes only its own slice.
   """
-  use Aikido.Slice
+  use Ash.Resource,
+    data_layer: :embedded,
+    validate_domain_inclusion?: false,
+    extensions: [Aikido.Ash.Slice]
 
   slice do
     name "ai_worker"
 
     schema do
-      attribute :pending, :term, default: nil
-      attribute :completed, :integer, default: 0
+      attribute :pending, :term, public?: true, default: nil
+      attribute :completed, :integer, public?: true, default: 0
     end
+
+    route "harness.task", :accept
+    route "ai.react.**", :observe
+    route "harness.ai.observe", :settle
   end
 
-  signal_routes do
-    route "harness.task", Aikido.Slices.AiWorker.Accept
-    route "ai.react.**", Aikido.Slices.AiWorker.Observe
-    route "harness.ai.observe", Aikido.Slices.AiWorker.Settle
-  end
-end
-
-defmodule Aikido.Slices.AiWorker.Accept do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "accept_ai_task"}}
   actions do
-    action :run, Aikido.ActionResult do
+    action :accept, Aikido.ActionResult do
+      public? false
       argument :state, :term
       argument :task_id, :string, allow_nil?: false
       argument :member, :term, allow_nil?: false
@@ -44,31 +41,19 @@ defmodule Aikido.Slices.AiWorker.Accept do
       argument :system_prompt, :string
       argument :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list]
       argument :max_iterations, :integer, constraints: [min: 1]
-      run Aikido.Slices.AiWorker.Accept.Implementation
+      run Aikido.Slices.AiWorker.Accept
     end
-  end
-end
 
-defmodule Aikido.Slices.AiWorker.Observe do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "observe_ai_task"}}
-  actions do
-    action :run, Aikido.ActionResult do
+    action :observe, Aikido.ActionResult do
+      public? false
       argument :state, :term
-      run Aikido.Slices.AiWorker.Observe.Implementation
+      run Aikido.Slices.AiWorker.Observe
     end
-  end
-end
 
-defmodule Aikido.Slices.AiWorker.Settle do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "settle_ai_task"}}
-  actions do
-    action :run, Aikido.ActionResult do
+    action :settle, Aikido.ActionResult do
+      public? false
       argument :state, :term
-      run Aikido.Slices.AiWorker.Settle.Implementation
+      run Aikido.Slices.AiWorker.Settle
     end
   end
 end

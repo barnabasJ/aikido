@@ -49,7 +49,7 @@ defmodule Aikido.Storage.Redis do
 
   alias Aikido.Slices.Thread.Entry
   alias Aikido.Slices.Thread.EntryNormalizer
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
 
   @default_prefix "aikido"
 

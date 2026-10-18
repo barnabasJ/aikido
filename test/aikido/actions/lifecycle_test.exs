@@ -17,7 +17,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
 
       {:ok, result, directives} =
         AikidoTest.NativeAction.run(
-          Lifecycle.NotifyParent,
+          {Aikido.AgentServer.RuntimeActions, :notify_parent},
           sig("notify_parent", data),
           %{},
           %{},
@@ -36,7 +36,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
 
       {:ok, result, directives} =
         AikidoTest.NativeAction.run(
-          Lifecycle.NotifyParent,
+          {Aikido.AgentServer.RuntimeActions, :notify_parent},
           sig("notify_parent", data),
           %{},
           %{},
@@ -61,7 +61,13 @@ defmodule AikidoTest.Actions.LifecycleTest do
       }
 
       {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(Lifecycle.NotifyPid, sig("notify_pid", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :notify_pid},
+          sig("notify_pid", data),
+          %{},
+          %{},
+          %{}
+        )
 
       assert result == %{sent_to: target}
       assert %Directives.Emit{} = directive
@@ -84,7 +90,13 @@ defmodule AikidoTest.Actions.LifecycleTest do
       }
 
       {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(Lifecycle.NotifyPid, sig("notify_pid", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :notify_pid},
+          sig("notify_pid", data),
+          %{},
+          %{},
+          %{}
+        )
 
       assert {:pid, opts} = directive.dispatch
       assert Keyword.get(opts, :target) == target
@@ -103,7 +115,13 @@ defmodule AikidoTest.Actions.LifecycleTest do
       }
 
       {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(Lifecycle.SpawnChild, sig("spawn_child", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :spawn_child},
+          sig("spawn_child", data),
+          %{},
+          %{},
+          %{}
+        )
 
       assert result == %{spawning: :worker_1}
       assert %Directives.SpawnAgent{} = directive
@@ -124,7 +142,13 @@ defmodule AikidoTest.Actions.LifecycleTest do
       }
 
       {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(Lifecycle.SpawnChild, sig("spawn_child", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :spawn_child},
+          sig("spawn_child", data),
+          %{},
+          %{},
+          %{}
+        )
 
       assert directive.opts == %{}
       assert directive.restart == :transient
@@ -135,7 +159,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
     test "creates stop directive with normal reason" do
       {:ok, result, [directive]} =
         AikidoTest.NativeAction.run(
-          Lifecycle.StopSelf,
+          {Aikido.AgentServer.RuntimeActions, :stop_self},
           sig("stop_self", %{reason: :normal}),
           %{},
           %{},
@@ -150,7 +174,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
     test "supports custom stop reasons" do
       {:ok, result, [directive]} =
         AikidoTest.NativeAction.run(
-          Lifecycle.StopSelf,
+          {Aikido.AgentServer.RuntimeActions, :stop_self},
           sig("stop_self", %{reason: :work_complete}),
           %{},
           %{},
@@ -167,7 +191,13 @@ defmodule AikidoTest.Actions.LifecycleTest do
       data = %{tag: :worker_1, reason: :normal}
 
       {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(Lifecycle.StopChild, sig("stop_child", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :stop_child},
+          sig("stop_child", data),
+          %{},
+          %{},
+          %{}
+        )
 
       assert result == %{stopping_child: :worker_1, reason: :normal}
       assert %Directives.StopChild{} = directive
@@ -179,7 +209,13 @@ defmodule AikidoTest.Actions.LifecycleTest do
       data = %{tag: :processor, reason: :shutdown}
 
       {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(Lifecycle.StopChild, sig("stop_child", data), %{}, %{}, %{})
+        AikidoTest.NativeAction.run(
+          {Aikido.AgentServer.RuntimeActions, :stop_child},
+          sig("stop_child", data),
+          %{},
+          %{},
+          %{}
+        )
 
       assert directive.reason == :shutdown
     end

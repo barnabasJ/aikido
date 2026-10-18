@@ -2,7 +2,7 @@ defmodule Aikido.Slices.Thread.Store.Adapters.JournalBackedTest do
   use ExUnit.Case, async: true
 
   alias Aikido.Slices.Thread.Entry
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
   alias Aikido.Slices.Thread.Store
   alias Aikido.Slices.Thread.Store.Adapters.JournalBacked
 

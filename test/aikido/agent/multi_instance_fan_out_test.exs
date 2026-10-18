@@ -1,163 +1,184 @@
-defmodule Aikido.Agent.MultiInstanceFanOutTest do
-  @moduledoc "Coverage for the multi-instance slice mount fan-out introduced by\ntask 0062. The same slice module mounted at multiple paths\n(`slice :slack_support, SlackSlice; slice :slack_sales, SlackSlice`)\nno longer trips `NoRouteConflicts`; instead, when a signal targets the\nshared action, `cmd/2` fans the action out — once per matching mount\nwith that mount's own slice state and `ctx.slice_config`.\n\nThese tests cover:\n\n  1. Compile-time acceptance of multi-instance same-slice mounts.\n  2. Per-mount state writes from a single `cmd/2` call.\n  3. `ctx.slice_path` and `ctx.slice_config` visibility per fan-out\n     iteration.\n  4. Atomicity — first mount's success rolls back when a later mount\n     errors (the cmd is all-or-nothing).\n  5. Edge case: action declared in BOTH a slice's `signal_routes` AND\n     the agent's own `signal_routes` fans out across slice mounts AND\n     the agent path (design choice #1).\n"
-  use ExUnit.Case, async: true
-
-  # ─── Fixtures ──────────────────────────────────────────────────────
-
-  defmodule SendAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "send"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-
-        argument(:message, :string,
-          allow_nil?: false,
-          constraints: [trim?: false, allow_empty?: true]
-        )
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
+defmodule Aikido.Agent.MultiInstanceFanOutTest.SendAction do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    msg =
+      case Map.fetch(input.arguments, :message) do
+        {:ok, value} -> value
+        :error -> input.context.aikido.signal.data[:message]
       end
-    end
 
-    defp reduce(%Jido.Signal{data: %{message: msg}}, slice, _opts, ctx) do
-      slice = slice || %{}
-      messages = Map.get(slice, :messages, [])
-      token = get_in(ctx, [:slice_config, :token]) || "no-config"
+    slice = input.arguments.state
+    ctx = input.context.aikido
+    slice = slice || %{}
+    messages = Map.get(slice, :messages, [])
+    token = get_in(ctx, [:slice_config, :token]) || "no-config"
 
+    directives =
       if pid = ctx[:test_pid] do
-        send(pid, {:fan_out_call, ctx[:slice_path], token, msg})
-      end
-
-      if get_in(ctx, [:slice_config, :fail?]) do
-        {:error, {:planned_failure, ctx[:slice_path]}}
+        observation = %{ctx.signal | data: %{path: ctx[:slice_path], token: token, message: msg}}
+        [Aikido.Directives.emit_to_pid(observation, pid)]
       else
-        {:ok, %{messages: messages ++ ["#{token}: #{msg}"]}, []}
+        []
       end
-    end
-  end
 
-  defmodule SlackSlice do
-    @moduledoc false
-    use Aikido.Slice
-
-    slice do
-      name("slack_slice")
-
-      schema do
-        attribute(:messages, {:array, :string},
-          allow_nil?: false,
-          default: [],
-          constraints: [items: [trim?: false, allow_empty?: true]]
-        )
-      end
-    end
-
-    signal_routes do
-      route("slack.send", Aikido.Agent.MultiInstanceFanOutTest.SendAction)
-    end
-  end
-
-  defmodule MultiSlackAgent do
-    @moduledoc false
-    use Aikido.Agent, default_slices: false
-
-    agent do
-      name("multi_slack_agent")
-    end
-
-    slices do
-      slice(:slack_support, SlackSlice, options: %{token: "support-token"})
-      slice(:slack_sales, SlackSlice, options: %{token: "sales-token"})
-    end
-  end
-
-  defmodule FailingMultiSlackAgent do
-    @moduledoc false
-    use Aikido.Agent, default_slices: false
-
-    agent do
-      name("failing_multi_slack_agent")
-    end
-
-    slices do
-      slice(:slack_support, SlackSlice, options: %{token: "support-token"})
-
-      slice(
-        :slack_sales,
-        SlackSlice,
-        options: %{token: "sales-token", fail?: true}
+    if get_in(ctx, [:slice_config, :fail?]) do
+      {:error, {:planned_failure, ctx[:slice_path]}}
+    else
+      Aikido.ActionResult.new(
+        state: %{messages: messages ++ ["#{token}: #{msg}"]},
+        directives: directives
       )
     end
   end
+end
 
-  defmodule HostSlackAgent do
-    @moduledoc false
-    # Action declared in BOTH a slice's signal_routes AND the agent's own
-    # signal_routes — exercises design choice #1: the agent path joins the
-    # fan-out list.
-    use Aikido.Agent, default_slices: false
+defmodule Aikido.Agent.MultiInstanceFanOutTest.SlackSlice do
+  @moduledoc false
+  use Ash.Resource,
+    data_layer: :embedded,
+    validate_domain_inclusion?: false,
+    extensions: [Aikido.Ash.Slice]
 
-    agent do
-      name("host_slack_agent")
-      path(:host)
+  slice do
+    name "slack_slice"
 
-      schema do
-        attribute(:messages, {:array, :string},
-          allow_nil?: false,
-          default: [],
-          constraints: [items: [trim?: false, allow_empty?: true]]
-        )
-      end
+    schema do
+      attribute :messages, {:array, :string},
+        public?: true,
+        allow_nil?: false,
+        default: [],
+        constraints: [items: [trim?: false, allow_empty?: true]]
     end
 
-    slices do
-      slice(:slack_support, SlackSlice, options: %{token: "support-token"})
-      slice(:slack_sales, SlackSlice, options: %{token: "sales-token"})
-    end
+    route "slack.send", :send
+  end
 
-    signal_routes do
-      route("host.send", Aikido.Agent.MultiInstanceFanOutTest.SendAction)
+  actions do
+    action :send, Aikido.ActionResult do
+      argument :state, :term
+
+      argument :message, :string,
+        allow_nil?: false,
+        constraints: [trim?: false, allow_empty?: true]
+
+      run Aikido.Agent.MultiInstanceFanOutTest.SendAction
+    end
+  end
+end
+
+defmodule Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent do
+  @moduledoc false
+  use Aikido.Agent, default_slices: false
+
+  agent do
+    name "multi_slack_agent"
+  end
+
+  slices do
+    slice :slack_support, Aikido.Agent.MultiInstanceFanOutTest.SlackSlice,
+      options: %{token: "support-token"}
+
+    slice :slack_sales, Aikido.Agent.MultiInstanceFanOutTest.SlackSlice,
+      options: %{token: "sales-token"}
+  end
+end
+
+defmodule Aikido.Agent.MultiInstanceFanOutTest.FailingMultiSlackAgent do
+  @moduledoc false
+  use Aikido.Agent, default_slices: false
+
+  agent do
+    name "failing_multi_slack_agent"
+  end
+
+  slices do
+    slice :slack_support, Aikido.Agent.MultiInstanceFanOutTest.SlackSlice,
+      options: %{token: "support-token"}
+
+    slice :slack_sales,
+          Aikido.Agent.MultiInstanceFanOutTest.SlackSlice,
+          options: %{token: "sales-token", fail?: true}
+  end
+end
+
+defmodule Aikido.Agent.MultiInstanceFanOutTest.HostSlackAgent do
+  @moduledoc false
+  use Aikido.Agent, default_slices: false
+
+  agent do
+    name "host_slack_agent"
+    path :host
+
+    schema do
+      attribute :messages, {:array, :string},
+        allow_nil?: false,
+        default: [],
+        constraints: [items: [trim?: false, allow_empty?: true]]
     end
   end
 
-  # ─── Tests ─────────────────────────────────────────────────────────
+  slices do
+    slice :slack_support, Aikido.Agent.MultiInstanceFanOutTest.SlackSlice,
+      options: %{token: "support-token"}
+
+    slice :slack_sales, Aikido.Agent.MultiInstanceFanOutTest.SlackSlice,
+      options: %{token: "sales-token"}
+  end
+
+  signal_routes do
+    route "host.send", {Aikido.Agent.MultiInstanceFanOutTest.SlackSlice, :send}
+  end
+end
+
+defmodule Aikido.Agent.MultiInstanceFanOutTest do
+  @moduledoc """
+  Coverage for the multi-instance slice mount fan-out introduced by
+  task 0062. The same slice module mounted at multiple paths
+  (`slice :slack_support, SlackSlice; slice :slack_sales, SlackSlice`)
+  no longer trips `NoRouteConflicts`; instead, when a signal targets the
+  shared action, `cmd/2` fans the action out — once per matching mount
+  with that mount's own slice state and `ctx.slice_config`.
+
+  These tests cover:
+
+    1. Compile-time acceptance of multi-instance same-slice mounts.
+    2. Per-mount state writes from a single `cmd/2` call.
+    3. `ctx.slice_path` and `ctx.slice_config` visibility per fan-out
+       iteration.
+    4. Atomicity — first mount's success rolls back when a later mount
+       errors (the cmd is all-or-nothing).
+    5. Edge case: action declared in BOTH a slice's `signal_routes` AND
+       the agent's own `signal_routes` fans out across slice mounts AND
+       the agent path (design choice #1).
+  """
+  use ExUnit.Case, async: true
 
   describe("compile-time acceptance") do
     test "the same slice module mounted at two different paths compiles cleanly" do
-      # If this module compiled, the verifier accepted the multi-mount
-      # configuration. Belt-and-braces: assert the agent's helpers exist.
-      assert function_exported?(MultiSlackAgent, :cmd, 3)
-      assert function_exported?(MultiSlackAgent, :new, 1)
+      assert function_exported?(Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent, :cmd, 3)
+      assert function_exported?(Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent, :new, 1)
     end
 
     test "slice_paths_for_action contains both mount paths for the shared action" do
-      table = Aikido.Dsl.Agent.Info.slice_paths_for_action(MultiSlackAgent)
-      paths = Map.get(table, SendAction, [])
+      table =
+        Aikido.Dsl.Agent.Info.slice_paths_for_action(
+          Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent
+        )
+
+      paths = Map.get(table, {Aikido.Agent.MultiInstanceFanOutTest.SlackSlice, :send}, [])
       assert :slack_support in paths
       assert :slack_sales in paths
       assert length(paths) == 2
     end
 
     test "mount_config_map exposes per-mount config" do
-      configs = Aikido.Dsl.Agent.Info.mount_config_map(MultiSlackAgent)
+      configs =
+        Aikido.Dsl.Agent.Info.mount_config_map(
+          Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent
+        )
+
       assert configs[:slack_support][:token] == "support-token"
       assert configs[:slack_sales][:token] == "sales-token"
     end
@@ -165,41 +186,62 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
 
   describe("runtime fan-out") do
     test "one cmd updates both mount paths" do
-      agent = MultiSlackAgent.new()
+      agent = Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent.new()
       assert agent.state.slack_support.messages == []
       assert agent.state.slack_sales.messages == []
       {:ok, signal} = Jido.Signal.new(%{type: "slack.send", data: %{message: "hi"}})
 
       {:ok, agent, _dirs} =
-        MultiSlackAgent.cmd(agent, {SendAction, %{message: "hi"}}, input_signal: signal)
+        Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent.cmd(
+          agent,
+          {{Aikido.Agent.MultiInstanceFanOutTest.SlackSlice, :send}, %{message: "hi"}},
+          input_signal: signal
+        )
 
       assert agent.state.slack_support.messages == ["support-token: hi"]
       assert agent.state.slack_sales.messages == ["sales-token: hi"]
     end
 
     test "ctx.slice_path identifies the current mount per fan-out iteration" do
-      agent = MultiSlackAgent.new()
+      agent = Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent.new()
       {:ok, signal} = Jido.Signal.new(%{type: "slack.send", data: %{message: "hi"}})
 
-      {:ok, _agent, _dirs} =
-        MultiSlackAgent.cmd(agent, {SendAction, %{message: "hi"}},
+      {:ok, _agent, directives} =
+        Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent.cmd(
+          agent,
+          {{Aikido.Agent.MultiInstanceFanOutTest.SlackSlice, :send}, %{message: "hi"}},
           ctx: %{test_pid: self()},
           input_signal: signal
         )
 
-      assert_received {:fan_out_call, :slack_support, "support-token", "hi"}
-      assert_received {:fan_out_call, :slack_sales, "sales-token", "hi"}
+      assert observations(directives) == [
+               {:slack_support, "support-token", "hi"},
+               {:slack_sales, "sales-token", "hi"}
+             ]
+
+      refute_received {:signal, _}
+      refute_received {:fan_out_call, _, _, _}
+
+      assert {:ok, _same_agent, ^directives} =
+               Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent.cmd(
+                 agent,
+                 {{Aikido.Agent.MultiInstanceFanOutTest.SlackSlice, :send}, %{message: "hi"}},
+                 ctx: %{test_pid: self()},
+                 input_signal: signal
+               )
     end
 
     test "ctx.slice_config carries the right mount's resolved config" do
-      agent = MultiSlackAgent.new()
+      agent = Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent.new()
       {:ok, signal} = Jido.Signal.new(%{type: "slack.send", data: %{message: "go"}})
 
       {:ok, agent, _dirs} =
-        MultiSlackAgent.cmd(agent, {SendAction, %{message: "go"}}, input_signal: signal)
+        Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent.cmd(
+          agent,
+          {{Aikido.Agent.MultiInstanceFanOutTest.SlackSlice, :send}, %{message: "go"}},
+          input_signal: signal
+        )
 
-      # The action prepends the token to the message — proves each mount
-      # saw its own slice_config token.
       assert agent.state.slack_support.messages == ["support-token: go"]
       assert agent.state.slack_sales.messages == ["sales-token: go"]
     end
@@ -207,43 +249,55 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
 
   describe("atomicity — first-mount success rolls back when a later mount errors") do
     test "the input agent's state is unchanged when any mount errors" do
-      agent = FailingMultiSlackAgent.new()
+      agent = Aikido.Agent.MultiInstanceFanOutTest.FailingMultiSlackAgent.new()
       {:ok, signal} = Jido.Signal.new(%{type: "slack.send", data: %{message: "hi"}})
 
       assert {:error, _reason} =
-               FailingMultiSlackAgent.cmd(agent, {SendAction, %{message: "hi"}},
+               Aikido.Agent.MultiInstanceFanOutTest.FailingMultiSlackAgent.cmd(
+                 agent,
+                 {{Aikido.Agent.MultiInstanceFanOutTest.SlackSlice, :send}, %{message: "hi"}},
+                 ctx: %{test_pid: self()},
                  input_signal: signal
                )
 
-      # Re-fetch the agent state — it should match the initial state for
-      # both mounts. The successful first mount's write to :slack_support
-      # is dropped on the floor when the second mount errors.
-      fresh = FailingMultiSlackAgent.new()
+      fresh = Aikido.Agent.MultiInstanceFanOutTest.FailingMultiSlackAgent.new()
       assert agent.state.slack_support == fresh.state.slack_support
       assert agent.state.slack_sales == fresh.state.slack_sales
+      refute_received {:signal, _}
+      refute_received {:fan_out_call, _, _, _}
     end
   end
 
   describe("edge case: action shared by slice mounts AND agent's own signal_routes") do
     test "fan-out covers slice mounts AND the agent path" do
-      agent = HostSlackAgent.new()
+      agent = Aikido.Agent.MultiInstanceFanOutTest.HostSlackAgent.new()
       {:ok, signal} = Jido.Signal.new(%{type: "host.send", data: %{message: "broadcast"}})
 
-      {:ok, agent, _dirs} =
-        HostSlackAgent.cmd(agent, {SendAction, %{message: "broadcast"}},
+      {:ok, agent, directives} =
+        Aikido.Agent.MultiInstanceFanOutTest.HostSlackAgent.cmd(
+          agent,
+          {{Aikido.Agent.MultiInstanceFanOutTest.SlackSlice, :send}, %{message: "broadcast"}},
           ctx: %{test_pid: self()},
           input_signal: signal
         )
 
-      # All three slices got an entry — slack_support and slack_sales
-      # carry their tokens; :host (agent's own path, no slice_config) uses
-      # the no-config marker.
       assert agent.state.slack_support.messages == ["support-token: broadcast"]
       assert agent.state.slack_sales.messages == ["sales-token: broadcast"]
       assert agent.state.host.messages == ["no-config: broadcast"]
-      assert_received {:fan_out_call, :slack_support, "support-token", "broadcast"}
-      assert_received {:fan_out_call, :slack_sales, "sales-token", "broadcast"}
-      assert_received {:fan_out_call, :host, "no-config", "broadcast"}
+
+      assert observations(directives) == [
+               {:slack_support, "support-token", "broadcast"},
+               {:slack_sales, "sales-token", "broadcast"},
+               {:host, "no-config", "broadcast"}
+             ]
+
+      refute_received {:signal, _}
     end
+  end
+
+  defp observations(directives) do
+    Enum.map(directives, fn %Aikido.Directives.Emit{signal: %{data: data}} ->
+      {data.path, data.token, data.message}
+    end)
   end
 end

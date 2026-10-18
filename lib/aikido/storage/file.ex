@@ -36,7 +36,7 @@ defmodule Aikido.Storage.File do
 
   alias Aikido.Slices.Thread.Entry
   alias Aikido.Slices.Thread.EntryNormalizer
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
 
   @type key :: term()
   @type opts :: keyword()
@@ -120,7 +120,7 @@ defmodule Aikido.Storage.File do
   @doc """
   Load a thread from disk.
 
-  Reads the meta file and entries log, reconstructing a `%Aikido.Slices.Thread.State{}`.
+  Reads the meta file and entries log, reconstructing a `%Aikido.Slices.Thread{}`.
   Returns `:not_found` if the thread directory doesn't exist.
   """
   @impl true

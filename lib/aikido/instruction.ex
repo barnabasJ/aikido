@@ -538,7 +538,11 @@ defmodule Aikido.Instruction do
   end
 
   defp cast_with_ash(attrs_with_defaults) do
-    case Ash.Type.apply_constraints(:struct, attrs_with_defaults, __MODULE__.subtype_constraints()) do
+    case Ash.Type.apply_constraints(
+           :struct,
+           attrs_with_defaults,
+           __MODULE__.subtype_constraints()
+         ) do
       {:ok, validated_struct} ->
         {:ok, validated_struct}
 

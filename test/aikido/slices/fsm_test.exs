@@ -1,61 +1,73 @@
+defmodule AikidoTest.Plugin.FSMTest.DefaultFSMAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "fsm_default"
+  end
+
+  slices do
+    slice :fsm, Aikido.Slices.FSM
+  end
+end
+
+defmodule AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "fsm_configured"
+  end
+
+  slices do
+    slice :fsm, Aikido.Slices.FSM,
+      options: [
+        initial_state: "ready",
+        transitions: %{
+          "ready" => ["working", "done"],
+          "working" => ["ready", "done", "errored"],
+          "done" => [],
+          "errored" => []
+        },
+        terminal_states: ["done", "errored"]
+      ]
+  end
+end
+
 defmodule AikidoTest.Plugin.FSMTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Slices.FSM
-  alias Aikido.Slices.FSM.Transition
-
-  defmodule DefaultFSMAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name "fsm_default"
-    end
-
-    slices do
-      slice(:fsm, FSM)
-    end
-  end
-
-  defmodule ConfiguredFSMAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name "fsm_configured"
-    end
-
-    slices do
-      slice(:fsm, FSM,
-        options: [
-          initial_state: "ready",
-          transitions: %{
-            "ready" => ["working", "done"],
-            "working" => ["ready", "done", "errored"],
-            "done" => [],
-            "errored" => []
-          },
-          terminal_states: ["done", "errored"]
-        ]
-      )
-    end
-  end
-
-  describe "Slice.Info surface" do
-    alias Aikido.Dsl.Slice.Info, as: SliceInfo
+  describe("Slice.Info surface") do
+    nil
 
     test "FSM signal_routes routes aikido.fsm.transition" do
-      assert {"aikido.fsm.transition", Transition} in SliceInfo.signal_routes(FSM)
+      assert {"aikido.fsm.transition", {Aikido.Slices.FSM, :transition}} in Aikido.Dsl.Slice.Info.signal_routes(
+               Aikido.Slices.FSM
+             )
     end
 
-    test "FSM actions return the Transition action" do
-      assert Transition in SliceInfo.actions(FSM)
+    test "FSM owns the native transition action" do
+      assert {Aikido.Slices.FSM, :transition} in Aikido.Dsl.Slice.Info.actions(Aikido.Slices.FSM)
+    end
+
+    test "the slice action runs directly through Ash with its declared arguments" do
+      assert Ash.Resource.Info.resource?(Aikido.Slices.FSM)
+      assert Aikido.Ash.Slice in Spark.extensions(Aikido.Slices.FSM)
+      state = AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.new().state.fsm
+
+      input =
+        Ash.ActionInput.for_action(Aikido.Slices.FSM, :transition, %{state: state, to: "working"})
+
+      assert {:ok, %Aikido.ActionResult{state: next, directives: []}} = Ash.run_action(input)
+      assert next.state == "working"
+      assert next.history == [%{from: "ready", to: "working"}]
+      assert state.state == "ready"
     end
   end
 
-  describe "default FSM (no per-agent config)" do
+  describe("default FSM (no per-agent config)") do
     test "agent boots with the default initial_state" do
-      agent = DefaultFSMAgent.new()
+      agent = AikidoTest.Plugin.FSMTest.DefaultFSMAgent.new()
       assert agent.state.fsm.state == "idle"
       assert agent.state.fsm.initial_state == "idle"
       assert agent.state.fsm.history == []
@@ -63,48 +75,75 @@ defmodule AikidoTest.Plugin.FSMTest do
     end
 
     test "an allowed transition mutates state" do
-      agent = DefaultFSMAgent.new()
+      agent = AikidoTest.Plugin.FSMTest.DefaultFSMAgent.new()
 
       {:ok, agent, _} =
-        DefaultFSMAgent.cmd(agent, {Transition, %{to: "processing"}})
+        AikidoTest.Plugin.FSMTest.DefaultFSMAgent.cmd(
+          agent,
+          {{Aikido.Slices.FSM, :transition}, %{to: "processing"}}
+        )
 
       assert agent.state.fsm.state == "processing"
       assert [%{from: "idle", to: "processing"}] = agent.state.fsm.history
     end
 
     test "transitioning into a terminal state flips terminal?" do
-      agent = DefaultFSMAgent.new()
-      {:ok, agent, _} = DefaultFSMAgent.cmd(agent, {Transition, %{to: "processing"}})
-      {:ok, agent, _} = DefaultFSMAgent.cmd(agent, {Transition, %{to: "completed"}})
+      agent = AikidoTest.Plugin.FSMTest.DefaultFSMAgent.new()
+
+      {:ok, agent, _} =
+        AikidoTest.Plugin.FSMTest.DefaultFSMAgent.cmd(
+          agent,
+          {{Aikido.Slices.FSM, :transition}, %{to: "processing"}}
+        )
+
+      {:ok, agent, _} =
+        AikidoTest.Plugin.FSMTest.DefaultFSMAgent.cmd(
+          agent,
+          {{Aikido.Slices.FSM, :transition}, %{to: "completed"}}
+        )
 
       assert agent.state.fsm.state == "completed"
       assert agent.state.fsm.terminal? == true
     end
   end
 
-  describe "configured FSM" do
+  describe("configured FSM") do
     test "per-agent config seeds the slice through the schema's transform" do
-      agent = ConfiguredFSMAgent.new()
+      agent = AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.new()
       assert agent.state.fsm.state == "ready"
       assert agent.state.fsm.terminal_states == ["done", "errored"]
       assert agent.state.fsm.terminal? == false
     end
 
     test "respects the configured transitions map" do
-      agent = ConfiguredFSMAgent.new()
-      {:ok, agent, _} = ConfiguredFSMAgent.cmd(agent, {Transition, %{to: "working"}})
+      agent = AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.new()
+
+      {:ok, agent, _} =
+        AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.cmd(
+          agent,
+          {{Aikido.Slices.FSM, :transition}, %{to: "working"}}
+        )
+
       assert agent.state.fsm.state == "working"
 
-      {:ok, agent, _} = ConfiguredFSMAgent.cmd(agent, {Transition, %{to: "errored"}})
+      {:ok, agent, _} =
+        AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.cmd(
+          agent,
+          {{Aikido.Slices.FSM, :transition}, %{to: "errored"}}
+        )
+
       assert agent.state.fsm.state == "errored"
       assert agent.state.fsm.terminal? == true
     end
 
     test "rejects a transition not in the allowed list" do
-      agent = ConfiguredFSMAgent.new()
+      agent = AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.new()
 
       assert {:error, _reason} =
-               ConfiguredFSMAgent.cmd(agent, {Transition, %{to: "unknown"}})
+               AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.cmd(
+                 agent,
+                 {{Aikido.Slices.FSM, :transition}, %{to: "unknown"}}
+               )
     end
   end
 end

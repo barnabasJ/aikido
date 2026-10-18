@@ -1,87 +1,88 @@
+defmodule AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    slice = input.arguments.state
+    count = Map.get(slice, :tick_count, 0)
+    ticks = Map.get(slice, :ticks, [])
+
+    Aikido.ActionResult.new(
+      state: %{tick_count: count + 1, ticks: ticks ++ [%{source: :slice_schedule}]},
+      directives: []
+    )
+  end
+end
+
+defmodule AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "slice_tick"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implementation,
+           action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice do
+  @moduledoc false
+  use Aikido.Slice
+
+  slice do
+    name "scheduler_integration_slice"
+
+    schema do
+    end
+  end
+
+  schedules do
+    schedule "* * * * * * *", AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction
+  end
+end
+
+defmodule AikidoTest.Integration.SchedulerIntegrationTest.SliceScheduledAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "scheduler_integration_slice_agent"
+    path :domain
+
+    schema do
+      attribute :tick_count, :integer, default: 0
+      attribute :ticks, {:array, :term}, default: []
+    end
+  end
+
+  slices do
+    slice :scheduler_integration_slice,
+          AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice
+  end
+end
+
 defmodule AikidoTest.Integration.SchedulerIntegrationTest do
-  @moduledoc "Scheduler integration tests for invasive runtime failure scenarios.\n\nTarget only with:\n\n    mix test --only scheduler_integration test/aikido/integration/scheduler_integration_test.exs\n"
+  @moduledoc """
+  Scheduler integration tests for invasive runtime failure scenarios.
+
+  Target only with:
+
+      mix test --only scheduler_integration test/aikido/integration/scheduler_integration_test.exs
+  """
   use AikidoTest.Case, async: false
   import ExUnit.CaptureLog
   import AikidoTest.Support.SchedulerIntegrationHarness
-  alias Aikido.AgentServer
-  alias Jido.Signal
-  alias AikidoTest.Support.FailingTimeZoneDatabase
   @moduletag :integration
   @moduletag :scheduler_integration
   @moduletag capture_log: true
   @moduletag timeout: 20000
-  defmodule SliceTickAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "slice_tick"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, slice, _opts, _ctx) do
-      count = Map.get(slice, :tick_count, 0)
-      ticks = Map.get(slice, :ticks, [])
-      {:ok, %{tick_count: count + 1, ticks: ticks ++ [%{source: :slice_schedule}]}, []}
-    end
-  end
-
-  defmodule ScheduledSlice do
-    @moduledoc false
-    use Aikido.Slice
-
-    slice do
-      name("scheduler_integration_slice")
-
-      schema do
-      end
-    end
-
-    schedules do
-      schedule("* * * * * * *", SliceTickAction)
-    end
-  end
-
-  defmodule SliceScheduledAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name("scheduler_integration_slice_agent")
-      path(:domain)
-
-      schema do
-        attribute(:tick_count, :integer, default: 0)
-        attribute(:ticks, {:array, :term}, default: [])
-      end
-    end
-
-    slices do
-      slice(:scheduler_integration_slice, ScheduledSlice)
-    end
-  end
 
   defp slice_job_id do
-    {:slice_schedule, :scheduler_integration_slice, SliceTickAction}
+    {:slice_schedule, :scheduler_integration_slice,
+     AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction}
   end
 
   describe("runtime scheduler failures") do
@@ -105,8 +106,12 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       wait_for_tick_count(pid, 1, timeout: 5000)
       server_ref = Process.monitor(pid)
 
-      # Simulate time zone database failure
-      Application.put_env(:aikido, :time_zone_database, FailingTimeZoneDatabase)
+      Application.put_env(
+        :aikido,
+        :time_zone_database,
+        AikidoTest.Support.FailingTimeZoneDatabase
+      )
+
       eventually(fn -> Process.alive?(pid) end, timeout: 2000)
 
       eventually(fn -> Process.alive?(job_pid) and :sys.get_state(job_pid).retrying? end,
@@ -114,15 +119,13 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       )
 
       {:ok, %{heartbeat_pid: heartbeat_pid, baseline: baseline}} =
-        AgentServer.state(pid, fn s ->
+        Aikido.AgentServer.state(pid, fn s ->
           {:ok,
            %{heartbeat_pid: s.cron_jobs[:heartbeat], baseline: s.agent.state.domain.tick_count}}
         end)
 
       assert heartbeat_pid == job_pid
       assert Process.alive?(job_pid)
-
-      # Restore working database
       Application.put_env(:aikido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
 
       eventually(fn -> Process.alive?(job_pid) and not :sys.get_state(job_pid).retrying? end,
@@ -141,9 +144,9 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       server_ref = Process.monitor(pid)
 
       bad_message =
-        Signal.new!("cron.tick", %{reply_to: self(), kind: :bad_message}, source: "/test")
+        Jido.Signal.new!("cron.tick", %{reply_to: self(), kind: :bad_message}, source: "/test")
 
-      good_message = Signal.new!("cron.tick", %{kind: :good_message}, source: "/test")
+      good_message = Jido.Signal.new!("cron.tick", %{kind: :good_message}, source: "/test")
 
       log =
         capture_log(fn ->
@@ -174,7 +177,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
         end)
 
       {:ok, snapshot} =
-        AgentServer.state(pid, fn s ->
+        Aikido.AgentServer.state(pid, fn s ->
           {:ok, %{cron_jobs: s.cron_jobs, cron_specs_keys: Map.keys(s.cron_specs)}}
         end)
 
@@ -189,8 +192,8 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
     test("restarting one dynamic cron job does not disrupt sibling jobs", context) do
       pid = start_cron_agent(context, id: unique_id("scheduler-siblings"))
       server_ref = Process.monitor(pid)
-      alpha_message = Signal.new!("cron.tick", %{job: :alpha}, source: "/test")
-      beta_message = Signal.new!("cron.tick", %{job: :beta}, source: "/test")
+      alpha_message = Jido.Signal.new!("cron.tick", %{job: :alpha}, source: "/test")
+      beta_message = Jido.Signal.new!("cron.tick", %{job: :beta}, source: "/test")
       assert :ok = register_cron(pid, "* * * * * * *", job_id: :alpha, message: alpha_message)
       assert :ok = register_cron(pid, "* * * * * * *", job_id: :beta, message: beta_message)
       alpha_job_pid = wait_for_job(pid, :alpha, timeout: 5000)
@@ -211,9 +214,6 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       beta_baseline = ticks(pid) |> Enum.count(&(&1[:job] == :beta))
       Process.exit(alpha_job_pid, :kill)
 
-      # The DOWN handler restarts the cron job synchronously; the next
-      # `cron.tick` (≤1s for "* * * * * * *") wakes our subscription so
-      # the selector sees the new pid.
       restarted_alpha_pid =
         await_state_value(
           pid,
@@ -229,7 +229,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
         )
 
       assert Process.alive?(beta_job_pid)
-      {:ok, beta_pid} = AgentServer.state(pid, fn s -> {:ok, s.cron_jobs[:beta]} end)
+      {:ok, beta_pid} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs[:beta]} end)
       assert beta_pid == beta_job_pid
       assert Process.alive?(restarted_alpha_pid)
 
@@ -258,7 +258,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       eventually(fn -> tick_count(pid) >= 1 end, timeout: 5000)
 
       {:ok, snapshot} =
-        AgentServer.state(pid, fn s ->
+        Aikido.AgentServer.state(pid, fn s ->
           {:ok, %{job_pid: s.cron_jobs[job_id], cron_specs: s.cron_specs}}
         end)
 
@@ -294,7 +294,11 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
 
   describe("slice schedule behavior") do
     test("slice schedules are runtime-only and deliver ticks", context) do
-      pid = start_server(context, SliceScheduledAgent, id: unique_id("scheduler-slice-runtime"))
+      pid =
+        start_server(context, AikidoTest.Integration.SchedulerIntegrationTest.SliceScheduledAgent,
+          id: unique_id("scheduler-slice-runtime")
+        )
+
       job_id = slice_job_id()
       job_pid = wait_for_job(pid, job_id, timeout: 5000)
       assert Process.alive?(job_pid)
@@ -307,7 +311,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       )
 
       {:ok, snapshot} =
-        AgentServer.state(pid, fn s ->
+        Aikido.AgentServer.state(pid, fn s ->
           {:ok, %{job_pid: s.cron_jobs[job_id], cron_specs: s.cron_specs}}
         end)
 
@@ -316,7 +320,11 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
     end
 
     test("slice schedules restart after abnormal scheduler death", context) do
-      pid = start_server(context, SliceScheduledAgent, id: unique_id("scheduler-slice-restart"))
+      pid =
+        start_server(context, AikidoTest.Integration.SchedulerIntegrationTest.SliceScheduledAgent,
+          id: unique_id("scheduler-slice-restart")
+        )
+
       job_id = slice_job_id()
       original_job_pid = wait_for_job(pid, job_id, timeout: 5000)
       assert Process.alive?(original_job_pid)

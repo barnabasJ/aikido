@@ -1,116 +1,116 @@
+defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceTickAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    slice = input.arguments.state
+    count = Map.get(slice, :tick_count, 0)
+    ticks = Map.get(slice, :ticks, [])
+
+    Aikido.ActionResult.new(
+      state: %{tick_count: count + 1, ticks: ticks ++ [%{source: :slice_schedule}]},
+      directives: []
+    )
+  end
+end
+
+defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceTickAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "slice_tick"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceTickAction.Implementation,
+           action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest.ScheduledSlice do
+  @moduledoc false
+  use Aikido.Slice
+
+  slice do
+    name "scheduler_integration_slice"
+
+    schema do
+    end
+  end
+
+  schedules do
+    schedule "* * * * * * *",
+             AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceTickAction
+  end
+end
+
+defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceScheduledAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "scheduler_integration_slice_agent"
+    path :domain
+
+    schema do
+      attribute :tick_count, :integer, default: 0
+      attribute :ticks, {:array, :term}, default: []
+    end
+  end
+
+  slices do
+    slice :scheduler_integration_slice,
+          AikidoTest.Integration.SchedulerDurabilityIntegrationTest.ScheduledSlice
+  end
+end
+
+defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest.RestoreCountingAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "scheduler_restore_counting_agent"
+    path :domain
+
+    schema do
+      attribute :counter, :integer, default: 0
+    end
+  end
+
+  @impl true
+  def restore(data, _ctx) do
+    case :persistent_term.get({__MODULE__, :notify_pid}, nil) do
+      pid when is_pid(pid) -> send(pid, {:restore_called, data.id})
+      _ -> :ok
+    end
+
+    agent = new(id: data.id)
+    restored_state = Map.merge(agent.state, Map.get(data, :state, %{}))
+    {:ok, %{agent | state: restored_state}}
+  end
+end
+
 defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
-  @moduledoc "Scheduler durability tests that exercise storage-backed hibernate/thaw\nand corrupted replay paths.\n\nTarget only with:\n\n    mix test --only scheduler_integration test/aikido/integration/scheduler_durability_integration_test.exs\n"
+  @moduledoc """
+  Scheduler durability tests that exercise storage-backed hibernate/thaw
+  and corrupted replay paths.
+
+  Target only with:
+
+      mix test --only scheduler_integration test/aikido/integration/scheduler_durability_integration_test.exs
+  """
   use AikidoTest.Case, async: false
   import ExUnit.CaptureLog
   import AikidoTest.Support.SchedulerIntegrationHarness
-  alias Aikido.AgentServer
-  alias Aikido.Persist
-  alias Jido.Signal
-  alias Aikido.Storage.ETS
-  alias AikidoTest.Support.SchedulerIntegrationHarness.{CronAgent, ScheduledCronAgent}
-  alias AikidoTest.Support.FailingTimeZoneDatabase
   @moduletag :integration
   @moduletag :scheduler_integration
   @moduletag capture_log: true
   @moduletag timeout: 25000
-  defmodule SliceTickAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "slice_tick"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, slice, _opts, _ctx) do
-      count = Map.get(slice, :tick_count, 0)
-      ticks = Map.get(slice, :ticks, [])
-      {:ok, %{tick_count: count + 1, ticks: ticks ++ [%{source: :slice_schedule}]}, []}
-    end
-  end
-
-  defmodule ScheduledSlice do
-    @moduledoc false
-    use Aikido.Slice
-
-    slice do
-      name("scheduler_integration_slice")
-
-      schema do
-      end
-    end
-
-    schedules do
-      schedule("* * * * * * *", SliceTickAction)
-    end
-  end
-
-  defmodule SliceScheduledAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name("scheduler_integration_slice_agent")
-      path(:domain)
-
-      schema do
-        attribute(:tick_count, :integer, default: 0)
-        attribute(:ticks, {:array, :term}, default: [])
-      end
-    end
-
-    slices do
-      slice(:scheduler_integration_slice, ScheduledSlice)
-    end
-  end
 
   defp slice_job_id do
-    {:slice_schedule, :scheduler_integration_slice, SliceTickAction}
-  end
-
-  defmodule RestoreCountingAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name("scheduler_restore_counting_agent")
-      path(:domain)
-
-      schema do
-        attribute(:counter, :integer, default: 0)
-      end
-    end
-
-    @impl true
-    def restore(data, _ctx) do
-      case :persistent_term.get({__MODULE__, :notify_pid}, nil) do
-        pid when is_pid(pid) -> send(pid, {:restore_called, data.id})
-        _ -> :ok
-      end
-
-      agent = new(id: data.id)
-      restored_state = Map.merge(agent.state, Map.get(data, :state, %{}))
-      {:ok, %{agent | state: restored_state}}
-    end
+    {:slice_schedule, :scheduler_integration_slice,
+     AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceTickAction}
   end
 
   defp start_snapshot_fixture(context, agent_module, opts \\ []) do
@@ -132,15 +132,13 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
     %{manager: manager, table: table}
   end
 
-  # These cases exercise the explicit snapshot middleware, including malformed
-  # storage records. Native DurableServer recovery is covered in durable_test.exs.
   defp start_persisted_agent(manager, key) do
     Aikido.start_agent(manager.aikido, manager.agent,
       id: key,
       restart: :transient,
       middleware: [
         {Aikido.Middlewares.Persister,
-         %{storage: {ETS, table: manager.table}, persistence_key: {manager, key}}}
+         %{storage: {Aikido.Storage.ETS, table: manager.table}, persistence_key: {manager, key}}}
       ]
     )
   end
@@ -156,36 +154,50 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
       "declarative schedules re-register after explicit shutdown and remain runtime-only",
       context
     ) do
-      %{manager: manager} = start_snapshot_fixture(context, ScheduledCronAgent)
+      %{manager: manager} =
+        start_snapshot_fixture(
+          context,
+          AikidoTest.Support.SchedulerIntegrationHarness.ScheduledCronAgent
+        )
+
       instance_key = "declarative-scheduler-1"
       {:ok, pid1} = start_persisted_agent(manager, instance_key)
       job_id = scheduled_job_id()
       job_pid1 = wait_for_job(pid1, job_id, timeout: 5000)
       assert Process.alive?(job_pid1)
       eventually(fn -> tick_count(pid1) >= 1 end, timeout: 5000)
-      {:ok, cron_specs1} = AgentServer.state(pid1, fn s -> {:ok, s.cron_specs} end)
+      {:ok, cron_specs1} = Aikido.AgentServer.state(pid1, fn s -> {:ok, s.cron_specs} end)
       assert cron_specs1 == %{}
       stop_and_wait(pid1)
       {:ok, pid2} = start_persisted_agent(manager, instance_key)
       job_pid2 = wait_for_job(pid2, job_id, timeout: 5000)
       assert Process.alive?(job_pid2)
       refute job_pid1 == job_pid2
-      {:ok, cron_specs2} = AgentServer.state(pid2, fn s -> {:ok, s.cron_specs} end)
+      {:ok, cron_specs2} = Aikido.AgentServer.state(pid2, fn s -> {:ok, s.cron_specs} end)
       assert cron_specs2 == %{}
     end
   end
 
   describe("corrupted replay cleanup") do
     test("mixed durable replay restores valid spec and drops malformed sibling", context) do
-      %{manager: manager, table: table} = start_snapshot_fixture(context, CronAgent)
+      %{manager: manager, table: table} =
+        start_snapshot_fixture(context, AikidoTest.Support.SchedulerIntegrationHarness.CronAgent)
+
       instance_key = "mixed-replay-1"
       scheduler_key = Aikido.Scheduler.cron_specs_state_key()
-      checkpoint_key = checkpoint_key(CronAgent, manager, instance_key)
-      good_signal = Signal.new!("cron.tick", %{kind: :good_replay}, source: "/test")
+
+      checkpoint_key =
+        checkpoint_key(
+          AikidoTest.Support.SchedulerIntegrationHarness.CronAgent,
+          manager,
+          instance_key
+        )
+
+      good_signal = Jido.Signal.new!("cron.tick", %{kind: :good_replay}, source: "/test")
 
       checkpoint = %{
         version: 1,
-        agent_module: CronAgent,
+        agent_module: AikidoTest.Support.SchedulerIntegrationHarness.CronAgent,
         id: instance_key,
         state:
           %{tick_count: 0, ticks: []}
@@ -196,20 +208,17 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
         thread: nil
       }
 
-      assert :ok = ETS.put_checkpoint(checkpoint_key, checkpoint, table: table)
+      assert :ok = Aikido.Storage.ETS.put_checkpoint(checkpoint_key, checkpoint, table: table)
 
       log =
         capture_log(fn ->
           {:ok, pid} = start_persisted_agent(manager, instance_key)
           good_job_pid = wait_for_job(pid, :good, timeout: 5000)
           assert Process.alive?(good_job_pid)
-
-          eventually(fn -> Enum.any?(ticks(pid), &(&1[:kind] == :good_replay)) end,
-            timeout: 5000
-          )
+          eventually(fn -> Enum.any?(ticks(pid), &(&1[:kind] == :good_replay)) end, timeout: 5000)
 
           {:ok, %{cron_jobs: cron_jobs, cron_specs: cron_specs}} =
-            AgentServer.state(pid, fn s ->
+            Aikido.AgentServer.state(pid, fn s ->
               {:ok, %{cron_jobs: s.cron_jobs, cron_specs: s.cron_specs}}
             end)
 
@@ -224,7 +233,7 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
 
       eventually(
         fn ->
-          case ETS.get_checkpoint(checkpoint_key, table: table) do
+          case Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table) do
             {:ok, updated_checkpoint} ->
               persisted_specs = Map.get(updated_checkpoint.state || %{}, scheduler_key, %{})
               Map.has_key?(persisted_specs, :good) and not Map.has_key?(persisted_specs, :broken)
@@ -241,14 +250,22 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
       "malformed persisted cron specs are logged, dropped on thaw, and cleaned on next hibernate",
       context
     ) do
-      %{manager: manager, table: table} = start_snapshot_fixture(context, CronAgent)
+      %{manager: manager, table: table} =
+        start_snapshot_fixture(context, AikidoTest.Support.SchedulerIntegrationHarness.CronAgent)
+
       instance_key = "corrupt-cron-spec-1"
       scheduler_key = Aikido.Scheduler.cron_specs_state_key()
-      checkpoint_key = checkpoint_key(CronAgent, manager, instance_key)
+
+      checkpoint_key =
+        checkpoint_key(
+          AikidoTest.Support.SchedulerIntegrationHarness.CronAgent,
+          manager,
+          instance_key
+        )
 
       checkpoint = %{
         version: 1,
-        agent_module: CronAgent,
+        agent_module: AikidoTest.Support.SchedulerIntegrationHarness.CronAgent,
         id: instance_key,
         state:
           %{tick_count: 0, ticks: []}
@@ -258,14 +275,14 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
         thread: nil
       }
 
-      assert :ok = ETS.put_checkpoint(checkpoint_key, checkpoint, table: table)
+      assert :ok = Aikido.Storage.ETS.put_checkpoint(checkpoint_key, checkpoint, table: table)
 
       log =
         capture_log(fn ->
           {:ok, pid} = start_persisted_agent(manager, instance_key)
 
           {:ok, %{cron_specs: cron_specs, cron_jobs: cron_jobs}} =
-            AgentServer.state(pid, fn s ->
+            Aikido.AgentServer.state(pid, fn s ->
               {:ok, %{cron_specs: s.cron_specs, cron_jobs: s.cron_jobs}}
             end)
 
@@ -278,7 +295,7 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
 
       eventually(
         fn ->
-          case ETS.get_checkpoint(checkpoint_key, table: table) do
+          case Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table) do
             {:ok, updated_checkpoint} ->
               scheduler_state = Map.get(updated_checkpoint.state || %{}, scheduler_key, %{})
               scheduler_state == %{}
@@ -295,34 +312,46 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
       "replay failure during thaw is scrubbed from persisted state after re-hibernate",
       context
     ) do
-      %{manager: manager, table: table} = start_snapshot_fixture(context, CronAgent)
+      %{manager: manager, table: table} =
+        start_snapshot_fixture(context, AikidoTest.Support.SchedulerIntegrationHarness.CronAgent)
+
       instance_key = "transient-replay-failure-1"
       scheduler_key = Aikido.Scheduler.cron_specs_state_key()
-      checkpoint_key = checkpoint_key(CronAgent, manager, instance_key)
+
+      checkpoint_key =
+        checkpoint_key(
+          AikidoTest.Support.SchedulerIntegrationHarness.CronAgent,
+          manager,
+          instance_key
+        )
 
       cron_specs = %{
         skipped:
           Aikido.Scheduler.build_cron_spec(
             "* * * * * * *",
-            Signal.new!("cron.tick", %{kind: :replayed}, source: "/test"),
+            Jido.Signal.new!("cron.tick", %{kind: :replayed}, source: "/test"),
             "America/New_York"
           )
       }
 
       checkpoint = %{
         version: 1,
-        agent_module: CronAgent,
+        agent_module: AikidoTest.Support.SchedulerIntegrationHarness.CronAgent,
         id: instance_key,
         state: %{tick_count: 0, ticks: []} |> Map.put(scheduler_key, cron_specs),
         thread: nil
       }
 
-      assert :ok = ETS.put_checkpoint(checkpoint_key, checkpoint, table: table)
+      assert :ok = Aikido.Storage.ETS.put_checkpoint(checkpoint_key, checkpoint, table: table)
 
       log =
         capture_log(fn ->
-          # Simulate time zone database failure
-          Application.put_env(:aikido, :time_zone_database, FailingTimeZoneDatabase)
+          Application.put_env(
+            :aikido,
+            :time_zone_database,
+            AikidoTest.Support.FailingTimeZoneDatabase
+          )
+
           {:ok, pid} = start_persisted_agent(manager, instance_key)
 
           await_state_value(
@@ -343,7 +372,7 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
 
       eventually(
         fn ->
-          case ETS.get_checkpoint(checkpoint_key, table: table) do
+          case Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table) do
             {:ok, updated_checkpoint} ->
               persisted_specs = Map.get(updated_checkpoint.state || %{}, scheduler_key, %{})
               persisted_specs == %{}
@@ -357,14 +386,26 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
     end
 
     test("bad durable replay does not block slice schedules on thaw", context) do
-      %{manager: manager, table: table} = start_snapshot_fixture(context, SliceScheduledAgent)
+      %{manager: manager, table: table} =
+        start_snapshot_fixture(
+          context,
+          AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceScheduledAgent
+        )
+
       instance_key = "slice-thaw-with-bad-durable-1"
       scheduler_key = Aikido.Scheduler.cron_specs_state_key()
-      checkpoint_key = checkpoint_key(SliceScheduledAgent, manager, instance_key)
+
+      checkpoint_key =
+        checkpoint_key(
+          AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceScheduledAgent,
+          manager,
+          instance_key
+        )
 
       checkpoint = %{
         version: 1,
-        agent_module: SliceScheduledAgent,
+        agent_module:
+          AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceScheduledAgent,
         id: instance_key,
         state:
           %{tick_count: 0, ticks: []}
@@ -374,7 +415,7 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
         thread: nil
       }
 
-      assert :ok = ETS.put_checkpoint(checkpoint_key, checkpoint, table: table)
+      assert :ok = Aikido.Storage.ETS.put_checkpoint(checkpoint_key, checkpoint, table: table)
 
       log =
         capture_log(fn ->
@@ -390,7 +431,7 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
           )
 
           {:ok, %{cron_jobs: cron_jobs, cron_specs: cron_specs}} =
-            AgentServer.state(pid, fn s ->
+            Aikido.AgentServer.state(pid, fn s ->
               {:ok, %{cron_jobs: s.cron_jobs, cron_specs: s.cron_specs}}
             end)
 
@@ -403,17 +444,38 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
     end
 
     test("custom restore callback runs exactly once through the starting middleware", context) do
-      %{manager: manager, table: table} = start_snapshot_fixture(context, RestoreCountingAgent)
+      %{manager: manager, table: table} =
+        start_snapshot_fixture(
+          context,
+          AikidoTest.Integration.SchedulerDurabilityIntegrationTest.RestoreCountingAgent
+        )
+
       instance_key = "restore-once-1"
-      :persistent_term.put({RestoreCountingAgent, :notify_pid}, self())
-      on_exit(fn -> :persistent_term.erase({RestoreCountingAgent, :notify_pid}) end)
-      agent = RestoreCountingAgent.new(id: "restore-once-agent")
+
+      :persistent_term.put(
+        {AikidoTest.Integration.SchedulerDurabilityIntegrationTest.RestoreCountingAgent,
+         :notify_pid},
+        self()
+      )
+
+      on_exit(fn ->
+        :persistent_term.erase(
+          {AikidoTest.Integration.SchedulerDurabilityIntegrationTest.RestoreCountingAgent,
+           :notify_pid}
+        )
+      end)
+
+      agent =
+        AikidoTest.Integration.SchedulerDurabilityIntegrationTest.RestoreCountingAgent.new(
+          id: "restore-once-agent"
+        )
+
       agent = %{agent | state: %{agent.state | domain: %{agent.state.domain | counter: 41}}}
 
       assert :ok =
-               Persist.hibernate(
-                 {ETS, table: table},
-                 RestoreCountingAgent,
+               Aikido.Persist.hibernate(
+                 {Aikido.Storage.ETS, table: table},
+                 AikidoTest.Integration.SchedulerDurabilityIntegrationTest.RestoreCountingAgent,
                  {manager, instance_key},
                  agent
                )
@@ -421,7 +483,10 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
       {:ok, pid} = start_persisted_agent(manager, instance_key)
       assert_receive {:restore_called, "restore-once-agent"}, 2000
       refute_receive {:restore_called, "restore-once-agent"}, 500
-      {:ok, counter} = AgentServer.state(pid, fn s -> {:ok, s.agent.state.domain.counter} end)
+
+      {:ok, counter} =
+        Aikido.AgentServer.state(pid, fn s -> {:ok, s.agent.state.domain.counter} end)
+
       assert counter == 41
     end
 
@@ -429,27 +494,39 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
       "write-through cron register and cancel do not rewrite corrupt checkpoint state",
       context
     ) do
-      %{manager: manager, table: table} = start_snapshot_fixture(context, CronAgent)
+      %{manager: manager, table: table} =
+        start_snapshot_fixture(context, AikidoTest.Support.SchedulerIntegrationHarness.CronAgent)
+
       register_key = "corrupt-write-through-register"
-      register_checkpoint_key = checkpoint_key(CronAgent, manager, register_key)
+
+      register_checkpoint_key =
+        checkpoint_key(
+          AikidoTest.Support.SchedulerIntegrationHarness.CronAgent,
+          manager,
+          register_key
+        )
 
       register_checkpoint = %{
         version: 1,
-        agent_module: CronAgent,
+        agent_module: AikidoTest.Support.SchedulerIntegrationHarness.CronAgent,
         id: register_key,
         marker: :register_marker,
         state: [],
         thread: nil
       }
 
-      assert :ok = ETS.put_checkpoint(register_checkpoint_key, register_checkpoint, table: table)
+      assert :ok =
+               Aikido.Storage.ETS.put_checkpoint(register_checkpoint_key, register_checkpoint,
+                 table: table
+               )
+
       {:ok, register_pid} = start_persisted_agent(manager, register_key)
       assert :ok = register_cron(register_pid, "* * * * * * *", job_id: :write_through_register)
       wait_for_job(register_pid, :write_through_register, timeout: 5000)
 
       eventually(
         fn ->
-          case ETS.get_checkpoint(register_checkpoint_key, table: table) do
+          case Aikido.Storage.ETS.get_checkpoint(register_checkpoint_key, table: table) do
             {:ok, checkpoint} -> checkpoint.state == [] and checkpoint.marker == :register_marker
             _ -> false
           end
@@ -458,14 +535,21 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
       )
 
       cancel_key = "corrupt-write-through-cancel"
-      cancel_checkpoint_key = checkpoint_key(CronAgent, manager, cancel_key)
+
+      cancel_checkpoint_key =
+        checkpoint_key(
+          AikidoTest.Support.SchedulerIntegrationHarness.CronAgent,
+          manager,
+          cancel_key
+        )
+
       {:ok, cancel_pid} = start_persisted_agent(manager, cancel_key)
       assert :ok = register_cron(cancel_pid, "* * * * * * *", job_id: :write_through_cancel)
       wait_for_job(cancel_pid, :write_through_cancel, timeout: 5000)
 
       corrupt_cancel_checkpoint = %{
         version: 1,
-        agent_module: CronAgent,
+        agent_module: AikidoTest.Support.SchedulerIntegrationHarness.CronAgent,
         id: cancel_key,
         marker: :cancel_marker,
         state: [],
@@ -473,13 +557,15 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
       }
 
       assert :ok =
-               ETS.put_checkpoint(cancel_checkpoint_key, corrupt_cancel_checkpoint, table: table)
+               Aikido.Storage.ETS.put_checkpoint(cancel_checkpoint_key, corrupt_cancel_checkpoint,
+                 table: table
+               )
 
       assert :ok = cancel_cron(cancel_pid, :write_through_cancel)
 
       eventually(
         fn ->
-          case ETS.get_checkpoint(cancel_checkpoint_key, table: table) do
+          case Aikido.Storage.ETS.get_checkpoint(cancel_checkpoint_key, table: table) do
             {:ok, checkpoint} -> checkpoint.state == [] and checkpoint.marker == :cancel_marker
             _ -> false
           end

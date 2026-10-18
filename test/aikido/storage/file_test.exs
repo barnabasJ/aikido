@@ -2,7 +2,7 @@ defmodule AikidoTest.Storage.FileTest do
   use ExUnit.Case, async: false
 
   alias Aikido.Slices.Thread.Entry
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
   alias Aikido.Storage.File, as: FileStorage
 
   @moduletag :storage
@@ -199,7 +199,7 @@ defmodule AikidoTest.Storage.FileTest do
                FileStorage.append_thread(thread_id, [entry2], opts_with_wrong_rev)
     end
 
-    test "load_thread/2 returns correct %Aikido.Slices.Thread.State{} with all entries", %{
+    test "load_thread/2 returns correct %Aikido.Slices.Thread{} with all entries", %{
       opts: opts
     } do
       thread_id = "load_test_#{:erlang.unique_integer([:positive])}"

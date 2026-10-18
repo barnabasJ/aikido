@@ -198,7 +198,9 @@ defmodule Aikido.Sensor.Runtime do
     config_map = if is_list(config), do: Map.new(config), else: config
 
     case Aikido.Dsl.Sensor.Info.schema(sensor) do
-      nil -> {:ok, config_map}
+      nil ->
+        {:ok, config_map}
+
       schema ->
         case Ash.Type.cast_input(schema, config_map) do
           {:ok, value} -> {:ok, Map.from_struct(value)}

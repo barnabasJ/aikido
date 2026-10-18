@@ -1,7 +1,6 @@
-defmodule Aikido.Slices.AiReact.Actions.AskTest do
+defmodule Aikido.Slices.AiReact.AskTest do
   use ExUnit.Case, async: true
   alias Aikido.AI.TestActions.TestAdd
-  nil
   alias Aikido.Slices.AiReact.Directives.LLMCall
   alias ReqLLM.Context
 
@@ -44,7 +43,7 @@ defmodule Aikido.Slices.AiReact.Actions.AskTest do
   test "transitions an idle slice to :running, seeds the context, and emits LLMCall" do
     {:ok, new_slice, [directive]} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :ask},
+        {Aikido.Slices.AiReact, :ask},
         ask_signal(),
         idle_slice(),
         %{},
@@ -81,7 +80,7 @@ defmodule Aikido.Slices.AiReact.Actions.AskTest do
   test "omits the system message when no system_prompt is given" do
     {:ok, new_slice, [_]} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :ask},
+        {Aikido.Slices.AiReact, :ask},
         ask_signal(%{system_prompt: nil}),
         idle_slice(),
         %{},
@@ -108,7 +107,7 @@ defmodule Aikido.Slices.AiReact.Actions.AskTest do
 
     {:ok, new_slice, [_]} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :ask},
+        {Aikido.Slices.AiReact, :ask},
         ask_signal(),
         slice,
         %{},
@@ -128,7 +127,7 @@ defmodule Aikido.Slices.AiReact.Actions.AskTest do
 
     assert {:error, %Ash.Error.Unknown{}} =
              AikidoTest.NativeAction.run(
-               {Aikido.Slices.AiReact.Actions, :ask},
+               {Aikido.Slices.AiReact, :ask},
                ask_signal(),
                slice,
                %{},
@@ -139,7 +138,7 @@ defmodule Aikido.Slices.AiReact.Actions.AskTest do
   test "accepts the ask when the slice is nil (uninitialized)" do
     {:ok, %{status: :running}, [%LLMCall{}]} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :ask},
+        {Aikido.Slices.AiReact, :ask},
         ask_signal(),
         nil,
         %{},

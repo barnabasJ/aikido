@@ -175,10 +175,15 @@ defmodule Aikido.Agent do
               schema: [],
               state: %{}
 
-    {:ok, struct_constraints} = Ash.Type.init(:struct,
+    {:ok, struct_constraints} =
+      Ash.Type.init(:struct,
         instance_of: __MODULE__,
-        fields: Enum.map(@schema_fields, fn {name, options} -> {name, Keyword.delete(options, :default)} end)
+        fields:
+          Enum.map(@schema_fields, fn {name, options} ->
+            {name, Keyword.delete(options, :default)}
+          end)
       )
+
     @struct_constraints struct_constraints
   )
 

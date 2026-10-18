@@ -14,7 +14,8 @@ defmodule Aikido.Slices.FSM do
         initial_state: String.t()
       }
 
-  Transitions are driven by signals routed to `Aikido.Slices.FSM.Transition`.
+  The slice owns the native Ash `:transition` action, implemented by
+  `Aikido.Slices.FSM.Transition`.
   Send a `aikido.fsm.transition` signal with `data: %{to: "<next_state>"}` to
   attempt a transition.
 
@@ -64,34 +65,51 @@ defmodule Aikido.Slices.FSM do
   }
   @default_terminal_states ["completed", "failed"]
 
-  use Aikido.Slice
+  use Ash.Resource,
+    data_layer: :embedded,
+    validate_domain_inclusion?: false,
+    extensions: [Aikido.Ash.Slice]
+
+  actions do
+    action :transition, Aikido.ActionResult do
+      argument :state, :term, allow_nil?: false
+      argument :to, :string, allow_nil?: false, constraints: [trim?: false, allow_empty?: true]
+      run Aikido.Slices.FSM.Transition
+    end
+  end
 
   slice do
     name "fsm"
 
     schema do
-      attribute :state, :string, allow_nil?: true, constraints: [trim?: false, allow_empty?: true]
-      attribute :history, {:array, :term}, allow_nil?: false, default: []
-      attribute :terminal?, :boolean, allow_nil?: true
+      attribute :state, :string,
+        public?: true,
+        allow_nil?: true,
+        constraints: [trim?: false, allow_empty?: true]
+
+      attribute :history, {:array, :term}, public?: true, allow_nil?: false, default: []
+      attribute :terminal?, :boolean, public?: true, allow_nil?: true
 
       attribute :initial_state, :string,
+        public?: true,
         allow_nil?: false,
         default: @default_initial_state,
         constraints: [trim?: false, allow_empty?: true]
 
-      attribute :transitions, :map, allow_nil?: false, default: @default_transitions
+      attribute :transitions, :map,
+        public?: true,
+        allow_nil?: false,
+        default: @default_transitions
 
       attribute :terminal_states, {:array, :string},
+        public?: true,
         allow_nil?: false,
         default: @default_terminal_states,
         constraints: [items: [trim?: false, allow_empty?: true]]
     end
 
     state_transform {__MODULE__, :seed_runtime_fields, []}
-  end
-
-  signal_routes do
-    route "aikido.fsm.transition", Aikido.Slices.FSM.Transition
+    route "aikido.fsm.transition", :transition
   end
 
   @doc false

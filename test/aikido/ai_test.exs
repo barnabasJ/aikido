@@ -1,133 +1,116 @@
+defmodule Aikido.AITest.MathAgent do
+  @moduledoc false
+  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+
+  agent do
+    name "math"
+  end
+
+  slices do
+    slice :ai, Aikido.Slices.AiReact
+  end
+
+  react do
+    model "anthropic:claude-haiku-4-5-20251001"
+    tools [Aikido.AI.TestActions.TestAdd]
+    system_prompt "You are precise."
+    max_iterations 4
+    max_tokens 256
+    temperature 0.0
+  end
+end
+
+defmodule Aikido.AITest.TestFailingTool.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    {:error, "explosion"}
+  end
+end
+
+defmodule Aikido.AITest.TestFailingTool do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+
+  @persist {:aikido_action_metadata,
+            %{
+              name: "test_failing",
+              description:
+                "A tool that always returns {:error, _} — exercises the tool-error path."
+            }}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      argument :reason, :string, default: "nope"
+      description "A tool that always returns {:error, _} — exercises the tool-error path."
+      run {Aikido.AITest.TestFailingTool.Implementation, action: :run}
+    end
+  end
+end
+
+defmodule Aikido.AITest.FailingAgent do
+  @moduledoc false
+  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+
+  agent do
+    name "failing"
+  end
+
+  slices do
+    slice :ai, Aikido.Slices.AiReact
+  end
+
+  react do
+    model "anthropic:claude-haiku-4-5-20251001"
+    tools [Aikido.AITest.TestFailingTool]
+    system_prompt "x"
+    max_iterations 4
+  end
+end
+
+defmodule Aikido.AITest.TightAgent do
+  @moduledoc false
+  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+
+  agent do
+    name "tight"
+  end
+
+  slices do
+    slice :ai, Aikido.Slices.AiReact
+  end
+
+  react do
+    model "anthropic:claude-haiku-4-5-20251001"
+    tools [Aikido.AI.TestActions.TestAdd]
+    system_prompt "x"
+    max_iterations 1
+  end
+end
+
+defmodule Aikido.AITest.NoModelAgent do
+  @moduledoc false
+  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+
+  agent do
+    name "no_model"
+  end
+
+  slices do
+    slice :ai, Aikido.Slices.AiReact
+  end
+
+  react do
+    tools [Aikido.AI.TestActions.TestAdd]
+    max_iterations 2
+  end
+end
+
 defmodule Aikido.AITest do
-  # async: false because the LLMCall and ToolExec directives spawn Tasks
-  # under the agent's TaskSupervisor; the Mimic stub on
-  # ReqLLM.Generation.generate_text/3 must be visible from those Tasks,
-  # and `set_mimic_global/0` is mutually exclusive with async tests.
   use AikidoTest.Case, async: false
   use Mimic
   import Aikido.AI.Test.ResponseFixtures
-  alias Aikido.Slices.AiReact
-
-  defmodule MathAgent do
-    @moduledoc false
-    use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
-
-    agent do
-      name("math")
-    end
-
-    slices do
-      slice(:ai, Aikido.Slices.AiReact)
-    end
-
-    react do
-      model("anthropic:claude-haiku-4-5-20251001")
-      tools([Aikido.AI.TestActions.TestAdd])
-      system_prompt("You are precise.")
-      max_iterations(4)
-      max_tokens(256)
-      temperature(0.0)
-    end
-  end
-
-  defmodule TestFailingTool do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-    @persist {:aikido_action_metadata,
-              %{
-                name: "test_failing",
-                description:
-                  "A tool that always returns {:error, _} — exercises the tool-error path."
-              }}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-        argument(:reason, :string, default: "nope")
-        description("A tool that always returns {:error, _} — exercises the tool-error path.")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, _slice, _opts, _ctx) do
-      {:error, "explosion"}
-    end
-  end
-
-  defmodule FailingAgent do
-    @moduledoc false
-    use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
-
-    agent do
-      name("failing")
-    end
-
-    slices do
-      slice(:ai, Aikido.Slices.AiReact)
-    end
-
-    react do
-      model("anthropic:claude-haiku-4-5-20251001")
-      tools([Aikido.AITest.TestFailingTool])
-      system_prompt("x")
-      max_iterations(4)
-    end
-  end
-
-  defmodule TightAgent do
-    @moduledoc false
-    use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
-
-    agent do
-      name("tight")
-    end
-
-    slices do
-      slice(:ai, Aikido.Slices.AiReact)
-    end
-
-    react do
-      model("anthropic:claude-haiku-4-5-20251001")
-      tools([Aikido.AI.TestActions.TestAdd])
-      system_prompt("x")
-      max_iterations(1)
-    end
-  end
-
-  defmodule NoModelAgent do
-    @moduledoc false
-    use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
-
-    agent do
-      name("no_model")
-    end
-
-    slices do
-      slice(:ai, Aikido.Slices.AiReact)
-    end
-
-    react do
-      tools([Aikido.AI.TestActions.TestAdd])
-      max_iterations(2)
-    end
-  end
 
   setup :set_mimic_global
   setup :verify_on_exit!
@@ -141,12 +124,8 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("19")}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       assert {:ok, "19"} = Aikido.AI.ask_sync(pid, "What is 5 + 7 * 2?", timeout: 1000)
-
-      # The slice's seeded config — model, system prompt, llm_opts
-      # (with `max_tokens` / `temperature` folded by the slice's
-      # config_schema transform) — must reach `ReqLLM.Generation` verbatim.
       assert_receive {:llm, model, messages, opts}, 1000
       assert model == "anthropic:claude-haiku-4-5-20251001"
       assert opts[:max_tokens] == 256
@@ -164,13 +143,11 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("ok")}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       assert {:ok, request_id} = Aikido.AI.ask(pid, "What is 5 + 7 * 2?")
       assert is_binary(request_id)
       assert String.starts_with?(request_id, "req_")
 
-      # Keep the mock alive until the background task has finished; otherwise
-      # verify_on_exit! can run before the task reaches generate_text/3.
       assert :completed ==
                await_state_value(
                  pid,
@@ -193,12 +170,8 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("3")}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
 
-      # Pure selector: project status + iteration. The default dispatch
-      # `{:pid, target: self()}` sends `{:aikido_subscription, sub_ref,
-      # %{result: {:ok, projection}}}` to this process for every
-      # non-:skip return.
       {:ok, sub_ref} =
         Aikido.AgentServer.subscribe(pid, "ai.react.**", fn state ->
           ai = state.agent.state.ai
@@ -212,12 +185,6 @@ defmodule Aikido.AITest do
 
       assert {:ok, request_id} = Aikido.AI.ask(pid, "Add 1 and 2")
       assert is_binary(request_id)
-
-      # We expect dispatches for: ask (running, 0) → llm.completed for
-      # the tool turn (running, 1) → tool.completed (running, 1) →
-      # llm.completed final (completed, 2). Order and exact counts
-      # depend on signal interleaving; the important thing is we
-      # observe both :running and :completed without await/2.
       assert_receive {:aikido_subscription, ^sub_ref, %{result: {:ok, %{status: :running}}}}, 1000
 
       assert_receive {:aikido_subscription, ^sub_ref,
@@ -240,7 +207,7 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("3")}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       assert {:ok, "3"} = Aikido.AI.ask_sync(pid, "Add 1 and 2", timeout: 1000)
       ai = read_ai(pid)
       assert ai.status == :completed
@@ -265,7 +232,7 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("done")}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       assert {:ok, "done"} = Aikido.AI.ask_sync(pid, "loop", timeout: 1000)
       assert_receive {:third_call_messages, messages}, 1000
 
@@ -277,7 +244,7 @@ defmodule Aikido.AITest do
           text
         end
 
-      assert Enum.any?(texts, &(&1 == AiReact.cycle_warning()))
+      assert Enum.any?(texts, &(&1 == Aikido.Slices.AiReact.cycle_warning()))
     end
 
     test("tool errors are returned as JSON in tool.completed (not as :failed)", ctx) do
@@ -291,7 +258,7 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("recovered")}
       end)
 
-      pid = start_test_server(ctx, FailingAgent)
+      pid = start_test_server(ctx, Aikido.AITest.FailingAgent)
       assert {:ok, "recovered"} = Aikido.AI.ask_sync(pid, "use a broken tool", timeout: 1000)
     end
   end
@@ -302,7 +269,7 @@ defmodule Aikido.AITest do
         {:ok, tool_call_response([{"test_add", %{"a" => 1, "b" => 2}}])}
       end)
 
-      pid = start_test_server(ctx, TightAgent)
+      pid = start_test_server(ctx, Aikido.AITest.TightAgent)
       assert {:ok, nil} = Aikido.AI.ask_sync(pid, "loop", timeout: 1000)
       ai = read_ai(pid)
       assert ai.status == :completed
@@ -317,7 +284,7 @@ defmodule Aikido.AITest do
         {:error, :rate_limited}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       assert {:error, :rate_limited} = Aikido.AI.ask_sync(pid, "boom", timeout: 1000)
       ai = read_ai(pid)
       assert ai.status == :failed
@@ -339,7 +306,7 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("done")}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       task = Task.async(fn -> Aikido.AI.ask_sync(pid, "first", timeout: 5000) end)
       assert_receive {:running, llm_pid}, 1000
       assert {:error, %Ash.Error.Unknown{} = error} = Aikido.AI.ask(pid, "second")
@@ -369,7 +336,7 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("late")}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       task = Task.async(fn -> Aikido.AI.ask_sync(pid, "stall", timeout: 50) end)
       assert_receive {:running, llm_pid}, 1000
       assert {:error, :timeout} = Task.await(task, 1000)
@@ -381,7 +348,7 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("ok")}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       assert {:ok, "ok"} = Aikido.AI.ask_sync(pid, "ok", timeout: 1000)
       ai_before = read_ai(pid)
 
@@ -394,9 +361,6 @@ defmodule Aikido.AITest do
         })
 
       :ok = Aikido.AgentServer.cast(pid, stale)
-      # Force a round-trip — the state call is enqueued behind the cast
-      # in the agent's mailbox, so when it returns the cast has already
-      # been processed (or rejected by the action's staleness guard).
       {:ok, :ok} = Aikido.AgentServer.state(pid, fn _ -> {:ok, :ok} end)
       assert read_ai(pid) == ai_before
     end
@@ -405,10 +369,8 @@ defmodule Aikido.AITest do
       "ask returns :no_model chain error when neither slice config nor opts supply a model",
       ctx
     ) do
-      pid = start_test_server(ctx, NoModelAgent)
-
-      assert {:error, %Ash.Error.Unknown{}} =
-               Aikido.AI.ask(pid, "anything")
+      pid = start_test_server(ctx, Aikido.AITest.NoModelAgent)
+      assert {:error, %Ash.Error.Unknown{}} = Aikido.AI.ask(pid, "anything")
     end
   end
 
@@ -422,7 +384,7 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("ok")}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
 
       assert {:ok, "ok"} =
                Aikido.AI.ask_sync(pid, "anything",
@@ -443,7 +405,7 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("ok")}
       end)
 
-      pid = start_test_server(ctx, NoModelAgent)
+      pid = start_test_server(ctx, Aikido.AITest.NoModelAgent)
 
       assert {:ok, "ok"} =
                Aikido.AI.ask_sync(pid, "anything", model: "openai:gpt-5", timeout: 1000)
@@ -458,28 +420,28 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("ok")}
       end)
 
-      pid = start_test_server(ctx, MathAgent)
+      pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       assert {:ok, _} = Aikido.AI.ask_sync(pid, "anything", tools: [], timeout: 1000)
       assert_receive {:tools, []}, 1000
     end
 
     test(":api_key in slice config llm_opts is propagated to ReqLLM", ctx) do
-      defmodule SliceKeyAgent do
+      defmodule Elixir.Aikido.AITest.SliceKeyAgent do
         @moduledoc false
         use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
 
         agent do
-          name("slice_key")
+          name "slice_key"
         end
 
         slices do
-          slice(:ai, Aikido.Slices.AiReact)
+          slice :ai, Aikido.Slices.AiReact
         end
 
         react do
-          model("anthropic:claude-haiku-4-5-20251001")
-          tools([])
-          llm_opts(api_key: "key-from-slice")
+          model "anthropic:claude-haiku-4-5-20251001"
+          tools []
+          llm_opts api_key: "key-from-slice"
         end
       end
 
@@ -490,28 +452,28 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("ok")}
       end)
 
-      pid = start_test_server(ctx, SliceKeyAgent)
+      pid = start_test_server(ctx, Aikido.AITest.SliceKeyAgent)
       assert {:ok, "ok"} = Aikido.AI.ask_sync(pid, "anything", timeout: 1000)
       assert_receive {:api_key, "key-from-slice"}, 1000
     end
 
     test(":api_key per-call llm_opts overrides the slice default", ctx) do
-      defmodule SliceKeyOverrideAgent do
+      defmodule Elixir.Aikido.AITest.SliceKeyOverrideAgent do
         @moduledoc false
         use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
 
         agent do
-          name("slice_key_override")
+          name "slice_key_override"
         end
 
         slices do
-          slice(:ai, Aikido.Slices.AiReact)
+          slice :ai, Aikido.Slices.AiReact
         end
 
         react do
-          model("anthropic:claude-haiku-4-5-20251001")
-          tools([])
-          llm_opts(api_key: "slice-default")
+          model "anthropic:claude-haiku-4-5-20251001"
+          tools []
+          llm_opts api_key: "slice-default"
         end
       end
 
@@ -522,7 +484,7 @@ defmodule Aikido.AITest do
         {:ok, final_answer_response("ok")}
       end)
 
-      pid = start_test_server(ctx, SliceKeyOverrideAgent)
+      pid = start_test_server(ctx, Aikido.AITest.SliceKeyOverrideAgent)
 
       assert {:ok, "ok"} =
                Aikido.AI.ask_sync(pid, "anything",

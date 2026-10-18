@@ -1,7 +1,7 @@
 defmodule AikidoTest.IdentityTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Slices.Identity.State
+  alias Aikido.Slices.Identity, as: State
 
   describe "new/1" do
     test "creates identity with default values" do

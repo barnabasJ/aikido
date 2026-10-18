@@ -1,7 +1,7 @@
-defmodule Aikido.Slices.Thread.State.StoreTest do
+defmodule Aikido.Slices.Thread.StoreTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
   alias Aikido.Slices.Thread.Store
 
   describe "Store.new/0" do

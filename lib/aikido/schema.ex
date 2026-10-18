@@ -36,7 +36,7 @@ defmodule Aikido.Schema do
       Spark.Dsl.is?(module, Ash.Resource) ->
         fields(Ash.Resource.Info.attributes(module))
 
-      Spark.Dsl.is?(module, Ash.TypedStruct) ->
+      Ash.TypedStruct.Dsl in Spark.extensions(module) ->
         module
         |> Spark.Dsl.Extension.get_entities([:typed_struct])
         |> fields()

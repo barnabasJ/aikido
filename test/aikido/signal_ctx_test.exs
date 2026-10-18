@@ -1,100 +1,104 @@
+defmodule AikidoTest.SignalCtxTest.TraceProbe.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    ctx = input.context.aikido
+
+    Aikido.ActionResult.new(
+      state: %{trace_id: Map.get(ctx, :trace_id), user: Map.get(ctx, :user)},
+      directives: []
+    )
+  end
+end
+
+defmodule AikidoTest.SignalCtxTest.TraceProbe do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "trace_probe"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.SignalCtxTest.TraceProbe.Implementation, action: :run}
+    end
+  end
+end
+
 defmodule AikidoTest.SignalCtxTest do
-  @moduledoc "Tests for `Aikido.SignalCtx` helpers and end-to-end ctx delivery into the\naction's `run/4` callback via `Aikido.Exec.run/*`.\n"
+  @moduledoc """
+  Tests for `Aikido.SignalCtx` helpers and end-to-end ctx delivery into the
+  action's `run/4` callback via `Aikido.Exec.run/*`.
+  """
   use ExUnit.Case, async: true
-  alias Jido.Signal
-  alias Aikido.SignalCtx
 
   describe("put/3 + get/3 + ctx/1") do
     test "writes and reads a single key" do
-      {:ok, sig} = Signal.new("t.x", %{}, source: "/x")
-      sig = SignalCtx.put(sig, :trace_id, "t-1")
-      assert SignalCtx.get(sig, :trace_id) == "t-1"
-      assert SignalCtx.ctx(sig) == %{trace_id: "t-1"}
+      {:ok, sig} = Jido.Signal.new("t.x", %{}, source: "/x")
+      sig = Aikido.SignalCtx.put(sig, :trace_id, "t-1")
+      assert Aikido.SignalCtx.get(sig, :trace_id) == "t-1"
+      assert Aikido.SignalCtx.ctx(sig) == %{trace_id: "t-1"}
     end
 
     test "default for missing key" do
-      {:ok, sig} = Signal.new("t.x", %{}, source: "/x")
-      assert SignalCtx.get(sig, :missing) == nil
-      assert SignalCtx.get(sig, :missing, :fallback) == :fallback
+      {:ok, sig} = Jido.Signal.new("t.x", %{}, source: "/x")
+      assert Aikido.SignalCtx.get(sig, :missing) == nil
+      assert Aikido.SignalCtx.get(sig, :missing, :fallback) == :fallback
     end
 
     test "merge/2 combines into existing ctx (right-biased)" do
-      {:ok, sig} = Signal.new("t.x", %{}, source: "/x")
-
-      sig =
-        sig |> SignalCtx.put(:trace_id, "t-1") |> SignalCtx.merge(%{trace_id: "t-2", user: "u"})
-
-      assert SignalCtx.get(sig, :trace_id) == "t-2"
-      assert SignalCtx.get(sig, :user) == "u"
-    end
-
-    test "delete/2 removes a key" do
-      {:ok, sig} = Signal.new("t.x", %{}, source: "/x")
+      {:ok, sig} = Jido.Signal.new("t.x", %{}, source: "/x")
 
       sig =
         sig
-        |> SignalCtx.put(:trace_id, "t-1")
-        |> SignalCtx.put(:tenant, "acme")
-        |> SignalCtx.delete(:tenant)
+        |> Aikido.SignalCtx.put(:trace_id, "t-1")
+        |> Aikido.SignalCtx.merge(%{trace_id: "t-2", user: "u"})
 
-      assert SignalCtx.ctx(sig) == %{trace_id: "t-1"}
+      assert Aikido.SignalCtx.get(sig, :trace_id) == "t-2"
+      assert Aikido.SignalCtx.get(sig, :user) == "u"
+    end
+
+    test "delete/2 removes a key" do
+      {:ok, sig} = Jido.Signal.new("t.x", %{}, source: "/x")
+
+      sig =
+        sig
+        |> Aikido.SignalCtx.put(:trace_id, "t-1")
+        |> Aikido.SignalCtx.put(:tenant, "acme")
+        |> Aikido.SignalCtx.delete(:tenant)
+
+      assert Aikido.SignalCtx.ctx(sig) == %{trace_id: "t-1"}
     end
 
     test "inherit/2 copies source ctx into target without overwriting target keys" do
-      {:ok, src} = Signal.new("a", %{}, source: "/a")
-      src = SignalCtx.merge(src, %{trace_id: "src", user: "u"})
-      {:ok, dst} = Signal.new("b", %{}, source: "/b")
-      dst = SignalCtx.put(dst, :trace_id, "dst")
-      merged = SignalCtx.inherit(dst, src)
-      assert SignalCtx.get(merged, :trace_id) == "dst"
-      assert SignalCtx.get(merged, :user) == "u"
+      {:ok, src} = Jido.Signal.new("a", %{}, source: "/a")
+      src = Aikido.SignalCtx.merge(src, %{trace_id: "src", user: "u"})
+      {:ok, dst} = Jido.Signal.new("b", %{}, source: "/b")
+      dst = Aikido.SignalCtx.put(dst, :trace_id, "dst")
+      merged = Aikido.SignalCtx.inherit(dst, src)
+      assert Aikido.SignalCtx.get(merged, :trace_id) == "dst"
+      assert Aikido.SignalCtx.get(merged, :user) == "u"
     end
   end
 
   describe("ctx delivery into action.run/4") do
-    defmodule TraceProbe do
-      @moduledoc false
-      use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-      @persist {:aikido_action_metadata, %{name: "trace_probe"}}
-      actions do
-        action(:run, Aikido.ActionResult) do
-          argument(:state, :term)
-
-          run(fn input, _context ->
-            runtime = input.context[:aikido] || %{}
-            params = Map.delete(input.arguments, :state)
-            signal = Map.fetch!(runtime, :signal)
-            signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-            case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-              {:ok, state, directives} ->
-                Aikido.ActionResult.new(state: state, directives: directives)
-
-              {:error, _} = error ->
-                error
-
-              other ->
-                {:error, "Unexpected return shape: #{inspect(other)}"}
-            end
-          end)
-        end
-      end
-
-      defp reduce(_signal, _slice, _opts, ctx) do
-        {:ok, %{trace_id: Map.get(ctx, :trace_id), user: Map.get(ctx, :user)}, []}
-      end
-    end
+    (
+      nil
+      nil
+    )
 
     test "Aikido.Exec.run delivers signal ctx to the action's ctx arg" do
-      {:ok, sig} = Signal.new("trace_probe", %{}, source: "/test")
-      sig = sig |> SignalCtx.put(:trace_id, "abc-123") |> SignalCtx.put(:user, "alice")
+      {:ok, sig} = Jido.Signal.new("trace_probe", %{}, source: "/test")
+
+      sig =
+        sig |> Aikido.SignalCtx.put(:trace_id, "abc-123") |> Aikido.SignalCtx.put(:user, "alice")
 
       assert {:ok, %{trace_id: "abc-123", user: "alice"}, []} =
-               Aikido.Exec.run(TraceProbe, %{}, %{signal: sig})
+               Aikido.Exec.run(AikidoTest.SignalCtxTest.TraceProbe, %{}, %{signal: sig})
     end
 
     test "without an explicit signal, ctx defaults to %{}" do
-      assert {:ok, %{trace_id: nil, user: nil}, []} = Aikido.Exec.run(TraceProbe, %{}, %{})
+      assert {:ok, %{trace_id: nil, user: nil}, []} =
+               Aikido.Exec.run(AikidoTest.SignalCtxTest.TraceProbe, %{}, %{})
     end
   end
 end

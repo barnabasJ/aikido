@@ -167,11 +167,14 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
   defp classify_mount(%SliceMount{path: path, module: module, options: options}, dsl_state) do
     ensure_module_loaded!(module)
 
-    unless Spark.Dsl.is?(module, Aikido.Slice) do
+    native_slice? =
+      Spark.Dsl.is?(module, Ash.Resource) && Aikido.Ash.Slice in Spark.extensions(module)
+
+    unless native_slice? || Spark.Dsl.is?(module, Aikido.Slice) do
       raise CompileError,
         description:
           "Module #{inspect(module)} mounted in `slices do …` is not a " <>
-            "`use Aikido.Slice` module. Did you forget the `use` line?"
+            "slice resource using `Aikido.Ash.Slice` or a `use Aikido.Slice` module."
     end
 
     block_config = read_contributed_block(module, dsl_state)

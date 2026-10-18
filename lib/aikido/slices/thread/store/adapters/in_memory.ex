@@ -8,7 +8,7 @@ defmodule Aikido.Slices.Thread.Store.Adapters.InMemory do
 
   @behaviour Aikido.Slices.Thread.Store
 
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
 
   @impl true
   def init(_opts) do

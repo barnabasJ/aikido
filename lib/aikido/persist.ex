@@ -60,7 +60,7 @@ defmodule Aikido.Persist do
   require Logger
 
   alias Aikido.Scheduler
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
 
   @type storage_config :: {module(), keyword()}
   @type agent :: struct()

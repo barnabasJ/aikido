@@ -1,139 +1,199 @@
+defmodule Aikido.Dsl.SliceTest.MinimalSlice do
+  @moduledoc false
+  use Aikido.Slice
+
+  slice do
+    name "minimal"
+
+    schema do
+      attribute :value, :term, allow_nil?: true
+    end
+  end
+
+  signal_routes do
+    route "minimal.noop", AikidoTest.PluginTestAction
+  end
+end
+
+defmodule Aikido.Dsl.SliceTest.FullSlice do
+  @moduledoc false
+  use Aikido.Slice
+
+  slice do
+    name "full"
+    description "A full slice"
+    category "test"
+    vsn "0.1.0"
+    tags ["a", "b"]
+
+    schema do
+      attribute :counter, :integer, allow_nil?: false, default: 0
+    end
+
+    config_schema do
+      attribute :enabled, :boolean, allow_nil?: false, default: true
+    end
+  end
+
+  signal_routes do
+    route "send", AikidoTest.PluginTestAction
+  end
+
+  capabilities do
+    capability :speak
+  end
+
+  requires do
+    requires :config, :token
+  end
+end
+
+defmodule Aikido.Dsl.SliceTest.SchemaSlice do
+  @moduledoc false
+  use Aikido.Slice
+
+  slice do
+    name "schema_only"
+
+    schema do
+      attribute :counter, :integer, allow_nil?: false, default: 0
+    end
+  end
+
+  signal_routes do
+    route "schema_only.noop", AikidoTest.PluginTestAction
+  end
+end
+
+defmodule Aikido.Dsl.SliceTest.BareSliceAgent do
+  @moduledoc false
+  use Aikido.Agent, default_slices: false
+
+  agent do
+    name "bare_slice_agent"
+  end
+
+  slices do
+    slice :schema_only, Aikido.Dsl.SliceTest.SchemaSlice
+  end
+end
+
 defmodule Aikido.Dsl.SliceTest do
   use ExUnit.Case, async: true
-
-  # Cover the seven slice DSL sections, the Info-module accessor
-  # surface, and the regression cases called out in the task spec
-  # (`schema/1` parity with the legacy macro,
-  # `Spark.Dsl.is?(mod, Aikido.Slice)` marker, plugin-as-slice override,
-  # slice-as-plugin rejection).
-
-  alias Aikido.Dsl.Slice.Info, as: SliceInfo
-
   Code.ensure_compiled!(AikidoTest.PluginTestAction)
 
-  defmodule MinimalSlice do
-    @moduledoc false
-    use Aikido.Slice
-
-    slice do
-      name("minimal")
-
-      schema do
-        attribute(:value, :term, allow_nil?: true)
-      end
-    end
-
-    signal_routes do
-      route("minimal.noop", AikidoTest.PluginTestAction)
-    end
-  end
-
-  defmodule FullSlice do
-    @moduledoc false
-    use Aikido.Slice
-
-    slice do
-      name("full")
-      description("A full slice")
-      category("test")
-      vsn("0.1.0")
-      tags(["a", "b"])
-
-      schema do
-        attribute(:counter, :integer, allow_nil?: false, default: 0)
-      end
-
-      config_schema do
-        attribute(:enabled, :boolean, allow_nil?: false, default: true)
-      end
-    end
-
-    signal_routes do
-      route("send", AikidoTest.PluginTestAction)
-    end
-
-    capabilities do
-      capability(:speak)
-    end
-
-    requires do
-      requires(:config, :token)
-    end
-  end
-
-  defmodule SchemaSlice do
-    @moduledoc false
-    use Aikido.Slice
-
-    slice do
-      name("schema_only")
-
-      schema do
-        attribute(:counter, :integer, allow_nil?: false, default: 0)
-      end
-    end
-
-    signal_routes do
-      route("schema_only.noop", AikidoTest.PluginTestAction)
-    end
-  end
-
-  describe "slice section accessors" do
+  describe("slice section accessors") do
     test "minimal slice exposes name, path, schema, and a single route" do
-      assert Map.get(SliceInfo.slice_options(MinimalSlice), :name) == "minimal"
-      assert SliceInfo.actions(MinimalSlice) == [AikidoTest.PluginTestAction]
-      assert Map.get(SliceInfo.slice_options(MinimalSlice), :tags) == []
-      assert SliceInfo.capabilities(MinimalSlice) == []
+      assert Map.get(
+               Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.MinimalSlice),
+               :name
+             ) == "minimal"
 
-      assert SliceInfo.signal_routes(MinimalSlice) == [
+      assert Aikido.Dsl.Slice.Info.actions(Aikido.Dsl.SliceTest.MinimalSlice) == [
+               AikidoTest.PluginTestAction
+             ]
+
+      assert Map.get(
+               Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.MinimalSlice),
+               :tags
+             ) == []
+
+      assert Aikido.Dsl.Slice.Info.capabilities(Aikido.Dsl.SliceTest.MinimalSlice) == []
+
+      assert Aikido.Dsl.Slice.Info.signal_routes(Aikido.Dsl.SliceTest.MinimalSlice) == [
                {"minimal.noop", AikidoTest.PluginTestAction}
              ]
 
-      assert SliceInfo.subscriptions(MinimalSlice) == []
-      assert SliceInfo.schedules(MinimalSlice) == []
-      assert SliceInfo.requires(MinimalSlice) == []
-      assert Map.get(SliceInfo.slice_options(MinimalSlice), :description) == nil
-      assert Map.get(SliceInfo.slice_options(MinimalSlice), :category) == nil
-      assert Map.get(SliceInfo.slice_options(MinimalSlice), :vsn) == nil
-      assert Map.get(SliceInfo.slice_options(MinimalSlice), :otp_app) == nil
-      assert Aikido.Action.Schema.schema_type(SliceInfo.schema(MinimalSlice)) == :ash
-      assert SliceInfo.config_schema(MinimalSlice) == nil
+      assert Aikido.Dsl.Slice.Info.subscriptions(Aikido.Dsl.SliceTest.MinimalSlice) == []
+      assert Aikido.Dsl.Slice.Info.schedules(Aikido.Dsl.SliceTest.MinimalSlice) == []
+      assert Aikido.Dsl.Slice.Info.requires(Aikido.Dsl.SliceTest.MinimalSlice) == []
+
+      assert Map.get(
+               Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.MinimalSlice),
+               :description
+             ) == nil
+
+      assert Map.get(
+               Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.MinimalSlice),
+               :category
+             ) == nil
+
+      assert Map.get(Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.MinimalSlice), :vsn) ==
+               nil
+
+      assert Map.get(
+               Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.MinimalSlice),
+               :otp_app
+             ) == nil
+
+      assert Aikido.Action.Schema.schema_type(
+               Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.MinimalSlice)
+             ) == :ash
+
+      assert Aikido.Dsl.Slice.Info.config_schema(Aikido.Dsl.SliceTest.MinimalSlice) == nil
     end
 
     test "full slice exposes every metadata field" do
-      assert Map.get(SliceInfo.slice_options(FullSlice), :name) == "full"
-      assert Map.get(SliceInfo.slice_options(FullSlice), :description) == "A full slice"
-      assert Map.get(SliceInfo.slice_options(FullSlice), :category) == "test"
-      assert Map.get(SliceInfo.slice_options(FullSlice), :vsn) == "0.1.0"
-      assert Map.get(SliceInfo.slice_options(FullSlice), :tags) == ["a", "b"]
-      assert SliceInfo.actions(FullSlice) == [AikidoTest.PluginTestAction]
-      assert SliceInfo.capabilities(FullSlice) == [:speak]
-      assert SliceInfo.requires(FullSlice) == [config: :token]
-      assert SliceInfo.signal_routes(FullSlice) == [{"send", AikidoTest.PluginTestAction}]
-      assert Aikido.Action.Schema.schema_type(SliceInfo.schema(FullSlice)) == :ash
-      assert Aikido.Action.Schema.schema_type(SliceInfo.config_schema(FullSlice)) == :ash
+      assert Map.get(Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.FullSlice), :name) ==
+               "full"
+
+      assert Map.get(
+               Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.FullSlice),
+               :description
+             ) == "A full slice"
+
+      assert Map.get(
+               Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.FullSlice),
+               :category
+             ) == "test"
+
+      assert Map.get(Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.FullSlice), :vsn) ==
+               "0.1.0"
+
+      assert Map.get(Aikido.Dsl.Slice.Info.slice_options(Aikido.Dsl.SliceTest.FullSlice), :tags) ==
+               ["a", "b"]
+
+      assert Aikido.Dsl.Slice.Info.actions(Aikido.Dsl.SliceTest.FullSlice) == [
+               AikidoTest.PluginTestAction
+             ]
+
+      assert Aikido.Dsl.Slice.Info.capabilities(Aikido.Dsl.SliceTest.FullSlice) == [:speak]
+      assert Aikido.Dsl.Slice.Info.requires(Aikido.Dsl.SliceTest.FullSlice) == [config: :token]
+
+      assert Aikido.Dsl.Slice.Info.signal_routes(Aikido.Dsl.SliceTest.FullSlice) == [
+               {"send", AikidoTest.PluginTestAction}
+             ]
+
+      assert Aikido.Action.Schema.schema_type(
+               Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.FullSlice)
+             ) == :ash
+
+      assert Aikido.Action.Schema.schema_type(
+               Aikido.Dsl.Slice.Info.config_schema(Aikido.Dsl.SliceTest.FullSlice)
+             ) == :ash
     end
 
     test "Spark.Dsl.is?(mod, Aikido.Slice) is true for slice modules" do
-      assert Spark.Dsl.is?(MinimalSlice, Aikido.Slice)
-      assert Spark.Dsl.is?(FullSlice, Aikido.Slice)
+      assert Spark.Dsl.is?(Aikido.Dsl.SliceTest.MinimalSlice, Aikido.Slice)
+      assert Spark.Dsl.is?(Aikido.Dsl.SliceTest.FullSlice, Aikido.Slice)
     end
   end
 
-  describe "schema/1 parity with the legacy macro" do
+  describe("schema/1 parity with the legacy macro") do
     test "schema/1 returns the same Ash contract passed into the section" do
-      schema = SliceInfo.schema(SchemaSlice)
+      schema = Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.SchemaSlice)
       assert Aikido.Action.Schema.schema_type(schema) == :ash
-      # Round-trip: parsing seed input through the schema yields the default
       assert {:ok, %{counter: 0}} = Aikido.Schema.cast(schema, %{})
     end
 
     test "schema/1 returns the slice's declared schema struct" do
-      assert Aikido.Action.Schema.schema_type(SliceInfo.schema(MinimalSlice)) == :ash
+      assert Aikido.Action.Schema.schema_type(
+               Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.MinimalSlice)
+             ) == :ash
     end
   end
 
-  describe "compile-time validation" do
+  describe("compile-time validation") do
     test "raises when required `name` is missing" do
       assert_raise Spark.Error.DslError, ~r/required :name option/, fn ->
         Code.compile_string(
@@ -151,27 +211,18 @@ defmodule Aikido.Dsl.SliceTest do
     end
   end
 
-  describe "agent integration with bare slices" do
-    defmodule BareSliceAgent do
-      @moduledoc false
-      use Aikido.Agent, default_slices: false
-
-      agent do
-        name("bare_slice_agent")
-      end
-
-      slices do
-        slice(:schema_only, Aikido.Dsl.SliceTest.SchemaSlice)
-      end
-    end
+  describe("agent integration with bare slices") do
+    nil
 
     test "Agent.new/1 seeds slice state from the schema's defaults" do
-      agent = BareSliceAgent.new()
+      agent = Aikido.Dsl.SliceTest.BareSliceAgent.new()
       assert agent.state.schema_only == %{counter: 0}
     end
 
     test "extensions: [Slice] mounts the slice at its path()" do
-      assert SchemaSlice in Aikido.Dsl.Agent.Info.slices(BareSliceAgent)
+      assert Aikido.Dsl.SliceTest.SchemaSlice in Aikido.Dsl.Agent.Info.slices(
+               Aikido.Dsl.SliceTest.BareSliceAgent
+             )
     end
   end
 end

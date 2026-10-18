@@ -1,6 +1,5 @@
-defmodule Aikido.Slices.AiReact.Actions.FailedTest do
+defmodule Aikido.Slices.AiReact.FailedTest do
   use ExUnit.Case, async: true
-  nil
 
   defp signal(request_id, reason) do
     Jido.Signal.new!("ai.react.failed", %{reason: reason, request_id: request_id})
@@ -27,7 +26,7 @@ defmodule Aikido.Slices.AiReact.Actions.FailedTest do
   test "settles a matching :running slice to :failed and stores the reason" do
     {:ok, new_slice, []} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :failed},
+        {Aikido.Slices.AiReact, :failed},
         signal("req_match", :rate_limited),
         running_slice("req_match"),
         %{},
@@ -43,7 +42,7 @@ defmodule Aikido.Slices.AiReact.Actions.FailedTest do
 
     {:ok, returned_slice, []} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :failed},
+        {Aikido.Slices.AiReact, :failed},
         signal("req_old", :anything),
         slice,
         %{},
@@ -58,7 +57,7 @@ defmodule Aikido.Slices.AiReact.Actions.FailedTest do
 
     {:ok, returned_slice, []} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :failed},
+        {Aikido.Slices.AiReact, :failed},
         signal("req_done", :late),
         slice,
         %{},

@@ -2,7 +2,7 @@ defmodule AikidoTest.ThreadTest do
   use AikidoTest.Case, async: true
 
   alias Aikido.Slices.Thread.Entry
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
 
   describe "Entry.new/1" do
     test "creates entry with defaults" do

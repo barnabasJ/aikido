@@ -9,7 +9,7 @@ defmodule Aikido.Action.Schema do
     do: :json_schema
 
   def schema_type(module) when is_atom(module) do
-    if Spark.Dsl.is?(module, Ash.Resource) || Spark.Dsl.is?(module, Ash.TypedStruct) ||
+    if Spark.Dsl.is?(module, Ash.Resource) || Ash.Type.ash_type?(module) ||
          function_exported?(module, :__ash_fields__, 0),
        do: :ash,
        else: :unknown

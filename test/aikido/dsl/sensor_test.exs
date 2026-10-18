@@ -1,126 +1,155 @@
+defmodule Aikido.Dsl.SensorTest.MinimalSensor do
+  @moduledoc false
+  use Aikido.Sensor
+
+  sensor do
+    name "minimal_sensor"
+  end
+
+  @impl Aikido.Sensor
+  def init(_config, _ctx) do
+    {:ok, %{}}
+  end
+
+  @impl Aikido.Sensor
+  def handle_event(_event, state) do
+    {:ok, state}
+  end
+end
+
+defmodule Aikido.Dsl.SensorTest.FullSensor do
+  @moduledoc false
+  use Aikido.Sensor
+
+  sensor do
+    name "full_sensor"
+    description "Full sensor with every accessor populated."
+    category "test"
+    tags ["a", "b"]
+    vsn "1.0.0"
+
+    schema do
+      attribute :interval, :integer, allow_nil?: false, default: 1000
+    end
+  end
+
+  @impl Aikido.Sensor
+  def init(_config, _ctx) do
+    {:ok, %{}}
+  end
+
+  @impl Aikido.Sensor
+  def handle_event(_event, state) do
+    {:ok, state}
+  end
+end
+
+defmodule Aikido.Dsl.SensorTest.TerminateSensor do
+  @moduledoc false
+  use Aikido.Sensor
+
+  sensor do
+    name "terminate_sensor"
+  end
+
+  @impl Aikido.Sensor
+  def init(_config, _ctx) do
+    {:ok, %{}}
+  end
+
+  @impl Aikido.Sensor
+  def handle_event(_event, state) do
+    {:ok, state}
+  end
+end
+
 defmodule Aikido.Dsl.SensorTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Dsl.Sensor.Info, as: SensorInfo
-
-  describe "sectioned DSL accessor parity" do
-    defmodule MinimalSensor do
-      @moduledoc false
-      use Aikido.Sensor
-
-      sensor do
-        name("minimal_sensor")
-      end
-
-      @impl Aikido.Sensor
-      def init(_config, _ctx) do
-        {:ok, %{}}
-      end
-
-      @impl Aikido.Sensor
-      def handle_event(_event, state) do
-        {:ok, state}
-      end
-    end
-
-    defmodule FullSensor do
-      @moduledoc false
-      use Aikido.Sensor
-
-      sensor do
-        name("full_sensor")
-        description("Full sensor with every accessor populated.")
-        category("test")
-        tags(["a", "b"])
-        vsn("1.0.0")
-
-        schema do
-          attribute(:interval, :integer, allow_nil?: false, default: 1000)
-        end
-      end
-
-      @impl Aikido.Sensor
-      def init(_config, _ctx) do
-        {:ok, %{}}
-      end
-
-      @impl Aikido.Sensor
-      def handle_event(_event, state) do
-        {:ok, state}
-      end
-    end
+  describe("sectioned DSL accessor parity") do
+    nil
+    nil
 
     test "name/1 returns the configured name" do
-      assert Map.get(SensorInfo.sensor_options(FullSensor), :name) == "full_sensor"
-      assert Map.get(SensorInfo.sensor_options(MinimalSensor), :name) == "minimal_sensor"
+      assert Map.get(
+               Aikido.Dsl.Sensor.Info.sensor_options(Aikido.Dsl.SensorTest.FullSensor),
+               :name
+             ) == "full_sensor"
+
+      assert Map.get(
+               Aikido.Dsl.Sensor.Info.sensor_options(Aikido.Dsl.SensorTest.MinimalSensor),
+               :name
+             ) == "minimal_sensor"
     end
 
     test "description/1, category/1, tags/1, vsn/1 round-trip" do
-      assert Map.get(SensorInfo.sensor_options(FullSensor), :description) ==
-               "Full sensor with every accessor populated."
+      assert Map.get(
+               Aikido.Dsl.Sensor.Info.sensor_options(Aikido.Dsl.SensorTest.FullSensor),
+               :description
+             ) == "Full sensor with every accessor populated."
 
-      assert Map.get(SensorInfo.sensor_options(FullSensor), :category) == "test"
-      assert Map.get(SensorInfo.sensor_options(FullSensor), :tags) == ["a", "b"]
-      assert Map.get(SensorInfo.sensor_options(FullSensor), :vsn) == "1.0.0"
+      assert Map.get(
+               Aikido.Dsl.Sensor.Info.sensor_options(Aikido.Dsl.SensorTest.FullSensor),
+               :category
+             ) == "test"
+
+      assert Map.get(
+               Aikido.Dsl.Sensor.Info.sensor_options(Aikido.Dsl.SensorTest.FullSensor),
+               :tags
+             ) == ["a", "b"]
+
+      assert Map.get(
+               Aikido.Dsl.Sensor.Info.sensor_options(Aikido.Dsl.SensorTest.FullSensor),
+               :vsn
+             ) == "1.0.0"
     end
 
     test "tags/1 defaults to []" do
-      assert Map.get(SensorInfo.sensor_options(MinimalSensor), :tags) == []
+      assert Map.get(
+               Aikido.Dsl.Sensor.Info.sensor_options(Aikido.Dsl.SensorTest.MinimalSensor),
+               :tags
+             ) == []
     end
 
     test "description/1 returns nil when omitted" do
-      assert Map.get(SensorInfo.sensor_options(MinimalSensor), :description) == nil
+      assert Map.get(
+               Aikido.Dsl.Sensor.Info.sensor_options(Aikido.Dsl.SensorTest.MinimalSensor),
+               :description
+             ) == nil
     end
 
     test "schema/1 round-trips a Ash field contract" do
-      schema = SensorInfo.schema(FullSensor)
+      schema = Aikido.Dsl.Sensor.Info.schema(Aikido.Dsl.SensorTest.FullSensor)
       assert Aikido.Action.Schema.schema_type(schema) == :ash
       assert {:ok, %{interval: 5000}} = Aikido.Schema.cast(schema, %{interval: 5000})
     end
 
     test "schema/1 returns nil when omitted" do
-      assert SensorInfo.schema(MinimalSensor) == nil
+      assert Aikido.Dsl.Sensor.Info.schema(Aikido.Dsl.SensorTest.MinimalSensor) == nil
     end
 
     test "Spark.Dsl.is?(mod, Aikido.Sensor) is true for sensor modules" do
-      assert Spark.Dsl.is?(FullSensor, Aikido.Sensor)
-      assert Spark.Dsl.is?(MinimalSensor, Aikido.Sensor)
+      assert Spark.Dsl.is?(Aikido.Dsl.SensorTest.FullSensor, Aikido.Sensor)
+      assert Spark.Dsl.is?(Aikido.Dsl.SensorTest.MinimalSensor, Aikido.Sensor)
     end
   end
 
-  describe "default terminate/2" do
-    defmodule TerminateSensor do
-      @moduledoc false
-      use Aikido.Sensor
-
-      sensor do
-        name("terminate_sensor")
-      end
-
-      @impl Aikido.Sensor
-      def init(_config, _ctx) do
-        {:ok, %{}}
-      end
-
-      @impl Aikido.Sensor
-      def handle_event(_event, state) do
-        {:ok, state}
-      end
-    end
+  describe("default terminate/2") do
+    nil
 
     test "default terminate/2 returns :ok" do
-      assert TerminateSensor.terminate(:normal, %{}) == :ok
+      assert Aikido.Dsl.SensorTest.TerminateSensor.terminate(:normal, %{}) == :ok
     end
   end
 
-  describe "behaviour" do
+  describe("behaviour") do
     test "modules use Aikido.Sensor implement the @behaviour" do
-      defmodule BehaviourCheckSensor do
+      defmodule Elixir.Aikido.Dsl.SensorTest.BehaviourCheckSensor do
         @moduledoc false
         use Aikido.Sensor
 
         sensor do
-          name("behaviour_check_sensor")
+          name "behaviour_check_sensor"
         end
 
         @impl Aikido.Sensor
@@ -135,7 +164,7 @@ defmodule Aikido.Dsl.SensorTest do
       end
 
       behaviours =
-        BehaviourCheckSensor.module_info(:attributes)
+        Aikido.Dsl.SensorTest.BehaviourCheckSensor.module_info(:attributes)
         |> Keyword.get_values(:behaviour)
         |> List.flatten()
 

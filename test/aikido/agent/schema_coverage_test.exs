@@ -1,48 +1,61 @@
+defmodule AikidoTest.Agent.SchemaCoverageTest.Defaults do
+  use Ash.TypedStruct
+
+  typed_struct do
+    field :enabled, :boolean, default: false
+    field :value, :term
+  end
+end
+
+defmodule AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(
+        %Ash.ActionInput{action: %{name: :check_enabled}} = input,
+        _opts,
+        _context
+      ) do
+    {:ok, input.arguments.enabled}
+  end
+end
+
+defmodule AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults do
+  use Ash.Resource, data_layer: :embedded
+
+  attributes do
+    attribute :token, :string, default: &Aikido.Util.generate_id/0, public?: true
+    attribute :time, :integer, default: {System, :system_time, [:millisecond]}, public?: true
+  end
+
+  actions do
+    defaults create: :*
+
+    action :check_enabled, :boolean do
+      argument :enabled, :boolean, allow_nil?: false
+      run AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults.Implementation
+    end
+  end
+end
+
+defmodule AikidoTest.Agent.SchemaCoverageTest.Nested do
+  use Ash.TypedStruct
+
+  typed_struct do
+    field :count, :integer, default: 3
+  end
+end
+
+defmodule AikidoTest.Agent.SchemaCoverageTest.NestedDefaults do
+  use Ash.TypedStruct
+
+  typed_struct do
+    field :nested, AikidoTest.Agent.SchemaCoverageTest.Nested, default: %{}
+  end
+end
+
 defmodule AikidoTest.Agent.SchemaCoverageTest do
   use ExUnit.Case, async: true
-
-  defmodule Defaults do
-    use Ash.TypedStruct
-
-    typed_struct do
-      field(:enabled, :boolean, default: false)
-      field(:value, :term)
-    end
-  end
-
-  defmodule ResourceDefaults do
-    use Ash.Resource, data_layer: :embedded
-
-    attributes do
-      attribute(:token, :string, default: &Aikido.Util.generate_id/0, public?: true)
-      attribute(:time, :integer, default: {System, :system_time, [:millisecond]}, public?: true)
-    end
-
-    actions do
-      defaults(create: :*)
-
-      action :check_enabled, :boolean do
-        argument :enabled, :boolean, allow_nil?: false
-        run fn input, _context -> {:ok, input.arguments.enabled} end
-      end
-    end
-  end
-
-  defmodule Nested do
-    use Ash.TypedStruct
-
-    typed_struct do
-      field(:count, :integer, default: 3)
-    end
-  end
-
-  defmodule NestedDefaults do
-    use Ash.TypedStruct
-
-    typed_struct do
-      field(:nested, Nested, default: %{})
-    end
-  end
 
   test "Ash casts values and enforces bounds" do
     schema = [count: [type: :integer, allow_nil?: false, constraints: [min: 1]]]
@@ -53,13 +66,13 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
   end
 
   test "false and nil defaults are retained" do
-    schema = Defaults
+    schema = AikidoTest.Agent.SchemaCoverageTest.Defaults
     assert Aikido.Schema.defaults(schema) == %{enabled: false}
     assert {:ok, %{enabled: false, value: nil}} = Aikido.Schema.cast(schema, %{})
   end
 
   test "Ash evaluates function and MFA defaults on each construction and preserves explicit nil" do
-    schema = ResourceDefaults
+    schema = AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults
     assert {:ok, first} = Aikido.Schema.cast(schema, %{})
     assert {:ok, second} = Aikido.Schema.cast(schema, %{token: nil})
     assert is_binary(first.token)
@@ -70,7 +83,7 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
 
   test "native validation errors retain their Splode identity at the action boundary" do
     assert {:error, %Ash.Error.Invalid{} = error} =
-             ResourceDefaults
+             AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults
              |> Ash.ActionInput.for_action(:check_enabled, %{enabled: "invalid"})
              |> Ash.run_action()
 
@@ -80,8 +93,8 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
   end
 
   test "state contracts remain native typed structs" do
-    schema = Defaults
-    assert schema == Defaults
+    schema = AikidoTest.Agent.SchemaCoverageTest.Defaults
+    assert schema == AikidoTest.Agent.SchemaCoverageTest.Defaults
     assert Ash.Type.NewType.new_type?(schema)
     refute Spark.Dsl.is?(schema, Ash.Resource)
     assert {:ok, typed} = schema.new(%{enabled: "true"})
@@ -90,7 +103,7 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
   end
 
   test "nested Ash fields apply defaults before casting" do
-    schema = NestedDefaults
+    schema = AikidoTest.Agent.SchemaCoverageTest.NestedDefaults
     assert {:ok, %{nested: %{count: 3}}} = Aikido.Schema.cast(schema, %{})
   end
 
@@ -144,8 +157,8 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
   end
 
   test "runtime structs can be cast through the Ash type API" do
-    assert {:ok, %Aikido.Slices.Memory.State{}} =
-             Ash.Type.cast_input(Aikido.Slices.Memory.State, %{
+    assert {:ok, %Aikido.Slices.Memory{}} =
+             Ash.Type.cast_input(Aikido.Slices.Memory, %{
                id: "memory",
                created_at: 1,
                updated_at: 1

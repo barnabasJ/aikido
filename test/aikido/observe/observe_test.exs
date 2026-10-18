@@ -3,27 +3,16 @@ defmodule AikidoTest.ObserveTest do
   Tests for Aikido.Observe façade and related modules.
   """
   use ExUnit.Case, async: false
-
   import ExUnit.CaptureLog
-
-  alias Aikido.Observe
-  alias Aikido.Observe.Log
-  alias Aikido.Observe.NoopTracer
-  alias Jido.Signal
-  alias Aikido.Tracing.Context, as: TraceContext
 
   setup do
     previous_level = Logger.level()
     Logger.configure(level: :debug)
-
-    on_exit(fn ->
-      Logger.configure(level: previous_level)
-    end)
-
+    on_exit(fn -> Logger.configure(level: previous_level) end)
     :ok
   end
 
-  describe "with_span/3" do
+  describe("with_span/3") do
     setup do
       test_pid = self()
       handler_id = "test-handler-#{System.unique_integer()}"
@@ -41,18 +30,13 @@ defmodule AikidoTest.ObserveTest do
         nil
       )
 
-      on_exit(fn ->
-        :telemetry.detach(handler_id)
-      end)
-
+      on_exit(fn -> :telemetry.detach(handler_id) end)
       :ok
     end
 
     test "emits :start and :stop telemetry events" do
       result =
-        Observe.with_span([:aikido, :test, :with_span], %{key: "value"}, fn ->
-          :success
-        end)
+        Aikido.Observe.with_span([:aikido, :test, :with_span], %{key: "value"}, fn -> :success end)
 
       assert result == :success
 
@@ -70,7 +54,7 @@ defmodule AikidoTest.ObserveTest do
 
     test "returns the function's return value" do
       result =
-        Observe.with_span([:aikido, :test, :with_span], %{}, fn ->
+        Aikido.Observe.with_span([:aikido, :test, :with_span], %{}, fn ->
           {:ok, %{data: [1, 2, 3]}}
         end)
 
@@ -80,7 +64,7 @@ defmodule AikidoTest.ObserveTest do
     test "measures duration correctly" do
       sleep_time_ms = 10
 
-      Observe.with_span([:aikido, :test, :with_span], %{}, fn ->
+      Aikido.Observe.with_span([:aikido, :test, :with_span], %{}, fn ->
         Process.sleep(sleep_time_ms)
       end)
 
@@ -95,7 +79,7 @@ defmodule AikidoTest.ObserveTest do
 
     test "emits :exception event on error and re-raises" do
       assert_raise RuntimeError, "test error", fn ->
-        Observe.with_span([:aikido, :test, :with_span], %{error_test: true}, fn ->
+        Aikido.Observe.with_span([:aikido, :test, :with_span], %{error_test: true}, fn ->
           raise "test error"
         end)
       end
@@ -116,7 +100,7 @@ defmodule AikidoTest.ObserveTest do
 
     test "emits :exception event on throw and re-throws" do
       assert catch_throw(
-               Observe.with_span([:aikido, :test, :with_span], %{throw_test: true}, fn ->
+               Aikido.Observe.with_span([:aikido, :test, :with_span], %{throw_test: true}, fn ->
                  throw(:my_throw)
                end)
              ) == :my_throw
@@ -133,7 +117,7 @@ defmodule AikidoTest.ObserveTest do
 
     test "emits :exception event on exit and re-exits" do
       assert catch_exit(
-               Observe.with_span([:aikido, :test, :with_span], %{exit_test: true}, fn ->
+               Aikido.Observe.with_span([:aikido, :test, :with_span], %{exit_test: true}, fn ->
                  exit(:my_exit)
                end)
              ) == :my_exit
@@ -150,47 +134,37 @@ defmodule AikidoTest.ObserveTest do
 
     test "passes metadata to all events" do
       metadata = %{agent_id: "agent-123", step: 5, model: "claude"}
-
-      Observe.with_span([:aikido, :test, :with_span], metadata, fn ->
-        :ok
-      end)
+      Aikido.Observe.with_span([:aikido, :test, :with_span], metadata, fn -> :ok end)
 
       assert_receive {:telemetry_event, [:aikido, :test, :with_span, :start], _,
                       received_metadata}
 
       assert received_metadata == metadata
-
       assert_receive {:telemetry_event, [:aikido, :test, :with_span, :stop], _, received_metadata}
       assert received_metadata == metadata
     end
   end
 
-  describe "start_span/2 and finish_span/2" do
+  describe("start_span/2 and finish_span/2") do
     setup do
       test_pid = self()
       handler_id = "test-handler-#{System.unique_integer()}"
 
       :telemetry.attach_many(
         handler_id,
-        [
-          [:aikido, :test, :manual_span, :start],
-          [:aikido, :test, :manual_span, :stop]
-        ],
+        [[:aikido, :test, :manual_span, :start], [:aikido, :test, :manual_span, :stop]],
         fn event, measurements, metadata, _ ->
           send(test_pid, {:telemetry_event, event, measurements, metadata})
         end,
         nil
       )
 
-      on_exit(fn ->
-        :telemetry.detach(handler_id)
-      end)
-
+      on_exit(fn -> :telemetry.detach(handler_id) end)
       :ok
     end
 
     test "emits :start event on start_span" do
-      _span_ctx = Observe.start_span([:aikido, :test, :manual_span], %{key: "start_value"})
+      _span_ctx = Aikido.Observe.start_span([:aikido, :test, :manual_span], %{key: "start_value"})
 
       assert_receive {:telemetry_event, [:aikido, :test, :manual_span, :start],
                       %{system_time: st}, %{key: "start_value"}}
@@ -199,11 +173,9 @@ defmodule AikidoTest.ObserveTest do
     end
 
     test "emits :stop event on finish_span" do
-      span_ctx = Observe.start_span([:aikido, :test, :manual_span], %{key: "stop_value"})
-      result = Observe.finish_span(span_ctx)
-
+      span_ctx = Aikido.Observe.start_span([:aikido, :test, :manual_span], %{key: "stop_value"})
+      result = Aikido.Observe.finish_span(span_ctx)
       assert result == :ok
-
       assert_receive {:telemetry_event, [:aikido, :test, :manual_span, :start], _, _}
 
       assert_receive {:telemetry_event, [:aikido, :test, :manual_span, :stop],
@@ -214,13 +186,10 @@ defmodule AikidoTest.ObserveTest do
     end
 
     test "includes extra_measurements in stop event" do
-      span_ctx = Observe.start_span([:aikido, :test, :manual_span], %{})
-
+      span_ctx = Aikido.Observe.start_span([:aikido, :test, :manual_span], %{})
       extra = %{prompt_tokens: 100, completion_tokens: 50, total_tokens: 150}
-      Observe.finish_span(span_ctx, extra)
-
+      Aikido.Observe.finish_span(span_ctx, extra)
       assert_receive {:telemetry_event, [:aikido, :test, :manual_span, :stop], measurements, _}
-
       assert measurements.duration >= 0
       assert measurements.prompt_tokens == 100
       assert measurements.completion_tokens == 50
@@ -229,10 +198,9 @@ defmodule AikidoTest.ObserveTest do
 
     test "duration is measured correctly" do
       sleep_time_ms = 10
-
-      span_ctx = Observe.start_span([:aikido, :test, :manual_span], %{})
+      span_ctx = Aikido.Observe.start_span([:aikido, :test, :manual_span], %{})
       Process.sleep(sleep_time_ms)
-      Observe.finish_span(span_ctx)
+      Aikido.Observe.finish_span(span_ctx)
 
       assert_receive {:telemetry_event, [:aikido, :test, :manual_span, :stop],
                       %{duration: duration}, _}
@@ -242,8 +210,7 @@ defmodule AikidoTest.ObserveTest do
     end
 
     test "returns span context struct with required keys" do
-      span_ctx = Observe.start_span([:aikido, :test, :manual_span], %{meta: "data"})
-
+      span_ctx = Aikido.Observe.start_span([:aikido, :test, :manual_span], %{meta: "data"})
       assert %Aikido.Observe.SpanCtx{} = span_ctx
       assert span_ctx.event_prefix == [:aikido, :test, :manual_span]
       assert span_ctx.metadata == %{meta: "data"}
@@ -253,40 +220,31 @@ defmodule AikidoTest.ObserveTest do
     end
   end
 
-  describe "finish_span_error/4" do
+  describe("finish_span_error/4") do
     setup do
       test_pid = self()
       handler_id = "test-handler-#{System.unique_integer()}"
 
       :telemetry.attach_many(
         handler_id,
-        [
-          [:aikido, :test, :error_span, :start],
-          [:aikido, :test, :error_span, :exception]
-        ],
+        [[:aikido, :test, :error_span, :start], [:aikido, :test, :error_span, :exception]],
         fn event, measurements, metadata, _ ->
           send(test_pid, {:telemetry_event, event, measurements, metadata})
         end,
         nil
       )
 
-      on_exit(fn ->
-        :telemetry.detach(handler_id)
-      end)
-
+      on_exit(fn -> :telemetry.detach(handler_id) end)
       :ok
     end
 
     test "emits :exception event" do
-      span_ctx = Observe.start_span([:aikido, :test, :error_span], %{})
+      span_ctx = Aikido.Observe.start_span([:aikido, :test, :error_span], %{})
 
       result =
-        Observe.finish_span_error(
-          span_ctx,
-          :error,
-          %RuntimeError{message: "boom"},
-          [{__MODULE__, :test, 0, []}]
-        )
+        Aikido.Observe.finish_span_error(span_ctx, :error, %RuntimeError{message: "boom"}, [
+          {__MODULE__, :test, 0, []}
+        ])
 
       assert result == :ok
 
@@ -295,12 +253,10 @@ defmodule AikidoTest.ObserveTest do
     end
 
     test "includes kind, error, stacktrace in metadata" do
-      span_ctx = Observe.start_span([:aikido, :test, :error_span], %{original: "meta"})
-
+      span_ctx = Aikido.Observe.start_span([:aikido, :test, :error_span], %{original: "meta"})
       error = %ArgumentError{message: "invalid argument"}
-      stacktrace = [{__MODULE__, :some_fun, 2, [file: ~c"test.ex", line: 42]}]
-
-      Observe.finish_span_error(span_ctx, :error, error, stacktrace)
+      stacktrace = [{__MODULE__, :some_fun, 2, file: ~c"test.ex", line: 42}]
+      Aikido.Observe.finish_span_error(span_ctx, :error, error, stacktrace)
 
       assert_receive {:telemetry_event, [:aikido, :test, :error_span, :exception], %{duration: _},
                       metadata}
@@ -313,8 +269,8 @@ defmodule AikidoTest.ObserveTest do
 
     test "supports different error kinds" do
       for kind <- [:error, :exit, :throw] do
-        span_ctx = Observe.start_span([:aikido, :test, :error_span], %{})
-        Observe.finish_span_error(span_ctx, kind, :some_reason, [])
+        span_ctx = Aikido.Observe.start_span([:aikido, :test, :error_span], %{})
+        Aikido.Observe.finish_span_error(span_ctx, kind, :some_reason, [])
 
         assert_receive {:telemetry_event, [:aikido, :test, :error_span, :exception], _,
                         %{kind: ^kind}}
@@ -323,10 +279,9 @@ defmodule AikidoTest.ObserveTest do
 
     test "measures duration correctly" do
       sleep_time_ms = 10
-
-      span_ctx = Observe.start_span([:aikido, :test, :error_span], %{})
+      span_ctx = Aikido.Observe.start_span([:aikido, :test, :error_span], %{})
       Process.sleep(sleep_time_ms)
-      Observe.finish_span_error(span_ctx, :error, :some_error, [])
+      Aikido.Observe.finish_span_error(span_ctx, :error, :some_error, [])
 
       assert_receive {:telemetry_event, [:aikido, :test, :error_span, :exception],
                       %{duration: duration}, _}
@@ -336,9 +291,9 @@ defmodule AikidoTest.ObserveTest do
     end
   end
 
-  describe "emit_event/3" do
+  describe("emit_event/3") do
     setup do
-      TraceContext.clear()
+      Aikido.Tracing.Context.clear()
       test_pid = self()
       handler_id = "emit-event-handler-#{System.unique_integer()}"
 
@@ -352,7 +307,7 @@ defmodule AikidoTest.ObserveTest do
       )
 
       on_exit(fn ->
-        TraceContext.clear()
+        Aikido.Tracing.Context.clear()
         :telemetry.detach(handler_id)
       end)
 
@@ -363,7 +318,7 @@ defmodule AikidoTest.ObserveTest do
       Application.put_env(:aikido, :observability, debug_events: :off)
 
       assert :ok =
-               Observe.emit_event(
+               Aikido.Observe.emit_event(
                  [:aikido, :test, :domain, :event],
                  %{duration_ms: 12},
                  %{request_id: "req-1"}
@@ -374,11 +329,9 @@ defmodule AikidoTest.ObserveTest do
     end
 
     test "enriches metadata with active trace context" do
-      signal = Signal.new!("trace.source", %{}, source: "/test")
-      {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
-
-      Observe.emit_event([:aikido, :test, :domain, :event], %{count: 1}, %{phase: :tool})
-
+      signal = Jido.Signal.new!("trace.source", %{}, source: "/test")
+      {_traced_signal, trace} = Aikido.Tracing.Context.ensure_from_signal(signal)
+      Aikido.Observe.emit_event([:aikido, :test, :domain, :event], %{count: 1}, %{phase: :tool})
       assert_receive {:telemetry_event, [:aikido, :test, :domain, :event], %{count: 1}, metadata}
       assert metadata.phase == :tool
       assert metadata.aikido_trace_id == trace.trace_id
@@ -386,10 +339,10 @@ defmodule AikidoTest.ObserveTest do
     end
 
     test "caller metadata overrides correlation metadata keys" do
-      signal = Signal.new!("trace.override", %{}, source: "/test")
-      {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
+      signal = Jido.Signal.new!("trace.override", %{}, source: "/test")
+      {_traced_signal, trace} = Aikido.Tracing.Context.ensure_from_signal(signal)
 
-      Observe.emit_event([:aikido, :test, :domain, :event], %{}, %{
+      Aikido.Observe.emit_event([:aikido, :test, :domain, :event], %{}, %{
         aikido_trace_id: "custom-trace"
       })
 
@@ -399,7 +352,7 @@ defmodule AikidoTest.ObserveTest do
     end
   end
 
-  describe "log/3" do
+  describe("log/3") do
     setup do
       original_config = Application.get_env(:aikido, :observability)
 
@@ -416,17 +369,12 @@ defmodule AikidoTest.ObserveTest do
 
     test "delegates to Aikido.Observe.Log" do
       Application.put_env(:aikido, :observability, log_level: :debug)
-
-      log =
-        capture_log(fn ->
-          Observe.log(:info, "test message", key: "value")
-        end)
-
+      log = capture_log(fn -> Aikido.Observe.log(:info, "test message", key: "value") end)
       assert log =~ "test message"
     end
   end
 
-  describe "Aikido.Observe.Log.threshold/0" do
+  describe("Aikido.Observe.Log.threshold/0") do
     setup do
       original_config = Application.get_env(:aikido, :observability)
 
@@ -443,24 +391,23 @@ defmodule AikidoTest.ObserveTest do
 
     test "returns configured value" do
       Application.put_env(:aikido, :observability, log_level: :warning)
-      assert Log.threshold() == :warning
-
+      assert Aikido.Observe.Log.threshold() == :warning
       Application.put_env(:aikido, :observability, log_level: :debug)
-      assert Log.threshold() == :debug
+      assert Aikido.Observe.Log.threshold() == :debug
     end
 
     test "defaults to :info when not configured" do
       Application.delete_env(:aikido, :observability)
-      assert Log.threshold() == :info
+      assert Aikido.Observe.Log.threshold() == :info
     end
 
     test "defaults to :info when log_level key is missing" do
       Application.put_env(:aikido, :observability, tracer: SomeTracer)
-      assert Log.threshold() == :info
+      assert Aikido.Observe.Log.threshold() == :info
     end
   end
 
-  describe "Aikido.Observe.Log.log/3" do
+  describe("Aikido.Observe.Log.log/3") do
     setup do
       original_config = Application.get_env(:aikido, :observability)
 
@@ -477,23 +424,13 @@ defmodule AikidoTest.ObserveTest do
 
     test "logs when message level meets threshold" do
       Application.put_env(:aikido, :observability, log_level: :info)
-
-      log =
-        capture_log(fn ->
-          Log.log(:info, "info message")
-        end)
-
+      log = capture_log(fn -> Aikido.Observe.Log.log(:info, "info message") end)
       assert log =~ "info message"
     end
 
     test "logs when message level exceeds threshold" do
       Application.put_env(:aikido, :observability, log_level: :info)
-
-      log =
-        capture_log(fn ->
-          Log.log(:warning, "warning message")
-        end)
-
+      log = capture_log(fn -> Aikido.Observe.Log.log(:warning, "warning message") end)
       assert log =~ "warning message"
     end
 
@@ -502,8 +439,8 @@ defmodule AikidoTest.ObserveTest do
 
       log =
         capture_log(fn ->
-          Log.log(:debug, "debug message")
-          Log.log(:info, "info message")
+          Aikido.Observe.Log.log(:debug, "debug message")
+          Aikido.Observe.Log.log(:info, "info message")
         end)
 
       refute log =~ "debug message"
@@ -515,7 +452,7 @@ defmodule AikidoTest.ObserveTest do
 
       log =
         capture_log(fn ->
-          Log.log(:info, "with metadata", agent_id: "agent-123")
+          Aikido.Observe.Log.log(:info, "with metadata", agent_id: "agent-123")
         end)
 
       assert log =~ "with metadata"
@@ -523,46 +460,36 @@ defmodule AikidoTest.ObserveTest do
 
     test "logs at debug level when threshold is debug" do
       Application.put_env(:aikido, :observability, log_level: :debug)
-
-      log =
-        capture_log(fn ->
-          Log.log(:debug, "debug level message")
-        end)
-
+      log = capture_log(fn -> Aikido.Observe.Log.log(:debug, "debug level message") end)
       assert log =~ "debug level message"
     end
   end
 
-  describe "Aikido.Observe.NoopTracer" do
+  describe("Aikido.Observe.NoopTracer") do
     test "span_start/2 returns nil" do
-      result = NoopTracer.span_start([:aikido, :test], %{key: "value"})
+      result = Aikido.Observe.NoopTracer.span_start([:aikido, :test], %{key: "value"})
       assert result == nil
     end
 
     test "span_stop/2 returns :ok" do
-      result = NoopTracer.span_stop(nil, %{duration: 1000})
+      result = Aikido.Observe.NoopTracer.span_stop(nil, %{duration: 1000})
       assert result == :ok
     end
 
     test "span_exception/4 returns :ok" do
       result =
-        NoopTracer.span_exception(
-          nil,
-          :error,
-          %RuntimeError{message: "error"},
-          []
-        )
+        Aikido.Observe.NoopTracer.span_exception(nil, :error, %RuntimeError{message: "error"}, [])
 
       assert result == :ok
     end
 
     test "implements Aikido.Observe.Tracer behaviour" do
-      behaviours = NoopTracer.__info__(:attributes)[:behaviour]
+      behaviours = Aikido.Observe.NoopTracer.__info__(:attributes)[:behaviour]
       assert Aikido.Observe.Tracer in behaviours
     end
   end
 
-  describe "custom tracer integration" do
+  describe("custom tracer integration") do
     setup do
       original_config = Application.get_env(:aikido, :observability)
 
@@ -578,9 +505,8 @@ defmodule AikidoTest.ObserveTest do
     end
 
     test "uses configured tracer for span operations" do
-      defmodule TestTracer do
+      defmodule Elixir.AikidoTest.ObserveTest.TestTracer do
         @behaviour Aikido.Observe.Tracer
-
         def span_start(event_prefix, metadata) do
           send(self(), {:tracer_start, event_prefix, metadata})
           :test_ctx
@@ -597,12 +523,8 @@ defmodule AikidoTest.ObserveTest do
         end
       end
 
-      Application.put_env(:aikido, :observability, tracer: TestTracer)
-
-      Observe.with_span([:aikido, :custom], %{test: true}, fn ->
-        :result
-      end)
-
+      Application.put_env(:aikido, :observability, tracer: AikidoTest.ObserveTest.TestTracer)
+      Aikido.Observe.with_span([:aikido, :custom], %{test: true}, fn -> :result end)
       assert_receive {:tracer_start, [:aikido, :custom], %{test: true}}
       assert_receive {:tracer_stop, :test_ctx, %{duration: _}}
     end

@@ -61,6 +61,7 @@ defmodule Aikido.Slice.Instance do
   @spec new(module() | {module(), map() | keyword()}, atom()) :: t()
   def new(declaration, path) when is_atom(path) and not is_nil(path) do
     {module, overrides} = normalize_declaration(declaration)
+
     overrides = Map.delete(overrides, :__path_override__)
 
     resolved_config = Config.resolve_config!(module, overrides)

@@ -1,64 +1,53 @@
+defmodule AikidoTest.AgentPoolTest.GetCountAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    slice = input.arguments.state
+
+    Aikido.ActionResult.new(
+      state: Map.put(slice, :last_count, Map.get(slice, :counter, 0)),
+      directives: []
+    )
+  end
+end
+
+defmodule AikidoTest.AgentPoolTest.GetCountAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "get_count"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.AgentPoolTest.GetCountAction.Implementation, action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.AgentPoolTest.PoolTestAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "pool_test_agent"
+    path :domain
+
+    schema do
+      attribute :counter, :integer, default: 0
+      attribute :last_count, :integer, default: 0
+    end
+  end
+
+  signal_routes do
+    route "increment", AikidoTest.TestActions.IncrementAction
+    route "get_count", AikidoTest.AgentPoolTest.GetCountAction
+  end
+end
+
 defmodule AikidoTest.AgentPoolTest do
   use ExUnit.Case, async: true
   import AikidoTest.Eventually
   @moduletag :capture_log
-  alias Aikido.Agent.WorkerPool, as: AgentPool
-  alias Aikido.AgentServer
-  alias Jido.Signal
-  alias AikidoTest.TestActions
-
-  defmodule GetCountAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "get_count"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, slice, _opts, _ctx) do
-      {:ok, Map.put(slice, :last_count, Map.get(slice, :counter, 0)), []}
-    end
-  end
-
-  defmodule PoolTestAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name("pool_test_agent")
-      path(:domain)
-
-      schema do
-        attribute(:counter, :integer, default: 0)
-        attribute(:last_count, :integer, default: 0)
-      end
-    end
-
-    signal_routes do
-      route("increment", TestActions.IncrementAction)
-      route("get_count", GetCountAction)
-    end
-  end
 
   defp unique_aikido_name do
     :"aikido_pool_test_#{System.unique_integer([:positive])}"
@@ -71,7 +60,9 @@ defmodule AikidoTest.AgentPoolTest do
       {:ok, aikido_pid} =
         Aikido.start_link(
           name: aikido_name,
-          agent_pools: [{:test_pool, PoolTestAgent, size: 2, max_overflow: 0}]
+          agent_pools: [
+            {:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent, size: 2, max_overflow: 0}
+          ]
         )
 
       pool_name = Aikido.agent_pool_name(aikido_name, :test_pool)
@@ -85,7 +76,10 @@ defmodule AikidoTest.AgentPoolTest do
       {:ok, aikido_pid} =
         Aikido.start_link(
           name: aikido_name,
-          agent_pools: [{:pool_a, PoolTestAgent, size: 2}, {:pool_b, PoolTestAgent, size: 3}]
+          agent_pools: [
+            {:pool_a, AikidoTest.AgentPoolTest.PoolTestAgent, size: 2},
+            {:pool_b, AikidoTest.AgentPoolTest.PoolTestAgent, size: 3}
+          ]
         )
 
       assert Process.whereis(Aikido.agent_pool_name(aikido_name, :pool_a)) != nil
@@ -99,10 +93,13 @@ defmodule AikidoTest.AgentPoolTest do
       aikido_name = unique_aikido_name()
 
       {:ok, aikido_pid} =
-        Aikido.start_link(name: aikido_name, agent_pools: [{:test_pool, PoolTestAgent, size: 2}])
+        Aikido.start_link(
+          name: aikido_name,
+          agent_pools: [{:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent, size: 2}]
+        )
 
       result =
-        AgentPool.with_agent(aikido_name, :test_pool, fn pid ->
+        Aikido.Agent.WorkerPool.with_agent(aikido_name, :test_pool, fn pid ->
           assert is_pid(pid)
           :worked
         end)
@@ -115,13 +112,16 @@ defmodule AikidoTest.AgentPoolTest do
       aikido_name = unique_aikido_name()
 
       {:ok, aikido_pid} =
-        Aikido.start_link(name: aikido_name, agent_pools: [{:test_pool, PoolTestAgent, size: 2}])
+        Aikido.start_link(
+          name: aikido_name,
+          agent_pools: [{:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent, size: 2}]
+        )
 
-      signal = Signal.new!("increment", %{}, source: "/test")
+      signal = Jido.Signal.new!("increment", %{}, source: "/test")
 
       result =
-        AgentPool.with_agent(aikido_name, :test_pool, fn pid ->
-          {:ok, agent} = AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
+        Aikido.Agent.WorkerPool.with_agent(aikido_name, :test_pool, fn pid ->
+          {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
           agent.state.domain.counter
         end)
 
@@ -133,17 +133,20 @@ defmodule AikidoTest.AgentPoolTest do
       aikido_name = unique_aikido_name()
 
       {:ok, aikido_pid} =
-        Aikido.start_link(name: aikido_name, agent_pools: [{:test_pool, PoolTestAgent, size: 1}])
+        Aikido.start_link(
+          name: aikido_name,
+          agent_pools: [{:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent, size: 1}]
+        )
 
-      signal = Signal.new!("increment", %{}, source: "/test")
+      signal = Jido.Signal.new!("increment", %{}, source: "/test")
 
-      AgentPool.with_agent(aikido_name, :test_pool, fn pid ->
-        AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
+      Aikido.Agent.WorkerPool.with_agent(aikido_name, :test_pool, fn pid ->
+        Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       end)
 
       result =
-        AgentPool.with_agent(aikido_name, :test_pool, fn pid ->
-          {:ok, agent} = AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
+        Aikido.Agent.WorkerPool.with_agent(aikido_name, :test_pool, fn pid ->
+          {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
           agent.state.domain.counter
         end)
 
@@ -157,10 +160,16 @@ defmodule AikidoTest.AgentPoolTest do
       aikido_name = unique_aikido_name()
 
       {:ok, aikido_pid} =
-        Aikido.start_link(name: aikido_name, agent_pools: [{:test_pool, PoolTestAgent, size: 2}])
+        Aikido.start_link(
+          name: aikido_name,
+          agent_pools: [{:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent, size: 2}]
+        )
 
-      signal = Signal.new!("increment", %{}, source: "/test")
-      {:ok, agent} = AgentPool.call(aikido_name, :test_pool, signal, fn s -> {:ok, s.agent} end)
+      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+
+      {:ok, agent} =
+        Aikido.Agent.WorkerPool.call(aikido_name, :test_pool, signal, fn s -> {:ok, s.agent} end)
+
       assert agent.state.domain.counter == 1
       Supervisor.stop(aikido_pid)
     end
@@ -171,15 +180,20 @@ defmodule AikidoTest.AgentPoolTest do
       aikido_name = unique_aikido_name()
 
       {:ok, aikido_pid} =
-        Aikido.start_link(name: aikido_name, agent_pools: [{:test_pool, PoolTestAgent, size: 1}])
+        Aikido.start_link(
+          name: aikido_name,
+          agent_pools: [{:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent, size: 1}]
+        )
 
-      signal = Signal.new!("increment", %{}, source: "/test")
-      assert :ok = AgentPool.cast(aikido_name, :test_pool, signal)
-      get_signal = Signal.new!("get_count", %{}, source: "/test")
+      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      assert :ok = Aikido.Agent.WorkerPool.cast(aikido_name, :test_pool, signal)
+      get_signal = Jido.Signal.new!("get_count", %{}, source: "/test")
 
       eventually(fn ->
         {:ok, agent} =
-          AgentPool.call(aikido_name, :test_pool, get_signal, fn s -> {:ok, s.agent} end)
+          Aikido.Agent.WorkerPool.call(aikido_name, :test_pool, get_signal, fn s ->
+            {:ok, s.agent}
+          end)
 
         agent.state.domain.counter >= 1
       end)
@@ -195,10 +209,12 @@ defmodule AikidoTest.AgentPoolTest do
       {:ok, aikido_pid} =
         Aikido.start_link(
           name: aikido_name,
-          agent_pools: [{:test_pool, PoolTestAgent, size: 3, max_overflow: 2}]
+          agent_pools: [
+            {:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent, size: 3, max_overflow: 2}
+          ]
         )
 
-      status = AgentPool.status(aikido_name, :test_pool)
+      status = Aikido.Agent.WorkerPool.status(aikido_name, :test_pool)
       assert status.state == :ready
       assert status.overflow == 0
       assert status.available == 3
@@ -210,13 +226,16 @@ defmodule AikidoTest.AgentPoolTest do
       aikido_name = unique_aikido_name()
 
       {:ok, aikido_pid} =
-        Aikido.start_link(name: aikido_name, agent_pools: [{:test_pool, PoolTestAgent, size: 3}])
+        Aikido.start_link(
+          name: aikido_name,
+          agent_pools: [{:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent, size: 3}]
+        )
 
-      pid = AgentPool.checkout(aikido_name, :test_pool)
-      status = AgentPool.status(aikido_name, :test_pool)
+      pid = Aikido.Agent.WorkerPool.checkout(aikido_name, :test_pool)
+      status = Aikido.Agent.WorkerPool.status(aikido_name, :test_pool)
       assert status.checked_out == 1
-      AgentPool.checkin(aikido_name, :test_pool, pid)
-      status = AgentPool.status(aikido_name, :test_pool)
+      Aikido.Agent.WorkerPool.checkin(aikido_name, :test_pool, pid)
+      status = Aikido.Agent.WorkerPool.status(aikido_name, :test_pool)
       assert status.checked_out == 0
       Supervisor.stop(aikido_pid)
     end
@@ -227,13 +246,16 @@ defmodule AikidoTest.AgentPoolTest do
       aikido_name = unique_aikido_name()
 
       {:ok, aikido_pid} =
-        Aikido.start_link(name: aikido_name, agent_pools: [{:test_pool, PoolTestAgent, size: 2}])
+        Aikido.start_link(
+          name: aikido_name,
+          agent_pools: [{:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent, size: 2}]
+        )
 
-      pid = AgentPool.checkout(aikido_name, :test_pool)
+      pid = Aikido.Agent.WorkerPool.checkout(aikido_name, :test_pool)
       assert is_pid(pid)
-      signal = Signal.new!("increment", %{}, source: "/test")
-      {:ok, _agent} = AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-      assert :ok = AgentPool.checkin(aikido_name, :test_pool, pid)
+      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
+      assert :ok = Aikido.Agent.WorkerPool.checkin(aikido_name, :test_pool, pid)
       Supervisor.stop(aikido_pid)
     end
   end
@@ -246,14 +268,17 @@ defmodule AikidoTest.AgentPoolTest do
         Aikido.start_link(
           name: aikido_name,
           agent_pools: [
-            {:test_pool, PoolTestAgent, size: 1, worker_opts: [initial_state: %{counter: 100}]}
+            {:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent,
+             size: 1, worker_opts: [initial_state: %{counter: 100}]}
           ]
         )
 
-      get_signal = Signal.new!("get_count", %{}, source: "/test")
+      get_signal = Jido.Signal.new!("get_count", %{}, source: "/test")
 
       {:ok, agent} =
-        AgentPool.call(aikido_name, :test_pool, get_signal, fn s -> {:ok, s.agent} end)
+        Aikido.Agent.WorkerPool.call(aikido_name, :test_pool, get_signal, fn s ->
+          {:ok, s.agent}
+        end)
 
       assert agent.state.domain.counter == 100
       Supervisor.stop(aikido_pid)
@@ -265,14 +290,19 @@ defmodule AikidoTest.AgentPoolTest do
       aikido_name = unique_aikido_name()
 
       {:ok, aikido_pid} =
-        Aikido.start_link(name: aikido_name, agent_pools: [{:test_pool, PoolTestAgent, size: 4}])
+        Aikido.start_link(
+          name: aikido_name,
+          agent_pools: [{:test_pool, AikidoTest.AgentPoolTest.PoolTestAgent, size: 4}]
+        )
 
-      signal = Signal.new!("increment", %{}, source: "/test")
+      signal = Jido.Signal.new!("increment", %{}, source: "/test")
 
       tasks =
         for _ <- 1..10 do
           Task.async(fn ->
-            AgentPool.call(aikido_name, :test_pool, signal, fn s -> {:ok, s.agent} end)
+            Aikido.Agent.WorkerPool.call(aikido_name, :test_pool, signal, fn s ->
+              {:ok, s.agent}
+            end)
           end)
         end
 

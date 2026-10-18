@@ -1,20 +1,68 @@
 defmodule Aikido.Slices.Identity do
-  @moduledoc "Identity slice — owns the `:identity` key in agent state, mounted as a\n`%Aikido.Slices.Identity.State{}` self-model.\n\n## State shape\n\nBound to `Aikido.Slices.Identity.State.schema/0`. The slice starts as `nil` (lazy-init);\nthe first inbound `aikido.identity.*` signal materializes a fresh\n`%Aikido.Slices.Identity.State{}` via the relevant action.\n\n## Routes\n\n    route \"aikido.identity.ensure\",         Actions.Ensure\n    route \"aikido.identity.evolve\",         Actions.Evolve\n    route \"aikido.identity.update_profile\", Actions.UpdateProfile\n\n## Default slice\n\nThis slice is automatically included as a default slice for all agents\nunless explicitly disabled:\n\n    use Aikido.Agent, default_slices: %{identity: false}\n\n    agent do\n      name \"minimal\"\n    end\n"
-  alias Aikido.Slices.Identity.State
-  use Aikido.Slice
+  @moduledoc """
+  Identity slice — owns the `:identity` key in agent state, mounted as a
+  `%Aikido.Slices.Identity{}` self-model.
 
-  @persist {:aikido_slice_schema, State}
+  ## State shape
+
+  Bound to `Aikido.Slices.Identity.schema/0`. The slice starts as `nil` (lazy-init);
+  the first inbound `aikido.identity.*` signal materializes a fresh
+  `%Aikido.Slices.Identity{}` via the relevant action.
+
+  ## Routes
+
+      route "aikido.identity.ensure",         Actions.Ensure
+      route "aikido.identity.evolve",         Actions.Evolve
+      route "aikido.identity.update_profile", Actions.UpdateProfile
+
+  ## Default slice
+
+  This slice is automatically included as a default slice for all agents
+  unless explicitly disabled:
+
+      use Aikido.Agent, default_slices: %{identity: false}
+
+      agent do
+        name "minimal"
+      end
+  """
+
+  use Ash.Resource,
+    data_layer: :embedded,
+    validate_domain_inclusion?: false,
+    extensions: [Aikido.Ash.Slice]
 
   slice do
     name "identity"
     description "Identity self-model for agent (lifecycle facts, profile)."
 
-  end
+    schema do
+      attribute :rev, :integer,
+        public?: true,
+        allow_nil?: false,
+        default: 0,
+        description: "Monotonic revision"
 
-  signal_routes do
-    route "aikido.identity.ensure", {Aikido.Slices.Identity.Actions, :ensure}
-    route "aikido.identity.evolve", {Aikido.Slices.Identity.Actions, :evolve}
-    route "aikido.identity.update_profile", {Aikido.Slices.Identity.Actions, :update_profile}
+      attribute :profile, :map,
+        public?: true,
+        allow_nil?: false,
+        default: %{age: nil},
+        description: "Lifecycle facts"
+
+      attribute :created_at, :integer,
+        public?: true,
+        allow_nil?: false,
+        description: "Creation timestamp (ms)"
+
+      attribute :updated_at, :integer,
+        public?: true,
+        allow_nil?: false,
+        description: "Last update timestamp (ms)"
+    end
+
+    route "aikido.identity.ensure", :ensure
+    route "aikido.identity.evolve", :evolve
+    route "aikido.identity.update_profile", :update_profile
   end
 
   capabilities do
@@ -29,4 +77,98 @@ defmodule Aikido.Slices.Identity do
   use Spark.Dsl.Extension,
     sections: [@identity_section],
     transformers: [Aikido.Slices.Identity.Transformers.RegisterContribution]
+
+  actions do
+    action :ensure, Aikido.ActionResult do
+      argument :state, :term
+
+      argument :profile, :map,
+        description: "Initial profile map for new identities.",
+        default: %{age: nil}
+
+      description "Initialize identity state if missing."
+      run {Aikido.Slices.Identity.Implementation, action: :ensure}
+    end
+
+    action :evolve, Aikido.ActionResult do
+      argument :state, :term
+      argument :days, :integer, description: "Days of simulated time to add", default: 0
+      argument :years, :integer, description: "Years of simulated time to add", default: 0
+      description "Evolve agent identity over simulated time"
+      run {Aikido.Slices.Identity.Implementation, action: :evolve}
+    end
+
+    action :update_profile, Aikido.ActionResult do
+      argument :state, :term
+
+      argument :profile, :map,
+        description: "Partial profile map to merge into the identity.",
+        allow_nil?: false
+
+      description "Merge a partial profile map into the identity profile."
+      run {Aikido.Slices.Identity.Implementation, action: :update_profile}
+    end
+  end
+
+  @type t :: map()
+  @schema __MODULE__
+  def new!(value) do
+    value |> then(&Ash.Type.cast_input(__MODULE__, &1)) |> Ash.Helpers.unwrap_or_raise!()
+  end
+
+  @doc "Returns the Ash type for Identity."
+  @spec schema() :: Ash.Type.t()
+  def schema do
+    @schema
+  end
+
+  @doc "Create a new identity"
+  @spec new(keyword()) :: t()
+  def new(opts \\ []) do
+    now = opts[:now] || System.system_time(:millisecond)
+
+    struct!(__MODULE__,
+      rev: 0,
+      profile: opts[:profile] || %{age: nil},
+      created_at: now,
+      updated_at: now
+    )
+  end
+
+  @doc "Pure evolution — increments age and bumps revision"
+  @spec evolve(t(), keyword()) :: t()
+  def evolve(%{__struct__: __MODULE__} = identity, opts \\ []) do
+    years = opts[:years] || 0
+    days = opts[:days] || 0
+    now = opts[:now] || System.system_time(:millisecond)
+    age_increment = years + div(days, 365)
+    current_age = identity.profile[:age] || 0
+
+    %{identity | profile: Map.put(identity.profile, :age, current_age + age_increment)}
+    |> bump(now: now)
+  end
+
+  @doc """
+  Merges `profile_updates` into the identity's profile and bumps the
+  revision. Existing keys in the profile are preserved when not present in
+  `profile_updates`.
+  """
+  @spec update_profile(t(), map(), keyword()) :: t()
+  def update_profile(%{__struct__: __MODULE__} = identity, profile_updates, opts \\ [])
+      when is_map(profile_updates) do
+    %{identity | profile: Map.merge(identity.profile, profile_updates)} |> bump(opts)
+  end
+
+  @doc "Return a public snapshot of the identity"
+  @spec snapshot(t()) :: map()
+  def snapshot(%{__struct__: __MODULE__} = identity) do
+    %{profile: Map.take(identity.profile, [:age, :generation, :origin])}
+  end
+
+  @doc "Bump identity revision and updated_at timestamp"
+  @spec bump(t(), keyword()) :: t()
+  def bump(%{__struct__: __MODULE__} = identity, opts \\ []) do
+    now = opts[:now] || System.system_time(:millisecond)
+    %{identity | rev: identity.rev + 1, updated_at: now}
+  end
 end

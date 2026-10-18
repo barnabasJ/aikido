@@ -1,191 +1,170 @@
+defmodule AikidoTest.PersistTest.TestAgent do
+  use Aikido.Agent
+
+  agent do
+    name "test_agent"
+    path :domain
+
+    schema do
+      attribute :counter, :integer, default: 0
+      attribute :status, :atom, default: :idle
+    end
+  end
+end
+
+defmodule AikidoTest.PersistTest.CustomAgent do
+  use Aikido.Agent
+
+  agent do
+    name "custom_agent"
+    path :domain
+
+    schema do
+      attribute :value, :string, default: ""
+    end
+  end
+
+  @impl true
+  def checkpoint(agent, _ctx) do
+    {:ok,
+     %{
+       version: 99,
+       agent_module: __MODULE__,
+       id: agent.id,
+       state: %{value: agent.state.domain.value, serialized_by: :custom},
+       marker: :custom_checkpoint,
+       thread: nil
+     }}
+  end
+
+  @impl true
+  def restore(data, _ctx) do
+    agent = new(id: data.id)
+    restored_state = agent.state |> Map.merge(data.state || %{}) |> Map.put(:restored_by, :custom)
+    {:ok, %{agent | state: restored_state}}
+  end
+end
+
+defmodule AikidoTest.PersistTest.RuntimeStateCheckpointAgent do
+  use Aikido.Agent
+
+  agent do
+    name "runtime_state_checkpoint_agent"
+    path :domain
+
+    schema do
+      attribute :value, :string, default: ""
+    end
+  end
+
+  @impl true
+  def checkpoint(agent, _ctx) do
+    {:ok,
+     %{
+       version: 1,
+       agent_module: __MODULE__,
+       id: agent.id,
+       state: %{value: agent.state.domain.value, thread: %{runtime_only: true}},
+       thread: nil
+     }}
+  end
+end
+
+defmodule AikidoTest.PersistTest.RaisingCheckpointAgent do
+  use Aikido.Agent
+
+  agent do
+    name "raising_checkpoint_agent"
+    path :domain
+
+    schema do
+      attribute :value, :string, default: ""
+    end
+  end
+
+  @impl true
+  def checkpoint(_agent, _ctx) do
+    raise "checkpoint boom"
+  end
+end
+
+defmodule AikidoTest.PersistTest.InvalidCheckpointStateAgent do
+  use Aikido.Agent
+
+  agent do
+    name "invalid_checkpoint_state_agent"
+    path :domain
+
+    schema do
+      attribute :value, :string, default: ""
+    end
+  end
+
+  @impl true
+  def checkpoint(agent, _ctx) do
+    {:ok, %{version: 1, agent_module: __MODULE__, id: agent.id, state: [], thread: nil}}
+  end
+end
+
+defmodule AikidoTest.PersistTest.RaisingRestoreAgent do
+  use Aikido.Agent
+
+  agent do
+    name "raising_restore_agent"
+    path :domain
+
+    schema do
+      attribute :value, :string, default: ""
+    end
+  end
+
+  @impl true
+  def restore(_data, _ctx) do
+    raise "restore boom"
+  end
+end
+
+defmodule AikidoTest.PersistTest.LenientRestoreAgent do
+  use Aikido.Agent
+
+  agent do
+    name "lenient_restore_agent"
+    path :domain
+
+    schema do
+      attribute :value, :string, default: ""
+    end
+  end
+
+  @impl true
+  def restore(data, _ctx) do
+    {:ok, new(id: data.id)}
+  end
+end
+
 defmodule AikidoTest.PersistTest do
   use AikidoTest.Case, async: true
-
-  alias Aikido.Persist
-  alias Aikido.Scheduler
-  alias Jido.Signal
-  alias Aikido.Slices.Thread.State
-  alias Aikido.Storage.ETS
-  alias AikidoTest.PersistTest.CustomAgent
-  alias AikidoTest.PersistTest.RuntimeStateCheckpointAgent
-  alias AikidoTest.PersistTest.TestAgent
-
-  defmodule TestAgent do
-    use Aikido.Agent
-
-    agent do
-      name "test_agent"
-      path :domain
-
-      schema do
-        attribute(:counter, :integer, default: 0)
-        attribute(:status, :atom, default: :idle)
-      end
-    end
-  end
-
-  defmodule CustomAgent do
-    use Aikido.Agent
-
-    agent do
-      name "custom_agent"
-      path :domain
-
-      schema do
-        attribute(:value, :string, default: "")
-      end
-    end
-
-    @impl true
-    def checkpoint(agent, _ctx) do
-      {:ok,
-       %{
-         version: 99,
-         agent_module: __MODULE__,
-         id: agent.id,
-         state: %{value: agent.state.domain.value, serialized_by: :custom},
-         marker: :custom_checkpoint,
-         thread: nil
-       }}
-    end
-
-    @impl true
-    def restore(data, _ctx) do
-      agent = new(id: data.id)
-
-      restored_state =
-        agent.state
-        |> Map.merge(data.state || %{})
-        |> Map.put(:restored_by, :custom)
-
-      {:ok, %{agent | state: restored_state}}
-    end
-  end
-
-  defmodule RuntimeStateCheckpointAgent do
-    use Aikido.Agent
-
-    agent do
-      name "runtime_state_checkpoint_agent"
-      path :domain
-
-      schema do
-        attribute(:value, :string, default: "")
-      end
-    end
-
-    @impl true
-    def checkpoint(agent, _ctx) do
-      {:ok,
-       %{
-         version: 1,
-         agent_module: __MODULE__,
-         id: agent.id,
-         state: %{
-           value: agent.state.domain.value,
-           thread: %{runtime_only: true}
-         },
-         thread: nil
-       }}
-    end
-  end
-
-  defmodule RaisingCheckpointAgent do
-    use Aikido.Agent
-
-    agent do
-      name "raising_checkpoint_agent"
-      path :domain
-
-      schema do
-        attribute(:value, :string, default: "")
-      end
-    end
-
-    @impl true
-    def checkpoint(_agent, _ctx) do
-      raise "checkpoint boom"
-    end
-  end
-
-  defmodule InvalidCheckpointStateAgent do
-    use Aikido.Agent
-
-    agent do
-      name "invalid_checkpoint_state_agent"
-      path :domain
-
-      schema do
-        attribute(:value, :string, default: "")
-      end
-    end
-
-    @impl true
-    def checkpoint(agent, _ctx) do
-      {:ok,
-       %{
-         version: 1,
-         agent_module: __MODULE__,
-         id: agent.id,
-         state: [],
-         thread: nil
-       }}
-    end
-  end
-
-  defmodule RaisingRestoreAgent do
-    use Aikido.Agent
-
-    agent do
-      name "raising_restore_agent"
-      path :domain
-
-      schema do
-        attribute(:value, :string, default: "")
-      end
-    end
-
-    @impl true
-    def restore(_data, _ctx) do
-      raise "restore boom"
-    end
-  end
-
-  defmodule LenientRestoreAgent do
-    use Aikido.Agent
-
-    agent do
-      name "lenient_restore_agent"
-      path :domain
-
-      schema do
-        attribute(:value, :string, default: "")
-      end
-    end
-
-    @impl true
-    def restore(data, _ctx) do
-      {:ok, new(id: data.id)}
-    end
-  end
 
   defp unique_table do
     :"persist_test_#{System.unique_integer([:positive])}"
   end
 
   defp storage(table) do
-    {ETS, table: table}
+    {Aikido.Storage.ETS, table: table}
   end
 
-  describe "hibernate/2" do
+  describe("hibernate/2") do
     test "hibernates agent without thread" do
       table = unique_table()
-      agent = TestAgent.new(id: "agent-1")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "agent-1")
       agent = update_in(agent.state.domain, &%{&1 | counter: 42, status: :active})
+      assert :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      assert :ok = Persist.hibernate(storage(table), agent)
+      {:ok, checkpoint} =
+        Aikido.Storage.ETS.get_checkpoint({AikidoTest.PersistTest.TestAgent, "agent-1"},
+          table: table
+        )
 
-      {:ok, checkpoint} = ETS.get_checkpoint({TestAgent, "agent-1"}, table: table)
       assert checkpoint.id == "agent-1"
       assert checkpoint.state.domain.counter == 42
       assert checkpoint.state.domain.status == :active
@@ -194,44 +173,48 @@ defmodule AikidoTest.PersistTest do
 
     test "hibernates agent with thread (thread is flushed first)" do
       table = unique_table()
-      agent = TestAgent.new(id: "agent-2")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "agent-2")
 
       thread =
-        State.new(id: "thread-2")
-        |> State.append(%{kind: :message, payload: %{content: "hello"}})
-        |> State.append(%{kind: :message, payload: %{content: "world"}})
+        Aikido.Slices.Thread.new(id: "thread-2")
+        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{content: "hello"}})
+        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{content: "world"}})
 
       agent = %{agent | state: Map.put(agent.state, :thread, thread)}
+      assert :ok = Aikido.Persist.hibernate(storage(table), agent)
+      {:ok, loaded_thread} = Aikido.Storage.ETS.load_thread("thread-2", table: table)
+      assert Aikido.Slices.Thread.entry_count(loaded_thread) == 2
 
-      assert :ok = Persist.hibernate(storage(table), agent)
+      {:ok, checkpoint} =
+        Aikido.Storage.ETS.get_checkpoint({AikidoTest.PersistTest.TestAgent, "agent-2"},
+          table: table
+        )
 
-      {:ok, loaded_thread} = ETS.load_thread("thread-2", table: table)
-      assert State.entry_count(loaded_thread) == 2
-
-      {:ok, checkpoint} = ETS.get_checkpoint({TestAgent, "agent-2"}, table: table)
       assert checkpoint.thread == %{id: "thread-2", rev: 2}
     end
 
     test "uses custom checkpoint callback when implemented" do
       table = unique_table()
-      agent = CustomAgent.new(id: "custom-1")
+      agent = AikidoTest.PersistTest.CustomAgent.new(id: "custom-1")
       agent = put_in(agent.state.domain.value, "custom_value")
+      assert :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      assert :ok = Persist.hibernate(storage(table), agent)
+      {:ok, checkpoint} =
+        Aikido.Storage.ETS.get_checkpoint({AikidoTest.PersistTest.CustomAgent, "custom-1"},
+          table: table
+        )
 
-      {:ok, checkpoint} = ETS.get_checkpoint({CustomAgent, "custom-1"}, table: table)
       assert checkpoint.id == "custom-1"
       assert checkpoint.state.value == "custom_value"
       assert checkpoint.state.serialized_by == :custom
       assert checkpoint.marker == :custom_checkpoint
-      assert checkpoint.agent_module == CustomAgent
+      assert checkpoint.agent_module == AikidoTest.PersistTest.CustomAgent
     end
 
     test "custom checkpoints receive injected scheduler manifest" do
       table = unique_table()
       scheduler_key = Aikido.Scheduler.cron_specs_state_key()
-
-      agent = CustomAgent.new(id: "custom-cron-1")
+      agent = AikidoTest.PersistTest.CustomAgent.new(id: "custom-cron-1")
 
       scheduler_manifest = %{
         durable: Aikido.Scheduler.build_cron_spec("* * * * *", false, "America/New_York")
@@ -244,141 +227,185 @@ defmodule AikidoTest.PersistTest do
           %{agent | state: Map.put(agent.state, scheduler_key, scheduler_manifest)}
         end)
 
-      assert :ok = Persist.hibernate(storage(table), agent)
+      assert :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      {:ok, checkpoint} = ETS.get_checkpoint({CustomAgent, "custom-cron-1"}, table: table)
+      {:ok, checkpoint} =
+        Aikido.Storage.ETS.get_checkpoint({AikidoTest.PersistTest.CustomAgent, "custom-cron-1"},
+          table: table
+        )
+
       assert checkpoint.state[scheduler_key] == scheduler_manifest
     end
 
     test "returns structured error when checkpoint callback raises" do
       table = unique_table()
-      agent = RaisingCheckpointAgent.new(id: "checkpoint-boom")
+      agent = AikidoTest.PersistTest.RaisingCheckpointAgent.new(id: "checkpoint-boom")
 
       assert {:error, {:checkpoint_callback_failed, {:raised, RuntimeError, "checkpoint boom"}}} =
-               Persist.hibernate(storage(table), agent)
+               Aikido.Persist.hibernate(storage(table), agent)
 
       assert :not_found =
-               ETS.get_checkpoint({RaisingCheckpointAgent, "checkpoint-boom"}, table: table)
+               Aikido.Storage.ETS.get_checkpoint(
+                 {AikidoTest.PersistTest.RaisingCheckpointAgent, "checkpoint-boom"},
+                 table: table
+               )
     end
 
     test "returns structured error for malformed checkpoint state" do
       table = unique_table()
-      agent = InvalidCheckpointStateAgent.new(id: "invalid-checkpoint-state")
+
+      agent =
+        AikidoTest.PersistTest.InvalidCheckpointStateAgent.new(id: "invalid-checkpoint-state")
 
       assert {:error, {:invalid_checkpoint, {:invalid_state, []}}} =
-               Persist.hibernate(storage(table), agent)
+               Aikido.Persist.hibernate(storage(table), agent)
 
       assert :not_found =
-               ETS.get_checkpoint({InvalidCheckpointStateAgent, "invalid-checkpoint-state"},
+               Aikido.Storage.ETS.get_checkpoint(
+                 {AikidoTest.PersistTest.InvalidCheckpointStateAgent, "invalid-checkpoint-state"},
                  table: table
                )
     end
 
     test "checkpoint never contains full Thread struct" do
       table = unique_table()
-      agent = TestAgent.new(id: "agent-3")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "agent-3")
 
       thread =
-        State.new(id: "thread-3")
-        |> State.append(%{kind: :message, payload: %{content: "test"}})
+        Aikido.Slices.Thread.new(id: "thread-3")
+        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{content: "test"}})
 
       agent = %{agent | state: Map.put(agent.state, :thread, thread)}
+      assert :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      assert :ok = Persist.hibernate(storage(table), agent)
+      {:ok, checkpoint} =
+        Aikido.Storage.ETS.get_checkpoint({AikidoTest.PersistTest.TestAgent, "agent-3"},
+          table: table
+        )
 
-      {:ok, checkpoint} = ETS.get_checkpoint({TestAgent, "agent-3"}, table: table)
-
-      refute is_struct(checkpoint.thread, State)
+      refute is_struct(checkpoint.thread, Aikido.Slices.Thread)
       refute Map.has_key?(checkpoint.state, :thread)
     end
 
     test "checkpoint contains thread pointer %{id, rev}" do
       table = unique_table()
-      agent = TestAgent.new(id: "agent-4")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "agent-4")
 
       thread =
-        State.new(id: "thread-4")
-        |> State.append(%{kind: :message, payload: %{content: "one"}})
-        |> State.append(%{kind: :message, payload: %{content: "two"}})
-        |> State.append(%{kind: :message, payload: %{content: "three"}})
+        Aikido.Slices.Thread.new(id: "thread-4")
+        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{content: "one"}})
+        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{content: "two"}})
+        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{content: "three"}})
 
       agent = %{agent | state: Map.put(agent.state, :thread, thread)}
+      assert :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      assert :ok = Persist.hibernate(storage(table), agent)
-
-      {:ok, checkpoint} = ETS.get_checkpoint({TestAgent, "agent-4"}, table: table)
+      {:ok, checkpoint} =
+        Aikido.Storage.ETS.get_checkpoint({AikidoTest.PersistTest.TestAgent, "agent-4"},
+          table: table
+        )
 
       assert checkpoint.thread == %{id: "thread-4", rev: 3}
       assert Map.keys(checkpoint.thread) |> Enum.sort() == [:id, :rev]
     end
   end
 
-  describe "hibernate/4" do
+  describe("hibernate/4") do
     test "uses explicit key instead of agent.id" do
       table = unique_table()
-      agent = TestAgent.new(id: "agent-id-ignored")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "agent-id-ignored")
       explicit_key = {:pool, :user_123}
 
-      assert :ok = Persist.hibernate(storage(table), TestAgent, explicit_key, agent)
-      assert {:ok, thawed} = Persist.thaw(storage(table), TestAgent, explicit_key)
+      assert :ok =
+               Aikido.Persist.hibernate(
+                 storage(table),
+                 AikidoTest.PersistTest.TestAgent,
+                 explicit_key,
+                 agent
+               )
+
+      assert {:ok, thawed} =
+               Aikido.Persist.thaw(storage(table), AikidoTest.PersistTest.TestAgent, explicit_key)
+
       assert thawed.id == "agent-id-ignored"
     end
   end
 
-  describe "thaw/3" do
+  describe("thaw/3") do
     test "returns {:error, :not_found} for missing agent" do
       table = unique_table()
-      ETS.put_checkpoint({TestAgent, "nonexistent"}, %{}, table: table)
-      ETS.delete_checkpoint({TestAgent, "nonexistent"}, table: table)
 
-      assert {:error, :not_found} = Persist.thaw(storage(table), TestAgent, "nonexistent")
+      Aikido.Storage.ETS.put_checkpoint({AikidoTest.PersistTest.TestAgent, "nonexistent"}, %{},
+        table: table
+      )
+
+      Aikido.Storage.ETS.delete_checkpoint({AikidoTest.PersistTest.TestAgent, "nonexistent"},
+        table: table
+      )
+
+      assert {:error, :not_found} =
+               Aikido.Persist.thaw(
+                 storage(table),
+                 AikidoTest.PersistTest.TestAgent,
+                 "nonexistent"
+               )
     end
 
     test "thaws agent without thread" do
       table = unique_table()
-      agent = TestAgent.new(id: "thaw-1")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "thaw-1")
       agent = update_in(agent.state.domain, &%{&1 | counter: 100, status: :completed})
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      :ok = Persist.hibernate(storage(table), agent)
+      assert {:ok, thawed} =
+               Aikido.Persist.thaw(storage(table), AikidoTest.PersistTest.TestAgent, "thaw-1")
 
-      assert {:ok, thawed} = Persist.thaw(storage(table), TestAgent, "thaw-1")
       assert thawed.id == "thaw-1"
       assert thawed.state.domain.counter == 100
       assert thawed.state.domain.status == :completed
-      # The :thread slice key exists (framework default plugin path) but no
-      # thread is attached.
       assert thawed.state.thread == nil
     end
 
     test "thaws agent with thread (thread is rehydrated)" do
       table = unique_table()
-      agent = TestAgent.new(id: "thaw-2")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "thaw-2")
 
       thread =
-        State.new(id: "thaw-thread-2")
-        |> State.append(%{kind: :message, payload: %{role: "user", content: "hello"}})
-        |> State.append(%{kind: :message, payload: %{role: "assistant", content: "hi"}})
+        Aikido.Slices.Thread.new(id: "thaw-thread-2")
+        |> Aikido.Slices.Thread.append(%{
+          kind: :message,
+          payload: %{role: "user", content: "hello"}
+        })
+        |> Aikido.Slices.Thread.append(%{
+          kind: :message,
+          payload: %{role: "assistant", content: "hi"}
+        })
 
       agent = %{agent | state: Map.put(agent.state, :thread, thread)}
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      :ok = Persist.hibernate(storage(table), agent)
+      assert {:ok, thawed} =
+               Aikido.Persist.thaw(storage(table), AikidoTest.PersistTest.TestAgent, "thaw-2")
 
-      assert {:ok, thawed} = Persist.thaw(storage(table), TestAgent, "thaw-2")
       assert thawed.state[:thread] != nil
-
       rehydrated_thread = thawed.state[:thread]
       assert rehydrated_thread.id == "thaw-thread-2"
-      assert State.entry_count(rehydrated_thread) == 2
+      assert Aikido.Slices.Thread.entry_count(rehydrated_thread) == 2
     end
 
     test "uses custom restore callback when implemented" do
       table = unique_table()
-      agent = CustomAgent.new(id: "thaw-custom")
+      agent = AikidoTest.PersistTest.CustomAgent.new(id: "thaw-custom")
       agent = put_in(agent.state.domain.value, "restored_value")
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      :ok = Persist.hibernate(storage(table), agent)
+      assert {:ok, thawed} =
+               Aikido.Persist.thaw(
+                 storage(table),
+                 AikidoTest.PersistTest.CustomAgent,
+                 "thaw-custom"
+               )
 
-      assert {:ok, thawed} = Persist.thaw(storage(table), CustomAgent, "thaw-custom")
       assert thawed.id == "thaw-custom"
       assert thawed.state.value == "restored_value"
       assert thawed.state.restored_by == :custom
@@ -389,16 +416,25 @@ defmodule AikidoTest.PersistTest do
 
       checkpoint = %{
         version: 1,
-        agent_module: RaisingRestoreAgent,
+        agent_module: AikidoTest.PersistTest.RaisingRestoreAgent,
         id: "restore-boom",
         state: %{},
         thread: nil
       }
 
-      :ok = ETS.put_checkpoint({RaisingRestoreAgent, "restore-boom"}, checkpoint, table: table)
+      :ok =
+        Aikido.Storage.ETS.put_checkpoint(
+          {AikidoTest.PersistTest.RaisingRestoreAgent, "restore-boom"},
+          checkpoint,
+          table: table
+        )
 
       assert {:error, {:restore_callback_failed, {:raised, RuntimeError, "restore boom"}}} =
-               Persist.thaw(storage(table), RaisingRestoreAgent, "restore-boom")
+               Aikido.Persist.thaw(
+                 storage(table),
+                 AikidoTest.PersistTest.RaisingRestoreAgent,
+                 "restore-boom"
+               )
     end
 
     test "returns structured error for malformed checkpoint state before restore" do
@@ -406,17 +442,25 @@ defmodule AikidoTest.PersistTest do
 
       checkpoint = %{
         version: 1,
-        agent_module: LenientRestoreAgent,
+        agent_module: AikidoTest.PersistTest.LenientRestoreAgent,
         id: "invalid-thaw-state",
         state: [],
         thread: nil
       }
 
       :ok =
-        ETS.put_checkpoint({LenientRestoreAgent, "invalid-thaw-state"}, checkpoint, table: table)
+        Aikido.Storage.ETS.put_checkpoint(
+          {AikidoTest.PersistTest.LenientRestoreAgent, "invalid-thaw-state"},
+          checkpoint,
+          table: table
+        )
 
       assert {:error, {:invalid_checkpoint, {:invalid_state, []}}} =
-               Persist.thaw(storage(table), LenientRestoreAgent, "invalid-thaw-state")
+               Aikido.Persist.thaw(
+                 storage(table),
+                 AikidoTest.PersistTest.LenientRestoreAgent,
+                 "invalid-thaw-state"
+               )
     end
 
     test "preserves falsey scheduler manifest values across thaw" do
@@ -428,14 +472,20 @@ defmodule AikidoTest.PersistTest do
       }
 
       agent =
-        TestAgent.new(id: "thaw-falsey-cron")
+        AikidoTest.PersistTest.TestAgent.new(id: "thaw-falsey-cron")
         |> then(fn agent ->
           %{agent | state: Map.put(agent.state, scheduler_key, scheduler_manifest)}
         end)
 
-      :ok = Persist.hibernate(storage(table), agent)
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      assert {:ok, thawed} = Persist.thaw(storage(table), TestAgent, "thaw-falsey-cron")
+      assert {:ok, thawed} =
+               Aikido.Persist.thaw(
+                 storage(table),
+                 AikidoTest.PersistTest.TestAgent,
+                 "thaw-falsey-cron"
+               )
+
       assert thawed.state[scheduler_key] == scheduler_manifest
       assert thawed.state[scheduler_key][:durable].message == false
     end
@@ -443,27 +493,27 @@ defmodule AikidoTest.PersistTest do
     test "preserves durable signal scheduler manifests across thaw" do
       table = unique_table()
       scheduler_key = Aikido.Scheduler.cron_specs_state_key()
-
-      signal =
-        Signal.new!(%{
-          type: "cron.tick",
-          source: "/persist",
-          data: %{count: 1}
-        })
+      signal = Jido.Signal.new!(%{type: "cron.tick", source: "/persist", data: %{count: 1}})
 
       scheduler_manifest = %{
         durable: Aikido.Scheduler.build_cron_spec("* * * * *", signal, "America/New_York")
       }
 
       agent =
-        TestAgent.new(id: "thaw-signal-cron")
+        AikidoTest.PersistTest.TestAgent.new(id: "thaw-signal-cron")
         |> then(fn agent ->
           %{agent | state: Map.put(agent.state, scheduler_key, scheduler_manifest)}
         end)
 
-      :ok = Persist.hibernate(storage(table), agent)
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      assert {:ok, thawed} = Persist.thaw(storage(table), TestAgent, "thaw-signal-cron")
+      assert {:ok, thawed} =
+               Aikido.Persist.thaw(
+                 storage(table),
+                 AikidoTest.PersistTest.TestAgent,
+                 "thaw-signal-cron"
+               )
+
       assert thawed.state[scheduler_key] == scheduler_manifest
       assert thawed.state[scheduler_key][:durable].message == signal
     end
@@ -473,22 +523,28 @@ defmodule AikidoTest.PersistTest do
 
       checkpoint = %{
         version: 1,
-        agent_module: TestAgent,
+        agent_module: AikidoTest.PersistTest.TestAgent,
         id: "orphan-1",
         state: %{counter: 0, status: :idle},
         thread: %{id: "missing-thread", rev: 5}
       }
 
-      :ok = ETS.put_checkpoint({TestAgent, "orphan-1"}, checkpoint, table: table)
+      :ok =
+        Aikido.Storage.ETS.put_checkpoint(
+          {AikidoTest.PersistTest.TestAgent, "orphan-1"},
+          checkpoint,
+          table: table
+        )
 
-      assert {:error, :missing_thread} = Persist.thaw(storage(table), TestAgent, "orphan-1")
+      assert {:error, :missing_thread} =
+               Aikido.Persist.thaw(storage(table), AikidoTest.PersistTest.TestAgent, "orphan-1")
     end
 
     test "returns {:error, :thread_mismatch} if thread rev doesn't match checkpoint" do
       table = unique_table()
 
       {:ok, _thread} =
-        ETS.append_thread(
+        Aikido.Storage.ETS.append_thread(
           "mismatch-thread",
           [
             %{kind: :message, payload: %{content: "one"}},
@@ -499,26 +555,33 @@ defmodule AikidoTest.PersistTest do
 
       checkpoint = %{
         version: 1,
-        agent_module: TestAgent,
+        agent_module: AikidoTest.PersistTest.TestAgent,
         id: "mismatch-1",
         state: %{counter: 0, status: :idle},
         thread: %{id: "mismatch-thread", rev: 10}
       }
 
-      :ok = ETS.put_checkpoint({TestAgent, "mismatch-1"}, checkpoint, table: table)
+      :ok =
+        Aikido.Storage.ETS.put_checkpoint(
+          {AikidoTest.PersistTest.TestAgent, "mismatch-1"},
+          checkpoint,
+          table: table
+        )
 
-      assert {:error, :thread_mismatch} = Persist.thaw(storage(table), TestAgent, "mismatch-1")
+      assert {:error, :thread_mismatch} =
+               Aikido.Persist.thaw(storage(table), AikidoTest.PersistTest.TestAgent, "mismatch-1")
     end
   end
 
-  describe "round-trip" do
+  describe("round-trip") do
     test "hibernate then thaw returns equivalent agent" do
       table = unique_table()
-      agent = TestAgent.new(id: "roundtrip-1")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "roundtrip-1")
       agent = update_in(agent.state.domain, &%{&1 | counter: 999, status: :processing})
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      :ok = Persist.hibernate(storage(table), agent)
-      {:ok, thawed} = Persist.thaw(storage(table), TestAgent, "roundtrip-1")
+      {:ok, thawed} =
+        Aikido.Persist.thaw(storage(table), AikidoTest.PersistTest.TestAgent, "roundtrip-1")
 
       assert thawed.id == agent.id
       assert thawed.__struct__ == agent.__struct__
@@ -526,19 +589,20 @@ defmodule AikidoTest.PersistTest do
 
     test "state is preserved correctly" do
       table = unique_table()
-      agent = TestAgent.new(id: "roundtrip-2")
-      agent = update_in(agent.state.domain, &%{&1 | counter: 12_345, status: :hibernated})
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "roundtrip-2")
+      agent = update_in(agent.state.domain, &%{&1 | counter: 12345, status: :hibernated})
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      :ok = Persist.hibernate(storage(table), agent)
-      {:ok, thawed} = Persist.thaw(storage(table), TestAgent, "roundtrip-2")
+      {:ok, thawed} =
+        Aikido.Persist.thaw(storage(table), AikidoTest.PersistTest.TestAgent, "roundtrip-2")
 
-      assert thawed.state.domain.counter == 12_345
+      assert thawed.state.domain.counter == 12345
       assert thawed.state.domain.status == :hibernated
     end
 
     test "thread is preserved correctly with all entries" do
       table = unique_table()
-      agent = TestAgent.new(id: "roundtrip-3")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "roundtrip-3")
 
       entries = [
         %{kind: :message, payload: %{role: "user", content: "first"}},
@@ -548,19 +612,18 @@ defmodule AikidoTest.PersistTest do
       ]
 
       thread =
-        State.new(id: "roundtrip-thread-3")
-        |> State.append(entries)
+        Aikido.Slices.Thread.new(id: "roundtrip-thread-3") |> Aikido.Slices.Thread.append(entries)
 
       agent = %{agent | state: Map.put(agent.state, :thread, thread)}
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      :ok = Persist.hibernate(storage(table), agent)
-      {:ok, thawed} = Persist.thaw(storage(table), TestAgent, "roundtrip-3")
+      {:ok, thawed} =
+        Aikido.Persist.thaw(storage(table), AikidoTest.PersistTest.TestAgent, "roundtrip-3")
 
       rehydrated = thawed.state[:thread]
       assert rehydrated.id == "roundtrip-thread-3"
-      assert State.entry_count(rehydrated) == 4
-
-      entry_list = State.to_list(rehydrated)
+      assert Aikido.Slices.Thread.entry_count(rehydrated) == 4
+      entry_list = Aikido.Slices.Thread.to_list(rehydrated)
       assert Enum.at(entry_list, 0).kind == :message
       assert Enum.at(entry_list, 0).payload.role == "user"
       assert Enum.at(entry_list, 1).kind == :tool_call
@@ -571,19 +634,20 @@ defmodule AikidoTest.PersistTest do
 
     test "multiple hibernate cycles update correctly" do
       table = unique_table()
-      agent = TestAgent.new(id: "multi-1")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "multi-1")
       agent = put_in(agent.state.domain.counter, 1)
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      :ok = Persist.hibernate(storage(table), agent)
+      {:ok, thawed} =
+        Aikido.Persist.thaw(storage(table), AikidoTest.PersistTest.TestAgent, "multi-1")
 
-      {:ok, thawed} = Persist.thaw(storage(table), TestAgent, "multi-1")
       assert thawed.state.domain.counter == 1
-
       updated = put_in(thawed.state.domain.counter, 2)
+      :ok = Aikido.Persist.hibernate(storage(table), updated)
 
-      :ok = Persist.hibernate(storage(table), updated)
+      {:ok, thawed2} =
+        Aikido.Persist.thaw(storage(table), AikidoTest.PersistTest.TestAgent, "multi-1")
 
-      {:ok, thawed2} = Persist.thaw(storage(table), TestAgent, "multi-1")
       assert thawed2.state.domain.counter == 2
     end
 
@@ -591,41 +655,43 @@ defmodule AikidoTest.PersistTest do
       table = unique_table()
 
       unpartitioned =
-        TestAgent.new(id: "partitioned-roundtrip")
+        AikidoTest.PersistTest.TestAgent.new(id: "partitioned-roundtrip")
         |> put_in([Access.key!(:state), :domain, :counter], 10)
 
       partitioned =
-        TestAgent.new(id: "partitioned-roundtrip")
+        AikidoTest.PersistTest.TestAgent.new(id: "partitioned-roundtrip")
         |> put_in([Access.key!(:state), :domain, :counter], 20)
 
-      # Runtime identity (partition) lives on AgentServer state per ADR 0014.
-      # Use the 4-arity hibernate form to specify a partition-scoped key.
-      assert :ok = Persist.hibernate(storage(table), unpartitioned)
+      assert :ok = Aikido.Persist.hibernate(storage(table), unpartitioned)
 
       assert :ok =
-               Persist.hibernate(
+               Aikido.Persist.hibernate(
                  storage(table),
-                 TestAgent,
+                 AikidoTest.PersistTest.TestAgent,
                  Aikido.partition_key("partitioned-roundtrip", :blue),
                  partitioned
                )
 
       assert {:ok, checkpoint} =
-               ETS.get_checkpoint({TestAgent, "partitioned-roundtrip"}, table: table)
+               Aikido.Storage.ETS.get_checkpoint(
+                 {AikidoTest.PersistTest.TestAgent, "partitioned-roundtrip"},
+                 table: table
+               )
 
       assert checkpoint.state.domain.counter == 10
 
       assert {:ok, partitioned_checkpoint} =
-               ETS.get_checkpoint({TestAgent, {:partition, :blue, "partitioned-roundtrip"}},
+               Aikido.Storage.ETS.get_checkpoint(
+                 {AikidoTest.PersistTest.TestAgent, {:partition, :blue, "partitioned-roundtrip"}},
                  table: table
                )
 
       assert partitioned_checkpoint.state.domain.counter == 20
 
       assert {:ok, thawed_partitioned} =
-               Persist.thaw(
+               Aikido.Persist.thaw(
                  storage(table),
-                 TestAgent,
+                 AikidoTest.PersistTest.TestAgent,
                  {:partition, :blue, "partitioned-roundtrip"}
                )
 
@@ -633,78 +699,78 @@ defmodule AikidoTest.PersistTest do
     end
   end
 
-  describe "integration with Aikido instance" do
+  describe("integration with Aikido instance") do
     test "hibernate and thaw with Aikido instance struct" do
       table = unique_table()
-      aikido_instance = %{storage: {ETS, table: table}}
-
-      agent = TestAgent.new(id: "aikido-instance-1")
+      aikido_instance = %{storage: {Aikido.Storage.ETS, table: table}}
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "aikido-instance-1")
       agent = put_in(agent.state.domain.counter, 777)
+      assert :ok = Aikido.Persist.hibernate(aikido_instance, agent)
 
-      assert :ok = Persist.hibernate(aikido_instance, agent)
-      assert {:ok, thawed} = Persist.thaw(aikido_instance, TestAgent, "aikido-instance-1")
+      assert {:ok, thawed} =
+               Aikido.Persist.thaw(
+                 aikido_instance,
+                 AikidoTest.PersistTest.TestAgent,
+                 "aikido-instance-1"
+               )
 
       assert thawed.state.domain.counter == 777
     end
 
     test "hibernate and thaw with thread using Aikido instance" do
       table = unique_table()
-      aikido_instance = %{storage: {ETS, table: table}}
-
-      agent = TestAgent.new(id: "aikido-instance-2")
+      aikido_instance = %{storage: {Aikido.Storage.ETS, table: table}}
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "aikido-instance-2")
 
       thread =
-        State.new(id: "aikido-instance-thread")
-        |> State.append(%{kind: :message, payload: %{content: "via aikido"}})
+        Aikido.Slices.Thread.new(id: "aikido-instance-thread")
+        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{content: "via aikido"}})
 
       agent = %{agent | state: Map.put(agent.state, :thread, thread)}
+      :ok = Aikido.Persist.hibernate(aikido_instance, agent)
 
-      :ok = Persist.hibernate(aikido_instance, agent)
-      {:ok, thawed} = Persist.thaw(aikido_instance, TestAgent, "aikido-instance-2")
+      {:ok, thawed} =
+        Aikido.Persist.thaw(
+          aikido_instance,
+          AikidoTest.PersistTest.TestAgent,
+          "aikido-instance-2"
+        )
 
       assert thawed.state[:thread].id == "aikido-instance-thread"
-      assert State.entry_count(thawed.state[:thread]) == 1
+      assert Aikido.Slices.Thread.entry_count(thawed.state[:thread]) == 1
     end
   end
 
-  describe "persist_scheduler_manifest/5" do
+  describe("persist_scheduler_manifest/5") do
     test "patches an existing checkpoint, strips runtime thread key, and updates scheduler manifest" do
       table = unique_table()
-      checkpoint_key = {TestAgent, {:pool, "existing"}}
-      scheduler_key = Scheduler.cron_specs_state_key()
+      checkpoint_key = {AikidoTest.PersistTest.TestAgent, {:pool, "existing"}}
+      scheduler_key = Aikido.Scheduler.cron_specs_state_key()
 
       existing_checkpoint = %{
         version: 1,
-        agent_module: TestAgent,
+        agent_module: AikidoTest.PersistTest.TestAgent,
         id: "existing-id",
         state:
-          %{
-            counter: 7,
-            status: :active,
-            thread: %{runtime_only: true}
-          }
+          %{counter: 7, status: :active, thread: %{runtime_only: true}}
           |> Map.put(scheduler_key, %{legacy: :value}),
         thread: nil
       }
 
-      :ok = ETS.put_checkpoint(checkpoint_key, existing_checkpoint, table: table)
-
-      manifest = %{
-        durable_job: Scheduler.build_cron_spec("* * * * *", :tick, "Etc/UTC")
-      }
-
-      agent = TestAgent.new(id: "existing-id")
+      :ok = Aikido.Storage.ETS.put_checkpoint(checkpoint_key, existing_checkpoint, table: table)
+      manifest = %{durable_job: Aikido.Scheduler.build_cron_spec("* * * * *", :tick, "Etc/UTC")}
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "existing-id")
 
       assert :ok =
-               Persist.persist_scheduler_manifest(
+               Aikido.Persist.persist_scheduler_manifest(
                  storage(table),
-                 TestAgent,
+                 AikidoTest.PersistTest.TestAgent,
                  {:pool, "existing"},
                  agent,
                  manifest
                )
 
-      {:ok, updated_checkpoint} = ETS.get_checkpoint(checkpoint_key, table: table)
+      {:ok, updated_checkpoint} = Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table)
       refute Map.has_key?(updated_checkpoint.state, :thread)
       assert updated_checkpoint.state.counter == 7
       assert updated_checkpoint.state.status == :active
@@ -713,75 +779,64 @@ defmodule AikidoTest.PersistTest do
 
     test "falls back to full hibernate when checkpoint does not exist" do
       table = unique_table()
-      checkpoint_key = {TestAgent, {:pool, "missing"}}
-      scheduler_key = Scheduler.cron_specs_state_key()
-
-      manifest = %{
-        first_job: Scheduler.build_cron_spec("@hourly", :tick, nil)
-      }
-
-      agent = TestAgent.new(id: "agent-missing")
+      checkpoint_key = {AikidoTest.PersistTest.TestAgent, {:pool, "missing"}}
+      scheduler_key = Aikido.Scheduler.cron_specs_state_key()
+      manifest = %{first_job: Aikido.Scheduler.build_cron_spec("@hourly", :tick, nil)}
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "agent-missing")
       agent = update_in(agent.state.domain, &%{&1 | counter: 42, status: :processing})
 
       assert :ok =
-               Persist.persist_scheduler_manifest(
+               Aikido.Persist.persist_scheduler_manifest(
                  storage(table),
-                 TestAgent,
+                 AikidoTest.PersistTest.TestAgent,
                  {:pool, "missing"},
                  agent,
                  manifest
                )
 
-      {:ok, checkpoint} = ETS.get_checkpoint(checkpoint_key, table: table)
+      {:ok, checkpoint} = Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table)
       assert checkpoint.state.domain.counter == 42
       assert checkpoint.state.domain.status == :processing
       assert checkpoint.state[scheduler_key] == manifest
     end
   end
 
-  describe "edge cases" do
+  describe("edge cases") do
     test "empty thread (no entries) does not create thread in storage" do
       table = unique_table()
-      agent = TestAgent.new(id: "empty-thread-1")
-
-      thread = State.new(id: "empty-thread")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "empty-thread-1")
+      thread = Aikido.Slices.Thread.new(id: "empty-thread")
       agent = %{agent | state: Map.put(agent.state, :thread, thread)}
-
-      :ok = Persist.hibernate(storage(table), agent)
-
-      assert :not_found = ETS.load_thread("empty-thread", table: table)
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
+      assert :not_found = Aikido.Storage.ETS.load_thread("empty-thread", table: table)
     end
 
     test "repeated hibernate does not duplicate thread entries" do
       table = unique_table()
-      agent = TestAgent.new(id: "conflict-1")
+      agent = AikidoTest.PersistTest.TestAgent.new(id: "conflict-1")
 
       thread =
-        State.new(id: "conflict-thread")
-        |> State.append(%{kind: :message, payload: %{content: "test"}})
+        Aikido.Slices.Thread.new(id: "conflict-thread")
+        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{content: "test"}})
 
       agent = %{agent | state: Map.put(agent.state, :thread, thread)}
-
-      :ok = Persist.hibernate(storage(table), agent)
-      :ok = Persist.hibernate(storage(table), agent)
-
-      {:ok, loaded} = ETS.load_thread("conflict-thread", table: table)
-      assert State.entry_count(loaded) == 1
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
+      {:ok, loaded} = Aikido.Storage.ETS.load_thread("conflict-thread", table: table)
+      assert Aikido.Slices.Thread.entry_count(loaded) == 1
     end
 
     test "checkpoint with thread enforces invariants and injects scheduler manifest" do
       table = unique_table()
       scheduler_key = Aikido.Scheduler.cron_specs_state_key()
-      agent = CustomAgent.new(id: "custom-thread-1")
+      agent = AikidoTest.PersistTest.CustomAgent.new(id: "custom-thread-1")
       agent = put_in(agent.state.domain.value, "with_thread")
 
       thread =
-        State.new(id: "custom-thread")
-        |> State.append(%{kind: :note, payload: %{text: "custom note"}})
+        Aikido.Slices.Thread.new(id: "custom-thread")
+        |> Aikido.Slices.Thread.append(%{kind: :note, payload: %{text: "custom note"}})
 
-      scheduler_manifest = %{
-        durable: Aikido.Scheduler.build_cron_spec("* * * * *", :tick, nil)
-      }
+      scheduler_manifest = %{durable: Aikido.Scheduler.build_cron_spec("* * * * *", :tick, nil)}
 
       agent =
         %{agent | state: Map.put(agent.state, :thread, thread)}
@@ -789,9 +844,12 @@ defmodule AikidoTest.PersistTest do
           %{agent | state: Map.put(agent.state, scheduler_key, scheduler_manifest)}
         end)
 
-      :ok = Persist.hibernate(storage(table), agent)
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
-      {:ok, checkpoint} = ETS.get_checkpoint({CustomAgent, "custom-thread-1"}, table: table)
+      {:ok, checkpoint} =
+        Aikido.Storage.ETS.get_checkpoint({AikidoTest.PersistTest.CustomAgent, "custom-thread-1"},
+          table: table
+        )
 
       assert checkpoint.thread == %{id: "custom-thread", rev: 1}
       refute Map.has_key?(checkpoint.state || %{}, :thread)
@@ -800,23 +858,22 @@ defmodule AikidoTest.PersistTest do
 
     test "custom checkpoint state always strips __thread__ and preserves scheduler manifest invariants" do
       table = unique_table()
-      scheduler_key = Scheduler.cron_specs_state_key()
-
-      manifest = %{
-        invariant_job: Scheduler.build_cron_spec("*/5 * * * *", :tick, nil)
-      }
-
-      agent = RuntimeStateCheckpointAgent.new(id: "runtime-invariant-1")
+      scheduler_key = Aikido.Scheduler.cron_specs_state_key()
+      manifest = %{invariant_job: Aikido.Scheduler.build_cron_spec("*/5 * * * *", :tick, nil)}
+      agent = AikidoTest.PersistTest.RuntimeStateCheckpointAgent.new(id: "runtime-invariant-1")
 
       agent =
         agent
         |> put_in([Access.key!(:state), :domain, :value], "with_runtime")
         |> put_in([Access.key!(:state), scheduler_key], manifest)
 
-      :ok = Persist.hibernate(storage(table), agent)
+      :ok = Aikido.Persist.hibernate(storage(table), agent)
 
       {:ok, checkpoint} =
-        ETS.get_checkpoint({RuntimeStateCheckpointAgent, "runtime-invariant-1"}, table: table)
+        Aikido.Storage.ETS.get_checkpoint(
+          {AikidoTest.PersistTest.RuntimeStateCheckpointAgent, "runtime-invariant-1"},
+          table: table
+        )
 
       refute Map.has_key?(checkpoint.state || %{}, :thread)
       assert checkpoint.state[scheduler_key] == manifest

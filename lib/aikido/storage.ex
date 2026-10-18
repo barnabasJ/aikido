@@ -48,7 +48,7 @@ defmodule Aikido.Storage do
   """
 
   alias Aikido.Slices.Thread.Entry
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
 
   @doc """
   Retrieve a checkpoint by key.

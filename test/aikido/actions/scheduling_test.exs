@@ -19,7 +19,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
 
       {:ok, result, [directive]} =
         AikidoTest.NativeAction.run(
-          Scheduling.ScheduleSignal,
+          {Aikido.AgentServer.RuntimeActions, :schedule_signal},
           sig("schedule_signal", data),
           %{},
           %{},
@@ -38,7 +38,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
 
       {:ok, _result, [directive]} =
         AikidoTest.NativeAction.run(
-          Scheduling.ScheduleSignal,
+          {Aikido.AgentServer.RuntimeActions, :schedule_signal},
           sig("schedule_signal", data),
           %{},
           %{},
@@ -55,7 +55,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
 
       {:ok, result, [directive]} =
         AikidoTest.NativeAction.run(
-          Scheduling.ScheduleTimeout,
+          {Aikido.AgentServer.RuntimeActions, :schedule_timeout},
           sig("schedule_timeout", data),
           %{},
           %{},
@@ -74,7 +74,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
 
       {:ok, result, [_directive]} =
         AikidoTest.NativeAction.run(
-          Scheduling.ScheduleTimeout,
+          {Aikido.AgentServer.RuntimeActions, :schedule_timeout},
           sig("schedule_timeout", data),
           %{},
           %{},
@@ -97,7 +97,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
 
       {:ok, result, [directive]} =
         AikidoTest.NativeAction.run(
-          Scheduling.ScheduleCron,
+          {Aikido.AgentServer.RuntimeActions, :schedule_cron},
           sig("schedule_cron", data),
           %{},
           %{},
@@ -122,7 +122,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
 
       {:ok, _result, [directive]} =
         AikidoTest.NativeAction.run(
-          Scheduling.ScheduleCron,
+          {Aikido.AgentServer.RuntimeActions, :schedule_cron},
           sig("schedule_cron", data),
           %{},
           %{},
@@ -139,7 +139,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
 
       {:ok, result, [directive]} =
         AikidoTest.NativeAction.run(
-          Scheduling.CancelCron,
+          {Aikido.AgentServer.RuntimeActions, :cancel_cron},
           sig("cancel_cron", data),
           %{},
           %{},

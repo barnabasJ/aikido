@@ -53,7 +53,7 @@ defmodule Aikido.Ash.Transformers.Agent do
          {:ok, dsl} <- add_signals(dsl, signals, mounts) do
       slices =
         Enum.map(mounts, fn mount ->
-          module = slice_module(mount.module)
+          module = mount.module
 
           quote do
             slice(unquote(mount.path), unquote(module),
@@ -117,14 +117,6 @@ defmodule Aikido.Ash.Transformers.Agent do
       error("Resource attributes cannot collide with the agent state path or mounted slice paths")
     else
       :ok
-    end
-  end
-
-  defp slice_module(module) do
-    if Spark.Dsl.is?(module, Ash.Resource) do
-      Module.concat(module, AikidoSlice)
-    else
-      module
     end
   end
 
@@ -205,7 +197,6 @@ defmodule Aikido.Ash.Transformers.Agent do
   defp mounted_signal?(signal, mounts) do
     Enum.any?(mounts, fn mount ->
       mount.module
-      |> slice_module()
       |> Aikido.Dsl.Slice.Info.signal_routes()
       |> Enum.any?(&(elem(&1, 0) == signal.type && elem(&1, 1) == signal.target))
     end)

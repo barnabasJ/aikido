@@ -1,55 +1,40 @@
+defmodule AikidoTest.AgentServerStopLogTest.StopTestAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    Aikido.ActionResult.new(state: %{}, directives: [%Aikido.Directives.Stop{reason: :normal}])
+  end
+end
+
+defmodule AikidoTest.AgentServerStopLogTest.StopTestAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "stop_test"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.AgentServerStopLogTest.StopTestAction.Implementation, action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.AgentServerStopLogTest.TestAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "test_agent"
+  end
+
+  signal_routes do
+    route "stop_test", AikidoTest.AgentServerStopLogTest.StopTestAction
+  end
+end
+
 defmodule AikidoTest.AgentServerStopLogTest do
   use AikidoTest.Case, async: false
   import ExUnit.CaptureLog
-  alias Aikido.AgentServer
-  alias Aikido.Directives
-  alias Jido.Signal
-
-  defmodule StopTestAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "stop_test"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, _slice, _opts, _ctx) do
-      {:ok, %{}, [%Directives.Stop{reason: :normal}]}
-    end
-  end
-
-  defmodule TestAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name("test_agent")
-    end
-
-    signal_routes do
-      route("stop_test", StopTestAction)
-    end
-  end
 
   setup do
     previous_level = Logger.level()
@@ -61,10 +46,15 @@ defmodule AikidoTest.AgentServerStopLogTest do
   test("Stop directive with normal reason logs warning", %{aikido: aikido}) do
     log =
       capture_log(fn ->
-        {:ok, pid} = AgentServer.start_link(agent_module: TestAgent, aikido: aikido)
+        {:ok, pid} =
+          Aikido.AgentServer.start_link(
+            agent_module: AikidoTest.AgentServerStopLogTest.TestAgent,
+            aikido: aikido
+          )
+
         ref = Process.monitor(pid)
-        signal = Signal.new!("stop_test", %{}, source: "/test")
-        AgentServer.cast(pid, signal)
+        signal = Jido.Signal.new!("stop_test", %{}, source: "/test")
+        Aikido.AgentServer.cast(pid, signal)
         assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1000
       end)
 

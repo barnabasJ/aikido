@@ -1,7 +1,7 @@
 defmodule AikidoTest.Storage.RedisTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
   alias Aikido.Storage
   alias Aikido.Storage.Redis
 

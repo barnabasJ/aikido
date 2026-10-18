@@ -1,53 +1,138 @@
 defmodule Aikido.Slices.AiReact do
-  @moduledoc "ReAct strategy as a configured `Aikido.Slice`.\n\nAttached to any `Aikido.Agent` via the agent's `extensions:` list and\nconfigured through the contributed `react do … end` section:\n\n    defmodule MyApp.SupportAgent do\n      use Aikido.Agent, extensions: [Aikido.Slices.AiReact]\n\n      agent do\n        name \"support\"\n      end\n\n      react do\n        model \"anthropic:claude-haiku-4-5-20251001\"\n        tools [MyApp.Actions.LookupOrder, MyApp.Actions.RefundOrder]\n        system_prompt \"You are a support agent.\"\n        max_iterations 5\n      end\n\n      slices do\n        slice :ai, Aikido.Slices.AiReact\n      end\n    end\n\nThe slice owns the `:ai` key of the agent's state and contains the full\nlifecycle of one ReAct conversation.\n\n## State machine\n\n    :idle ──ask──▶ :running ─┬─final answer──▶ :completed\n                             ├─tool calls + iter < max ─▶ :running (next iter)\n                             ├─tool calls + iter ≥ max ─▶ :completed (truncated)\n                             └─LLM error ──▶ :failed\n\nConcurrent `ai.react.ask` while `:running` is rejected with\n`{:error, :busy}` (ADR 0022 §5).\n\n## Slice fields\n\n  * `:status` — `:idle | :running | :completed | :failed`.\n  * `:request_id` — opaque correlation id minted by `Aikido.AI.ask/3`.\n    Every response signal carries it; mismatched signals are dropped as\n    stale.\n  * `:context` — the full `ReqLLM.Context` carried verbatim per ADR\n    0022 §3 — system + user + assistant + tool messages.\n  * `:iteration` — number of LLM calls completed so far.\n  * `:max_iterations` — cap on LLM calls; further `:tool_calls` turns\n    after this is reached truncate the run as `:completed`.\n  * `:result` — final answer text on `:completed`, or `nil`.\n  * `:error` — error term on `:failed`, or `nil`.\n  * `:pending_tool_calls` — tool calls from the last `:tool_calls` turn,\n    kept until every paired tool result has come back.\n  * `:tool_results_received` — tool results accumulated for the in-flight\n    tool batch; cleared when the batch completes and the next LLMCall\n    fires.\n  * `:previous_tool_signature` — signature of the last batch's tool\n    calls; used to detect tool-call cycles and prepend a cycle-warning\n    user message before the next LLMCall.\n  * `:model`, `:tools`, `:system_prompt`, `:llm_opts` — run config\n    seeded from the slice's `slices:` config (validated through\n    `config_schema/0`); `Aikido.Slices.AiReact.Actions.Ask` falls back to these\n    values when the opening signal omits them.\n\n## Config keys (`config_schema/0`)\n\n  * `:model` — any value accepted by `ReqLLM.Generation.generate_text/3`.\n    Optional; the floor enforced by the `Ask` action is `{:error, :no_model}`\n    when neither the slice config nor the per-call `Aikido.AI.ask/3` opts\n    supply a model.\n  * `:tools` — runtime tool objects, contextual callback pairs, Ash action references, or Aikido actions exposed to the model.\n  * `:system_prompt` — system message text prepended to the conversation.\n  * `:max_iterations` — cap on LLM calls per run (default 10).\n  * `:max_tokens` — folded into `:llm_opts` (default 4096).\n  * `:temperature` — folded into `:llm_opts` (default 0.2).\n  * `:llm_opts` — extra keyword list merged into per-call options\n    (last-write-wins over `:max_tokens` / `:temperature`).\n"
+  @moduledoc """
+  ReAct strategy as a configured `Aikido.Slice`.
 
+  Attached to any `Aikido.Agent` via the agent's `extensions:` list and
+  configured through the contributed `react do … end` section:
+
+      defmodule MyApp.SupportAgent do
+        use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+
+        agent do
+          name "support"
+        end
+
+        react do
+          model "anthropic:claude-haiku-4-5-20251001"
+          tools [MyApp.Actions.LookupOrder, MyApp.Actions.RefundOrder]
+          system_prompt "You are a support agent."
+          max_iterations 5
+        end
+
+        slices do
+          slice :ai, Aikido.Slices.AiReact
+        end
+      end
+
+  The slice owns the `:ai` key of the agent's state and contains the full
+  lifecycle of one ReAct conversation.
+
+  ## State machine
+
+      :idle ──ask──▶ :running ─┬─final answer──▶ :completed
+                               ├─tool calls + iter < max ─▶ :running (next iter)
+                               ├─tool calls + iter ≥ max ─▶ :completed (truncated)
+                               └─LLM error ──▶ :failed
+
+  Concurrent `ai.react.ask` while `:running` is rejected with
+  `{:error, :busy}` (ADR 0022 §5).
+
+  ## Slice fields
+
+    * `:status` — `:idle | :running | :completed | :failed`.
+    * `:request_id` — opaque correlation id minted by `Aikido.AI.ask/3`.
+      Every response signal carries it; mismatched signals are dropped as
+      stale.
+    * `:context` — the full `ReqLLM.Context` carried verbatim per ADR
+      0022 §3 — system + user + assistant + tool messages.
+    * `:iteration` — number of LLM calls completed so far.
+    * `:max_iterations` — cap on LLM calls; further `:tool_calls` turns
+      after this is reached truncate the run as `:completed`.
+    * `:result` — final answer text on `:completed`, or `nil`.
+    * `:error` — error term on `:failed`, or `nil`.
+    * `:pending_tool_calls` — tool calls from the last `:tool_calls` turn,
+      kept until every paired tool result has come back.
+    * `:tool_results_received` — tool results accumulated for the in-flight
+      tool batch; cleared when the batch completes and the next LLMCall
+      fires.
+    * `:previous_tool_signature` — signature of the last batch's tool
+      calls; used to detect tool-call cycles and prepend a cycle-warning
+      user message before the next LLMCall.
+    * `:model`, `:tools`, `:system_prompt`, `:llm_opts` — run config
+      seeded from the slice's `slices:` config (validated through
+      `config_schema/0`); `Aikido.Slices.AiReact.Ask` falls back to these
+      values when the opening signal omits them.
+
+  ## Config keys (`config_schema/0`)
+
+    * `:model` — any value accepted by `ReqLLM.Generation.generate_text/3`.
+      Optional; the floor enforced by the `Ask` action is `{:error, :no_model}`
+      when neither the slice config nor the per-call `Aikido.AI.ask/3` opts
+      supply a model.
+    * `:tools` — runtime tool objects, contextual callback pairs, Ash action references, or Aikido actions exposed to the model.
+    * `:system_prompt` — system message text prepended to the conversation.
+    * `:max_iterations` — cap on LLM calls per run (default 10).
+    * `:max_tokens` — folded into `:llm_opts` (default 4096).
+    * `:temperature` — folded into `:llm_opts` (default 0.2).
+    * `:llm_opts` — extra keyword list merged into per-call options
+      (last-write-wins over `:max_tokens` / `:temperature`).
+  """
   @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
-  use Aikido.Slice
+  use Ash.Resource,
+    data_layer: :embedded,
+    validate_domain_inclusion?: false,
+    extensions: [Aikido.Ash.Slice]
 
   slice do
     name "ai"
     description "ReAct reasoning slice attached via `slices:` on a Aikido.Agent."
 
     schema do
-      attribute :status, :atom, allow_nil?: false, default: :idle
-      attribute :request_id, :term, allow_nil?: true, default: nil
-      attribute :context, :term, allow_nil?: true, default: nil
-      attribute :iteration, :integer, allow_nil?: false, default: 0
-      attribute :max_iterations, :integer, allow_nil?: false, default: 10
-      attribute :result, :term, allow_nil?: true, default: nil
-      attribute :error, :term, allow_nil?: true, default: nil
-      attribute :pending_tool_calls, {:array, :term}, allow_nil?: false, default: []
-      attribute :tool_results_received, {:array, :term}, allow_nil?: false, default: []
-      attribute :previous_tool_signature, :term, allow_nil?: true, default: nil
-      attribute :model, :term, allow_nil?: true, default: nil
-      attribute :client, :atom, allow_nil?: false, default: ReqLLM.Generation
-      attribute :tools, {:array, :term}, allow_nil?: false, default: []
-      attribute :tool_context, :map, allow_nil?: false, default: %{}
-      attribute :system_prompt, :term, allow_nil?: true, default: nil
-      attribute :llm_opts, :term, allow_nil?: false, default: []
+      attribute :status, :atom, public?: true, allow_nil?: false, default: :idle
+      attribute :request_id, :term, public?: true, allow_nil?: true, default: nil
+      attribute :context, :term, public?: true, allow_nil?: true, default: nil
+      attribute :iteration, :integer, public?: true, allow_nil?: false, default: 0
+      attribute :max_iterations, :integer, public?: true, allow_nil?: false, default: 10
+      attribute :result, :term, public?: true, allow_nil?: true, default: nil
+      attribute :error, :term, public?: true, allow_nil?: true, default: nil
+
+      attribute :pending_tool_calls, {:array, :term},
+        public?: true,
+        allow_nil?: false,
+        default: []
+
+      attribute :tool_results_received, {:array, :term},
+        public?: true,
+        allow_nil?: false,
+        default: []
+
+      attribute :previous_tool_signature, :term, public?: true, allow_nil?: true, default: nil
+      attribute :model, :term, public?: true, allow_nil?: true, default: nil
+      attribute :client, :atom, public?: true, allow_nil?: false, default: ReqLLM.Generation
+      attribute :tools, {:array, :term}, public?: true, allow_nil?: false, default: []
+      attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
+      attribute :system_prompt, :term, public?: true, allow_nil?: true, default: nil
+      attribute :llm_opts, :term, public?: true, allow_nil?: false, default: []
     end
 
     config_schema do
-      attribute :model, :term, allow_nil?: true
-      attribute :client, :atom, allow_nil?: false, default: ReqLLM.Generation
-      attribute :tools, {:array, :term}, allow_nil?: false, default: []
-      attribute :tool_context, :map, allow_nil?: false, default: %{}
-      attribute :system_prompt, :term, allow_nil?: true
-      attribute :max_iterations, :integer, allow_nil?: false, default: 10
-      attribute :max_tokens, :integer, allow_nil?: false, default: 4096
-      attribute :temperature, :term, allow_nil?: false, default: 0.2
-      attribute :llm_opts, :term, allow_nil?: false, default: []
+      attribute :model, :term, public?: true, allow_nil?: true
+      attribute :client, :atom, public?: true, allow_nil?: false, default: ReqLLM.Generation
+      attribute :tools, {:array, :term}, public?: true, allow_nil?: false, default: []
+      attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
+      attribute :system_prompt, :term, public?: true, allow_nil?: true
+      attribute :max_iterations, :integer, public?: true, allow_nil?: false, default: 10
+      attribute :max_tokens, :integer, public?: true, allow_nil?: false, default: 4096
+      attribute :temperature, :term, public?: true, allow_nil?: false, default: 0.2
+      attribute :llm_opts, :term, public?: true, allow_nil?: false, default: []
     end
 
     config_transform {__MODULE__, :__fold_llm_opts__, []}
-  end
-
-  signal_routes do
-    route "ai.react.ask", {Aikido.Slices.AiReact.Actions, :ask}
-    route "ai.react.llm.completed", {Aikido.Slices.AiReact.Actions, :llm_turn}
-    route "ai.react.tool.completed", {Aikido.Slices.AiReact.Actions, :tool_result}
-    route "ai.react.failed", {Aikido.Slices.AiReact.Actions, :failed}
-    route "ai.react.cancel", {Aikido.Slices.AiReact.Actions, :cancel}
+    route "ai.react.ask", :ask
+    route "ai.react.llm.completed", :llm_turn
+    route "ai.react.tool.completed", :tool_result
+    route "ai.react.failed", :failed
+    route "ai.react.cancel", :cancel
   end
 
   @react_section %Spark.Dsl.Section{
@@ -92,11 +177,6 @@ defmodule Aikido.Slices.AiReact do
     transformers: [Aikido.Slices.AiReact.Transformers.RegisterContribution]
 
   @doc false
-  # Folds the convenience keys `:max_tokens` and `:temperature` into
-  # `:llm_opts` so the slice carries a single keyword list of per-call
-  # options. The state schema doesn't track them as separate fields; this
-  # The config transform runs after Ash casting and before the
-  # config is merged into slice state.
   @spec __fold_llm_opts__(map(), term()) :: {:ok, map()}
   def __fold_llm_opts__(config, _ctx) when is_map(config) do
     {max_tokens, config} = Map.pop(config, :max_tokens)
@@ -123,13 +203,21 @@ defmodule Aikido.Slices.AiReact do
     end
   end
 
-  @doc "The cycle-warning user message appended to the context when the next\nLLMCall would otherwise repeat the previous tool-call batch verbatim.\n"
+  @doc """
+  The cycle-warning user message appended to the context when the next
+  LLMCall would otherwise repeat the previous tool-call batch verbatim.
+  """
   @spec cycle_warning() :: String.t()
   def cycle_warning do
     @cycle_warning
   end
 
-  @doc "Tool-call signature for cycle detection.\n\nStable, sortable, and tolerant of mixed atom/string keys (different\nReqLLM provider adapters return one or the other).\n"
+  @doc """
+  Tool-call signature for cycle detection.
+
+  Stable, sortable, and tolerant of mixed atom/string keys (different
+  ReqLLM provider adapters return one or the other).
+  """
   @spec tool_call_signature([map()]) :: String.t()
   def tool_call_signature(tool_calls) when is_list(tool_calls) do
     tool_calls
@@ -140,5 +228,56 @@ defmodule Aikido.Slices.AiReact do
     end)
     |> Enum.sort()
     |> Enum.join("|")
+  end
+
+  actions do
+    action :ask, Aikido.ActionResult do
+      argument :state, :term
+      argument :query, :string, allow_nil?: false
+      argument :request_id, :string, allow_nil?: false
+      argument :model, :term
+      argument :client, :atom
+      argument :tools, {:array, :term}
+      argument :system_prompt, :string
+      argument :max_iterations, :integer, constraints: [min: 1]
+      argument :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list]
+      description "Open a ReAct run on a Aikido.Slices.AiReact-equipped agent."
+      run {Aikido.Slices.AiReact.Implementation, action: :ask}
+    end
+
+    action :cancel, Aikido.ActionResult do
+      argument :state, :term
+      argument :request_id, :string, default: nil
+      run {Aikido.Slices.AiReact.Implementation, action: :cancel}
+    end
+
+    action :failed, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :reason, :term, allow_nil?: false
+      argument :request_id, :string, allow_nil?: false
+      description "Settle the slice as :failed with the reason."
+      run {Aikido.Slices.AiReact.Implementation, action: :failed}
+    end
+
+    action :llm_turn, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :turn, :term, allow_nil?: false
+      argument :request_id, :string, allow_nil?: false
+      description "Process a completed LLM turn and decide the next ReAct step."
+      run {Aikido.Slices.AiReact.Implementation, action: :llm_turn}
+    end
+
+    action :tool_result, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :tool_call_id, :string, allow_nil?: false
+      argument :name, :string, allow_nil?: false
+      argument :content, :string, allow_nil?: false
+      argument :request_id, :string, allow_nil?: false
+      description "Process one tool result and fan-in to the next LLM turn."
+      run {Aikido.Slices.AiReact.Implementation, action: :tool_result}
+    end
   end
 end

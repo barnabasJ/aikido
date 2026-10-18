@@ -1,116 +1,131 @@
+defmodule Aikido.Dsl.AgentTest.SimpleAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "simple_agent"
+    description "Bare agent — no plugins, no slices."
+    category "test"
+    tags ["simple", "test"]
+    vsn "1.0.0"
+    path :domain
+
+    schema do
+      attribute :counter, :integer, default: 0
+      attribute :status, :atom, default: :idle
+    end
+  end
+end
+
+defmodule Aikido.Dsl.AgentTest.RouteAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "route_agent"
+  end
+
+  signal_routes do
+    route "user.created", AikidoTest.PluginTestAction
+    route "high.priority", AikidoTest.PluginTestAction, priority: 10
+  end
+end
+
 defmodule Aikido.Dsl.AgentTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Agent
-  alias Aikido.Dsl.Agent.Info, as: AgentInfo
-
-  defmodule SimpleAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name "simple_agent"
-      description "Bare agent — no plugins, no slices."
-      category "test"
-      tags ["simple", "test"]
-      vsn "1.0.0"
-      path :domain
-
-      schema do
-        attribute(:counter, :integer, default: 0)
-        attribute(:status, :atom, default: :idle)
-      end
-    end
-  end
-
-  describe "basic accessors (sectioned `agent do … end`)" do
+  describe("basic accessors (sectioned `agent do … end`)") do
     test "name/1" do
-      assert Map.get(AgentInfo.agent_options(SimpleAgent), :name) == "simple_agent"
+      assert Map.get(Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentTest.SimpleAgent), :name) ==
+               "simple_agent"
     end
 
     test "description/1" do
-      assert Map.get(AgentInfo.agent_options(SimpleAgent), :description) ==
-               "Bare agent — no plugins, no slices."
+      assert Map.get(
+               Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentTest.SimpleAgent),
+               :description
+             ) == "Bare agent — no plugins, no slices."
     end
 
     test "category/1" do
-      assert Map.get(AgentInfo.agent_options(SimpleAgent), :category) == "test"
+      assert Map.get(
+               Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentTest.SimpleAgent),
+               :category
+             ) == "test"
     end
 
     test "tags/1" do
-      assert Map.get(AgentInfo.agent_options(SimpleAgent), :tags) == ["simple", "test"]
+      assert Map.get(Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentTest.SimpleAgent), :tags) ==
+               ["simple", "test"]
     end
 
     test "vsn/1" do
-      assert Map.get(AgentInfo.agent_options(SimpleAgent), :vsn) == "1.0.0"
+      assert Map.get(Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentTest.SimpleAgent), :vsn) ==
+               "1.0.0"
     end
 
     test "path/1" do
-      assert Map.get(AgentInfo.agent_options(SimpleAgent), :path) == :domain
+      assert Map.get(Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentTest.SimpleAgent), :path) ==
+               :domain
     end
 
     test "slices/1 / middleware/1 default to framework defaults / empty" do
-      # Framework default slices are auto-attached.
-      assert Aikido.Slices.Memory in AgentInfo.slices(SimpleAgent)
-      assert Aikido.Slices.Identity in AgentInfo.slices(SimpleAgent)
-      assert Aikido.Slices.Thread in AgentInfo.slices(SimpleAgent)
-      assert AgentInfo.middleware(SimpleAgent) == []
+      assert Aikido.Slices.Memory in Aikido.Dsl.Agent.Info.slices(
+               Aikido.Dsl.AgentTest.SimpleAgent
+             )
+
+      assert Aikido.Slices.Identity in Aikido.Dsl.Agent.Info.slices(
+               Aikido.Dsl.AgentTest.SimpleAgent
+             )
+
+      assert Aikido.Slices.Thread in Aikido.Dsl.Agent.Info.slices(
+               Aikido.Dsl.AgentTest.SimpleAgent
+             )
+
+      assert Aikido.Dsl.Agent.Info.middleware(Aikido.Dsl.AgentTest.SimpleAgent) == []
     end
 
     test "actions/1 returns the union from all attached slices" do
-      assert is_list(AgentInfo.actions(SimpleAgent))
+      assert is_list(Aikido.Dsl.Agent.Info.actions(Aikido.Dsl.AgentTest.SimpleAgent))
     end
   end
 
-  describe "new/1 + cmd/2 + set/2" do
+  describe("new/1 + cmd/2 + set/2") do
     test "new/1 seeds the agent slice with schema defaults" do
-      agent = SimpleAgent.new()
-      assert %Agent{} = agent
-      assert agent.agent_module == SimpleAgent
+      agent = Aikido.Dsl.AgentTest.SimpleAgent.new()
+      assert %Aikido.Agent{} = agent
+      assert agent.agent_module == Aikido.Dsl.AgentTest.SimpleAgent
       assert agent.name == "simple_agent"
-      # Schema defaults applied under the agent's path
       assert get_in(agent.state, [:domain, :counter]) == 0
       assert get_in(agent.state, [:domain, :status]) == :idle
     end
 
     test "new/1 accepts user-supplied state and merges over defaults" do
-      agent = SimpleAgent.new(state: %{counter: 5})
+      agent = Aikido.Dsl.AgentTest.SimpleAgent.new(state: %{counter: 5})
       assert get_in(agent.state, [:domain, :counter]) == 5
     end
 
     test "set/2 wraps flat attrs into the path slice" do
-      agent = SimpleAgent.new()
-      {:ok, agent} = SimpleAgent.set(agent, %{status: :running})
+      agent = Aikido.Dsl.AgentTest.SimpleAgent.new()
+      {:ok, agent} = Aikido.Dsl.AgentTest.SimpleAgent.set(agent, %{status: :running})
       assert get_in(agent.state, [:domain, :status]) == :running
     end
   end
 
-  describe "signal_routes do … end section" do
-    defmodule RouteAgent do
-      @moduledoc false
-      use Aikido.Agent
-
-      agent do
-        name "route_agent"
-      end
-
-      signal_routes do
-        route "user.created", AikidoTest.PluginTestAction
-        route "high.priority", AikidoTest.PluginTestAction, priority: 10
-      end
-    end
+  describe("signal_routes do … end section") do
+    nil
 
     test "section entries become legacy route_spec tuples" do
-      routes = AgentInfo.signal_routes(RouteAgent)
+      routes = Aikido.Dsl.Agent.Info.signal_routes(Aikido.Dsl.AgentTest.RouteAgent)
       assert {"user.created", AikidoTest.PluginTestAction} in routes
       assert {"high.priority", AikidoTest.PluginTestAction, 10} in routes
     end
   end
 
-  describe "compile-time errors" do
+  describe("compile-time errors") do
     test "missing required `name` raises" do
       assert_raise Spark.Error.DslError, fn ->
-        defmodule MissingName do
+        defmodule Elixir.Aikido.Dsl.AgentTest.MissingName do
           use Aikido.Agent
 
           agent do
@@ -122,14 +137,14 @@ defmodule Aikido.Dsl.AgentTest do
     test "schema without path warns at compile time" do
       stderr =
         ExUnit.CaptureIO.capture_io(:stderr, fn ->
-          defmodule SchemaNoPath do
+          defmodule Elixir.Aikido.Dsl.AgentTest.SchemaNoPath do
             use Aikido.Agent
 
             agent do
               name "schema_no_path"
 
               schema do
-                attribute(:counter, :integer, default: 0)
+                attribute :counter, :integer, default: 0
               end
             end
           end
@@ -141,7 +156,7 @@ defmodule Aikido.Dsl.AgentTest do
     test "path without schema warns at compile time" do
       stderr =
         ExUnit.CaptureIO.capture_io(:stderr, fn ->
-          defmodule PathNoSchema do
+          defmodule Elixir.Aikido.Dsl.AgentTest.PathNoSchema do
             use Aikido.Agent
 
             agent do

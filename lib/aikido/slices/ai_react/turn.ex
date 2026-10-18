@@ -4,7 +4,7 @@ defmodule Aikido.Slices.AiReact.Turn do
 
   Classifies the response as either a tool-calling turn (the model wants
   the host to run one or more tools and call back) or a final-answer turn
-  (the model is done). Consumed by `Aikido.Slices.AiReact.Actions.LLMTurn` after
+  (the model is done). Consumed by `Aikido.Slices.AiReact.LLMTurn` after
   `Aikido.Slices.AiReact.Directives.LLMCall`'s executor packages a `ReqLLM.Response`.
 
   `ReqLLM.Response.classify/1` does the heavy lifting — finish-reason

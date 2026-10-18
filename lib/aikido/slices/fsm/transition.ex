@@ -1,19 +1,21 @@
 defmodule Aikido.Slices.FSM.Transition do
-  @moduledoc """
-  Transitions the FSM slice to a new state.
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    slice = input.arguments.state
+    to = input.arguments.to
+    from = Map.fetch!(slice, :state)
+    transitions = Map.get(slice, :transitions, %{})
+    allowed = Map.get(transitions, from, [])
 
-  Triggered by a `aikido.fsm.transition` signal with `data: %{to: "<next>"}`.
-  Validates the requested transition against `slice.transitions`, appends
-  a `%{from:, to:}` entry to `slice.history`, and flips `terminal?` if the
-  new state is in `slice.terminal_states`.
-  """
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "fsm_transition"}}
-  actions do
-    action :run, Aikido.ActionResult do
-      argument :state, :term
-      argument :to, :string, allow_nil?: false, constraints: [trim?: false, allow_empty?: true]
-      run Aikido.Slices.FSM.Transition.Implementation
+    if to in allowed do
+      terminal_states = Map.get(slice, :terminal_states, [])
+      history = Map.get(slice, :history, []) ++ [%{from: from, to: to}]
+      new_slice = %{slice | state: to, history: history, terminal?: to in terminal_states}
+      Aikido.ActionResult.new(state: new_slice, directives: [])
+    else
+      {:error, "invalid FSM transition from #{inspect(from)} to #{inspect(to)}"}
     end
   end
 end

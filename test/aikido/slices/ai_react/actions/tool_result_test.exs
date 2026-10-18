@@ -1,8 +1,7 @@
-defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
+defmodule Aikido.Slices.AiReact.ToolResultTest do
   use ExUnit.Case, async: true
   alias Aikido.AI.TestActions.TestAdd
   alias Aikido.Slices.AiReact
-  nil
   alias Aikido.Slices.AiReact.Directives.LLMCall
   alias ReqLLM.Context
 
@@ -43,7 +42,7 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
 
     {:ok, new_slice, directives} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :tool_result},
+        {Aikido.Slices.AiReact, :tool_result},
         signal("req_1", "call_1", "test_add", "{\"result\":3}"),
         slice,
         %{},
@@ -63,7 +62,7 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
 
     {:ok, new_slice, [%LLMCall{} = directive]} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :tool_result},
+        {Aikido.Slices.AiReact, :tool_result},
         signal("req_1", "call_1", "test_add", "{\"result\":3}"),
         slice,
         %{},
@@ -87,7 +86,7 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
 
     {:ok, new_slice, [%LLMCall{} = directive]} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :tool_result},
+        {Aikido.Slices.AiReact, :tool_result},
         signal("req_1", "call_1", "test_add", "{\"result\":3}"),
         slice,
         %{},
@@ -108,7 +107,7 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
 
     {:ok, new_slice, [%LLMCall{}]} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :tool_result},
+        {Aikido.Slices.AiReact, :tool_result},
         signal("req_1", "call_1", "test_add", "{\"result\":3}"),
         slice,
         %{},
@@ -125,7 +124,7 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
 
     {:ok, returned, []} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :tool_result},
+        {Aikido.Slices.AiReact, :tool_result},
         signal("req_old", "call_1", "test_add", "{}"),
         slice,
         %{},
@@ -141,7 +140,7 @@ defmodule Aikido.Slices.AiReact.Actions.ToolResultTest do
 
     {:ok, returned, []} =
       AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact.Actions, :tool_result},
+        {Aikido.Slices.AiReact, :tool_result},
         signal("req_1", "call_1", "test_add", "{}"),
         slice,
         %{},

@@ -2,7 +2,7 @@ defmodule AikidoTest.Memory.MemoryTest do
   use ExUnit.Case, async: true
 
   alias Aikido.Slices.Memory.Space
-  alias Aikido.Slices.Memory.State
+  alias Aikido.Slices.Memory, as: State
 
   describe "new/0,1" do
     test "creates memory with default spaces" do

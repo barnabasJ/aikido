@@ -39,5 +39,4 @@ defmodule Aikido.Dsl.Schema do
 
     module
   end
-
 end

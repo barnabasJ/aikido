@@ -1,208 +1,216 @@
-defmodule AikidoTest.Observe.ConfigTest do
-  use ExUnit.Case, async: false
-
-  alias Aikido.Config.Defaults
-  alias Aikido.Debug
-  alias Aikido.Observe.Config
-
-  @test_instance :"aikido_observe_config_#{System.unique_integer([:positive])}"
-
-  defmodule ValidTracer do
-    @moduledoc false
-    @behaviour Aikido.Observe.Tracer
-
-    @impl true
-    def span_start(_event_prefix, _metadata), do: :ok
-
-    @impl true
-    def span_stop(_ctx, _measurements), do: :ok
-
-    @impl true
-    def span_exception(_ctx, _kind, _reason, _stacktrace), do: :ok
+defmodule AikidoTest.Observe.ConfigTest.ValidTracer do
+  @moduledoc false
+  @behaviour Aikido.Observe.Tracer
+  @impl true
+  def span_start(_event_prefix, _metadata) do
+    :ok
   end
 
+  @impl true
+  def span_stop(_ctx, _measurements) do
+    :ok
+  end
+
+  @impl true
+  def span_exception(_ctx, _kind, _reason, _stacktrace) do
+    :ok
+  end
+end
+
+defmodule AikidoTest.Observe.ConfigTest do
+  use ExUnit.Case, async: false
+  @test_instance :"aikido_observe_config_#{System.unique_integer([:positive])}"
+
   setup do
-    Debug.reset(@test_instance)
+    Aikido.Debug.reset(@test_instance)
 
     on_exit(fn ->
       Application.delete_env(:aikido, :telemetry)
       Application.delete_env(:aikido, :observability)
-      Debug.reset(@test_instance)
+      Aikido.Debug.reset(@test_instance)
     end)
 
     :ok
   end
 
-  describe "telemetry_log_level/1" do
+  describe("telemetry_log_level/1") do
     test "returns default when no config set" do
-      assert Config.telemetry_log_level(nil) == Defaults.telemetry_log_level()
+      assert Aikido.Observe.Config.telemetry_log_level(nil) ==
+               Aikido.Config.Defaults.telemetry_log_level()
     end
 
     test "reads from global config" do
       Application.put_env(:aikido, :telemetry, log_level: :info)
-      assert Config.telemetry_log_level(nil) == :info
+      assert Aikido.Observe.Config.telemetry_log_level(nil) == :info
     end
 
     test "falls back to default when global value is invalid" do
       Application.put_env(:aikido, :telemetry, log_level: :invalid)
-      assert Config.telemetry_log_level(nil) == Defaults.telemetry_log_level()
+
+      assert Aikido.Observe.Config.telemetry_log_level(nil) ==
+               Aikido.Config.Defaults.telemetry_log_level()
     end
 
     test "nil instance skips debug override" do
-      assert Config.telemetry_log_level(nil) == Defaults.telemetry_log_level()
+      assert Aikido.Observe.Config.telemetry_log_level(nil) ==
+               Aikido.Config.Defaults.telemetry_log_level()
     end
   end
 
-  describe "telemetry_log_args/1" do
+  describe("telemetry_log_args/1") do
     test "returns default when no config set" do
-      assert Config.telemetry_log_args(nil) == Defaults.telemetry_log_args()
+      assert Aikido.Observe.Config.telemetry_log_args(nil) ==
+               Aikido.Config.Defaults.telemetry_log_args()
     end
 
     test "reads from global config" do
       Application.put_env(:aikido, :telemetry, log_args: :full)
-      assert Config.telemetry_log_args(nil) == :full
+      assert Aikido.Observe.Config.telemetry_log_args(nil) == :full
     end
 
     test "falls back to default when value is invalid" do
       Application.put_env(:aikido, :telemetry, log_args: :verbose)
-      assert Config.telemetry_log_args(nil) == Defaults.telemetry_log_args()
+
+      assert Aikido.Observe.Config.telemetry_log_args(nil) ==
+               Aikido.Config.Defaults.telemetry_log_args()
     end
   end
 
-  describe "slow_signal_threshold_ms/1" do
+  describe("slow_signal_threshold_ms/1") do
     test "returns default" do
-      assert Config.slow_signal_threshold_ms(nil) == Defaults.slow_signal_threshold_ms()
+      assert Aikido.Observe.Config.slow_signal_threshold_ms(nil) ==
+               Aikido.Config.Defaults.slow_signal_threshold_ms()
     end
 
     test "reads from global config" do
       Application.put_env(:aikido, :telemetry, slow_signal_threshold_ms: 50)
-      assert Config.slow_signal_threshold_ms(nil) == 50
+      assert Aikido.Observe.Config.slow_signal_threshold_ms(nil) == 50
     end
 
     test "falls back to default when value is invalid" do
       Application.put_env(:aikido, :telemetry, slow_signal_threshold_ms: -5)
-      assert Config.slow_signal_threshold_ms(nil) == Defaults.slow_signal_threshold_ms()
+
+      assert Aikido.Observe.Config.slow_signal_threshold_ms(nil) ==
+               Aikido.Config.Defaults.slow_signal_threshold_ms()
     end
   end
 
-  describe "slow_directive_threshold_ms/1" do
+  describe("slow_directive_threshold_ms/1") do
     test "returns default" do
-      assert Config.slow_directive_threshold_ms(nil) == Defaults.slow_directive_threshold_ms()
+      assert Aikido.Observe.Config.slow_directive_threshold_ms(nil) ==
+               Aikido.Config.Defaults.slow_directive_threshold_ms()
     end
 
     test "falls back to default when value is invalid" do
       Application.put_env(:aikido, :telemetry, slow_directive_threshold_ms: "slow")
-      assert Config.slow_directive_threshold_ms(nil) == Defaults.slow_directive_threshold_ms()
+
+      assert Aikido.Observe.Config.slow_directive_threshold_ms(nil) ==
+               Aikido.Config.Defaults.slow_directive_threshold_ms()
     end
   end
 
-  describe "interesting_signal_types/1" do
+  describe("interesting_signal_types/1") do
     test "returns default list" do
-      types = Config.interesting_signal_types(nil)
+      types = Aikido.Observe.Config.interesting_signal_types(nil)
       assert is_list(types)
     end
 
     test "falls back to defaults when list contains non-strings" do
       Application.put_env(:aikido, :telemetry, interesting_signal_types: ["ok", 123])
-      assert Config.interesting_signal_types(nil) == Defaults.interesting_signal_types()
+
+      assert Aikido.Observe.Config.interesting_signal_types(nil) ==
+               Aikido.Config.Defaults.interesting_signal_types()
     end
   end
 
-  describe "trace_enabled?/1" do
+  describe("trace_enabled?/1") do
     test "false by default" do
-      refute Config.trace_enabled?(nil)
+      refute Aikido.Observe.Config.trace_enabled?(nil)
     end
 
     test "true when log level is trace" do
       Application.put_env(:aikido, :telemetry, log_level: :trace)
-      assert Config.trace_enabled?(nil)
+      assert Aikido.Observe.Config.trace_enabled?(nil)
     end
   end
 
-  describe "debug_enabled?/1" do
+  describe("debug_enabled?/1") do
     test "false by default (default log level is :info)" do
-      refute Config.debug_enabled?(nil)
+      refute Aikido.Observe.Config.debug_enabled?(nil)
     end
 
     test "false when log level is info" do
       Application.put_env(:aikido, :telemetry, log_level: :info)
-      refute Config.debug_enabled?(nil)
+      refute Aikido.Observe.Config.debug_enabled?(nil)
     end
   end
 
-  describe "action_log_level/1" do
+  describe("action_log_level/1") do
     test "suppresses verbose action logs when args are keys_only" do
       Application.put_env(:aikido, :telemetry, log_level: :debug, log_args: :keys_only)
-
-      assert Config.action_log_level(nil) == :warning
+      assert Aikido.Observe.Config.action_log_level(nil) == :warning
     end
 
     test "enables full action logs only when args are full" do
       Application.put_env(:aikido, :telemetry, log_level: :debug, log_args: :full)
-
-      assert Config.action_log_level(nil) == :debug
+      assert Aikido.Observe.Config.action_log_level(nil) == :debug
     end
 
     test "maps trace telemetry to debug for action logger" do
       Application.put_env(:aikido, :telemetry, log_level: :trace, log_args: :full)
-
-      assert Config.action_log_level(nil) == :debug
+      assert Aikido.Observe.Config.action_log_level(nil) == :debug
     end
 
     test "honors debug override for keys_only mode" do
       Application.put_env(:aikido, :telemetry, log_level: :trace, log_args: :full)
-      Debug.enable(@test_instance, :on)
-
-      assert Config.action_log_level(@test_instance) == :warning
+      Aikido.Debug.enable(@test_instance, :on)
+      assert Aikido.Observe.Config.action_log_level(@test_instance) == :warning
     end
 
     test "honors verbose debug override for full args" do
       Application.put_env(:aikido, :telemetry, log_level: :warning, log_args: :none)
-      Debug.enable(@test_instance, :verbose)
-
-      assert Config.action_log_level(@test_instance) == :debug
+      Aikido.Debug.enable(@test_instance, :verbose)
+      assert Aikido.Observe.Config.action_log_level(@test_instance) == :debug
     end
   end
 
-  describe "action_telemetry_mode/1" do
+  describe("action_telemetry_mode/1") do
     test "suppresses action telemetry when args are keys_only" do
       Application.put_env(:aikido, :telemetry, log_level: :debug, log_args: :keys_only)
-
-      assert Config.action_telemetry_mode(nil) == :silent
+      assert Aikido.Observe.Config.action_telemetry_mode(nil) == :silent
     end
 
     test "suppresses action telemetry when args are none" do
       Application.put_env(:aikido, :telemetry, log_level: :debug, log_args: :none)
-
-      assert Config.action_telemetry_mode(nil) == :silent
+      assert Aikido.Observe.Config.action_telemetry_mode(nil) == :silent
     end
 
     test "enables action telemetry only when args are full" do
       Application.put_env(:aikido, :telemetry, log_level: :debug, log_args: :full)
-
-      assert Config.action_telemetry_mode(nil) == :full
+      assert Aikido.Observe.Config.action_telemetry_mode(nil) == :full
     end
 
     test "honors verbose debug override for full action telemetry" do
       Application.put_env(:aikido, :telemetry, log_level: :warning, log_args: :none)
-      Debug.enable(@test_instance, :verbose)
-
-      assert Config.action_telemetry_mode(@test_instance) == :full
+      Aikido.Debug.enable(@test_instance, :verbose)
+      assert Aikido.Observe.Config.action_telemetry_mode(@test_instance) == :full
     end
   end
 
-  describe "action_exec_opts/2" do
+  describe("action_exec_opts/2") do
     test "adds derived exec options without overwriting explicit opts" do
       Application.put_env(:aikido, :telemetry, log_level: :debug, log_args: :keys_only)
-
-      opts = Config.action_exec_opts(nil, timeout: 10)
-
+      opts = Aikido.Observe.Config.action_exec_opts(nil, timeout: 10)
       assert Keyword.get(opts, :log_level) == :warning
       assert Keyword.get(opts, :telemetry) == :silent
       assert Keyword.get(opts, :timeout) == 10
 
       explicit_opts =
-        Config.action_exec_opts(nil, log_level: :error, telemetry: :full, timeout: 10)
+        Aikido.Observe.Config.action_exec_opts(nil,
+          log_level: :error,
+          telemetry: :full,
+          timeout: 10
+        )
 
       assert Keyword.get(explicit_opts, :log_level) == :error
       assert Keyword.get(explicit_opts, :telemetry) == :full
@@ -211,9 +219,7 @@ defmodule AikidoTest.Observe.ConfigTest do
 
     test "strips internal Aikido instance plumbing before calling Aikido.Exec" do
       Application.put_env(:aikido, :telemetry, log_level: :debug, log_args: :keys_only)
-
-      opts = Config.action_exec_opts(nil, __aikido_instance__: Aikido, timeout: 10)
-
+      opts = Aikido.Observe.Config.action_exec_opts(nil, __aikido_instance__: Aikido, timeout: 10)
       refute Keyword.has_key?(opts, :__aikido_instance__)
       assert Keyword.get(opts, :log_level) == :warning
       assert Keyword.get(opts, :telemetry) == :silent
@@ -221,137 +227,148 @@ defmodule AikidoTest.Observe.ConfigTest do
     end
   end
 
-  describe "observe_log_level/1" do
+  describe("observe_log_level/1") do
     test "returns default" do
-      assert Config.observe_log_level(nil) == Defaults.observe_log_level()
+      assert Aikido.Observe.Config.observe_log_level(nil) ==
+               Aikido.Config.Defaults.observe_log_level()
     end
 
     test "reads from global observability config" do
       Application.put_env(:aikido, :observability, log_level: :debug)
-      assert Config.observe_log_level(nil) == :debug
+      assert Aikido.Observe.Config.observe_log_level(nil) == :debug
     end
 
     test "falls back to default for invalid logger level" do
       Application.put_env(:aikido, :observability, log_level: :invalid)
-      assert Config.observe_log_level(nil) == Defaults.observe_log_level()
+
+      assert Aikido.Observe.Config.observe_log_level(nil) ==
+               Aikido.Config.Defaults.observe_log_level()
     end
   end
 
-  describe "debug_events/1" do
+  describe("debug_events/1") do
     test "returns :off by default" do
-      assert Config.debug_events(nil) == Defaults.observe_debug_events()
+      assert Aikido.Observe.Config.debug_events(nil) ==
+               Aikido.Config.Defaults.observe_debug_events()
     end
 
     test "reads from global observability config" do
       Application.put_env(:aikido, :observability, debug_events: :all)
-      assert Config.debug_events(nil) == :all
+      assert Aikido.Observe.Config.debug_events(nil) == :all
     end
 
     test "falls back to default when value is invalid" do
       Application.put_env(:aikido, :observability, debug_events: :everything)
-      assert Config.debug_events(nil) == Defaults.observe_debug_events()
+
+      assert Aikido.Observe.Config.debug_events(nil) ==
+               Aikido.Config.Defaults.observe_debug_events()
     end
   end
 
-  describe "debug_events_enabled?/1" do
+  describe("debug_events_enabled?/1") do
     test "false by default" do
-      refute Config.debug_events_enabled?(nil)
+      refute Aikido.Observe.Config.debug_events_enabled?(nil)
     end
 
     test "true when debug_events is :all" do
       Application.put_env(:aikido, :observability, debug_events: :all)
-      assert Config.debug_events_enabled?(nil)
+      assert Aikido.Observe.Config.debug_events_enabled?(nil)
     end
 
     test "true when debug_events is :minimal" do
       Application.put_env(:aikido, :observability, debug_events: :minimal)
-      assert Config.debug_events_enabled?(nil)
+      assert Aikido.Observe.Config.debug_events_enabled?(nil)
     end
   end
 
-  describe "redact_sensitive?/1" do
+  describe("redact_sensitive?/1") do
     test "false by default" do
-      refute Config.redact_sensitive?(nil)
+      refute Aikido.Observe.Config.redact_sensitive?(nil)
     end
 
     test "reads from global observability config" do
       Application.put_env(:aikido, :observability, redact_sensitive: true)
-      assert Config.redact_sensitive?(nil)
+      assert Aikido.Observe.Config.redact_sensitive?(nil)
     end
   end
 
-  describe "tracer/1" do
+  describe("tracer/1") do
     test "returns NoopTracer by default" do
-      assert Config.tracer(nil) == Aikido.Observe.NoopTracer
+      assert Aikido.Observe.Config.tracer(nil) == Aikido.Observe.NoopTracer
     end
 
     test "returns configured tracer when it implements the contract" do
-      Application.put_env(:aikido, :observability, tracer: ValidTracer)
-      assert Config.tracer(nil) == ValidTracer
+      Application.put_env(:aikido, :observability,
+        tracer: AikidoTest.Observe.ConfigTest.ValidTracer
+      )
+
+      assert Aikido.Observe.Config.tracer(nil) == AikidoTest.Observe.ConfigTest.ValidTracer
     end
 
     test "falls back to default tracer when configured module is invalid" do
       Application.put_env(:aikido, :observability, tracer: Date)
-      assert Config.tracer(nil) == Defaults.tracer()
+      assert Aikido.Observe.Config.tracer(nil) == Aikido.Config.Defaults.tracer()
     end
   end
 
-  describe "tracer_failure_mode/1" do
+  describe("tracer_failure_mode/1") do
     test "returns :warn by default" do
-      assert Config.tracer_failure_mode(nil) == :warn
+      assert Aikido.Observe.Config.tracer_failure_mode(nil) == :warn
     end
 
     test "reads from global observability config" do
       Application.put_env(:aikido, :observability, tracer_failure_mode: :strict)
-      assert Config.tracer_failure_mode(nil) == :strict
+      assert Aikido.Observe.Config.tracer_failure_mode(nil) == :strict
     end
 
     test "falls back to default when value is invalid" do
       Application.put_env(:aikido, :observability, tracer_failure_mode: :invalid)
-      assert Config.tracer_failure_mode(nil) == :warn
+      assert Aikido.Observe.Config.tracer_failure_mode(nil) == :warn
     end
   end
 
-  describe "debug_max_events/1" do
+  describe("debug_max_events/1") do
     test "returns default by default" do
-      assert Config.debug_max_events(nil) == Defaults.debug_max_events()
+      assert Aikido.Observe.Config.debug_max_events(nil) ==
+               Aikido.Config.Defaults.debug_max_events()
     end
 
     test "reads from global telemetry config" do
       Application.put_env(:aikido, :telemetry, debug_max_events: 1000)
-      assert Config.debug_max_events(nil) == 1000
+      assert Aikido.Observe.Config.debug_max_events(nil) == 1000
     end
 
     test "falls back to default when value is invalid" do
       Application.put_env(:aikido, :telemetry, debug_max_events: -1)
-      assert Config.debug_max_events(nil) == Defaults.debug_max_events()
+
+      assert Aikido.Observe.Config.debug_max_events(nil) ==
+               Aikido.Config.Defaults.debug_max_events()
     end
   end
 
-  describe "level_enabled?/2" do
+  describe("level_enabled?/2") do
     test "debug is not enabled at info level" do
-      refute Config.level_enabled?(nil, :debug)
+      refute Aikido.Observe.Config.level_enabled?(nil, :debug)
     end
 
     test "trace is not enabled at debug level" do
-      refute Config.level_enabled?(nil, :trace)
+      refute Aikido.Observe.Config.level_enabled?(nil, :trace)
     end
 
     test "info is enabled at debug level" do
-      assert Config.level_enabled?(nil, :info)
+      assert Aikido.Observe.Config.level_enabled?(nil, :info)
     end
   end
 
-  describe "interesting_signal_type?/2" do
+  describe("interesting_signal_type?/2") do
     test "returns true for types listed in interesting_signal_types config" do
       Application.put_env(:aikido, :telemetry, interesting_signal_types: ["my.app.event"])
       on_exit(fn -> Application.delete_env(:aikido, :telemetry) end)
-
-      assert Config.interesting_signal_type?(nil, "my.app.event")
+      assert Aikido.Observe.Config.interesting_signal_type?(nil, "my.app.event")
     end
 
     test "returns false for unknown types" do
-      refute Config.interesting_signal_type?(nil, "some.random.signal")
+      refute Aikido.Observe.Config.interesting_signal_type?(nil, "some.random.signal")
     end
   end
 end

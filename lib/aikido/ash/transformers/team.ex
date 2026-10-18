@@ -16,7 +16,6 @@ defmodule Aikido.Ash.Transformers.Team do
     :broadcast,
     :assign_task
   ]
-  @events ~w(cleanup started stopped failed exited timeout operation.completed task.completed task.failed task.timeout)
 
   def before?(Aikido.Ash.Transformers.Agent), do: true
   def before?(_), do: false
@@ -77,49 +76,8 @@ defmodule Aikido.Ash.Transformers.Team do
   end
 
   defp build(dsl, config) do
-    resource = Transformer.get_persisted(dsl, :module)
-    slice = Module.concat(resource, TeamSlice)
-
-    types =
-      Enum.map(@commands ++ @events, &"aikido.ash.team.#{&1}") ++
-        ["aikido.agent.child.started", "aikido.agent.child.exit"]
-
-    routes = for type <- types, do: {type, {resource, String.to_atom("__" <> type)}}
-
-    dsl =
-      Enum.reduce(routes, dsl, fn {_type, {_resource, name}}, dsl ->
-        {:ok, dsl} =
-          Builder.add_action(dsl, :action, name,
-            public?: false,
-            returns: Aikido.ActionResult,
-            arguments: [arg(:state, :term), arg(:data, :map, default: %{})],
-            run: {Aikido.Ash.Team.Action, []}
-          )
-
-        dsl
-      end)
-
-    Module.create(
-      slice,
-      quote do
-        use Aikido.Slice
-
-        @persist {:aikido_slice_schema, Aikido.Ash.Team.State}
-
-        slice do
-          name "ash_team"
-        end
-
-        signal_routes do
-          (unquote_splicing(
-             for {type, target} <- routes do
-               quote do: route(unquote(type), unquote(Macro.escape(target)))
-             end
-           ))
-        end
-      end,
-      Macro.Env.location(__ENV__)
-    )
+    slice = Aikido.Ash.Team.State
+    Code.ensure_compiled!(slice)
 
     dsl =
       dsl
@@ -145,7 +103,7 @@ defmodule Aikido.Ash.Transformers.Team do
         Transformer.add_entity(dsl, [:agent], %Aikido.Ash.Agent.Signal{
           name: if(command == :start, do: :configure_topology, else: command),
           type: "aikido.ash.team.#{command}",
-          target: {resource, String.to_atom("__aikido.ash.team.#{command}")}
+          target: {slice, command}
         })
 
       case Builder.add_new_action(

@@ -32,95 +32,31 @@ defmodule Aikido.Ash.Transformers.Slice do
         )
 
       true ->
-        generate(dsl, routes, schedules)
+        resource = Transformer.get_persisted(dsl, :module)
+        config = Transformer.get_entities(dsl, [:slice, :config_schema])
+        dsl = Transformer.persist(dsl, :aikido_slice_schema, resource)
+
+        if config == [] do
+          {:ok, dsl}
+        else
+          contract =
+            Aikido.Dsl.Schema.create_typed_struct_module(Module.concat(resource, Config), config)
+
+          {:ok, Transformer.set_option(dsl, [:slice], :config_schema, contract)}
+        end
     end
   end
 
   defp invalid_action?(dsl, name) do
     case Ash.Resource.Info.action(dsl, name) do
       %{type: :action, returns: Aikido.ActionResult, arguments: arguments} ->
-        names = Enum.map(arguments, & &1.name)
-        :state not in names
+        !Enum.any?(arguments, &(&1.name == :state))
 
       _ ->
         true
     end
   end
 
-  defp generate(dsl, routes, schedules) do
-    resource = Transformer.get_persisted(dsl, :module)
-    name = Transformer.get_option(dsl, [:slice], :name)
-
-    scheduled_routes =
-      schedules
-      |> Enum.reject(fn entry -> Enum.any?(routes, &(&1.action == entry.action)) end)
-      |> Enum.map(fn entry ->
-        %Aikido.Ash.Slice.Route{
-          type: "aikido.ash.schedule.#{name}.#{entry.action}",
-          action: entry.action
-        }
-      end)
-
-    # Action ownership comes from routes, including actions used only by cron.
-    routing =
-      Enum.map(routes ++ scheduled_routes, fn route ->
-        target = {resource, route.action}
-
-        quote do
-          route unquote(route.type), unquote(Macro.escape(target))
-        end
-      end)
-
-    subscriptions =
-      Enum.map(Transformer.get_entities(dsl, [:subscriptions]), fn entry ->
-        quote do
-          subscription unquote(entry.sensor), unquote(Macro.escape(entry.config))
-        end
-      end)
-
-    scheduled =
-      Enum.map(schedules, fn entry ->
-        target = {resource, entry.action}
-
-        quote do
-          schedule unquote(entry.cron), unquote(Macro.escape(target)),
-            data: unquote(Macro.escape(entry.data))
-        end
-      end)
-
-    block =
-      quote do
-        defmodule unquote(Module.concat(resource, AikidoSlice)) do
-          import Aikido.Ash.Slice, only: []
-          use Aikido.Slice
-
-          @doc false
-          def __aikido_resource__, do: unquote(resource)
-
-          @persist {:aikido_slice_schema, unquote(resource)}
-
-          slice do
-            name unquote(name)
-          end
-
-          signal_routes do
-            (unquote_splicing(routing))
-          end
-
-          subscriptions do
-            (unquote_splicing(subscriptions))
-          end
-
-          schedules do
-            (unquote_splicing(scheduled))
-          end
-        end
-      end
-
-    {:ok, Transformer.eval(dsl, [], block)}
-  end
-
-  defp error(message) do
-    {:error, Spark.Error.DslError.exception(message: message, path: [:slice])}
-  end
+  defp error(message),
+    do: {:error, Spark.Error.DslError.exception(message: message, path: [:slice])}
 end

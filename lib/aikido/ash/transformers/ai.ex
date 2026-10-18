@@ -89,7 +89,7 @@ defmodule Aikido.Ash.Transformers.AI do
       Transformer.add_entity(dsl, [:agent], %Aikido.Ash.Agent.Signal{
         name: name,
         type: "ai.react.#{name}",
-        target: {Aikido.Slices.AiReact.Actions, name}
+        target: {Aikido.Slices.AiReact, name}
       })
 
     Builder.add_new_action(dsl, :action, name,

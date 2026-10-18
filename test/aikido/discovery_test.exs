@@ -1,63 +1,50 @@
+defmodule AikidoTest.DiscoveryTest.TestAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    Aikido.ActionResult.new(state: %{}, directives: [])
+  end
+end
+
+defmodule AikidoTest.DiscoveryTest.TestAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+
+  @persist {:aikido_action_metadata,
+            %{name: "discovery_test_action", description: "Test action for discovery"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      description "Test action for discovery"
+      run {AikidoTest.DiscoveryTest.TestAction.Implementation, action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.DiscoveryTest.TestAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "discovery_test_agent"
+    description "Test agent for discovery"
+    category "test"
+    tags ["discovery", "test"]
+  end
+end
+
 defmodule AikidoTest.DiscoveryTest do
   use ExUnit.Case, async: false
-  alias Aikido.Discovery
-
-  defmodule TestAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-    @persist {:aikido_action_metadata,
-              %{name: "discovery_test_action", description: "Test action for discovery"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-        description("Test action for discovery")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, _slice, _opts, _ctx) do
-      {:ok, %{}, []}
-    end
-  end
-
-  defmodule TestAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name("discovery_test_agent")
-      description("Test agent for discovery")
-      category("test")
-      tags(["discovery", "test"])
-    end
-  end
 
   setup do
-    Discovery.refresh()
+    Aikido.Discovery.refresh()
     :ok
   end
 
   describe("init_async/0") do
     test "returns a Task" do
-      task = Discovery.init_async()
+      task = Aikido.Discovery.init_async()
       assert %Task{} = task
       Task.await(task)
     end
@@ -65,20 +52,20 @@ defmodule AikidoTest.DiscoveryTest do
 
   describe("refresh/0") do
     test "refreshes the catalog" do
-      assert :ok = Discovery.refresh()
+      assert :ok = Aikido.Discovery.refresh()
     end
   end
 
   describe("last_updated/0") do
     test "returns timestamp after initialization" do
-      {:ok, timestamp} = Discovery.last_updated()
+      {:ok, timestamp} = Aikido.Discovery.last_updated()
       assert %DateTime{} = timestamp
     end
   end
 
   describe("catalog/0") do
     test "returns full catalog" do
-      {:ok, catalog} = Discovery.catalog()
+      {:ok, catalog} = Aikido.Discovery.catalog()
       assert Map.has_key?(catalog, :last_updated)
       assert Map.has_key?(catalog, :components)
       assert Map.has_key?(catalog.components, :actions)
@@ -91,18 +78,18 @@ defmodule AikidoTest.DiscoveryTest do
 
   describe("list_actions/1") do
     test "returns a list of actions" do
-      actions = Discovery.list_actions()
+      actions = Aikido.Discovery.list_actions()
       assert is_list(actions)
     end
 
     test "filters by limit" do
-      actions = Discovery.list_actions(limit: 2)
+      actions = Aikido.Discovery.list_actions(limit: 2)
       assert length(actions) <= 2
     end
 
     test "filters by offset" do
-      all_actions = Discovery.list_actions()
-      offset_actions = Discovery.list_actions(offset: 1)
+      all_actions = Aikido.Discovery.list_actions()
+      offset_actions = Aikido.Discovery.list_actions(offset: 1)
 
       if length(all_actions) > 1 do
         assert length(offset_actions) == length(all_actions) - 1
@@ -110,41 +97,41 @@ defmodule AikidoTest.DiscoveryTest do
     end
 
     test "filters by name" do
-      actions = Discovery.list_actions(name: "discovery_test")
+      actions = Aikido.Discovery.list_actions(name: "discovery_test")
       assert Enum.all?(actions, fn a -> String.contains?(a[:name] || "", "discovery_test") end)
     end
 
     test "filters by description" do
-      actions = Discovery.list_actions(description: "discovery")
+      actions = Aikido.Discovery.list_actions(description: "discovery")
       assert Enum.all?(actions, fn a -> String.contains?(a[:description] || "", "discovery") end)
     end
 
     test "filters by category" do
-      actions = Discovery.list_actions(category: :utility)
+      actions = Aikido.Discovery.list_actions(category: :utility)
       assert Enum.all?(actions, fn a -> a[:category] == :utility end)
     end
 
     test "filters by tag" do
-      actions = Discovery.list_actions(tag: :test)
+      actions = Aikido.Discovery.list_actions(tag: :test)
       assert Enum.all?(actions, fn a -> is_list(a[:tags]) and :test in a[:tags] end)
     end
   end
 
   describe("list_sensors/1") do
     test "returns a list of sensors" do
-      sensors = Discovery.list_sensors()
+      sensors = Aikido.Discovery.list_sensors()
       assert is_list(sensors)
     end
 
     test "filters by limit" do
-      sensors = Discovery.list_sensors(limit: 1)
+      sensors = Aikido.Discovery.list_sensors(limit: 1)
       assert length(sensors) <= 1
     end
   end
 
   describe("list_agents/1") do
     test "returns a list of agents" do
-      agents = Discovery.list_agents()
+      agents = Aikido.Discovery.list_agents()
       assert is_list(agents)
     end
 
@@ -153,7 +140,9 @@ defmodule AikidoTest.DiscoveryTest do
 
       spec =
         {:application, app,
-         description: ~c"Aikido discovery test app", vsn: ~c"0.1.0", modules: [TestAgent]}
+         description: ~c"Aikido discovery test app",
+         vsn: ~c"0.1.0",
+         modules: [AikidoTest.DiscoveryTest.TestAgent]}
 
       load_result =
         case :application.load(spec) do
@@ -173,59 +162,59 @@ defmodule AikidoTest.DiscoveryTest do
         assert unload_result == :ok
       end)
 
-      :ok = Discovery.refresh()
-      agents = Discovery.list_agents()
+      :ok = Aikido.Discovery.refresh()
+      agents = Aikido.Discovery.list_agents()
       agent = Enum.find(agents, &(&1[:name] == "discovery_test_agent"))
       assert agent != nil
       assert agent[:description] == "Test agent for discovery"
       assert agent[:category] == "test"
       assert is_list(agent[:tags]) and "discovery" in agent[:tags]
-      assert agent[:module] == TestAgent
+      assert agent[:module] == AikidoTest.DiscoveryTest.TestAgent
       assert Map.has_key?(agent, :schema)
       assert Map.has_key?(agent, :slug)
     end
 
     test "filters by limit" do
-      agents = Discovery.list_agents(limit: 1)
+      agents = Aikido.Discovery.list_agents(limit: 1)
       assert length(agents) <= 1
     end
   end
 
   describe("list_slices/1") do
     test "returns a list of slices" do
-      slices = Discovery.list_slices()
+      slices = Aikido.Discovery.list_slices()
       assert is_list(slices)
     end
 
     test "filters by limit" do
-      slices = Discovery.list_slices(limit: 1)
+      slices = Aikido.Discovery.list_slices(limit: 1)
       assert length(slices) <= 1
     end
   end
 
   describe("list_demos/1") do
     test "returns a list of demos" do
-      demos = Discovery.list_demos()
+      demos = Aikido.Discovery.list_demos()
       assert is_list(demos)
     end
 
     test "filters by limit" do
-      demos = Discovery.list_demos(limit: 1)
+      demos = Aikido.Discovery.list_demos(limit: 1)
       assert length(demos) <= 1
     end
   end
 
   describe("get_action_by_slug/1") do
     test "returns nil for non-existent slug" do
-      assert nil == Discovery.get_action_by_slug("nonexistent_slug_123")
+      assert nil == Aikido.Discovery.get_action_by_slug("nonexistent_slug_123")
     end
 
     test "returns action for valid slug" do
-      actions = Discovery.list_actions(limit: 1)
+      actions = Aikido.Discovery.list_actions(limit: 1)
 
       if actions != [] do
         [action | _] = actions
-        found = Discovery.get_action_by_slug(action.slug)
+        found = Aikido.Discovery.get_action_by_slug(action.slug)
         assert found != nil
         assert found.slug == action.slug
       end
@@ -234,21 +223,21 @@ defmodule AikidoTest.DiscoveryTest do
 
   describe("get_sensor_by_slug/1") do
     test "returns nil for non-existent slug" do
-      assert nil == Discovery.get_sensor_by_slug("nonexistent_slug_123")
+      assert nil == Aikido.Discovery.get_sensor_by_slug("nonexistent_slug_123")
     end
   end
 
   describe("get_agent_by_slug/1") do
     test "returns nil for non-existent slug" do
-      assert nil == Discovery.get_agent_by_slug("nonexistent_slug_123")
+      assert nil == Aikido.Discovery.get_agent_by_slug("nonexistent_slug_123")
     end
 
     test "returns agent for valid slug" do
-      agents = Discovery.list_agents(limit: 1)
+      agents = Aikido.Discovery.list_agents(limit: 1)
 
       if agents != [] do
         [agent | _] = agents
-        found = Discovery.get_agent_by_slug(agent.slug)
+        found = Aikido.Discovery.get_agent_by_slug(agent.slug)
         assert found != nil
         assert found.slug == agent.slug
       end
@@ -257,21 +246,21 @@ defmodule AikidoTest.DiscoveryTest do
 
   describe("get_slice_by_slug/1") do
     test "returns nil for non-existent slug" do
-      assert nil == Discovery.get_slice_by_slug("nonexistent_slug_123")
+      assert nil == Aikido.Discovery.get_slice_by_slug("nonexistent_slug_123")
     end
   end
 
   describe("get_demo_by_slug/1") do
     test "returns nil for non-existent slug" do
-      assert nil == Discovery.get_demo_by_slug("nonexistent_slug_123")
+      assert nil == Aikido.Discovery.get_demo_by_slug("nonexistent_slug_123")
     end
   end
 
   describe("pagination") do
     test "offset and limit work together" do
-      all = Discovery.list_actions()
-      page1 = Discovery.list_actions(limit: 2, offset: 0)
-      page2 = Discovery.list_actions(limit: 2, offset: 2)
+      all = Aikido.Discovery.list_actions()
+      page1 = Aikido.Discovery.list_actions(limit: 2, offset: 0)
+      page2 = Aikido.Discovery.list_actions(limit: 2, offset: 2)
 
       if length(all) >= 4 do
         assert length(page1) == 2
@@ -282,7 +271,7 @@ defmodule AikidoTest.DiscoveryTest do
     end
 
     test "handles invalid limit gracefully" do
-      actions = Discovery.list_actions(limit: -1)
+      actions = Aikido.Discovery.list_actions(limit: -1)
       assert is_list(actions)
     end
   end
@@ -290,34 +279,34 @@ defmodule AikidoTest.DiscoveryTest do
   describe("catalog not initialized") do
     test "list functions return empty when catalog not initialized" do
       :persistent_term.erase(:aikido_discovery_catalog)
-      assert [] == Discovery.list_actions()
-      assert [] == Discovery.list_sensors()
-      assert [] == Discovery.list_agents()
-      assert [] == Discovery.list_slices()
-      assert [] == Discovery.list_demos()
-      Discovery.refresh()
+      assert [] == Aikido.Discovery.list_actions()
+      assert [] == Aikido.Discovery.list_sensors()
+      assert [] == Aikido.Discovery.list_agents()
+      assert [] == Aikido.Discovery.list_slices()
+      assert [] == Aikido.Discovery.list_demos()
+      Aikido.Discovery.refresh()
     end
 
     test "get_by_slug returns nil when catalog not initialized" do
       :persistent_term.erase(:aikido_discovery_catalog)
-      assert nil == Discovery.get_action_by_slug("any")
-      assert nil == Discovery.get_sensor_by_slug("any")
-      assert nil == Discovery.get_agent_by_slug("any")
-      assert nil == Discovery.get_slice_by_slug("any")
-      assert nil == Discovery.get_demo_by_slug("any")
-      Discovery.refresh()
+      assert nil == Aikido.Discovery.get_action_by_slug("any")
+      assert nil == Aikido.Discovery.get_sensor_by_slug("any")
+      assert nil == Aikido.Discovery.get_agent_by_slug("any")
+      assert nil == Aikido.Discovery.get_slice_by_slug("any")
+      assert nil == Aikido.Discovery.get_demo_by_slug("any")
+      Aikido.Discovery.refresh()
     end
 
     test "last_updated returns error when not initialized" do
       :persistent_term.erase(:aikido_discovery_catalog)
-      assert {:error, :not_initialized} = Discovery.last_updated()
-      Discovery.refresh()
+      assert {:error, :not_initialized} = Aikido.Discovery.last_updated()
+      Aikido.Discovery.refresh()
     end
 
     test "catalog returns error when not initialized" do
       :persistent_term.erase(:aikido_discovery_catalog)
-      assert {:error, :not_initialized} = Discovery.catalog()
-      Discovery.refresh()
+      assert {:error, :not_initialized} = Aikido.Discovery.catalog()
+      Aikido.Discovery.refresh()
     end
   end
 end

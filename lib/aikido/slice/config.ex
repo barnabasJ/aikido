@@ -60,7 +60,9 @@ defmodule Aikido.Slice.Config do
           values = Map.from_struct(validated)
 
           case Spark.Dsl.Extension.get_opt(slice_module, [:slice], :config_transform) do
-            nil -> {:ok, values}
+            nil ->
+              {:ok, values}
+
             {module, function, args} ->
               case apply(module, function, [values, [] | args]) do
                 {:ok, _} = result -> result

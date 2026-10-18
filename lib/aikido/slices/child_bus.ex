@@ -43,13 +43,10 @@ defmodule Aikido.Slices.ChildBus do
   the I/O and casts a result signal, the cascade action mutates the
   slice.
   """
-
-  alias Aikido.Slices.ChildBus.AutoSubscribeChild
-  alias Aikido.Slices.ChildBus.AutoUnsubscribeChild
-  alias Aikido.Slices.ChildBus.RecordSubscription
-  alias Aikido.Slices.ChildBus.RecordSubscriptionFailure
-
-  use Aikido.Slice
+  use Ash.Resource,
+    data_layer: :embedded,
+    validate_domain_inclusion?: false,
+    extensions: [Aikido.Ash.Slice]
 
   slice do
     name "child_bus"
@@ -57,6 +54,7 @@ defmodule Aikido.Slices.ChildBus do
 
     schema do
       attribute :bus, Aikido.Types.Validated,
+        public?: true,
         allow_nil?: false,
         constraints: [
           type: :atom,
@@ -66,22 +64,22 @@ defmodule Aikido.Slices.ChildBus do
         description: "Name of the Jido.Signal.Bus to subscribe children on."
 
       attribute :subscriptions, :map,
+        public?: true,
         allow_nil?: false,
         default: %{},
         description: "Per-tag subscription-id lists, used for cleanup on child.exit."
 
       attribute :failed_subscriptions, :map,
+        public?: true,
         allow_nil?: false,
         default: %{},
         description: "Per-tag list of subscription failures (path/reason/at) surfaced by the bus."
     end
-  end
 
-  signal_routes do
-    route "aikido.agent.child.started", AutoSubscribeChild
-    route "aikido.agent.child.exit", AutoUnsubscribeChild
-    route "child_bus.subscribed", RecordSubscription
-    route "child_bus.subscribe_failed", RecordSubscriptionFailure
+    route "aikido.agent.child.started", :auto_subscribe_child
+    route "aikido.agent.child.exit", :auto_unsubscribe_child
+    route "child_bus.subscribed", :record_subscription
+    route "child_bus.subscribe_failed", :record_subscription_failure
   end
 
   capabilities do
@@ -100,5 +98,52 @@ defmodule Aikido.Slices.ChildBus do
 
   def validate_bus_atom(other, _opts) do
     {:error, "Aikido.Slices.ChildBus requires a `:bus` atom; got #{inspect(other)}"}
+  end
+
+  actions do
+    action :auto_subscribe_child, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :pid, :term, allow_nil?: false
+      argument :child_module, :atom, allow_nil?: false
+      argument :tag, :term, allow_nil?: false
+      argument :parent_id, :string, allow_nil?: true
+      argument :child_id, :string, allow_nil?: true
+      argument :child_partition, :term, allow_nil?: true
+      argument :meta, :map, allow_nil?: true
+      description "Emit subscribe directives for each of a child's signal_routes."
+      run Aikido.Slices.ChildBus.AutoSubscribeChild
+    end
+
+    action :auto_unsubscribe_child, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :tag, :term, allow_nil?: false
+      argument :pid, :term, allow_nil?: true
+      argument :reason, :term, allow_nil?: true
+      description "Drop a child's subscription tracking and emit unsubscribe directives."
+      run Aikido.Slices.ChildBus.AutoUnsubscribeChild
+    end
+
+    action :record_subscription, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :tag, :term, allow_nil?: false
+      argument :sub_id, :term, allow_nil?: false
+      argument :path, :string, allow_nil?: true
+      description "Record a successful child-bus subscription's sub_id."
+      run Aikido.Slices.ChildBus.RecordSubscription
+    end
+
+    action :record_subscription_failure, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :tag, :term, allow_nil?: false
+      argument :path, :string, allow_nil?: false
+      argument :reason, :term, allow_nil?: false
+      argument :child_module, :atom, allow_nil?: true
+      description "Record a child-bus subscription that failed at the bus."
+      run Aikido.Slices.ChildBus.RecordSubscriptionFailure
+    end
   end
 end

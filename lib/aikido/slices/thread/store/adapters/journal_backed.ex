@@ -28,7 +28,7 @@ defmodule Aikido.Slices.Thread.Store.Adapters.JournalBacked do
   alias Jido.Signal.Journal
   alias Aikido.Slices.Thread.Entry
   alias Aikido.Slices.Thread.EntryNormalizer
-  alias Aikido.Slices.Thread.State
+  alias Aikido.Slices.Thread, as: State
 
   @signal_type "aikido.thread.entry"
 
