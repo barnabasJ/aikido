@@ -13,7 +13,7 @@ defmodule AikidoTest.Observe.SpanCtxTest do
   describe "schema/0" do
     test "returns the Ash field contract" do
       schema = SpanCtx.schema()
-      assert Aikido.Action.Schema.schema_type(schema) == :ash
+      assert Ash.Type.ash_type?(schema)
     end
   end
 

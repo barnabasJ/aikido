@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Build native action tools directly with `AshAi.Tools`; remove the custom
+  action schema/JSON Schema and tool-casting facades. Ash AI owns argument
+  validation and result serialization, including its `input` argument envelope.
+
 - Generate directive `t()` types once in the Spark host instead of maintaining
   handwritten struct types in each directive module.
 

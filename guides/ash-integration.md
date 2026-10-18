@@ -353,15 +353,15 @@ process-backed resource model described here.
 
 ## Native contracts and tools
 
-Actions, slice schemas, and sensor configuration also use `schema do` with Ash
-`attribute` declarations. Action output contracts use `output_schema do`, and
-slice configuration uses `config_schema do`. No separate input module is needed.
-Action inputs become native typed structs directly on the action module through
-Spark's transformer evaluation hook. Other plain contracts use a nested
-Ash.TypedStruct. Native constructors handle literal defaults, casting, and validation. Ash agents
-and slices reuse their existing resource attributes and native changesets,
-including resource function/MFA defaults. Ash/Splode errors retain their field
-paths and nested causes.
+Actions declare native Ash `argument`s and a return type. Reducers return
+`Aikido.ActionResult`; ordinary tools return their declared Ash type. Implement
+callbacks with `Ash.Resource.Actions.Implementation` modules and reference them
+with `run MyApp.Implementation` on the owning resource.
+
+Agent and slice `schema do` declarations become attributes on their existing
+Ash resources. Sensor and configuration contracts use Ash typed structs. Native
+Ash constructors and changesets handle defaults, casting, and validation;
+Ash/Splode errors retain their field paths and nested causes.
 
 AI tool callbacks receive the process-backed resource in trusted
 `agent_resource` context. Team members also carry `parent.meta.team_resource`
@@ -372,7 +372,7 @@ team without accepting team IDs or modules as model inputs. The example app's
 teams, delegate work, list templates, and stop or remove owned subtrees.
 
 Use `AshAi.build_tools_and_registry/1` to supply Ash tools and their callbacks.
-Resource/action pairs also use AshAI for schema generation and execution; their
+Resource/action pairs and module shorthand for `:run` also use AshAI for schema generation and execution; their
 arguments follow AshAI's `%{"input" => %{...}}` shape. Actor, tenant, and context
 are passed through to AshAI. Native validation remains authoritative for type
 constraints that AshAI does not currently expose in JSON Schema.

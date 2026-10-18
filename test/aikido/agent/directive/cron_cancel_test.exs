@@ -73,7 +73,7 @@ defmodule AikidoTest.Agent.Directives.CronCancelTest do
 
   describe "schema validation" do
     test "has valid schema" do
-      assert Aikido.Action.Schema.schema_type(CronCancel.schema()) == :ash
+      assert Ash.Type.ash_type?(CronCancel.schema())
     end
 
     test "enforces required job_id key" do

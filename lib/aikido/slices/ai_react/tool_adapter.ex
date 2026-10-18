@@ -1,49 +1,30 @@
 defmodule Aikido.Slices.AiReact.ToolAdapter do
   @moduledoc """
-  Adapts Aikido Actions into ReqLLM.Tool structs for LLM consumption.
+  Builds ReqLLM tools from native Ash actions through `AshAi.Tools`.
 
-  This module bridges Aikido domain concepts (actions with schemas) to ReqLLM's
-  tool representation.
+  Ash AI owns JSON schemas, argument casting, action execution, and serialization.
+  This module combines those tools with caller-supplied ReqLLM tools.
 
-  ## Design
+  Use `{MyApp.Tools, :search}` references or pass the tool/callback pairs returned
+  by `AshAi.build_tools_and_registry/1`. Module shorthand selects the resource's
+  native `:run` action. Ash AI tools accept arguments in an `input` object.
 
-  - **Schema-focused**: Tools use a noop callback; Aikido owns execution via `Aikido.Exec.run/4`
-  - **Adapter pattern**: Converts `Aikido.Action` behaviour → `ReqLLM.Tool` struct
-  - **Single source of truth**: All action→tool conversion goes through this module
-
-  ## Usage
-
-      # Convert action modules to ReqLLM tools
-      tools = Aikido.Slices.AiReact.ToolAdapter.from_actions([
-        MyApp.Actions.Calculator,
-        MyApp.Actions.Search
-      ])
-
-      # With options
-      tools = Aikido.Slices.AiReact.ToolAdapter.from_actions(actions,
-        prefix: "myapp_",
-        filter: fn mod -> Aikido.ActionRef.category(mod) == :search end
-      )
-
-      # Use in LLM call
-      ReqLLM.Generation.generate_text(model, context, tools: tools)
+  Caller-supplied ReqLLM tools keep their own parameter schemas and callbacks.
   """
-
-  alias Aikido.Action.Schema, as: ActionSchema
 
   # ============================================================================
   # Action Conversion
   # ============================================================================
 
   @doc """
-  Converts a list of Aikido.Action modules into ReqLLM.Tool structs.
+  Converts a list of Ash action references into ReqLLM.Tool structs.
 
-  The returned tools use a noop callback—they're purely for describing available
-  actions to the LLM. Actual execution happens via `Aikido.Exec.run/4`.
+  Ash AI builds the returned tool descriptors and executes their native actions.
+  The ReAct runtime delivers each result back as a signal.
 
   ## Arguments
 
-    * `action_modules` - List of modules implementing the `Aikido.Action` behaviour
+    * `action_modules` - List of modules implementing the native Ash actions
     * `opts` - Optional keyword list of options
 
   ## Options
@@ -112,11 +93,11 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
   end
 
   @doc """
-  Converts a single Aikido.Action module into a ReqLLM.Tool struct.
+  Converts a single Ash action reference into a ReqLLM.Tool struct.
 
   ## Arguments
 
-    * `action_module` - A module implementing the `Aikido.Action` behaviour
+    * `action_module` - A module implementing the native Ash actions
     * `opts` - Optional keyword list of options
 
   ## Options
@@ -152,25 +133,20 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
     {tool, _callback} =
       AshAi.Tools.build(ash_tool({resource, action_name}), Keyword.put_new(opts, :strict, false))
 
+    from_action(tool, Keyword.put_new(opts, :strict, false))
+  end
+
+  def from_action(resource, opts) when is_atom(resource) do
+    opts = Keyword.put_new(opts, :strict, infer_strict?(resource))
+    {tool, _callback} = AshAi.Tools.build(ash_tool(resource), opts)
     from_action(tool, opts)
   end
 
-  def from_action(action_module, opts) when is_atom(action_module) do
-    prefix = Keyword.get(opts, :prefix)
-
-    strict =
-      Keyword.get_lazy(opts, :strict, fn -> infer_strict?(action_module) end)
-
-    ReqLLM.Tool.new!(
-      name: apply_prefix(Map.get(Aikido.ActionRef.action_options(action_module), :name), prefix),
-      description: Map.get(Aikido.ActionRef.action_options(action_module), :description),
-      parameter_schema: build_json_schema(Aikido.ActionRef.schema(action_module)),
-      callback: &noop_callback/1,
-      strict: strict
-    )
+  @doc false
+  def ash_tool(resource) when is_atom(resource) do
+    %{ash_tool({resource, :run}) | name: Aikido.ActionRef.action_options(resource).name}
   end
 
-  @doc false
   def ash_tool({resource, action_name}) do
     action =
       Ash.Resource.Info.action(resource, action_name) ||
@@ -333,8 +309,6 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
     Enum.filter(modules, filter_fn)
   end
 
-  defp build_json_schema(schema), do: ActionSchema.to_json_schema(schema, strict: true)
-
   # Infers whether an action should use strict mode for LLM tool calling.
   #
   # Checks for a `strict?/0` callback on the action module, defaulting to false.
@@ -347,8 +321,6 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
   defp infer_strict?(module) do
     if function_exported?(module, :strict?, 0), do: module.strict?(), else: false
   end
-
-  defp noop_callback(_args), do: {:ok, %{}}
 
   defp apply_prefix(name, nil), do: name
   defp apply_prefix(name, prefix) when is_binary(prefix), do: prefix <> name

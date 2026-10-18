@@ -10,7 +10,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
       Keyword.get(opts, :tool_call, %{
         id: "call_1",
         name: "test_add",
-        arguments: %{"a" => 1, "b" => 2}
+        arguments: %{"input" => %{"a" => 1, "b" => 2}}
       })
 
     %ToolExec{
@@ -75,7 +75,13 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
     agent = spawn_agent_stub(test_pid)
 
     failing =
-      directive(tool_call: %{id: "call_2", name: "test_fails", arguments: %{"reason" => "nope"}})
+      directive(
+        tool_call: %{
+          id: "call_2",
+          name: "test_fails",
+          arguments: %{"input" => %{"reason" => "nope"}}
+        }
+      )
 
     :ok =
       run_in(agent, fn ->
@@ -84,7 +90,8 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     assert_receive {:cast, signal}, @receive_timeout
     assert signal.type == "ai.react.tool.completed"
-    assert Jason.decode!(signal.data.content) == %{"error" => "nope"}
+    assert %{"error" => error} = Jason.decode!(signal.data.content)
+    assert error =~ "nope"
   end
 
   test "encodes a 'tool not found' error when no module matches", %{aikido: aikido} do

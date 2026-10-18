@@ -129,7 +129,7 @@ defmodule AikidoTest.Agent.Directives.CronTest do
 
   describe "schema validation" do
     test "has valid schema" do
-      assert Aikido.Action.Schema.schema_type(Cron.schema()) == :ash
+      assert Ash.Type.ash_type?(Cron.schema())
     end
 
     test "enforces required keys" do

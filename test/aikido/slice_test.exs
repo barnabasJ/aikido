@@ -153,13 +153,11 @@ defmodule AikidoTest.SliceTest do
                {"send", AikidoTest.PluginTestAction}
              ]
 
-      assert Aikido.Action.Schema.schema_type(
-               Aikido.Dsl.Slice.Info.schema(AikidoTest.SliceTest.FullSlice)
-             ) == :ash
+      assert Ash.Type.ash_type?(Aikido.Dsl.Slice.Info.schema(AikidoTest.SliceTest.FullSlice))
 
-      assert Aikido.Action.Schema.schema_type(
+      assert Ash.Type.ash_type?(
                Aikido.Dsl.Slice.Info.config_schema(AikidoTest.SliceTest.FullSlice)
-             ) == :ash
+             )
     end
   end
 

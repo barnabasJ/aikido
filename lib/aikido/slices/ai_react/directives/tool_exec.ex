@@ -4,8 +4,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
 
   Emitted by `Aikido.Slices.AiReact.LLMTurn`, one per tool call in a turn that
   asked for tools. The executor spawns a Task that resolves the tool by
-  name, coerces arguments through the action's schema, runs the action
-  via `Aikido.Exec.run/4`, and casts back an `"ai.react.tool.completed"`
+  name and runs native Ash tools through `AshAi.Tools.execute/4`, and casts back an `"ai.react.tool.completed"`
   signal carrying a JSON-encoded result.
 
   Tool errors and crashes are caught and converted to error JSON inside
@@ -23,7 +22,6 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
     field :request_id, :string, allow_nil?: false
   end
 
-  alias Aikido.Action.Tool, as: ActionTool
   alias Aikido.AgentServer
   alias Jido.Signal
   alias Aikido.Slices.AiReact.Directives.ToolExec
@@ -116,8 +114,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   end
 
   defp invoke(module, args, context) do
-    params = ActionTool.convert_params_using_schema(args, Aikido.ActionRef.schema(module))
-    Aikido.Exec.run(module, params, context, [])
+    AshAi.Tools.execute(ToolAdapter.ash_tool(module), args, context)
   end
 
   defp format_error(%{errors: errors}) when is_list(errors),

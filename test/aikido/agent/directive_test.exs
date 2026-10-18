@@ -243,7 +243,7 @@ defmodule AikidoTest.Agent.DirectiveTest do
       @module module
       test "#{inspect(@module)}.schema/0 returns Ash field contract" do
         schema = @module.schema()
-        assert Aikido.Action.Schema.schema_type(schema) == :ash
+        assert Ash.Type.ash_type?(schema)
       end
     end
   end

@@ -3,8 +3,8 @@ defmodule Aikido.Schema do
   Metadata and native Ash validation for compiled DSL contracts.
 
   Ash resources own their attributes, changesets, and defaults. Plain Aikido DSL
-  hosts compile inline contracts with Ash.TypedStruct; action inputs live on
-  the action module itself, while other plain contracts use nested modules.
+  hosts compile inline contracts with Ash.TypedStruct. Native action inputs
+  are defined on their owning Ash resources.
   This boundary projects generated typed structs into the plain maps used by
   the pure agent runtime; Ash owns all casting and constraint validation.
   Anonymous field lists use native Ash map constraints; declare defaults in

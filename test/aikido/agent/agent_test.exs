@@ -59,9 +59,8 @@ defmodule AikidoTest.AgentTest do
                :description
              ) == nil
 
-      assert Aikido.Action.Schema.schema_type(
-               Aikido.Dsl.Agent.Info.schema(AikidoTest.TestAgents.Minimal)
-             ) in [:ash, :empty]
+      schema = Aikido.Dsl.Agent.Info.schema(AikidoTest.TestAgents.Minimal)
+      assert Keyword.keyword?(schema)
     end
   end
 

@@ -40,8 +40,7 @@ defmodule Aikido.AITest.TestFailingTool do
                 "A tool that always returns {:error, _} — exercises the tool-error path."
             }}
   actions do
-    action :run, Aikido.ActionResult do
-      argument :state, :term
+    action :run, :map do
       argument :reason, :string, default: "nope"
       description "A tool that always returns {:error, _} — exercises the tool-error path."
       run {Aikido.AITest.TestFailingTool.Implementation, action: :run}
@@ -163,7 +162,7 @@ defmodule Aikido.AITest do
 
     test("caller can subscribe out-of-band and observe every intermediate signal", ctx) do
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
-        {:ok, tool_call_response([{"test_add", %{"a" => 1, "b" => 2}}])}
+        {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 2}}}])}
       end)
 
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
@@ -199,7 +198,7 @@ defmodule Aikido.AITest do
     test("tool turn → tool exec → final answer turn", ctx) do
       expect(ReqLLM.Generation, :generate_text, fn _model, messages, _opts ->
         assert Enum.map(messages, & &1.role) == [:system, :user]
-        {:ok, tool_call_response([{"test_add", %{"a" => 1, "b" => 2}}])}
+        {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 2}}}])}
       end)
 
       expect(ReqLLM.Generation, :generate_text, fn _model, messages, _opts ->
@@ -218,11 +217,11 @@ defmodule Aikido.AITest do
 
     test("appends a cycle warning when consecutive tool batches are identical", ctx) do
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
-        {:ok, tool_call_response([{"test_add", %{"a" => 1, "b" => 1}}])}
+        {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 1}}}])}
       end)
 
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
-        {:ok, tool_call_response([{"test_add", %{"a" => 1, "b" => 1}}])}
+        {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 1}}}])}
       end)
 
       test_pid = self()
@@ -249,7 +248,7 @@ defmodule Aikido.AITest do
 
     test("tool errors are returned as JSON in tool.completed (not as :failed)", ctx) do
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
-        {:ok, tool_call_response([{"test_failing", %{"reason" => "boom"}}])}
+        {:ok, tool_call_response([{"test_failing", %{"input" => %{"reason" => "boom"}}}])}
       end)
 
       expect(ReqLLM.Generation, :generate_text, fn _model, messages, _opts ->
@@ -266,7 +265,7 @@ defmodule Aikido.AITest do
   describe("max iterations") do
     test("settles :completed without a result when the cap is hit", ctx) do
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
-        {:ok, tool_call_response([{"test_add", %{"a" => 1, "b" => 2}}])}
+        {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 2}}}])}
       end)
 
       pid = start_test_server(ctx, Aikido.AITest.TightAgent)

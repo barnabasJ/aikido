@@ -120,7 +120,7 @@ defmodule Aikido.Dsl.SensorTest do
 
     test "schema/1 round-trips a Ash field contract" do
       schema = Aikido.Dsl.Sensor.Info.schema(Aikido.Dsl.SensorTest.FullSensor)
-      assert Aikido.Action.Schema.schema_type(schema) == :ash
+      assert Ash.Type.ash_type?(schema)
       assert {:ok, %{interval: 5000}} = Aikido.Schema.cast(schema, %{interval: 5000})
     end
 

@@ -126,9 +126,7 @@ defmodule Aikido.Dsl.SliceTest do
                :otp_app
              ) == nil
 
-      assert Aikido.Action.Schema.schema_type(
-               Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.MinimalSlice)
-             ) == :ash
+      assert Ash.Type.ash_type?(Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.MinimalSlice))
 
       assert Aikido.Dsl.Slice.Info.config_schema(Aikido.Dsl.SliceTest.MinimalSlice) == nil
     end
@@ -164,13 +162,11 @@ defmodule Aikido.Dsl.SliceTest do
                {"send", AikidoTest.PluginTestAction}
              ]
 
-      assert Aikido.Action.Schema.schema_type(
-               Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.FullSlice)
-             ) == :ash
+      assert Ash.Type.ash_type?(Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.FullSlice))
 
-      assert Aikido.Action.Schema.schema_type(
+      assert Ash.Type.ash_type?(
                Aikido.Dsl.Slice.Info.config_schema(Aikido.Dsl.SliceTest.FullSlice)
-             ) == :ash
+             )
     end
 
     test "Spark.Dsl.is?(mod, Aikido.Slice) is true for slice modules" do
@@ -182,14 +178,12 @@ defmodule Aikido.Dsl.SliceTest do
   describe("schema/1 parity with the legacy macro") do
     test "schema/1 returns the same Ash contract passed into the section" do
       schema = Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.SchemaSlice)
-      assert Aikido.Action.Schema.schema_type(schema) == :ash
+      assert Ash.Type.ash_type?(schema)
       assert {:ok, %{counter: 0}} = Aikido.Schema.cast(schema, %{})
     end
 
     test "schema/1 returns the slice's declared schema struct" do
-      assert Aikido.Action.Schema.schema_type(
-               Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.MinimalSlice)
-             ) == :ash
+      assert Ash.Type.ash_type?(Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.MinimalSlice))
     end
   end
 

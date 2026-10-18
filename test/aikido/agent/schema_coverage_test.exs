@@ -18,6 +18,9 @@ defmodule AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults.Implementation do
       ) do
     {:ok, input.arguments.enabled}
   end
+
+  def run(%Ash.ActionInput{action: %{name: :check_schema}} = input, _opts, _context),
+    do: {:ok, input.arguments}
 end
 
 defmodule AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults do
@@ -33,6 +36,13 @@ defmodule AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults do
 
     action :check_enabled, :boolean do
       argument :enabled, :boolean, allow_nil?: false
+      run AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults.Implementation
+    end
+
+    action :check_schema, :map do
+      argument :name, :string, allow_nil?: false, constraints: [min_length: 2]
+      argument :mode, :atom, constraints: [one_of: [:fast, :slow]]
+      argument :count, :integer
       run AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults.Implementation
     end
   end
@@ -127,9 +137,19 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
   end
 
   test "tool conversion uses Ash casting without accepting numeric suffixes" do
-    schema = [count: [type: :integer, allow_nil?: false]]
-    converted = Aikido.Action.Tool.convert_params_using_schema(%{"count" => "12invalid"}, schema)
-    assert {:error, _} = Aikido.Action.Schema.validate(schema, converted)
+    tool =
+      Aikido.Slices.AiReact.ToolAdapter.ash_tool(
+        {AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults, :check_schema}
+      )
+
+    assert {:error, error} =
+             AshAi.Tools.execute(
+               tool,
+               %{"input" => %{"name" => "valid", "count" => "12invalid"}},
+               %{}
+             )
+
+    assert error =~ "count"
   end
 
   test "explicit normalization preserves tagged errors" do
@@ -144,15 +164,15 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
   end
 
   test "JSON tool schemas retain Ash constraints and enum choices" do
-    schema = [
-      name: [type: :string, allow_nil?: false, constraints: [min_length: 2]],
-      mode: [type: :atom, constraints: [one_of: [:fast, :slow]]]
-    ]
+    tool =
+      Aikido.Slices.AiReact.ToolAdapter.ash_tool(
+        {AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults, :check_schema}
+      )
 
-    json = Aikido.Action.Schema.to_json_schema(schema)
+    json = AshAi.Tools.parameter_schema(tool, strict: false)["properties"]["input"]
     assert json["required"] == ["name"]
     assert json["properties"]["name"]["type"] == "string"
-    assert {:error, _} = Aikido.Schema.cast(schema, %{name: "x"})
+    assert {:error, _} = AshAi.Tools.execute(tool, %{"input" => %{"name" => "x"}}, %{})
     assert json["properties"]["mode"]["enum"] == ["fast", "slow"]
   end
 
