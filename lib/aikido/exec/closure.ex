@@ -6,7 +6,7 @@ defmodule Aikido.Exec.Closure do
   creating reusable action closures that can be executed with different parameters.
   """
 
-  alias Aikido.Action.Error
+  alias Aikido.Error
   alias Aikido.Exec
 
   @type action :: Exec.action()

@@ -10,9 +10,9 @@ end
 defmodule AikidoTest.PluginTestAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "plugin_test_action"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :plugin_test_action, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.PluginTestAction.Implementation, action: :run}
     end
@@ -37,9 +37,9 @@ end
 defmodule AikidoTest.PluginTestAnotherAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "plugin_test_another_action"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :plugin_test_another_action, Aikido.ActionResult do
       argument :state, :term
       argument :value, :integer, default: 0
       run {AikidoTest.PluginTestAnotherAction.Implementation, action: :run}
@@ -73,10 +73,8 @@ defmodule AikidoTest.TestActions.BasicAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-  @persist {:aikido_action_metadata,
-            %{name: "basic_action", description: "A basic action for testing"}}
   actions do
-    action :run, Aikido.ActionResult do
+    action :basic_action, Aikido.ActionResult do
       argument :state, :term
       argument :value, :integer, allow_nil?: false
       description "A basic action for testing"
@@ -110,9 +108,9 @@ end
 defmodule AikidoTest.TestActions.NoSchema do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "no_schema", description: "Action with no schema"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :no_schema, Aikido.ActionResult do
       argument :state, :term
       description "Action with no schema"
       run {AikidoTest.TestActions.NoSchema.Implementation, action: :run}
@@ -144,9 +142,9 @@ end
 defmodule AikidoTest.TestActions.Add do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "add", description: "Adds amount to value"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :add, Aikido.ActionResult do
       argument :state, :term
       argument :value, :integer, allow_nil?: false
       argument :amount, :integer, default: 1
@@ -170,10 +168,8 @@ defmodule AikidoTest.TestActions.EmitAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-  @persist {:aikido_action_metadata,
-            %{name: "emit_action", description: "Action that returns an emit effect"}}
   actions do
-    action :run, Aikido.ActionResult do
+    action :emit_action, Aikido.ActionResult do
       argument :state, :term
       description "Action that returns an emit effect"
       run {AikidoTest.TestActions.EmitAction.Implementation, action: :run}
@@ -199,10 +195,8 @@ defmodule AikidoTest.TestActions.MultiEffectAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-  @persist {:aikido_action_metadata,
-            %{name: "multi_effect_action", description: "Action that returns multiple effects"}}
   actions do
-    action :run, Aikido.ActionResult do
+    action :multi_effect_action, Aikido.ActionResult do
       argument :state, :term
       description "Action that returns multiple effects"
       run {AikidoTest.TestActions.MultiEffectAction.Implementation, action: :run}
@@ -228,13 +222,8 @@ defmodule AikidoTest.TestActions.MultiSliceAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-  @persist {:aikido_action_metadata,
-            %{
-              name: "multi_slice_action",
-              description: "Action that returns a SliceUpdate writing two slices in one turn"
-            }}
   actions do
-    action :run, Aikido.ActionResult do
+    action :multi_slice_action, Aikido.ActionResult do
       argument :state, :term
       description "Action that returns a SliceUpdate writing two slices in one turn"
       run {AikidoTest.TestActions.MultiSliceAction.Implementation, action: :run}
@@ -270,9 +259,9 @@ end
 defmodule AikidoTest.TestActions.IncrementAction do
   @moduledoc "Action that increments the :counter state field"
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "increment"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :increment, Aikido.ActionResult do
       argument :state, :term
       argument :amount, :integer, default: 1
       run {AikidoTest.TestActions.IncrementAction.Implementation, action: :run}
@@ -308,9 +297,9 @@ end
 defmodule AikidoTest.TestActions.DecrementAction do
   @moduledoc "Action that decrements the :counter state field"
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "decrement"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :decrement, Aikido.ActionResult do
       argument :state, :term
       argument :amount, :integer, default: 1
       run {AikidoTest.TestActions.DecrementAction.Implementation, action: :run}
@@ -336,9 +325,9 @@ end
 defmodule AikidoTest.TestActions.RecordAction do
   @moduledoc "Action that appends params to the :messages state field"
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "record"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :record, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.TestActions.RecordAction.Implementation, action: :run}
     end
@@ -364,9 +353,9 @@ end
 defmodule AikidoTest.TestActions.SlowAction do
   @moduledoc "Action that sleeps for a configurable delay"
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "slow"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :slow, Aikido.ActionResult do
       argument :state, :term
       argument :delay_ms, :integer, default: 100
       run {AikidoTest.TestActions.SlowAction.Implementation, action: :run}
@@ -392,9 +381,9 @@ end
 defmodule AikidoTest.TestActions.FailingAction do
   @moduledoc "Action that always fails with a configurable error message"
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "failing"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :failing, Aikido.ActionResult do
       argument :state, :term
       argument :reason, :string, default: "intentional failure"
       run {AikidoTest.TestActions.FailingAction.Implementation, action: :run}

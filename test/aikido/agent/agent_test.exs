@@ -256,7 +256,7 @@ defmodule AikidoTest.AgentTest do
     test "passes timeout option to instruction" do
       agent = AikidoTest.TestAgents.Basic.new()
 
-      assert {:error, %Aikido.Error.ExecutionError{}} =
+      assert {:error, %Aikido.Error.TimeoutError{timeout: 10}} =
                AikidoTest.TestAgents.Basic.cmd(
                  agent,
                  {AikidoTest.TestActions.SlowAction, %{delay_ms: 200}},
@@ -268,7 +268,7 @@ defmodule AikidoTest.AgentTest do
       agent = AikidoTest.TestAgents.Basic.new()
       start_no_retry = System.monotonic_time(:millisecond)
 
-      assert {:error, %Aikido.Error.ExecutionError{}} =
+      assert {:error, %Aikido.Error.TimeoutError{timeout: 10}} =
                AikidoTest.TestAgents.Basic.cmd(
                  agent,
                  {AikidoTest.TestActions.SlowAction, %{delay_ms: 200}},
@@ -279,7 +279,7 @@ defmodule AikidoTest.AgentTest do
       elapsed_no_retry = System.monotonic_time(:millisecond) - start_no_retry
       start_default = System.monotonic_time(:millisecond)
 
-      assert {:error, %Aikido.Error.ExecutionError{}} =
+      assert {:error, %Aikido.Error.TimeoutError{timeout: 10}} =
                AikidoTest.TestAgents.Basic.cmd(
                  agent,
                  {AikidoTest.TestActions.SlowAction, %{delay_ms: 200}},
@@ -306,7 +306,7 @@ defmodule AikidoTest.AgentTest do
     test "opts are merged into all instructions; first failure halts" do
       agent = AikidoTest.TestAgents.Basic.new()
 
-      assert {:error, %Aikido.Error.ExecutionError{}} =
+      assert {:error, %Aikido.Error.TimeoutError{timeout: 10}} =
                AikidoTest.TestAgents.Basic.cmd(
                  agent,
                  [

@@ -4,7 +4,7 @@ defmodule Aikido.Error do
 
   ## Error Types
 
-  Six consolidated error types cover all failure scenarios:
+  Runtime error types cover all failure scenarios:
 
   | Error | Use Case |
   |-------|----------|
@@ -12,7 +12,6 @@ defmodule Aikido.Error do
   | `ExecutionError` | Runtime failures during execution or planning |
   | `RoutingError` | Signal routing and dispatch failures |
   | `TimeoutError` | Operation timeouts |
-  | `CompensationError` | Saga compensation failures |
   | `InternalError` | Unexpected system failures |
 
   ## Usage
@@ -240,42 +239,6 @@ defmodule Aikido.Error do
     end
   end
 
-  defmodule CompensationError do
-    @moduledoc """
-    Error for saga compensation failures.
-
-    ## Fields
-
-    - `message` - Human-readable error message
-    - `original_error` - The error that triggered compensation
-    - `compensated` - Whether compensation succeeded
-    - `result` - Result from successful compensation
-    - `details` - Additional context
-    """
-    use Splode.Error,
-      class: :execution,
-      fields: [:message, :original_error, :compensated, :result, :details]
-
-    @type t :: %__MODULE__{
-            message: String.t(),
-            original_error: any(),
-            compensated: boolean(),
-            result: any(),
-            details: map()
-          }
-
-    @impl true
-    def exception(opts) do
-      opts = if is_map(opts), do: Map.to_list(opts), else: opts
-
-      opts
-      |> Keyword.put_new(:message, "Compensation error")
-      |> Keyword.put_new(:compensated, false)
-      |> Keyword.put_new(:details, %{})
-      |> super()
-    end
-  end
-
   defmodule InternalError do
     @moduledoc """
     Error for unexpected internal failures.
@@ -341,7 +304,7 @@ defmodule Aikido.Error do
       message: message,
       kind: kind,
       subject: subject,
-      details: Keyword.get(opts, :details, %{})
+      details: merge_extra_details(opts, [:kind, :subject, :action, :sensor, :field])
     )
   end
 
@@ -400,29 +363,6 @@ defmodule Aikido.Error do
     TimeoutError.exception(
       message: message,
       timeout: Keyword.get(opts, :timeout),
-      details: Keyword.get(opts, :details, %{})
-    )
-  end
-
-  @doc """
-  Creates a compensation error.
-
-  ## Options
-
-  - `:original_error` - The error that triggered compensation
-  - `:compensated` - Whether compensation succeeded (default: false)
-  - `:result` - Result from successful compensation
-  - `:details` - Additional context map
-  """
-  @spec compensation_error(String.t(), keyword() | map()) :: CompensationError.t()
-  def compensation_error(message, opts \\ []) do
-    opts = if is_map(opts), do: Map.to_list(opts), else: opts
-
-    CompensationError.exception(
-      message: message,
-      original_error: Keyword.get(opts, :original_error),
-      compensated: Keyword.get(opts, :compensated, false),
-      result: Keyword.get(opts, :result),
       details: Keyword.get(opts, :details, %{})
     )
   end
@@ -599,16 +539,10 @@ defmodule Aikido.Error do
   defp unified_type(%ExecutionError{}), do: :execution_error
   defp unified_type(%RoutingError{}), do: :routing_error
   defp unified_type(%TimeoutError{}), do: :timeout
-  defp unified_type(%CompensationError{}), do: :compensation_error
   defp unified_type(%InternalError{}), do: :internal
   defp unified_type(%Internal.UnknownError{}), do: :internal
 
   # Cross-package error mapping (aikido_action, jido_signal)
-  defp unified_type(%Aikido.Action.Error.InvalidInputError{}), do: :validation_error
-  defp unified_type(%Aikido.Action.Error.ExecutionFailureError{}), do: :execution_error
-  defp unified_type(%Aikido.Action.Error.TimeoutError{}), do: :timeout
-  defp unified_type(%Aikido.Action.Error.ConfigurationError{}), do: :config_error
-  defp unified_type(%Aikido.Action.Error.InternalError{}), do: :internal
 
   defp unified_type(%Jido.Signal.Error.InvalidInputError{}), do: :validation_error
   defp unified_type(%Jido.Signal.Error.ExecutionFailureError{}), do: :execution_error
@@ -620,4 +554,78 @@ defmodule Aikido.Error do
   defp unified_type(%{class: :invalid}), do: :validation_error
   defp unified_type(%{class: :forbidden}), do: :forbidden
   defp unified_type(_), do: :internal
+  @doc "Whether an execution failure should be retried; native Ash input errors are terminal."
+  @spec retryable?(term()) :: boolean()
+  def retryable?({:error, reason, _effects}), do: retryable?(reason)
+  def retryable?({:error, reason}), do: retryable?(reason)
+  def retryable?(%ValidationError{}), do: false
+  def retryable?(%{class: class}) when class in [:invalid, :forbidden], do: false
+  def retryable?(%TimeoutError{}), do: true
+  def retryable?(%ExecutionError{details: details}), do: retryable_hint(details, true)
+  def retryable?(%InternalError{details: details}), do: retryable_hint(details, true)
+  def retryable?(%Internal.UnknownError{details: details}), do: retryable_hint(details, true)
+
+  def retryable?(%{retryable?: value}) when is_boolean(value), do: value
+  def retryable?(%{retryable: value}) when is_boolean(value), do: value
+
+  def retryable?(%{type: type} = error) when is_atom(type) do
+    retryable_hint(Map.get(error, :details, error), default_retryable?(type))
+  end
+
+  def retryable?(%{code: type} = error) when is_atom(type) do
+    retryable_hint(Map.get(error, :details, error), default_retryable?(type))
+  end
+
+  def retryable?(%{} = map) do
+    retryable_hint(map, true)
+  end
+
+  def retryable?(reason) when is_atom(reason), do: default_retryable?(reason)
+  def retryable?(_reason), do: true
+
+  defp default_retryable?(type) when type in [:validation_error, :configuration_error], do: false
+  defp default_retryable?(_type), do: true
+
+  defp retryable_hint(term, default) do
+    case extract_retry_hint(term) do
+      nil -> default
+      value -> value != false
+    end
+  end
+
+  defp extract_retry_hint(%{details: details}) do
+    case extract_retry_value(details) do
+      nil -> details |> extract_nested_reason() |> extract_retry_hint()
+      value -> value
+    end
+  end
+
+  defp extract_retry_hint(%{} = map) do
+    case extract_retry_value(map) do
+      nil -> map |> extract_nested_reason() |> extract_retry_hint()
+      value -> value
+    end
+  end
+
+  defp extract_retry_hint(_), do: nil
+
+  defp extract_nested_reason(%{} = map) do
+    Map.get(map, :reason) || Map.get(map, "reason")
+  end
+
+  defp extract_nested_reason(_), do: nil
+
+  defp extract_retry_value(%{} = map) do
+    cond do
+      Map.has_key?(map, :retry) -> Map.get(map, :retry)
+      Map.has_key?(map, "retry") -> Map.get(map, "retry")
+      true -> nil
+    end
+  end
+
+  defp extract_retry_value(keyword) when is_list(keyword) do
+    if Keyword.keyword?(keyword), do: Keyword.get(keyword, :retry), else: nil
+  end
+
+  defp extract_retry_value(_), do: nil
 end

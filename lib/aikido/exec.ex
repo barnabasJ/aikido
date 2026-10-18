@@ -7,7 +7,6 @@ defmodule Aikido.Exec do
 
   - **Aikido.Exec.Telemetry** - Logging and telemetry events
   - **Aikido.Exec.Retry** - Exponential backoff and retry logic
-  - **Aikido.Exec.Compensation** - Error handling and compensation
   - **Aikido.Exec.Async** - Asynchronous execution management
   - **Aikido.Exec.Chain** - Sequential action execution
   - **Aikido.Exec.Closure** - Action closures with pre-applied context
@@ -18,7 +17,7 @@ defmodule Aikido.Exec do
   - Automatic retries with exponential backoff
   - Timeout handling for long-running actions
   - Parameter and context normalization
-  - Comprehensive error handling and compensation
+  - Structured error handling
   - Telemetry integration for monitoring and tracing
   - Action cancellation and cleanup
 
@@ -38,9 +37,8 @@ defmodule Aikido.Exec do
   """
   use Private
 
-  alias Aikido.Action.Error
+  alias Aikido.Error
   alias Aikido.Exec.Async
-  alias Aikido.Exec.Compensation
   alias Aikido.Exec.Retry
   alias Aikido.Exec.Supervisors
   alias Aikido.Exec.Telemetry
@@ -102,12 +100,6 @@ defmodule Aikido.Exec do
     - `:log_level` - Override the global Logger level for this specific action. Accepts #{inspect(Logger.levels())}.
     - `:aikido` - Optional instance name for isolation. Routes execution through instance-scoped supervisors (e.g., `MyApp.Aikido.TaskSupervisor`).
 
-  ## Action Metadata in Context
-
-  The action's metadata (name, description, category, tags, version, etc.) is made available
-  to the action's `run/2` function via the `context` parameter under the `:action_metadata` key.
-  This allows actions to access their own metadata when needed.
-
   ## Returns
 
   - `{:ok, slice, [directive]}` on success — always a 3-tuple, even when no
@@ -120,26 +112,11 @@ defmodule Aikido.Exec do
       {:ok, %{result: "processed value"}, []}
 
       iex> Aikido.Exec.run(MyAction, %{invalid: "input"}, %{}, timeout: 1000)
-      {:error, %Aikido.Action.Error{type: :validation_error, message: "Invalid input"}}
+      {:error, %Ash.Error.Invalid{}}
 
       iex> Aikido.Exec.run(MyAction, %{input: "value"}, %{}, log_level: :debug)
       {:ok, %{result: "processed value"}, []}
 
-      # Access action metadata in the action:
-      # defmodule MyAction do
-      #   use Aikido.Action
-      #
-      #   action do
-      #     name "my_action"
-      #     description "Example action"
-      #     vsn "1.0.0"
-      #   end
-      #
-      #   def run(_signal, slice, _opts, ctx) do
-      #     metadata = Map.get(ctx, :action_metadata)
-      #     {:ok, %{name: metadata.name, version: metadata.vsn}, []}
-      #   end
-      # end
   """
   @spec run(Instruction.t()) :: exec_result()
   @spec run(action(), params(), context(), run_opts()) :: exec_result()
@@ -161,12 +138,9 @@ defmodule Aikido.Exec do
     with {:ok, normalized_params} <- normalize_params(params),
          {:ok, normalized_context} <- normalize_context(context),
          :ok <- validate_action(action) do
-      enhanced_context =
-        Map.put(normalized_context, :action_metadata, Aikido.ActionRef.to_json(action))
+      Telemetry.cond_log_start(log_level, action, normalized_params, normalized_context)
 
-      Telemetry.cond_log_start(log_level, action, normalized_params, enhanced_context)
-
-      do_run_with_retry(action, normalized_params, enhanced_context, opts)
+      do_run_with_retry(action, normalized_params, normalized_context, opts)
     else
       {:error, reason} ->
         Telemetry.cond_log_failure(log_level, inspect(reason))
@@ -248,7 +222,7 @@ defmodule Aikido.Exec do
 
   - `{:ok, result}` if the Action executes successfully.
   - `{:error, reason}` if an error occurs during execution or if the action times out.
-  - `{:error, %Aikido.Action.Error.InvalidInputError{}}` when awaited by a non-owner process.
+  - `{:error, %Aikido.Error.ValidationError{}}` when awaited by a non-owner process.
 
   ## Examples
 
@@ -258,7 +232,7 @@ defmodule Aikido.Exec do
 
       iex> async_ref = Aikido.Exec.run_async(SlowAction, %{input: "value"})
       iex> Aikido.Exec.await(async_ref, 100)
-      {:error, %Aikido.Action.Error{type: :timeout, message: "Async action timed out after 100ms"}}
+      {:error, %Aikido.Error.TimeoutError{}}
   """
   @spec await(async_ref()) :: exec_result
   def await(async_ref), do: Async.await(async_ref)
@@ -290,7 +264,7 @@ defmodule Aikido.Exec do
 
   - `:ok` if the cancellation was successful.
   - `{:error, reason}` if the cancellation failed or the input was invalid.
-  - `{:error, %Aikido.Action.Error.InvalidInputError{}}` when cancelled by a non-owner process.
+  - `{:error, %Aikido.Error.ValidationError{}}` when cancelled by a non-owner process.
 
   ## Examples
 
@@ -299,7 +273,7 @@ defmodule Aikido.Exec do
       :ok
 
       iex> Aikido.Exec.cancel("invalid")
-      {:error, %Aikido.Action.Error{type: :invalid_async_ref, message: "Invalid async ref for cancellation"}}
+      {:error, %Aikido.Error.ValidationError{}}
   """
   @spec cancel(async_ref() | pid()) :: :ok | exec_error
   def cancel(async_ref_or_pid), do: Async.cancel(async_ref_or_pid)
@@ -430,24 +404,10 @@ defmodule Aikido.Exec do
           {:ok, _result, _dirs} = success ->
             success
 
-          {:error, %Aikido.Action.Error.TimeoutError{}} = timeout_err ->
-            timeout_err
-
-          {:error, error} ->
-            handle_action_error(action, params, budgeted_context, error, opts)
+          {:error, _} = error ->
+            error
         end
       end
-    end
-
-    @spec handle_action_error(
-            action(),
-            params(),
-            context(),
-            Exception.t(),
-            run_opts()
-          ) :: exec_result
-    defp handle_action_error(action, params, context, error, opts) do
-      Compensation.handle_error(action, params, context, error, opts)
     end
 
     @spec execute_action_with_timeout(
@@ -686,7 +646,6 @@ defmodule Aikido.Exec do
         |> Map.merge(Map.get(ctx_in, :ctx, %{}))
         |> maybe_put(:agent, Map.get(ctx_in, :agent))
         |> maybe_put(:agent_server_pid, Map.get(ctx_in, :agent_server_pid))
-        |> maybe_put(:action_metadata, Map.get(ctx_in, :action_metadata))
         |> maybe_put(:slice_path, Map.get(ctx_in, :slice_path))
         |> maybe_put(:slice_config, Map.get(ctx_in, :slice_config))
 
@@ -694,11 +653,7 @@ defmodule Aikido.Exec do
     end
 
     defp synthesize_signal(action, params) do
-      type =
-        case Map.get(Aikido.ActionRef.action_options(action), :name) do
-          nil -> Atom.to_string(action)
-          name when is_binary(name) -> name
-        end
+      type = action |> Aikido.ActionRef.definition() |> Map.fetch!(:name) |> to_string()
 
       data = ensure_map(params)
 

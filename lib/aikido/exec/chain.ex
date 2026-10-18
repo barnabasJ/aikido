@@ -17,7 +17,7 @@ defmodule Aikido.Exec.Chain do
       {:interrupted, %{value: 6}}
   """
 
-  alias Aikido.Action.Error
+  alias Aikido.Error
   alias Aikido.Exec
   alias Aikido.Exec.Supervisors
 

@@ -11,9 +11,9 @@ end
 defmodule AikidoTest.Agent.SignalHandlingTest.EmitTestAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "emit_test"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :emit_test, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation, action: :run}
     end

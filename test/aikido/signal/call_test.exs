@@ -12,9 +12,9 @@ end
 defmodule AikidoTest.Signal.CallTest.EchoAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "echo_action"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :echo_action, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.Signal.CallTest.EchoAction.Implementation, action: :run}
     end
@@ -33,9 +33,9 @@ end
 defmodule AikidoTest.Signal.CallTest.SilentAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "silent_action"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :silent_action, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.Signal.CallTest.SilentAction.Implementation, action: :run}
     end

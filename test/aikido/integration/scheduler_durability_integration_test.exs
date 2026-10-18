@@ -17,9 +17,9 @@ end
 defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceTickAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "slice_tick"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :slice_tick, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.Integration.SchedulerDurabilityIntegrationTest.SliceTickAction.Implementation,

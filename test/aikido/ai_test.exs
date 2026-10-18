@@ -33,14 +33,8 @@ defmodule Aikido.AITest.TestFailingTool do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-  @persist {:aikido_action_metadata,
-            %{
-              name: "test_failing",
-              description:
-                "A tool that always returns {:error, _} — exercises the tool-error path."
-            }}
   actions do
-    action :run, :map do
+    action :test_failing, :map do
       argument :reason, :string, default: "nope"
       description "A tool that always returns {:error, _} — exercises the tool-error path."
       run {Aikido.AITest.TestFailingTool.Implementation, action: :run}

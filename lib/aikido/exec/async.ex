@@ -7,7 +7,7 @@ defmodule Aikido.Exec.Async do
   """
   use Private
 
-  alias Aikido.Action.Error
+  alias Aikido.Error
   alias Aikido.Exec.Supervisors
 
   require Logger

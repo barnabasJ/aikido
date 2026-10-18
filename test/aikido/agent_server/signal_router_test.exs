@@ -10,9 +10,9 @@ end
 defmodule AikidoTest.AgentServer.SignalRouterTest.TestAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "test_action"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :test_action, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServer.SignalRouterTest.TestAction.Implementation, action: :run}
     end
@@ -31,9 +31,9 @@ end
 defmodule AikidoTest.AgentServer.SignalRouterTest.AnotherAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "another_action"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :another_action, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServer.SignalRouterTest.AnotherAction.Implementation, action: :run}
     end

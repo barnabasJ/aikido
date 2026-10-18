@@ -6,7 +6,7 @@ defmodule Aikido.Exec.Telemetry do
   and error message extraction used throughout the execution system.
   """
 
-  import Aikido.Action.Util, only: [cond_log: 3]
+  import Aikido.Util, only: [cond_log: 3]
 
   require Logger
 

@@ -15,9 +15,9 @@ end
 defmodule AikidoTest.SignalCtxTest.TraceProbe do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "trace_probe"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :trace_probe, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.SignalCtxTest.TraceProbe.Implementation, action: :run}
     end

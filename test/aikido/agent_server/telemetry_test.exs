@@ -11,9 +11,9 @@ end
 defmodule AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "emit_directive"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :emit_directive, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementation, action: :run}
     end
@@ -35,9 +35,9 @@ end
 defmodule AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "schedule_directive"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :schedule_directive, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implementation,

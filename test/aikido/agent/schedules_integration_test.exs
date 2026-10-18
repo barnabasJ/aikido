@@ -11,9 +11,9 @@ end
 
 defmodule AikidoTest.Agent.SchedulesIntegrationTest.TickAction do
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "tick"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :tick, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.Agent.SchedulesIntegrationTest.TickAction.Implementation, action: :run}
     end

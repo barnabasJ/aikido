@@ -17,9 +17,9 @@ end
 defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "emit_directive"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :emit_directive, Aikido.ActionResult do
       argument :state, :term
       argument :directive, :term, allow_nil?: false
 
@@ -60,9 +60,9 @@ end
 defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.SuccessAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "strict_success"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :strict_success, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.AgentServer.DirectiveStrictSeparationTest.SuccessAction.Implementation,
@@ -88,9 +88,9 @@ end
 defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.CaptureAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "strict_capture"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :strict_capture, Aikido.ActionResult do
       argument :state, :term
       argument :status, :atom, allow_nil?: false
       argument :result, :map, default: %{}

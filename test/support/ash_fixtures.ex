@@ -15,9 +15,9 @@ end
 
 defmodule AikidoTest.AshFixtures.Increment do
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "ash_increment"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :ash_increment, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AshFixtures.Increment.Implementation, action: :run}
     end
@@ -41,9 +41,9 @@ end
 
 defmodule AikidoTest.AshFixtures.GeneratedIncrement do
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "generated_increment"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :generated_increment, Aikido.ActionResult do
       argument :state, :term
 
       argument :amount, :integer,
@@ -73,9 +73,9 @@ end
 
 defmodule AikidoTest.AshFixtures.DataIncrement do
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "data_increment"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :data_increment, Aikido.ActionResult do
       argument :state, :term
 
       argument :data, :map,
@@ -257,9 +257,9 @@ end
 
 defmodule AikidoTest.AshFixtures.TaskAction do
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "task_echo"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :task_echo, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AshFixtures.TaskAction.Implementation, action: :run}
     end

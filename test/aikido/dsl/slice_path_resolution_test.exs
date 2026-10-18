@@ -12,6 +12,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.CounterSlice do
 
   signal_routes do
     route "counter.bump", Aikido.Dsl.SlicePathResolutionTest.BumpAction
+    route "counter.escape", Aikido.Dsl.SlicePathResolutionTest.EscapeAction
   end
 end
 
@@ -28,9 +29,9 @@ end
 defmodule Aikido.Dsl.SlicePathResolutionTest.BumpAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "bump"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :bump, Aikido.ActionResult do
       argument :state, :term
       run {Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation, action: :run}
     end
@@ -50,9 +51,9 @@ end
 defmodule Aikido.Dsl.SlicePathResolutionTest.EscapeAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "escape", path: :counter}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :escape, Aikido.ActionResult do
       argument :state, :term
       run {Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation, action: :run}
     end
@@ -72,9 +73,9 @@ end
 defmodule Aikido.Dsl.SlicePathResolutionTest.UnboundAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "unbound"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :unbound, Aikido.ActionResult do
       argument :state, :term
       run {Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation, action: :run}
     end
@@ -138,14 +139,14 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
 
     test "BumpAction has no `path :foo` of its own — resolution comes from the slice mount" do
       assert Map.get(
-               Aikido.ActionRef.action_options(Aikido.Dsl.SlicePathResolutionTest.BumpAction),
+               Aikido.ActionRef.definition(Aikido.Dsl.SlicePathResolutionTest.BumpAction),
                :path
              ) == nil
     end
   end
 
-  describe("step 2 — action's own `path :foo` escape valve") do
-    test "EscapeAction (not in any slice's signal_routes) writes to its declared :counter path" do
+  describe("explicit slice ownership") do
+    test "EscapeAction writes to the counter slice that declares its route" do
       agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.new()
 
       {:ok, agent, _dirs} =
@@ -158,11 +159,13 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
       assert agent.state.domain == %{last_action: nil}
     end
 
-    test "EscapeAction has `path :counter` declared as the escape valve" do
-      assert Map.get(
-               Aikido.ActionRef.action_options(Aikido.Dsl.SlicePathResolutionTest.EscapeAction),
-               :path
-             ) == :counter
+    test "the compiled mount table records explicit ownership" do
+      paths =
+        Aikido.Dsl.Agent.Info.slice_paths_for_action(
+          Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent
+        )
+
+      assert paths[Aikido.Dsl.SlicePathResolutionTest.EscapeAction] == [:counter]
     end
   end
 
@@ -190,7 +193,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
 
       assert is_map(table)
       assert Map.get(table, Aikido.Dsl.SlicePathResolutionTest.BumpAction) == [:counter]
-      refute Map.has_key?(table, Aikido.Dsl.SlicePathResolutionTest.EscapeAction)
+      assert table[Aikido.Dsl.SlicePathResolutionTest.EscapeAction] == [:counter]
       refute Map.has_key?(table, Aikido.Dsl.SlicePathResolutionTest.UnboundAction)
     end
   end

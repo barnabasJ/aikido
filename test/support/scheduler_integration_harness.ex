@@ -20,9 +20,9 @@ end
 defmodule AikidoTest.Support.SchedulerIntegrationHarness.TickAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "cron_count"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :cron_count, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementation, action: :run}
@@ -51,9 +51,9 @@ end
 defmodule AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "register_cron"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :register_cron, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Implementation,
@@ -81,9 +81,9 @@ end
 defmodule AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "cancel_cron"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :cancel_cron, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction.Implementation,

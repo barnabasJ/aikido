@@ -8,7 +8,7 @@ defmodule Aikido.Exec.Retry do
   - Retry option processing and validation
   """
 
-  alias Aikido.Action.Error
+  alias Aikido.Error
   alias Aikido.Exec.Telemetry
 
   require Logger

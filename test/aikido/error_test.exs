@@ -98,37 +98,6 @@ defmodule AikidoTest.ErrorTest do
     end
   end
 
-  describe "compensation_error/2" do
-    test "creates a compensation error for successful compensation" do
-      original = Error.execution_error("Original failure")
-
-      error =
-        Error.compensation_error("Compensated",
-          original_error: original,
-          compensated: true,
-          result: %{refund: true}
-        )
-
-      assert %Error.CompensationError{} = error
-      assert error.compensated == true
-      assert error.original_error == original
-      assert error.result == %{refund: true}
-    end
-
-    test "creates a compensation error for failed compensation" do
-      original = Error.execution_error("Original failure")
-
-      error =
-        Error.compensation_error("Compensation failed",
-          original_error: original,
-          compensated: false
-        )
-
-      assert error.compensated == false
-      assert error.original_error == original
-    end
-  end
-
   describe "internal_error/2" do
     test "creates an internal error" do
       error = Error.internal_error("Unexpected error")
@@ -241,14 +210,6 @@ defmodule AikidoTest.ErrorTest do
       assert result.type == :validation_error
       assert result.message == "Invalid"
       assert is_list(result.stacktrace)
-    end
-
-    test "converts compensation error to map" do
-      original = Error.execution_error("Original")
-      error = Error.compensation_error("Compensated", original_error: original, compensated: true)
-      result = Error.to_map(error)
-
-      assert result.type == :compensation_error
     end
 
     test "handles unknown struct" do

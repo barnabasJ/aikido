@@ -59,24 +59,6 @@ defmodule AikidoTest.ErrorCoverageTest do
       assert error.details == %{operation: :fetch}
     end
 
-    test "compensation_error accepts map opts" do
-      original = Error.execution_error("Original failure")
-
-      error =
-        Error.compensation_error("Compensated", %{
-          original_error: original,
-          compensated: true,
-          result: :ok,
-          details: %{action: :rollback}
-        })
-
-      assert %Error.CompensationError{} = error
-      assert error.original_error == original
-      assert error.compensated == true
-      assert error.result == :ok
-      assert error.details == %{action: :rollback}
-    end
-
     test "internal_error accepts map opts" do
       error = Error.internal_error("Unexpected", %{details: %{code: 500}})
 
@@ -249,12 +231,6 @@ defmodule AikidoTest.ErrorCoverageTest do
       assert result.type == :timeout
     end
 
-    test "CompensationError returns :compensation_error" do
-      error = Error.compensation_error("Compensated")
-      result = Error.to_map(error)
-      assert result.type == :compensation_error
-    end
-
     test "InternalError returns :internal" do
       error = Error.internal_error("Internal")
       result = Error.to_map(error)
@@ -268,33 +244,33 @@ defmodule AikidoTest.ErrorCoverageTest do
     end
   end
 
-  describe "unified_type for cross-package errors (Aikido.Action.Error.*)" do
+  describe "unified_type for cross-package errors (Aikido.Error.*)" do
     test "InvalidInputError returns :validation_error" do
-      error = %Aikido.Action.Error.InvalidInputError{message: "Bad input", details: %{}}
+      error = %Aikido.Error.ValidationError{message: "Bad input", details: %{}}
       result = Error.to_map(error)
       assert result.type == :validation_error
     end
 
     test "ExecutionFailureError returns :execution_error" do
-      error = %Aikido.Action.Error.ExecutionFailureError{message: "Failed", details: %{}}
+      error = %Aikido.Error.ExecutionError{message: "Failed", details: %{}}
       result = Error.to_map(error)
       assert result.type == :execution_error
     end
 
     test "TimeoutError returns :timeout" do
-      error = %Aikido.Action.Error.TimeoutError{message: "Timed out", details: %{}}
+      error = %Aikido.Error.TimeoutError{message: "Timed out", details: %{}}
       result = Error.to_map(error)
       assert result.type == :timeout
     end
 
     test "ConfigurationError returns :config_error" do
-      error = %Aikido.Action.Error.ConfigurationError{message: "Bad config", details: %{}}
+      error = %Aikido.Error.ValidationError{message: "Bad config", kind: :config, details: %{}}
       result = Error.to_map(error)
       assert result.type == :config_error
     end
 
     test "InternalError returns :internal" do
-      error = %Aikido.Action.Error.InternalError{message: "Internal", details: %{}}
+      error = %Aikido.Error.InternalError{message: "Internal", details: %{}}
       result = Error.to_map(error)
       assert result.type == :internal
     end

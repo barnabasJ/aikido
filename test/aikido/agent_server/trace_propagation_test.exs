@@ -11,9 +11,9 @@ end
 defmodule AikidoTest.AgentServer.TracePropagationTest.EmitAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "emit"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :emit, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServer.TracePropagationTest.EmitAction.Implementation, action: :run}
     end

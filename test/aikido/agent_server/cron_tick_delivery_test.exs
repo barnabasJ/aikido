@@ -20,9 +20,9 @@ end
 defmodule AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "tick_count"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :tick_count, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction.Implementation,
@@ -51,9 +51,9 @@ end
 defmodule AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "register_cron"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :register_cron, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction.Implementation,

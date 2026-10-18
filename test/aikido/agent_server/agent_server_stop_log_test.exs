@@ -10,9 +10,9 @@ end
 defmodule AikidoTest.AgentServerStopLogTest.StopTestAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "stop_test"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :stop_test, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServerStopLogTest.StopTestAction.Implementation, action: :run}
     end

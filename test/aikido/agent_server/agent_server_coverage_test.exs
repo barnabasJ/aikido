@@ -40,9 +40,9 @@ end
 defmodule AikidoTest.AgentServerCoverageTest.ManyDirectivesAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "many_directives"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :many_directives, Aikido.ActionResult do
       argument :state, :term
       argument :count, :integer, default: 10
       run {AikidoTest.AgentServerCoverageTest.ManyDirectivesAction.Implementation, action: :run}
@@ -81,9 +81,9 @@ end
 defmodule AikidoTest.AgentServerCoverageTest.CompleteAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "complete"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :complete, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServerCoverageTest.CompleteAction.Implementation, action: :run}
     end
@@ -105,9 +105,9 @@ end
 defmodule AikidoTest.AgentServerCoverageTest.FailAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "fail"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :fail, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServerCoverageTest.FailAction.Implementation, action: :run}
     end
@@ -137,9 +137,9 @@ end
 defmodule AikidoTest.AgentServerCoverageTest.DelayCompleteAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "delay_complete"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :delay_complete, Aikido.ActionResult do
       argument :state, :term
       argument :delay_ms, :integer, default: 50
       run {AikidoTest.AgentServerCoverageTest.DelayCompleteAction.Implementation, action: :run}

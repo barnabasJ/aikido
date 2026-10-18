@@ -214,7 +214,7 @@ defmodule Aikido.NativeActionTest do
   end
 
   test "invalid action references return structured errors" do
-    assert {:error, %Aikido.Action.Error.InvalidInputError{}} =
+    assert {:error, %Aikido.Error.ValidationError{}} =
              Aikido.Exec.run({Aikido.NativeActionTest.Actions, :missing}, %{}, %{}, timeout: 0)
   end
 

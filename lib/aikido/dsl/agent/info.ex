@@ -91,8 +91,7 @@ defmodule Aikido.Dsl.Agent.Info do
   Multi-instance mounts of the same slice produce multi-element lists;
   single-mount actions are one-element lists; agent-level `signal_routes`
   declarations contribute the agent's own path. Actions not owned by any
-  declared route are absent from the map (and resolved at runtime via the
-  action's own `path :foo` escape valve or the agent's path).
+  declared route are absent from the map and use the agent's own path.
   """
   @spec slice_paths_for_action(module()) :: %{module() => [atom()]}
   def slice_paths_for_action(module),

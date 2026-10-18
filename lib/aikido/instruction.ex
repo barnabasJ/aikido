@@ -133,7 +133,7 @@ defmodule Aikido.Instruction do
   - `Aikido.Agent` - Agent-based execution
   """
 
-  alias Aikido.Action.Error
+  alias Aikido.Error
   alias Aikido.Instruction
 
   # Define the Ash type for instructions
@@ -202,7 +202,7 @@ defmodule Aikido.Instruction do
     * `%Instruction{}` - Successfully created instruction
 
   ## Raises
-    * `Aikido.Action.Error` - If action is missing or invalid
+    * `Aikido.Error` - If action is missing or invalid
 
   ## Examples
 
@@ -213,7 +213,7 @@ defmodule Aikido.Instruction do
       %Instruction{action: MyAction}
 
       iex> Instruction.new!(%{params: %{value: 1}})
-      ** (Aikido.Action.Error) missing action
+      ** (Aikido.Error) missing action
   """
   @spec new!(map() | keyword()) :: t() | no_return()
   def new!(attrs) do
@@ -455,7 +455,7 @@ defmodule Aikido.Instruction do
     * `[t()]` - List of normalized instructions
 
   ## Raises
-    * `Aikido.Action.Error` - If instruction cannot be normalized
+    * `Aikido.Error` - If instruction cannot be normalized
 
   ## Examples
       iex> Instruction.normalize!({MyAction, %{value: 42}})
@@ -509,7 +509,7 @@ defmodule Aikido.Instruction do
       unregistered_str = Enum.map_join(unregistered, ", ", &inspect/1)
 
       {:error,
-       Error.config_error("Actions not allowed: #{unregistered_str}", %{
+       Error.validation_error("Actions not allowed: #{unregistered_str}", %{
          actions: unregistered,
          allowed_actions: allowed_actions
        })}

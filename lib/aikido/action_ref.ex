@@ -4,7 +4,15 @@ defmodule Aikido.ActionRef do
   def normalize({resource, action}) when is_atom(resource) and is_atom(action),
     do: {resource, action}
 
-  def normalize(resource) when is_atom(resource), do: {resource, :run}
+  def normalize(resource) when is_atom(resource) do
+    case Enum.filter(Ash.Resource.Info.actions(resource), &(&1.type == :action)) do
+      [%{name: name}] ->
+        {resource, name}
+
+      _ ->
+        raise ArgumentError, "Use {resource, action} when a resource has multiple generic actions"
+    end
+  end
 
   def definition(reference) do
     {resource, action} = normalize(reference)
@@ -44,26 +52,4 @@ defmodule Aikido.ActionRef do
       &{&1, Map.get(argument, &1)}
     )
   end
-
-  def action_options(reference) do
-    {resource, name} = normalize(reference)
-    action = definition(reference)
-    metadata = Spark.Dsl.Extension.get_persisted(resource, :aikido_action_metadata, %{})
-
-    Map.merge(
-      %{
-        name: to_string(name),
-        description: action && action.description,
-        category: nil,
-        tags: [],
-        vsn: nil,
-        compensation: nil,
-        path: nil
-      },
-      metadata
-    )
-  end
-
-  def category(reference), do: action_options(reference).category
-  def to_json(reference), do: Map.put(action_options(reference), :schema, schema(reference))
 end

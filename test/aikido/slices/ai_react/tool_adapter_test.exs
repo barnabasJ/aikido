@@ -41,10 +41,8 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-  @persist {:aikido_action_metadata,
-            %{name: "empty_action", description: "An action with no parameters"}}
   actions do
-    action :run, :map do
+    action :empty_action, :map do
       description "An action with no parameters"
       run {Aikido.Slices.AiReact.ToolAdapterTest.EmptySchemaAction.Implementation, action: :run}
     end
@@ -64,10 +62,8 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest.ParamAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-  @persist {:aikido_action_metadata,
-            %{name: "param_action", description: "An action with parameters"}}
   actions do
-    action :run, :map do
+    action :param_action, :map do
       argument :query, :string, description: "Search query", allow_nil?: false
       argument :limit, :integer, description: "Max results", default: 10
       description "An action with parameters"
@@ -89,13 +85,8 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest.StrictAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-  @persist {:aikido_action_metadata,
-            %{
-              name: "strict_action",
-              description: "An action that explicitly opts into strict mode"
-            }}
   actions do
-    action :run, :map do
+    action :strict_action, :map do
       argument :value, :string, description: "A value", allow_nil?: false
       description "An action that explicitly opts into strict mode"
       run {Aikido.Slices.AiReact.ToolAdapterTest.StrictAction.Implementation, action: :run}
@@ -120,10 +111,8 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest.NestedSchemaAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-  @persist {:aikido_action_metadata,
-            %{name: "nested_action", description: "An action with nested objects"}}
   actions do
-    action :run, :map do
+    action :nested_action, :map do
       argument :name, :string, description: "Name", allow_nil?: false
 
       argument :config, :map,
@@ -162,10 +151,8 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest.DuplicateNameAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-  @persist {:aikido_action_metadata,
-            %{name: "param_action", description: "Same name as ParamAction"}}
   actions do
-    action :run, :map do
+    action :param_action, :map do
       description "Same name as ParamAction"
 
       run {Aikido.Slices.AiReact.ToolAdapterTest.DuplicateNameAction.Implementation, action: :run}
@@ -337,7 +324,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
             Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
           ],
           filter: fn mod ->
-            Map.get(Aikido.ActionRef.action_options(mod), :name) == "param_action"
+            to_string(Aikido.ActionRef.definition(mod).name) == "param_action"
           end
         )
 
@@ -443,11 +430,8 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
       assert Aikido.Slices.AiReact.ToolAdapter.to_action_map([
                Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
              ]) == %{
-               Map.get(
-                 Aikido.ActionRef.action_options(
-                   Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
-                 ),
-                 :name
+               to_string(
+                 Aikido.ActionRef.definition(Aikido.Slices.AiReact.ToolAdapterTest.ParamAction).name
                ) => Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
              }
     end
@@ -456,20 +440,16 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
       assert Aikido.Slices.AiReact.ToolAdapter.to_action_map(
                Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
              ) == %{
-               Map.get(
-                 Aikido.ActionRef.action_options(
-                   Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
-                 ),
-                 :name
+               to_string(
+                 Aikido.ActionRef.definition(Aikido.Slices.AiReact.ToolAdapterTest.ParamAction).name
                ) => Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
              }
     end
 
     test "keeps already-normalized maps intact" do
       tools = %{
-        Map.get(
-          Aikido.ActionRef.action_options(Aikido.Slices.AiReact.ToolAdapterTest.ParamAction),
-          :name
+        to_string(
+          Aikido.ActionRef.definition(Aikido.Slices.AiReact.ToolAdapterTest.ParamAction).name
         ) => Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
       }
 
@@ -481,11 +461,8 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
                Aikido.Slices.AiReact.ToolAdapterTest.ParamAction,
                :not_a_module
              ]) == %{
-               Map.get(
-                 Aikido.ActionRef.action_options(
-                   Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
-                 ),
-                 :name
+               to_string(
+                 Aikido.ActionRef.definition(Aikido.Slices.AiReact.ToolAdapterTest.ParamAction).name
                ) => Aikido.Slices.AiReact.ToolAdapterTest.ParamAction
              }
     end
@@ -524,9 +501,9 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
         defmodule Elixir.Aikido.Slices.AiReact.ToolAdapterTest.AAction do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-          @persist {:aikido_action_metadata, %{name: "action", description: "First action"}}
+
           actions do
-            action :run, :map do
+            action :action, :map do
               description "First action"
               run {Aikido.Slices.AiReact.ToolAdapterTest.AAction.Implementation, action: :run}
             end
@@ -548,10 +525,8 @@ defmodule Aikido.Slices.AiReact.ToolAdapterTest do
           @moduledoc false
           use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
-          @persist {:aikido_action_metadata,
-                    %{name: "action", description: "Second action with same name"}}
           actions do
-            action :run, :map do
+            action :action, :map do
               description "Second action with same name"
               run {Aikido.Slices.AiReact.ToolAdapterTest.BAction.Implementation, action: :run}
             end

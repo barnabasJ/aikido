@@ -17,9 +17,9 @@ end
 defmodule AikidoTest.AgentServer.AckSubscribeTest.WriteAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "write"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :write, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation, action: :run}
     end
@@ -38,9 +38,9 @@ end
 defmodule AikidoTest.AgentServer.AckSubscribeTest.FailingAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "fail"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :fail, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServer.AckSubscribeTest.FailingAction.Implementation, action: :run}
     end
@@ -104,9 +104,9 @@ end
 defmodule AikidoTest.AgentServer.AckSubscribeTest.FlakyAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "flaky"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :flaky, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServer.AckSubscribeTest.FlakyAction.Implementation, action: :run}
     end

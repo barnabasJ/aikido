@@ -18,9 +18,9 @@ end
 defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "identity_watcher"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :identity_watcher, Aikido.ActionResult do
       argument :state, :term
       run {AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementation, action: :run}
     end

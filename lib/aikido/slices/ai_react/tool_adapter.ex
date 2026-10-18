@@ -7,7 +7,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
 
   Use `{MyApp.Tools, :search}` references or pass the tool/callback pairs returned
   by `AshAi.build_tools_and_registry/1`. Module shorthand selects the resource's
-  native `:run` action. Ash AI tools accept arguments in an `input` object.
+  only native generic action. Ash AI tools accept arguments in an `input` object.
 
   Caller-supplied ReqLLM tools keep their own parameter schemas and callbacks.
   """
@@ -49,7 +49,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
 
       # With filter
       tools = Aikido.Slices.AiReact.ToolAdapter.from_actions(actions,
-        filter: fn mod -> Aikido.ActionRef.category(mod) == :math end
+        filter: fn reference -> reference == {MyApp.Tools, :add} end
       )
   """
   @type action ::
@@ -144,7 +144,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
 
   @doc false
   def ash_tool(resource) when is_atom(resource) do
-    %{ash_tool({resource, :run}) | name: Aikido.ActionRef.action_options(resource).name}
+    ash_tool(Aikido.ActionRef.normalize(resource))
   end
 
   def ash_tool({resource, action_name}) do
@@ -195,7 +195,7 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
 
   def to_action_map(module) when is_atom(module) do
     if valid_action_module?(module) do
-      %{Map.get(Aikido.ActionRef.action_options(module), :name) => module}
+      %{(module |> Aikido.ActionRef.definition() |> Map.fetch!(:name) |> to_string()) => module}
     else
       %{}
     end
@@ -297,7 +297,9 @@ defmodule Aikido.Slices.AiReact.ToolAdapter do
   defp tool_name({%ReqLLM.Tool{name: name}, _callback}), do: name
   defp tool_name(%ReqLLM.Tool{name: name}), do: name
   defp tool_name({_resource, action}), do: to_string(action)
-  defp tool_name(module), do: Map.get(Aikido.ActionRef.action_options(module), :name)
+
+  defp tool_name(module),
+    do: module |> Aikido.ActionRef.definition() |> Map.fetch!(:name) |> to_string()
 
   # ============================================================================
   # Private Functions - Schema and Filtering

@@ -17,9 +17,9 @@ end
 defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "step1"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :step1, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Implementation,
@@ -42,9 +42,9 @@ end
 defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "set_followup_key"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :set_followup_key, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction.Implementation,
@@ -68,9 +68,9 @@ end
 defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action do
   @moduledoc false
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-  @persist {:aikido_action_metadata, %{name: "step2"}}
+
   actions do
-    action :run, Aikido.ActionResult do
+    action :step2, Aikido.ActionResult do
       argument :state, :term
 
       run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Implementation,

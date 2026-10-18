@@ -247,8 +247,7 @@ defmodule Aikido.Dsl.Agent.Transformers.GenerateAccessors do
         #      plus the agent's own path if the action is also declared on
         #      the agent's own `signal_routes` (compile-time list-valued
         #      lookup table).
-        #   2. Fall back to a single-element list with the action's own
-        #      `path :foo` escape valve, then the agent's own path.
+        #   2. Fall back to the agent's own path.
         case Map.get(@slice_paths_for_action, action) do
           [_ | _] = paths ->
             paths
@@ -264,14 +263,8 @@ defmodule Aikido.Dsl.Agent.Transformers.GenerateAccessors do
       defp __resolve_slice_paths__(_action),
         do: [Map.get(Aikido.Dsl.Agent.Info.agent_options(__MODULE__), :path)]
 
-      defp __fallback_slice_path__(action) do
-        case Map.get(Aikido.ActionRef.action_options(action), :path) do
-          path when is_atom(path) and not is_nil(path) -> path
-          _ -> Map.get(Aikido.Dsl.Agent.Info.agent_options(__MODULE__), :path)
-        end
-      rescue
-        UndefinedFunctionError -> Map.get(Aikido.Dsl.Agent.Info.agent_options(__MODULE__), :path)
-      end
+      defp __fallback_slice_path__(_action),
+        do: Map.get(Aikido.Dsl.Agent.Info.agent_options(__MODULE__), :path)
 
       defp __apply_slice_result__(
              agent,
