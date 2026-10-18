@@ -16,7 +16,9 @@ defmodule Aikido.Sensor do
         sensor do
           name "my_sensor"
           description "Monitors a specific metric"
-          schema metric: [type: :string, allow_nil?: false]
+          schema do
+            attribute :metric, :string, allow_nil?: false
+          end
         end
 
         @impl true

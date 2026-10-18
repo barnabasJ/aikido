@@ -29,6 +29,10 @@ defmodule Aikido.Agent do
 
   ## Defining an Agent Module
 
+  `use Aikido.Agent` creates an embedded Ash resource host and generates the
+  pure command API. State schemas become attributes on that same resource.
+  Reducers are native Ash actions implemented by separate callback modules.
+
   ```elixir
   defmodule MyAgent do
     use Aikido.Agent,
@@ -38,7 +42,9 @@ defmodule Aikido.Agent do
       name "my_agent"
       description "My custom agent"
       path :domain
-      schema [counter: [type: :integer, default: 0]]
+      schema do
+        attribute :counter, :integer, default: 0
+      end
     end
 
     slices do

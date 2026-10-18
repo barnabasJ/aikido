@@ -3,10 +3,10 @@ defmodule Aikido.Slice do
   A Slice is a declarative bundle of agent-state schema, actions, signal
   routes, sensor subscriptions, and schedules.
 
-  A Slice owns one flat key in `agent.state` (its `path:`). Actions belonging
-  to the slice receive that slice as their second argument and return the new
-  full slice value. There are no lifecycle callbacks — a Slice is fully
-  described by its `use` block.
+  The mounting agent assigns its key in `agent.state`. Native Ash actions
+  receive the slice in `input.arguments.state` and return `Aikido.ActionResult`.
+  `use Aikido.Slice` creates an embedded Ash resource host; schema declarations
+  become attributes on that resource.
 
   Cross-cutting behaviour (auditing, persistence, retries, transformation)
   belongs in `Aikido.Middleware`, not here. The Slice / Middleware split is the
@@ -20,20 +20,27 @@ defmodule Aikido.Slice do
 
         slice do
           name "chat"
-          path :chat
-          schema messages: [type: {:array, :term}, default: []],
-                 model: [type: :string, default: "gpt-4"]
+          schema do
+            attribute :messages, {:array, :term}, default: []
+          end
         end
 
         signal_routes do
-          route "chat.send", MyApp.Actions.SendMessage
-          route "chat.history", MyApp.Actions.ListHistory
+          route "chat.send", {__MODULE__, :send_message}
+        end
+
+        actions do
+          action :send_message, Aikido.ActionResult do
+            argument :state, :term
+            argument :message, :string, allow_nil?: false
+            run MyApp.Chat.SendMessage
+          end
         end
       end
 
   ## Sections
 
-  - `slice do … end` — slice identity (`name`, `path`, `description`,
+  - `slice do … end` — slice identity (`name`, `description`,
     `category`, `vsn`, `otp_app`, `schema`, `config_schema`, `tags`).
   - `signal_routes do … end` — `route "type", Action, opts` entries.
   - `subscriptions do … end` — `subscription Sensor, %{config}` entries.
@@ -41,8 +48,8 @@ defmodule Aikido.Slice do
   - `capabilities do … end` — `capability :name` entries.
   - `requires do … end` — `requires :kind, :name` entries.
 
-  `actions/0` is derived from the `signal_routes` table — there is no
-  separate `actions` section.
+  Declare reducers in the native `actions do … end` section. Implement them
+  with `Ash.Resource.Actions.Implementation` and return directives for I/O.
   """
 
   defmacro __using__(_opts) do
