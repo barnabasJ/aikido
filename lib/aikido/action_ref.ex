@@ -64,7 +64,6 @@ defmodule Aikido.ActionRef do
     )
   end
 
-  def output_schema(_reference), do: []
   def category(reference), do: action_options(reference).category
   def to_json(reference), do: Map.put(action_options(reference), :schema, schema(reference))
 end

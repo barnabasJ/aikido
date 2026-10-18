@@ -70,14 +70,10 @@ defmodule Aikido.Directives.SpawnAgent do
 
     field :meta, :map, allow_nil?: false, default: %{}, description: "Metadata to pass to child"
 
-    field :restart, Aikido.Types.Validated,
+    field :restart, :atom,
       allow_nil?: false,
       default: :transient,
-      constraints: [
-        type: :atom,
-        constraints: [],
-        validation: {Aikido.Directives, :validate_restart_policy, []}
-      ],
+      constraints: [one_of: [:permanent, :transient, :temporary]],
       description: "Restart policy for the child"
   end
 

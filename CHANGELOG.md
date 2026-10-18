@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Remove no-op execution validators and obsolete action output-schema plumbing;
+  native Ash action inputs and return types own those checks. Use native atom
+  and enum constraints for child-bus names and child restart policies.
+
 - Build native action tools directly with `AshAi.Tools`; remove the custom
   action schema/JSON Schema and tool-casting facades. Ash AI owns argument
   validation and result serialization, including its `input` argument envelope.

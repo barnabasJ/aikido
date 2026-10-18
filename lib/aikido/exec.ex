@@ -5,7 +5,6 @@ defmodule Aikido.Exec do
   This module provides the core execution interface for Aikido Actions with specialized
   helper modules handling specific concerns:
 
-  - **Aikido.Exec.Validator** - Parameter and output validation
   - **Aikido.Exec.Telemetry** - Logging and telemetry events
   - **Aikido.Exec.Retry** - Exponential backoff and retry logic
   - **Aikido.Exec.Compensation** - Error handling and compensation
@@ -35,7 +34,7 @@ defmodule Aikido.Exec do
       # ... do other work ...
       result = Aikido.Exec.await(async_ref)
 
-  See `Aikido.Action` for how to define an Action.
+  Define actions on their owning Ash resource with `Ash.Resource.Actions.Implementation` callbacks.
   """
   use Private
 
@@ -45,7 +44,6 @@ defmodule Aikido.Exec do
   alias Aikido.Exec.Retry
   alias Aikido.Exec.Supervisors
   alias Aikido.Exec.Telemetry
-  alias Aikido.Exec.Validator
   alias Aikido.Instruction
 
   require Logger
@@ -162,14 +160,13 @@ defmodule Aikido.Exec do
 
     with {:ok, normalized_params} <- normalize_params(params),
          {:ok, normalized_context} <- normalize_context(context),
-         :ok <- Validator.validate_action(action),
-         {:ok, validated_params} <- Validator.validate_params(action, normalized_params) do
+         :ok <- validate_action(action) do
       enhanced_context =
         Map.put(normalized_context, :action_metadata, Aikido.ActionRef.to_json(action))
 
-      Telemetry.cond_log_start(log_level, action, validated_params, enhanced_context)
+      Telemetry.cond_log_start(log_level, action, normalized_params, enhanced_context)
 
-      do_run_with_retry(action, validated_params, enhanced_context, opts)
+      do_run_with_retry(action, normalized_params, enhanced_context, opts)
     else
       {:error, reason} ->
         Telemetry.cond_log_failure(log_level, inspect(reason))
@@ -309,6 +306,12 @@ defmodule Aikido.Exec do
 
   # Private functions are exposed to the test suite
   private do
+    defp validate_action(reference) do
+      if Aikido.ActionRef.valid?(reference),
+        do: :ok,
+        else: {:error, Error.validation_error("Invalid native Ash action: #{inspect(reference)}")}
+    end
+
     @spec normalize_params(params()) :: {:ok, map()} | {:error, Exception.t()}
     defp normalize_params(%_{} = error) when is_exception(error), do: {:error, error}
     defp normalize_params(params) when is_map(params), do: {:ok, params}
@@ -622,7 +625,7 @@ defmodule Aikido.Exec do
       log_level = Keyword.get(opts, :log_level, :info)
       Telemetry.cond_log_execution_debug(log_level, action, params, context)
 
-      {signal, slice, action_opts, ctx} = build_run4_args(action, params, context)
+      {signal, slice, action_opts, ctx} = build_action_context(action, params, context)
 
       {resource, name} = Aikido.ActionRef.normalize(action)
       definition = Ash.Resource.Info.action(resource, name)
@@ -659,22 +662,10 @@ defmodule Aikido.Exec do
         handle_action_exception(e, __STACKTRACE__, action, opts)
     end
 
-    # Build the `(signal, slice, opts, ctx)` argument tuple that
-    # `Aikido.Action.run/4` expects. Three sources of truth:
-    #
-    #   - `context[:signal]` is the wire signal handed in by the agent
-    #     server. We reuse its envelope (id, type, source, extensions),
-    #     but overwrite `:data` with the validated `params` Exec has
-    #     already merged for this action so the action body sees schema
-    #     defaults applied. If absent (direct `Exec.run/4` from a test
-    #     or REPL), we synthesize a fresh signal from `action.name()`.
-    #   - `context[:state]` is the slice the strategy scoped down to
-    #     `agent.state[path]`. The action receives it as `slice`.
-    #   - `signal.extensions[:aikido_ctx]` carries per-signal runtime
-    #     context. We extract it into the explicit `ctx` arg, then
-    #     fold in agent-level identity (`:agent`, `:agent_server_pid`,
-    #     `:action_metadata`) the strategy already attached.
-    defp build_run4_args(action, params, ctx_in) do
+    # Scope the resource action to its slice and preserve the signal envelope.
+    # Native Ash arguments own casting and defaults; runtime metadata is carried
+    # separately in input.context.aikido.
+    defp build_action_context(action, params, ctx_in) do
       signal =
         case Map.get(ctx_in, :signal) do
           %Jido.Signal{} = sig -> %{sig | data: ensure_map(params)}
@@ -727,8 +718,8 @@ defmodule Aikido.Exec do
     # list defaulting to []. Anything else is rejected as a contract
     # violation with a structured ExecutionError.
 
-    defp handle_action_result({:ok, result, dirs}, action, log_level, opts) do
-      validate_and_log_success(action, result, log_level, opts, List.wrap(dirs))
+    defp handle_action_result({:ok, result, dirs}, action, log_level, _opts) do
+      log_success(action, result, log_level, List.wrap(dirs))
     end
 
     defp handle_action_result({:error, %_{} = error}, action, log_level, _opts)
@@ -762,8 +753,7 @@ defmodule Aikido.Exec do
     defp extract_error_fields(reason) when is_map(reason), do: {inspect(reason), reason}
     defp extract_error_fields(reason), do: {inspect(reason), %{}}
 
-    defp validate_and_log_success(action, result, log_level, opts, dirs) do
-      _ = opts
+    defp log_success(action, result, log_level, dirs) do
       Telemetry.cond_log_end(log_level, action, {:ok, result, dirs})
       {:ok, result, dirs}
     end

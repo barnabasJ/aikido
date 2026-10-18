@@ -18,7 +18,7 @@ defmodule Aikido.Dsl.Transformers.CompileSchemas do
 
     dsl =
       Enum.reduce([:agent, :slice, :sensor], dsl, fn section, dsl ->
-        Enum.reduce([:schema, :output_schema, :config_schema], dsl, fn key, dsl ->
+        Enum.reduce([:schema, :config_schema], dsl, fn key, dsl ->
           path = [section, key]
 
           if Map.has_key?(dsl, path) do

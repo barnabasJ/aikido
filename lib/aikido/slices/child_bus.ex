@@ -53,14 +53,9 @@ defmodule Aikido.Slices.ChildBus do
     description "Auto-subscribes an agent's children to a named signal bus."
 
     schema do
-      attribute :bus, Aikido.Types.Validated,
+      attribute :bus, :atom,
         public?: true,
         allow_nil?: false,
-        constraints: [
-          type: :atom,
-          constraints: [],
-          validation: {__MODULE__, :validate_bus_atom, []}
-        ],
         description: "Name of the Jido.Signal.Bus to subscribe children on."
 
       attribute :subscriptions, :map,
@@ -84,20 +79,6 @@ defmodule Aikido.Slices.ChildBus do
 
   capabilities do
     capability :bus_wiring
-  end
-
-  @doc false
-  @spec validate_bus_atom(atom(), keyword()) :: :ok | {:error, String.t()}
-  def validate_bus_atom(nil, _opts) do
-    {:error, "Aikido.Slices.ChildBus requires a `:bus` atom; got nil"}
-  end
-
-  def validate_bus_atom(value, _opts) when is_atom(value) do
-    :ok
-  end
-
-  def validate_bus_atom(other, _opts) do
-    {:error, "Aikido.Slices.ChildBus requires a `:bus` atom; got #{inspect(other)}"}
   end
 
   actions do
