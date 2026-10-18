@@ -81,8 +81,6 @@ defmodule Aikido.Directives.SpawnAgent do
       description: "Restart policy for the child"
   end
 
-  @type t :: %__MODULE__{}
-
   @doc """
   Pure I/O directive: spawns the child via the agent supervisor and
   persists the parent ⇒ child relationship in `Aikido.RuntimeStore`. The

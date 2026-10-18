@@ -44,8 +44,6 @@ defmodule Aikido.Directives.Emit do
       description: "Dispatch config: {adapter, opts} or list"
   end
 
-  @type t :: %__MODULE__{}
-
   alias Aikido.Tracing.Context, as: TraceContext
 
   require Logger

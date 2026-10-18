@@ -46,8 +46,6 @@ defmodule Aikido.Directives.Cron do
     field :timezone, :term, allow_nil?: true, description: "Timezone identifier (optional)"
   end
 
-  @type t :: %__MODULE__{}
-
   @typedoc false
   @type io_result :: %{
           job_id: term(),

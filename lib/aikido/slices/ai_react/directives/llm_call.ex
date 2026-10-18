@@ -19,15 +19,6 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   run without re-reading slice state.
   """
 
-  @type t :: %__MODULE__{
-          model: ReqLLM.model_input(),
-          context: ReqLLM.Context.t(),
-          tools: [Aikido.Slices.AiReact.ToolAdapter.action()],
-          client: module(),
-          request_id: String.t(),
-          llm_opts: keyword()
-        }
-
   use Aikido.Directive
 
   typed_struct do

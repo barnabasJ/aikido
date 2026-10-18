@@ -3,7 +3,8 @@ defmodule Aikido.Directive do
   A typed I/O directive and its execution behaviour.
 
   Uses Spark with Ash's typed-struct DSL. Declare the descriptor's fields and
-  implement `exec/3` in the same module:
+  implement `exec/3` in the same module. The host generates the struct's public
+  `t()` type; Ash validates the declared field types and constraints.
 
       defmodule MyApp.Notify do
         use Aikido.Directive
@@ -37,6 +38,13 @@ defmodule Aikido.Directive do
 
       @doc "Returns the directive's Ash type."
       def schema, do: __MODULE__
+    end
+  end
+
+  @impl Spark.Dsl
+  def handle_before_compile(_opts) do
+    quote do
+      @type t :: %__MODULE__{}
     end
   end
 

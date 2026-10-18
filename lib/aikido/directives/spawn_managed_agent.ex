@@ -58,8 +58,6 @@ defmodule Aikido.Directives.SpawnManagedAgent do
       description: "Extra AgentServer options"
   end
 
-  @type t :: %__MODULE__{}
-
   @doc """
   Executes the directive synchronously, returning `{:ok, pid}` for the
   spawned child or `{:error, reason}` on failure.

@@ -55,8 +55,6 @@ defmodule Aikido.Directives.RunInstruction do
       description: "Optional metadata for result payload"
   end
 
-  @type t :: %__MODULE__{}
-
   @doc """
   Pure I/O directive: runs the instruction and emits a result signal of
   type `result_signal_type`. The directive does not call `cmd/2`

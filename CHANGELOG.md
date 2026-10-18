@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Generate directive `t()` types once in the Spark host instead of maintaining
+  handwritten struct types in each directive module.
+
 - Configure agent snapshot retention with `persistence :permanent | :temporary`.
   Temporary agents delete their saved state on stop; permanent agents retain it.
   Add a generic `delete` action and generated domain interface for removing a

@@ -21,8 +21,6 @@ defmodule Aikido.Directives.Schedule do
     field :message, :term, allow_nil?: false, description: "Message to send after delay"
   end
 
-  @type t :: %__MODULE__{}
-
   alias Aikido.AgentServer.Signal.Scheduled
   alias Aikido.Tracing.Context, as: TraceContext
 

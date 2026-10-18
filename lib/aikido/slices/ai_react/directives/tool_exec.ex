@@ -14,13 +14,6 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   tool failure never produces an `"ai.react.failed"` signal.
   """
 
-  @type t :: %__MODULE__{
-          tool_call: %{id: String.t(), name: String.t(), arguments: map()},
-          tool_modules: [Aikido.Slices.AiReact.ToolAdapter.action()],
-          tool_context: map(),
-          request_id: String.t()
-        }
-
   use Aikido.Directive
 
   typed_struct do

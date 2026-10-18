@@ -1,8 +1,6 @@
 defmodule Aikido.Slices.ChildBus.Directives.UnsubscribeChild do
   @moduledoc false
 
-  @type t :: %__MODULE__{bus: atom(), sub_id: any(), tag: any()}
-
   use Aikido.Directive
 
   typed_struct do

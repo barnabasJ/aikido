@@ -17,8 +17,6 @@ defmodule Aikido.Directives.CronCancel do
     field :job_id, :term, allow_nil?: false, description: "Logical cron job id within the agent"
   end
 
-  @type t :: %__MODULE__{}
-
   require Logger
   alias Aikido.AgentServer
 

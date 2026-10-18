@@ -54,13 +54,6 @@ defmodule Aikido.Directives.Reply do
   @type builder ::
           {module :: module(), fun :: atom(), extra_args :: [term()]}
 
-  @type t :: %__MODULE__{
-          input_signal: Jido.Signal.t(),
-          reply_type: String.t(),
-          error_type: String.t(),
-          build: builder()
-        }
-
   alias Jido.Signal
   alias Jido.Signal.Dispatch
 

@@ -1,14 +1,6 @@
 defmodule Aikido.Slices.ChildBus.Directives.SubscribeChild do
   @moduledoc false
 
-  @type t :: %__MODULE__{
-          bus: atom(),
-          tag: any(),
-          path: String.t(),
-          target_pid: pid(),
-          child_module: module()
-        }
-
   use Aikido.Directive
 
   typed_struct do

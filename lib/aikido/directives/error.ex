@@ -18,8 +18,6 @@ defmodule Aikido.Directives.Error do
     field :context, :atom, allow_nil?: true, description: "Error context"
   end
 
-  @type t :: %__MODULE__{}
-
   # The framework-level error policy is gone (C4 of ADR 0014). Error
   # directives just log and continue; users who need stop-on-error or
   # max-errors semantics write a small middleware that pattern-matches on

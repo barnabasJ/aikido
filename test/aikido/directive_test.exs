@@ -37,6 +37,25 @@ defmodule Aikido.DirectiveTest do
     assert {:error, _} = Notify.new(count: 2)
   end
 
+  test "the directive host generates the public struct type" do
+    assert {:ok, types} = Code.Typespec.fetch_types(Aikido.Slices.AiReact.Directives.ToolExec)
+
+    assert Enum.any?(types, fn
+             {:type, {:t, {:type, _, :map, fields}, []}} ->
+               Enum.any?(fields, fn
+                 {:type, _, :map_field_exact,
+                  [{:atom, _, :__struct__}, {:atom, _, Aikido.Slices.AiReact.Directives.ToolExec}]} ->
+                   true
+
+                 _ ->
+                   false
+               end)
+
+             _ ->
+               false
+           end)
+  end
+
   test "validated custom directives execute their module callback without a protocol" do
     directive = Notify.new!(recipient: self(), count: 2)
     assert {:ok, ^directive} = Aikido.Types.Directive.cast_input(directive, [])

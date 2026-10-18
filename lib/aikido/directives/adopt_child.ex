@@ -31,8 +31,6 @@ defmodule Aikido.Directives.AdoptChild do
       description: "Metadata to pass to the adopted child"
   end
 
-  @type t :: %__MODULE__{}
-
   @doc """
   Pure I/O directive: pushes a fresh `%ParentRef{}` into the live child
   via `AgentServer.adopt_parent/2`. The child's

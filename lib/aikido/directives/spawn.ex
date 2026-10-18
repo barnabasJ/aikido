@@ -25,8 +25,6 @@ defmodule Aikido.Directives.Spawn do
     field :tag, :term, allow_nil?: true, description: "Optional correlation tag"
   end
 
-  @type t :: %__MODULE__{}
-
   require Logger
 
   @impl true

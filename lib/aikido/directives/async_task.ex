@@ -62,8 +62,6 @@ defmodule Aikido.Directives.AsyncTask do
       description: "GenServer target for reply signals; defaults to originating agent"
   end
 
-  @type t :: %__MODULE__{}
-
   alias Aikido.AgentServer
   alias Aikido.AgentServer.State
   alias Aikido.Directives.AsyncTask

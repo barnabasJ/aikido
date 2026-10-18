@@ -41,8 +41,6 @@ defmodule Aikido.Directives.StopChild do
     field :reason, :term, allow_nil?: false, default: :normal, description: "Reason for stopping"
   end
 
-  @type t :: %__MODULE__{}
-
   alias Aikido.AgentServer.StopChildRuntime
 
   @impl true
