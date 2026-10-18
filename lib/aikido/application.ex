@@ -12,7 +12,6 @@ defmodule Aikido.Application do
     ]
 
     register_signal_extensions()
-    Aikido.Discovery.init_async()
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Aikido.Supervisor)
   end

@@ -573,32 +573,4 @@ defmodule Aikido do
   end
 
   defp normalize_parent_binding(_binding), do: :error
-
-  # ---------------------------------------------------------------------------
-  # Discovery
-  # ---------------------------------------------------------------------------
-
-  @doc "Lists discovered Actions with optional filtering."
-  defdelegate list_actions(opts \\ []), to: Aikido.Discovery
-
-  @doc "Lists discovered Sensors with optional filtering."
-  defdelegate list_sensors(opts \\ []), to: Aikido.Discovery
-
-  @doc "Lists discovered Slices with optional filtering."
-  defdelegate list_slices(opts \\ []), to: Aikido.Discovery
-
-  @doc "Lists discovered Demos with optional filtering."
-  defdelegate list_demos(opts \\ []), to: Aikido.Discovery
-
-  @doc "Gets an Action by its slug."
-  defdelegate get_action_by_slug(slug), to: Aikido.Discovery
-
-  @doc "Gets a Sensor by its slug."
-  defdelegate get_sensor_by_slug(slug), to: Aikido.Discovery
-
-  @doc "Gets a Slice by its slug."
-  defdelegate get_slice_by_slug(slug), to: Aikido.Discovery
-
-  @doc "Refreshes the Discovery catalog."
-  defdelegate refresh_discovery(), to: Aikido.Discovery, as: :refresh
 end

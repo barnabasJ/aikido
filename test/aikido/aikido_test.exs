@@ -108,48 +108,6 @@ defmodule AikidoTest.AikidoTest do
     end
   end
 
-  describe "discovery delegates" do
-    test "list_actions/1 delegates to Aikido.Discovery" do
-      actions = Aikido.list_actions()
-      assert is_list(actions)
-    end
-
-    test "list_sensors/1 delegates to Aikido.Discovery" do
-      sensors = Aikido.list_sensors()
-      assert is_list(sensors)
-    end
-
-    test "list_slices/1 delegates to Aikido.Discovery" do
-      slices = Aikido.list_slices()
-      assert is_list(slices)
-    end
-
-    test "list_demos/1 delegates to Aikido.Discovery" do
-      demos = Aikido.list_demos()
-      assert is_list(demos)
-    end
-
-    test "get_action_by_slug/1 delegates to Aikido.Discovery" do
-      result = Aikido.get_action_by_slug("nonexistent-action-slug")
-      assert result == nil or is_map(result)
-    end
-
-    test "get_sensor_by_slug/1 delegates to Aikido.Discovery" do
-      result = Aikido.get_sensor_by_slug("nonexistent-sensor-slug")
-      assert result == nil or is_map(result)
-    end
-
-    test "get_slice_by_slug/1 delegates to Aikido.Discovery" do
-      result = Aikido.get_slice_by_slug("nonexistent-slice-slug")
-      assert result == nil or is_map(result)
-    end
-
-    test "refresh_discovery/0 delegates to Aikido.Discovery" do
-      result = Aikido.refresh_discovery()
-      assert result == :ok
-    end
-  end
-
   describe "AgentServer.await_child/3" do
     test "returns timeout when child not found", %{aikido: aikido} do
       {:ok, pid} = Aikido.start_agent(aikido, Minimal, id: "await-child-delegate")
