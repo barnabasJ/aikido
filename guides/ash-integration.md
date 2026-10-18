@@ -342,14 +342,10 @@ process side effects cannot be rolled back as a database transaction.
 
 ## Migration
 
-Existing `Aikido.Agent`, `Aikido.Slice`, plugins, middleware, directives, and runtime
-APIs continue to work. Move a consumer to resource declarations and domain
-interfaces, then convert its slices to embedded resources. Internal generated
-`Runtime` and `AikidoSlice` modules are implementation details.
-
-The separate `ash_aikido` package serves the opposite integration direction: it
-exposes existing Ash resource actions as Aikido actions. It is not needed for the
-process-backed resource model described here.
+`Aikido.Agent`, `Aikido.Slice`, and `Aikido.Sensor` are convenience macros over
+native Ash resource hosts. Their state declarations become resource attributes.
+Use `Ash.Resource` with `Aikido.Ash.Agent` and domain interfaces for the public
+agent API. The generated `Runtime` module supplies the pure decision engine.
 
 ## Native contracts and tools
 
@@ -359,7 +355,9 @@ callbacks with `Ash.Resource.Actions.Implementation` modules and reference them
 with `run MyApp.Implementation` on the owning resource.
 
 Agent and slice `schema do` declarations become attributes on their existing
-Ash resources. Sensor and configuration contracts use Ash typed structs. Native
+Ash resources. Sensors also own native attributes. Slice configuration is cast
+through a private native generic action on the same resource, including argument
+defaults and constraints. No generated schema modules are needed. Native
 Ash constructors and changesets handle defaults, casting, and validation;
 Ash/Splode errors retain their field paths and nested causes.
 
@@ -372,7 +370,8 @@ team without accepting team IDs or modules as model inputs. The example app's
 teams, delegate work, list templates, and stop or remove owned subtrees.
 
 Use `AshAi.build_tools_and_registry/1` to supply Ash tools and their callbacks.
-Resource/action pairs and module shorthand for `:run` also use AshAI for schema generation and execution; their
+Resource/action pairs also use Ash AI for schema generation and execution. Module
+shorthand is supported when a resource has exactly one generic action. Their
 arguments follow AshAI's `%{"input" => %{...}}` shape. Actor, tenant, and context
 are passed through to AshAI. Native validation remains authoritative for type
 constraints that AshAI does not currently expose in JSON Schema.

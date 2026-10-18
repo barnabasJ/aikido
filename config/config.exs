@@ -4,10 +4,9 @@ config :ash, default_string_length_count: :codepoints
 
 config :spark, :formatter,
   remove_parens?: true,
-  "Aikido.Action": [],
-  "Aikido.Agent": [],
-  "Aikido.Slice": [],
-  "Aikido.Sensor": [],
+  "Aikido.Agent": [type: Ash.Resource, extensions: [Aikido.Dsl.Agent]],
+  "Aikido.Slice": [type: Ash.Resource, extensions: [Aikido.Dsl.Slice]],
+  "Aikido.Sensor": [type: Ash.Resource, extensions: [Aikido.Dsl.Sensor]],
   "Aikido.Middleware": [],
   "Ash.Resource": [
     extensions: [Aikido.Ash.Agent, Aikido.Ash.Slice, Aikido.Ash.Team, Aikido.Ash.AI]

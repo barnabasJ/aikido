@@ -10,7 +10,6 @@ spark_locals_without_parens = [
   capability: 2,
   category: 1,
   client: 1,
-  compensation: 1,
   config_transform: 1,
   constraints: 1,
   create_timestamp: 1,

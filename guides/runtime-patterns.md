@@ -10,11 +10,11 @@ for a separately configured keyed pool; it delegates process ownership and stora
 to DurableServer. InstanceManager and the pod API have been removed.
 
 `Aikido.Agent` remains the pure action/signal engine. `Aikido.AgentServer` is the
-runtime callback implementation shared by the durable host and deliberately
-nonpersistent instances (`durable: false`). Actions own state transitions;
+runtime callback implementation hosted by DurableServer. Configure
+`persistence :temporary` to delete snapshots on stop. Actions own state transitions;
 directives perform I/O and return results through signals.
 
-`SpawnAgent` supports direct child processes. Teams add desired topology,
+`SpawnAgent` starts durable child agents and snapshots their current logical parent. Teams add desired topology,
 dependencies, ownership, lazy activation, dynamic worker templates, and task
 receipts. A team resource can itself be a member or a worker template.
 

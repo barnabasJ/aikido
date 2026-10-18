@@ -6,6 +6,17 @@
 
 ### Changed
 
+- Remove component discovery, startup scanning, public catalog delegates, and
+  their tests. Remove legacy action metadata and the unused compensation engine.
+- Consolidate runtime errors in `Aikido.Error`; preserve native Ash errors and
+  use the same retry classification across execution paths.
+- Start supervised agents and spawned children through DurableServer. Remove
+  the runtime relationship store and optional non-durable instance path; save
+  current parent bindings in snapshots, including adoption and detachment.
+- Make the remaining agent, slice, and sensor DSL hosts native Ash resources.
+  State schemas become attributes and slice configuration uses native action
+  arguments. Remove generated contract modules and the custom schema facade.
+
 - Remove no-op execution validators and obsolete action output-schema plumbing;
   native Ash action inputs and return types own those checks. Use native atom
   and enum constraints for child-bus names and child restart policies.
@@ -42,8 +53,8 @@
   declare reducers directly; built-in slices and the example app use native
   resource/action targets.
 - Initialize and validate agent state through native Ash resource attributes
-  and typed-struct contracts. The migration is in progress; schema-related
-  regression tests still require follow-up.
+  and typed-struct contracts, with regression coverage for defaults, constraints,
+  native tool schemas, and state projection.
 
 ### Added
 
