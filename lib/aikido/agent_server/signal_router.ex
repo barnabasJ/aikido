@@ -61,7 +61,7 @@ defmodule Aikido.AgentServer.SignalRouter do
   # slice/agent so user-defined routes always win on conflict.
   defp add_builtin_routes(routes) do
     builtin = [
-      {"aikido.agent.query.children", Aikido.AgentServer.Actions.QueryChildren}
+      {"aikido.agent.query.children", {Aikido.AgentServer.RuntimeActions, :query_children}}
     ]
 
     routes ++ normalize_routes(builtin, @slice_default_priority - 10)

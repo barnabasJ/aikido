@@ -210,7 +210,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
     test "every agent has the aikido.agent.query.children built-in route" do
       router = SignalRouter.build(build_state(AgentWithoutRoutes))
 
-      assert {:ok, [Aikido.AgentServer.Actions.QueryChildren]} =
+      assert {:ok, [{Aikido.AgentServer.RuntimeActions, :query_children}]} =
                AikidoRouter.route(router, signal("aikido.agent.query.children"))
     end
   end

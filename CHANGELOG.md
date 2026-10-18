@@ -6,6 +6,8 @@
 
 ### Changed
 
+- Declare the built-in children query on a shared runtime resource and implement
+  it with `Ash.Resource.Actions.Implementation`, preserving domain state.
 - Replace the custom action DSL with native Ash generic actions and a shared
   `Aikido.ActionResult` contract that validates returned directives. Agents may
   declare reducers directly; built-in slices and the example app use native

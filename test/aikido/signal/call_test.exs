@@ -87,6 +87,22 @@ defmodule AikidoTest.Signal.CallTest do
   end
 
   describe("call/3") do
+    test "the built-in children action replies without changing domain state", %{aikido: aikido} do
+      {:ok, pid} =
+        AgentServer.start_link(agent_module: CallTestAgent, id: "children-query", aikido: aikido)
+
+      :ok = AgentServer.await_ready(pid)
+      assert {:ok, before_state} = AgentServer.state(pid, &{:ok, &1.agent.state})
+      query = Signal.new!("aikido.agent.query.children", %{}, source: "/test")
+
+      assert {:ok, reply} = Call.call(pid, query)
+      assert reply.type == "aikido.agent.query.children.reply"
+      assert reply.subject == query.id
+      assert reply.data == %{children: %{}}
+      assert {:ok, ^before_state} = AgentServer.state(pid, &{:ok, &1.agent.state})
+      GenServer.stop(pid)
+    end
+
     test("returns the reply signal on the happy path", %{aikido: aikido}) do
       {:ok, pid} = AgentServer.start_link(agent_module: CallTestAgent, id: "echo", aikido: aikido)
       query = Signal.new!("aikido.test.echo", %{}, source: "/test")
