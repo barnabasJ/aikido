@@ -41,22 +41,18 @@ defmodule MyApp.Counter do
       attribute :count, :integer, default: 0, public?: true
     end
 
-    signal :add, "counter.add", MyApp.Increment
+    signal :add, "counter.add", :increment
   end
-end
 
-defmodule MyApp.Increment do
-  use Aikido.Action
+  actions do
+    action :increment, Aikido.ActionResult do
+      argument :state, :map, allow_nil?: false
+      argument :amount, :integer, allow_nil?: false
 
-  action do
-    name "increment"
-    schema do
-      attribute :amount, :integer, allow_nil?: false
+      run fn input, _context ->
+        Aikido.ActionResult.new(state: %{count: input.arguments.state.count + input.arguments.amount})
+      end
     end
-  end
-
-  def run(signal, state, _opts, _context) do
-    {:ok, %{count: state.count + signal.data.amount}, []}
   end
 end
 ```
@@ -81,7 +77,9 @@ standard default unless the application selects another data layer. Selecting
 AshPostgres or another layer does not automatically persist live agent snapshots
 or make process effects transactional; generic actions still use the agent runtime.
 
-The target is the third positional argument: `signal :add, "counter.add", MyApp.Increment`.
+The target is the third positional argument: `signal :add, "counter.add", :increment`.
+A local action name targets a native action on the agent; `{MyApp.Actions, :increment}`
+targets a reusable action on another Ash resource.
 It is required on every declaration. Mounting an embedded Ash slice automatically
 exposes its routed public actions with their existing targets and argument contracts;
 do not repeat those signals on the agent. Names come from the slice action names.
@@ -90,7 +88,7 @@ Public routes require concrete signal types. Conflicting inherited names fail
 compilation; an explicit agent signal can override an inherited action name.
 
 A `signal` declaration generates a generic action with arguments inferred from
-its target Aikido action or mounted slice route. Types, constraints and defaults
+its native Ash target or mounted slice route. Types, constraints and defaults
 are preserved. Untyped routes accept a `data` map defaulting to `%{}`. An explicit
 `action :name, :map` may customize arguments and native preparations; omit its
 `run` implementation so the transformer installs signal delivery.
@@ -105,6 +103,24 @@ as demonstrated by `AgentExamples.AI.ask/3`.
 
 Use IDs for durable identity: recovery may replace a PID. Neither a receipt nor
 a snapshot establishes exactly-once external effects or a durable input inbox.
+Native state transitions return `Aikido.ActionResult`, an `Ash.TypedStruct` with
+`state` and `directives`. Its directives must have a concrete
+`Aikido.AgentServer.DirectiveExec` protocol implementation; the `Any` fallback
+is rejected. The runtime validates every returned result before applying state
+or executing effects, including raw maps returned by native actions. Use
+`Aikido.ActionResult.new/1` for validation when calling an action directly with Ash.
+Ash owns arguments, defaults, constraints, preparations, authorization, and errors.
+
+Agents can declare the same native reducer actions directly, without slices.
+Local reducers are compiled as private Ash actions so their public signal commands
+can keep the declared names. Generated domain interfaces expose only public actions;
+callers pass an agent reference and payload, while the runtime supplies current state.
+
+`Aikido.AgentServer.call_until/5` registers a one-shot subscription before sending
+a command and waits for its selector to return a result. It handles process exit,
+timeout and subscription cleanup. Use it from external callers for asynchronous
+completion; selectors return `:skip` while waiting. Team lifecycle commands use it.
+
 ## The domain is the interface
 
 ```elixir

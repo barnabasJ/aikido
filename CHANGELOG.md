@@ -4,6 +4,21 @@
 
 ## Unreleased
 
+### Changed
+
+- Replace the custom action DSL with native Ash generic actions and a shared
+  `Aikido.ActionResult` contract that validates returned directives. Agents may
+  declare reducers directly; built-in slices and the example app use native
+  resource/action targets.
+- Initialize and validate agent state through native Ash resource attributes
+  and typed-struct contracts. The migration is in progress; schema-related
+  regression tests still require follow-up.
+
+### Added
+
+- Add `Aikido.AgentServer.call_until/5` for subscribe-before-dispatch command
+  completion, including timeout, process monitoring, and subscription cleanup.
+
 ### Removed
 
 - Remove historical ADRs, research, task plans, legacy guides/Livebooks, review

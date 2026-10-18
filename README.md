@@ -24,26 +24,10 @@ children = [Aikido]
 
 ## An agent and its public interface
 
-Define the action's input with Ash attributes. Actions return the next state and
-pure effect descriptors:
+Define native Ash actions directly on an agent or on a mounted slice. Runtime
+state is supplied internally; each action returns `Aikido.ActionResult`:
 
 ```elixir
-defmodule MyApp.Add do
-  use Aikido.Action
-
-  action do
-    name "add"
-
-    schema do
-      attribute :amount, :integer, allow_nil?: false
-    end
-  end
-
-  def run(signal, state, _options, _context) do
-    {:ok, %{state | count: state.count + signal.data.amount}, []}
-  end
-end
-
 defmodule MyApp.Counter do
   use Ash.Resource,
     domain: MyApp.Agents,
@@ -56,7 +40,19 @@ defmodule MyApp.Counter do
       attribute :count, :integer, allow_nil?: false, default: 0, public?: true
     end
 
-    signal :add, "counter.add", MyApp.Add
+    signal :add, "counter.add", :add
+  end
+
+  actions do
+    action :add, Aikido.ActionResult do
+      argument :state, :map, allow_nil?: false
+      argument :amount, :integer, allow_nil?: false
+
+      run fn input, _context ->
+        state = input.arguments.state
+        Aikido.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
+      end
+    end
   end
 end
 
