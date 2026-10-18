@@ -9,6 +9,18 @@ defmodule AgentExamples.Counter do
       attribute :count, :integer, allow_nil?: false, default: 0, public?: true
     end
 
-    signal :add, "counter.add", AgentExamples.Actions.Add
+    signal :add, "counter.add", :add
+  end
+
+  actions do
+    action :add, Aikido.ActionResult do
+      argument :state, :map, allow_nil?: false
+      argument :amount, :integer, allow_nil?: false
+
+      run fn input, _context ->
+        state = input.arguments.state
+        Aikido.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
+      end
+    end
   end
 end

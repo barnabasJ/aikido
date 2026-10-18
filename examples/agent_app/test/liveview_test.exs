@@ -41,10 +41,11 @@ defmodule AgentExamplesWeb.LiveViewTest do
     end
 
     worker = Catalog.find("worker") |> AgentExamples.Source.for_example()
-    work = Enum.find(worker, &(&1.module == AgentExamples.Actions.Work))
-    result = Enum.find(worker, &(&1.module == AgentExamples.Actions.WorkResult))
-    refute work.code =~ "defmodule AgentExamples.Actions.WorkResult"
-    refute result.code =~ "defmodule AgentExamples.Actions.Work do"
+    definition = Enum.find(worker, &(&1.module == AgentExamples.Worker))
+    assert definition.code =~ "action :work, Aikido.ActionResult"
+    assert definition.code =~ "action :completed, Aikido.ActionResult"
+    assert definition.code =~ "action :failed, Aikido.ActionResult"
+    assert definition.open?
 
     assert Enum.any?(
              AgentExamples.Source.for_example(Catalog.find("research-team")),

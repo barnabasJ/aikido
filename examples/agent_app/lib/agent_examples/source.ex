@@ -4,7 +4,6 @@ defmodule AgentExamples.Source do
   @files Enum.flat_map(
            [
              "examples/agent_app/lib/agent_examples/agents/*.ex",
-             "examples/agent_app/lib/agent_examples/actions/*.ex",
              "examples/agent_app/lib/agent_examples/slices/*.ex",
              "examples/agent_app/lib/agent_examples/ai/*.ex",
              "examples/agent_app/lib/agent_examples/agents.ex",
@@ -138,20 +137,17 @@ defmodule AgentExamples.Source do
     )
   end
 
-  defp modules("counter"), do: [AgentExamples.Actions.Add]
-  defp modules("checklist"), do: [AgentExamples.Actions.Checklist]
+  defp modules("counter"), do: []
+  defp modules("checklist"), do: []
   defp modules("notebook"), do: [AgentExamples.Journal]
-  defp modules("worker"), do: [AgentExamples.Actions.Work, AgentExamples.Actions.WorkResult]
+  defp modules("worker"), do: []
 
   defp modules("team"),
     do: [
       AgentExamples.Counter,
       AgentExamples.Notebook,
       AgentExamples.Worker,
-      AgentExamples.Journal,
-      AgentExamples.Actions.Add,
-      AgentExamples.Actions.Work,
-      AgentExamples.Actions.WorkResult
+      AgentExamples.Journal
     ]
 
   defp modules("research-team"),

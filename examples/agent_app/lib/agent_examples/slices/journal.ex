@@ -7,16 +7,14 @@ defmodule AgentExamples.Journal do
   end
 
   actions do
-    action :append, :map do
+    action :append, Aikido.ActionResult do
       argument :state, :map, allow_nil?: false
 
-      argument :data, :map,
-        allow_nil?: false,
-        constraints: [fields: [text: [type: :string, allow_nil?: false]]]
+      argument :text, :string, allow_nil?: false
 
       run fn input, _context ->
         state = input.arguments.state
-        {:ok, %{state: %{entries: state.entries ++ [input.arguments.data.text]}}}
+        Aikido.ActionResult.new(state: %{entries: state.entries ++ [input.arguments.text]})
       end
     end
   end
