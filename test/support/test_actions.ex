@@ -390,9 +390,3 @@ defmodule AikidoTest.TestActions.FailingAction do
     end
   end
 end
-
-defmodule AikidoTest.TestActions do
-  @moduledoc """
-  Shared test actions for Aikido test suite.
-  """
-end

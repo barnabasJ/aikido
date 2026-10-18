@@ -1,7 +1,3 @@
-defmodule Aikido.AI.TestActions do
-  @moduledoc false
-end
-
 defmodule Aikido.AI.TestActions.TestAdd.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation

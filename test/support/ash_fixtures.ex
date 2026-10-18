@@ -370,6 +370,3 @@ defmodule AikidoTest.AshFixtures.Domain do
     agent :protected, AikidoTest.AshFixtures.Protected
   end
 end
-
-defmodule AikidoTest.AshFixtures do
-end

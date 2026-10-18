@@ -1,6 +1,5 @@
 defmodule AikidoTest.Actions.LifecycleTest do
   use ExUnit.Case, async: true
-  alias Aikido.Actions.Lifecycle
   alias Aikido.AgentServer.ParentRef
   alias Aikido.Directives
   alias Jido.Signal

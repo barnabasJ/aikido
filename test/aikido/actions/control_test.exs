@@ -1,6 +1,5 @@
 defmodule AikidoTest.Actions.ControlTest do
   use ExUnit.Case, async: true
-  alias Aikido.Actions.Control
   alias Aikido.Directives
   alias Jido.Signal
 

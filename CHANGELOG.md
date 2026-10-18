@@ -63,6 +63,8 @@
 
 ### Removed
 
+- Remove unused action namespace modules and empty test-support namespace stubs.
+
 - Remove historical ADRs, research, task plans, legacy guides/Livebooks, review
   notes, migrations, and stale generated DSL references. Retain current guides
   and refresh the README and ExDoc navigation for the Ash/DurableServer API.
