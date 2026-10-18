@@ -1,10 +1,51 @@
 defmodule Aikido.Actions.Lifecycle do
-  @moduledoc "Base actions for agent lifecycle and coordination patterns.\n\nThese actions provide common patterns for:\n- Parent-child communication\n- Process spawning\n- Graceful termination\n\n## Usage\n\n    use Aikido.Agent\n\n    agent do\n      name \"coordinator_agent\"\n    end\n\n    signal_routes do\n      route \"work.done\", Aikido.Actions.Lifecycle.NotifyParent\n      route \"spawn.worker\", Aikido.Actions.Lifecycle.SpawnChild\n      route \"shutdown\", Aikido.Actions.Lifecycle.StopSelf\n    end\n"
   alias Aikido.Directives
-  alias Jido.Signal
+
+  @moduledoc """
+  Base actions for agent lifecycle and coordination patterns.
+
+  These actions provide common patterns for:
+  - Parent-child communication
+  - Process spawning
+  - Graceful termination
+
+  ## Usage
+
+      use Aikido.Agent
+
+      agent do
+        name "coordinator_agent"
+      end
+
+      signal_routes do
+        route "work.done", Aikido.Actions.Lifecycle.NotifyParent
+        route "spawn.worker", Aikido.Actions.Lifecycle.SpawnChild
+        route "shutdown", Aikido.Actions.Lifecycle.StopSelf
+      end
+  """
 
   defmodule NotifyParent do
-    @moduledoc "Emit a signal back to the spawning parent agent.\n\nReads the current parent reference from `ctx.parent` (a `%ParentRef{}`\nseeded by AgentServer). When the agent is orphaned, `ctx.parent` is\n`nil` and the action emits no directive.\n\n## Schema\n\n- `signal_type` - Signal type to emit (required)\n- `payload` - Signal payload data (default: %{})\n- `source` - Signal source path (default: \"/child\")\n\n## Example\n\n    # Route child completion to this action\n    {\"work.complete\", Aikido.Actions.Lifecycle.NotifyParent}\n\n    # Or invoke directly with params\n    {Aikido.Actions.Lifecycle.NotifyParent, %{signal_type: \"child.done\", payload: %{result: 42}}}\n"
+    @moduledoc """
+    Emit a signal back to the spawning parent agent.
+
+    Reads the current parent reference from `ctx.parent` (a `%ParentRef{}`
+    seeded by AgentServer). When the agent is orphaned, `ctx.parent` is
+    `nil` and the action emits no directive.
+
+    ## Schema
+
+    - `signal_type` - Signal type to emit (required)
+    - `payload` - Signal payload data (default: %{})
+    - `source` - Signal source path (default: "/child")
+
+    ## Example
+
+        # Route child completion to this action
+        {"work.complete", Aikido.Actions.Lifecycle.NotifyParent}
+
+        # Or invoke directly with params
+        {Aikido.Actions.Lifecycle.NotifyParent, %{signal_type: "child.done", payload: %{result: 42}}}
+    """
     use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
     @persist {:aikido_action_metadata,
@@ -21,50 +62,31 @@ defmodule Aikido.Actions.Lifecycle do
         argument(:payload, :map, description: "Signal payload data", default: %{})
         argument(:source, :string, description: "Signal source path", default: "/child")
         description("Emit a signal back to the parent agent")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
+        run(Aikido.Actions.Lifecycle.NotifyParent.Implementation)
       end
-    end
-
-    defp reduce(
-           %Jido.Signal{data: %{signal_type: type, payload: payload, source: source}},
-           _slice,
-           _opts,
-           ctx
-         ) do
-      signal = Signal.new!(type, payload, source: source)
-
-      directive =
-        case Map.get(ctx, :parent) do
-          %Aikido.AgentServer.ParentRef{pid: pid} when is_pid(pid) ->
-            Directives.emit_to_pid(signal, pid)
-
-          _ ->
-            nil
-        end
-
-      {:ok, %{notified: directive != nil}, List.wrap(directive)}
     end
   end
 
   defmodule NotifyPid do
-    @moduledoc "Emit a signal to an arbitrary process by PID.\n\n## Schema\n\n- `target_pid` - PID to send signal to (required)\n- `signal_type` - Signal type to emit (required)\n- `payload` - Signal payload data (default: %{})\n- `source` - Signal source path (default: \"/agent\")\n- `delivery_mode` - :async (default) or :sync\n\n## Example\n\n    {Aikido.Actions.Lifecycle.NotifyPid, %{\n      target_pid: some_pid,\n      signal_type: \"result.ready\",\n      payload: %{data: result}\n    }}\n"
+    @moduledoc """
+    Emit a signal to an arbitrary process by PID.
+
+    ## Schema
+
+    - `target_pid` - PID to send signal to (required)
+    - `signal_type` - Signal type to emit (required)
+    - `payload` - Signal payload data (default: %{})
+    - `source` - Signal source path (default: "/agent")
+    - `delivery_mode` - :async (default) or :sync
+
+    ## Example
+
+        {Aikido.Actions.Lifecycle.NotifyPid, %{
+          target_pid: some_pid,
+          signal_type: "result.ready",
+          payload: %{data: result}
+        }}
+    """
     use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
     @persist {:aikido_action_metadata,
@@ -84,49 +106,39 @@ defmodule Aikido.Actions.Lifecycle do
         )
 
         description("Emit a signal to a specific process")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
+        run(Aikido.Actions.Lifecycle.NotifyPid.Implementation)
       end
-    end
-
-    defp reduce(
-           %Jido.Signal{
-             data: %{
-               target_pid: pid,
-               signal_type: type,
-               payload: payload,
-               source: source,
-               delivery_mode: mode
-             }
-           },
-           _slice,
-           _opts,
-           _ctx
-         ) do
-      signal = Signal.new!(type, payload, source: source)
-      directive = Directives.emit_to_pid(signal, pid, delivery_mode: mode)
-      {:ok, %{sent_to: pid}, [directive]}
     end
   end
 
   defmodule SpawnChild do
-    @moduledoc "Spawn a child agent with hierarchy tracking.\n\nThe spawned agent will have its `ctx.parent` populated so its actions\ncan address the parent directly via\n`%Directives.Emit{dispatch: {:pid, target: ctx.parent.pid}}`.\n\n## Schema\n\n- `agent_module` - Agent module to spawn (required)\n- `tag` - Tag for tracking this child (required)\n- `initial_state` - Initial state for the child agent (default: %{})\n- `meta` - Metadata to pass to child (default: %{})\n- `restart` - Restart policy for the child (default: `:transient`)\n\n## Example\n\n    {\"coordinator.spawn\", Aikido.Actions.Lifecycle.SpawnChild}\n\n    # With params\n    {Aikido.Actions.Lifecycle.SpawnChild, %{\n      agent_module: MyWorker,\n      tag: :worker_1,\n      initial_state: %{batch_size: 100},\n      restart: :permanent\n    }}\n"
+    @moduledoc """
+    Spawn a child agent with hierarchy tracking.
+
+    The spawned agent will have its `ctx.parent` populated so its actions
+    can address the parent directly via
+    `%Directives.Emit{dispatch: {:pid, target: ctx.parent.pid}}`.
+
+    ## Schema
+
+    - `agent_module` - Agent module to spawn (required)
+    - `tag` - Tag for tracking this child (required)
+    - `initial_state` - Initial state for the child agent (default: %{})
+    - `meta` - Metadata to pass to child (default: %{})
+    - `restart` - Restart policy for the child (default: `:transient`)
+
+    ## Example
+
+        {"coordinator.spawn", Aikido.Actions.Lifecycle.SpawnChild}
+
+        # With params
+        {Aikido.Actions.Lifecycle.SpawnChild, %{
+          agent_module: MyWorker,
+          tag: :worker_1,
+          initial_state: %{batch_size: 100},
+          restart: :permanent
+        }}
+    """
     use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
     @persist {:aikido_action_metadata,
@@ -146,55 +158,26 @@ defmodule Aikido.Actions.Lifecycle do
         )
 
         description("Spawn a child agent with hierarchy tracking")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
+        run(Aikido.Actions.Lifecycle.SpawnChild.Implementation)
       end
-    end
-
-    defp reduce(
-           %Jido.Signal{
-             data: %{
-               agent_module: mod,
-               tag: tag,
-               initial_state: state,
-               meta: meta,
-               restart: restart
-             }
-           },
-           _slice,
-           _opts,
-           _ctx
-         ) do
-      opts =
-        if state == %{} do
-          %{}
-        else
-          %{initial_state: state}
-        end
-
-      directive = Directives.spawn_agent(mod, tag, opts: opts, meta: meta, restart: restart)
-      {:ok, %{spawning: tag}, [directive]}
     end
   end
 
   defmodule StopSelf do
-    @moduledoc "Request graceful termination of the current agent process.\n\n## Schema\n\n- `reason` - Reason for stopping (default: :normal)\n\n## Example\n\n    {\"shutdown\", Aikido.Actions.Lifecycle.StopSelf}\n\n    # With custom reason\n    {Aikido.Actions.Lifecycle.StopSelf, %{reason: :work_complete}}\n"
+    @moduledoc """
+    Request graceful termination of the current agent process.
+
+    ## Schema
+
+    - `reason` - Reason for stopping (default: :normal)
+
+    ## Example
+
+        {"shutdown", Aikido.Actions.Lifecycle.StopSelf}
+
+        # With custom reason
+        {Aikido.Actions.Lifecycle.StopSelf, %{reason: :work_complete}}
+    """
     use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
     @persist {:aikido_action_metadata,
@@ -204,35 +187,26 @@ defmodule Aikido.Actions.Lifecycle do
         argument(:state, :term)
         argument(:reason, :term, description: "Reason for stopping", default: :normal)
         description("Request graceful termination of this agent")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
+        run(Aikido.Actions.Lifecycle.StopSelf.Implementation)
       end
-    end
-
-    defp reduce(%Jido.Signal{data: %{reason: reason}}, _slice, _opts, _ctx) do
-      directive = Directives.stop(reason)
-      {:ok, %{stopping: true, reason: reason}, [directive]}
     end
   end
 
   defmodule StopChild do
-    @moduledoc "Request graceful termination of a tracked child agent.\n\n## Schema\n\n- `tag` - Tag of the child to stop (required)\n- `reason` - Reason for stopping (default: :normal)\n\n## Example\n\n    {\"coordinator.stop_worker\", Aikido.Actions.Lifecycle.StopChild}\n\n    {Aikido.Actions.Lifecycle.StopChild, %{tag: :worker_1, reason: :shutdown}}\n"
+    @moduledoc """
+    Request graceful termination of a tracked child agent.
+
+    ## Schema
+
+    - `tag` - Tag of the child to stop (required)
+    - `reason` - Reason for stopping (default: :normal)
+
+    ## Example
+
+        {"coordinator.stop_worker", Aikido.Actions.Lifecycle.StopChild}
+
+        {Aikido.Actions.Lifecycle.StopChild, %{tag: :worker_1, reason: :shutdown}}
+    """
     use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
     @persist {:aikido_action_metadata,
@@ -243,30 +217,8 @@ defmodule Aikido.Actions.Lifecycle do
         argument(:tag, :atom, description: "Tag of child to stop", allow_nil?: false)
         argument(:reason, :term, description: "Reason for stopping", default: :normal)
         description("Request graceful termination of a child agent")
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
+        run(Aikido.Actions.Lifecycle.StopChild.Implementation)
       end
-    end
-
-    defp reduce(%Jido.Signal{data: %{tag: tag, reason: reason}}, _slice, _opts, _ctx) do
-      directive = Directives.stop_child(tag, reason)
-      {:ok, %{stopping_child: tag, reason: reason}, [directive]}
     end
   end
 end
