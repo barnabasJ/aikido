@@ -2,7 +2,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   @moduledoc """
   Side-effect directive: makes one call to `ReqLLM.Generation.generate_text/3`.
 
-  Emitted by `Aikido.Slices.AiReact.Actions.Ask` (first turn) and `Aikido.Slices.AiReact.Actions.ToolResult`
+  Emitted by `Aikido.Slices.AiReact.Ask` (first turn) and `Aikido.Slices.AiReact.ToolResult`
   (subsequent turns, once all tool results in a batch have come back).
   The executor spawns a Task under the agent's task supervisor — the Task
   is the *only* place a blocking ReqLLM call lives, so the agent process
@@ -28,17 +28,16 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
           llm_opts: keyword()
         }
 
-  @enforce_keys [:model, :context, :request_id]
-  defstruct model: nil,
-            client: ReqLLM.Generation,
-            context: nil,
-            tools: [],
-            request_id: nil,
-            llm_opts: []
-end
+  use Aikido.Directive
 
-defimpl Aikido.AgentServer.DirectiveExec, for: Aikido.Slices.AiReact.Directives.LLMCall do
-  @moduledoc false
+  typed_struct do
+    field :model, :term, allow_nil?: false
+    field :client, :module, allow_nil?: false, default: ReqLLM.Generation
+    field :context, :term, allow_nil?: false
+    field :tools, {:array, :term}, allow_nil?: false, default: []
+    field :request_id, :string, allow_nil?: false
+    field :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list], default: []
+  end
 
   alias Aikido.AgentServer
   alias Jido.Signal

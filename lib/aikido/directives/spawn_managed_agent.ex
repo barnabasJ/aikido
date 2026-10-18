@@ -21,8 +21,8 @@ defmodule Aikido.Directives.SpawnManagedAgent do
 
   `execute/2` performs the spawn synchronously and returns the new child
   pid, so callers outside the directive pipeline can reuse the exact
-  same shape. The `DirectiveExec` impl is a thin wrapper that discards
-  the pid to match the protocol contract.
+  same shape. The `Aikido.Directive` callback is a thin wrapper that discards
+  the pid to match the behaviour contract.
 
   ## Examples
 
@@ -36,7 +36,7 @@ defmodule Aikido.Directives.SpawnManagedAgent do
       {:ok, pid} = SpawnManagedAgent.execute(directive, state)
   """
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :namespace, :atom, allow_nil?: false, description: "Durable namespace"
@@ -58,14 +58,7 @@ defmodule Aikido.Directives.SpawnManagedAgent do
       description: "Extra AgentServer options"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
-
-  @doc "Returns the Ash type for SpawnManagedAgent."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
 
   @doc """
   Executes the directive synchronously, returning `{:ok, pid}` for the
@@ -109,7 +102,7 @@ defmodule Aikido.Directives.SpawnManagedAgent do
   # Priority: explicit directive.parent > agent_opts[:parent] > self-as-parent
   # fallback built from `state`. The fallback is only valid when execute/2 is
   # called from the intended parent's own process (i.e. `self()` is the
-  # parent agent), which is true for DirectiveExec callers.
+  # parent agent), which is true for directive callers.
   defp resolve_parent(%__MODULE__{parent: parent}, _state) when not is_nil(parent), do: parent
 
   defp resolve_parent(%__MODULE__{agent_opts: agent_opts} = directive, state) do
@@ -124,4 +117,29 @@ defmodule Aikido.Directives.SpawnManagedAgent do
   end
 
   defp default_parent_ref(_directive, _state), do: nil
+
+  alias Aikido.Directives.SpawnManagedAgent
+
+  require Logger
+
+  # Delegate to SpawnManagedAgent.execute/2 (the single source of truth for
+  # "spawn via Durable with a parent ref") and discard the pid to
+  # fit the directive `:ok` contract. Non-directive callers like
+  # orchestration code can use execute/2 directly and keep the pid.
+  @impl true
+  def exec(directive, _input_signal, state) do
+    case SpawnManagedAgent.execute(directive, state) do
+      {:ok, _pid} ->
+        Logger.debug(
+          "SpawnManagedAgent #{state.id}: #{directive.tag} at #{directive.namespace}/#{directive.key}"
+        )
+
+        :ok
+
+      {:error, reason} ->
+        Logger.error("SpawnManagedAgent #{state.id}: failed #{directive.tag}: #{inspect(reason)}")
+
+        :ok
+    end
+  end
 end

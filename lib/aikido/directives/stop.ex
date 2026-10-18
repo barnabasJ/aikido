@@ -7,18 +7,16 @@ defmodule Aikido.Directives.Stop do
   - `reason` - Reason for stopping (default: `:normal`)
   """
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :reason, :term, allow_nil?: false, default: :normal, description: "Reason for stopping"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
 
-  @doc "Returns the Ash type for Stop."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
+  @impl true
+  def exec(%{reason: reason}, _input_signal, _state) do
+    {:stop, reason}
+  end
 end

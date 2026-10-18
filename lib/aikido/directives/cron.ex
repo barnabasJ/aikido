@@ -30,7 +30,7 @@ defmodule Aikido.Directives.Cron do
   alias Aikido.AgentServer
   alias Aikido.AgentServer.{CronRuntimeSpec, State}
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :job_id, :term, allow_nil?: true, description: "Logical cron job id within the agent"
@@ -46,14 +46,7 @@ defmodule Aikido.Directives.Cron do
     field :timezone, :term, allow_nil?: true, description: "Timezone identifier (optional)"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
-
-  @doc "Returns the Ash type for Cron."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
 
   @typedoc false
   @type io_result :: %{
@@ -97,16 +90,13 @@ defmodule Aikido.Directives.Cron do
       runtime_spec: runtime_spec
     }
   end
-end
-
-defimpl Aikido.AgentServer.DirectiveExec, for: Aikido.Directives.Cron do
-  @moduledoc false
 
   require Logger
 
   alias Aikido.AgentServer
   alias Aikido.AgentServer.Signal.CronRegistered
 
+  @impl true
   def exec(
         %{cron: cron_expr, message: message, job_id: logical_id, timezone: tz},
         _input_signal,

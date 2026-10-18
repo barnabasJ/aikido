@@ -3,19 +3,20 @@ defmodule Aikido.Slices.ChildBus.Directives.UnsubscribeChild do
 
   @type t :: %__MODULE__{bus: atom(), sub_id: any(), tag: any()}
 
-  @enforce_keys [:bus, :sub_id, :tag]
-  defstruct bus: nil, sub_id: nil, tag: nil
-end
+  use Aikido.Directive
 
-defimpl Aikido.AgentServer.DirectiveExec,
-  for: Aikido.Slices.ChildBus.Directives.UnsubscribeChild do
-  @moduledoc false
+  typed_struct do
+    field :bus, :atom, allow_nil?: false
+    field :sub_id, :term, allow_nil?: false
+    field :tag, :term, allow_nil?: false
+  end
 
   require Logger
 
   alias Jido.Signal.Bus
   alias Aikido.Slices.ChildBus.Directives.UnsubscribeChild
 
+  @impl true
   def exec(%UnsubscribeChild{} = d, _input_signal, _state) do
     case Bus.unsubscribe(d.bus, d.sub_id) do
       :ok ->

@@ -34,7 +34,7 @@ defmodule Aikido.Directives.Emit do
       ]}
   """
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :signal, :term, allow_nil?: false, description: "Jido.Signal.t() to dispatch"
@@ -44,12 +44,43 @@ defmodule Aikido.Directives.Emit do
       description: "Dispatch config: {adapter, opts} or list"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
 
-  @doc "Returns the Ash type for Emit."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
+  alias Aikido.Tracing.Context, as: TraceContext
+
+  require Logger
+
+  @impl true
+  def exec(%{signal: signal, dispatch: dispatch}, input_signal, state) do
+    cfg = dispatch || state.default_dispatch
+
+    traced_signal =
+      case TraceContext.propagate_to(signal, input_signal.id) do
+        {:ok, s} -> s
+        {:error, _} -> signal
+      end
+
+    dispatch_signal(traced_signal, cfg, state)
+
+    :ok
+  end
+
+  defp dispatch_signal(traced_signal, nil, _state) do
+    send(self(), {:signal, traced_signal})
+  end
+
+  defp dispatch_signal(traced_signal, cfg, state) do
+    if Code.ensure_loaded?(Jido.Signal.Dispatch) do
+      task_sup =
+        if state.aikido,
+          do: Aikido.task_supervisor_name(state.aikido),
+          else: Aikido.TaskSupervisor
+
+      Task.Supervisor.start_child(task_sup, fn ->
+        Jido.Signal.Dispatch.dispatch(traced_signal, cfg)
+      end)
+    else
+      Logger.warning("Jido.Signal.Dispatch not available, skipping emit")
+    end
+  end
 end

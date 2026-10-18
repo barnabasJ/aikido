@@ -11,24 +11,13 @@ defmodule Aikido.Directives.CronCancel do
       %CronCancel{job_id: :heartbeat}
   """
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :job_id, :term, allow_nil?: false, description: "Logical cron job id within the agent"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
-
-  @doc "Returns the Ash type for CronCancel."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
-end
-
-defimpl Aikido.AgentServer.DirectiveExec, for: Aikido.Directives.CronCancel do
-  @moduledoc false
 
   require Logger
   alias Aikido.AgentServer
@@ -36,6 +25,7 @@ defimpl Aikido.AgentServer.DirectiveExec, for: Aikido.Directives.CronCancel do
   alias Aikido.AgentServer.Signal.CronCancelled
   alias Aikido.AgentServer.State
 
+  @impl true
   def exec(%{job_id: logical_id}, _input_signal, %State{} = state) do
     pid = Map.get(state.cron_jobs, logical_id)
     monitor_ref = Map.get(state.cron_monitors, logical_id)

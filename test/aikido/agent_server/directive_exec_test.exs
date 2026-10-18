@@ -1,320 +1,297 @@
+defmodule AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    directive =
+      case Map.fetch(input.arguments, :directive) do
+        {:ok, value} -> value
+        :error -> input.context.aikido.signal.data[:directive]
+      end
+
+    slice = input.arguments.state
+    Aikido.ActionResult.new(state: slice || %{}, directives: [directive])
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "emit_directive"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      argument :directive, :term, allow_nil?: false
+
+      run {AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction.Implementation,
+           action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.TestAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "directive_exec_test_agent"
+    path :domain
+
+    schema do
+      attribute :counter, :integer, default: 0
+    end
+  end
+
+  signal_routes do
+    route "test.directive", AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.StopOnSignalAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    runtime = input.context.aikido
+
+    signal = %{
+      runtime.signal
+      | data: Map.merge(runtime.signal.data || %{}, Map.delete(input.arguments, :state))
+    }
+
+    case {signal, input.arguments.state, runtime[:action_opts] || %{}, runtime} do
+      {%Jido.Signal{data: %{reason: reason}}, %{observer_pid: observer_pid}, _opts, _ctx}
+      when is_pid(observer_pid) ->
+        observation = %{signal | type: "test.child.stopping", data: %{reason: reason}}
+
+        Aikido.ActionResult.new(
+          state: %{stop_reason: reason},
+          directives: [
+            Aikido.Directives.emit_to_pid(observation, observer_pid),
+            %Aikido.Directives.Stop{reason: reason}
+          ]
+        )
+
+      {%Jido.Signal{data: %{reason: reason}}, _slice, _opts, _ctx} ->
+        Aikido.ActionResult.new(
+          state: %{stop_reason: reason},
+          directives: [%Aikido.Directives.Stop{reason: reason}]
+        )
+    end
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.StopOnSignalAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "stop_on_signal"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      argument :reason, :term, default: :normal
+
+      run {AikidoTest.AgentServer.DirectiveExecTest.StopOnSignalAction.Implementation,
+           action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "directive_exec_stop_aware_agent"
+    path :domain
+
+    schema do
+      attribute :observer_pid, :term, default: nil
+      attribute :stop_reason, :term, default: nil
+    end
+  end
+
+  signal_routes do
+    route "aikido.agent.stop", AikidoTest.AgentServer.DirectiveExecTest.StopOnSignalAction
+    route "test.directive", AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.CustomDirective do
+  @moduledoc false
+  defstruct [:value]
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.RunInstructionSuccessAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    Aikido.ActionResult.new(state: %{ran: true}, directives: [])
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.RunInstructionSuccessAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "run_instruction_success"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.AgentServer.DirectiveExecTest.RunInstructionSuccessAction.Implementation,
+           action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.RunInstructionFailureAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    {:error, :boom}
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.RunInstructionFailureAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "run_instruction_failure"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.AgentServer.DirectiveExecTest.RunInstructionFailureAction.Implementation,
+           action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.CaptureResultAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    params =
+      Map.merge(input.context.aikido.signal.data || %{}, Map.delete(input.arguments, :state))
+
+    slice = input.arguments.state
+    slice = slice || %{}
+
+    Aikido.ActionResult.new(
+      state:
+        Map.merge(slice, %{
+          captured_status: params.status,
+          captured_result: params.result,
+          captured_reason: params[:reason],
+          captured_meta: params.meta
+        }),
+      directives: []
+    )
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.CaptureResultAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "capture_result_action"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      argument :status, :atom, allow_nil?: false
+      argument :result, :map, default: %{}
+      argument :reason, :term, default: nil
+      argument :effects, :term, default: []
+      argument :instruction, :term, default: nil
+      argument :meta, :map, default: %{}
+
+      run {AikidoTest.AgentServer.DirectiveExecTest.CaptureResultAction.Implementation,
+           action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.CaptureResultEmitAction.Implementation do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _opts, _context) do
+    slice = input.arguments.state
+    slice = slice || %{}
+    directive = Aikido.Directives.emit(%{type: "capture.result.event"})
+    Aikido.ActionResult.new(state: Map.put(slice, :captured_emit, true), directives: [directive])
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.CaptureResultEmitAction do
+  @moduledoc false
+  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  @persist {:aikido_action_metadata, %{name: "capture_result_emit_action"}}
+  actions do
+    action :run, Aikido.ActionResult do
+      argument :state, :term
+      argument :status, :atom, allow_nil?: false
+      argument :result, :map, default: %{}
+      argument :reason, :term, default: nil
+      argument :effects, :term, default: []
+      argument :instruction, :term, default: nil
+      argument :meta, :map, default: %{}
+
+      run {AikidoTest.AgentServer.DirectiveExecTest.CaptureResultEmitAction.Implementation,
+           action: :run}
+    end
+  end
+end
+
+defmodule AikidoTest.AgentServer.DirectiveExecTest.RunInstructionRoutedAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "run_instruction_routed_agent"
+    path :domain
+
+    schema do
+      attribute :captured_status, :atom, default: nil
+      attribute :captured_result, :map, default: %{}
+      attribute :captured_reason, :term, default: nil
+      attribute :captured_meta, :map, default: %{}
+      attribute :captured_emit, :boolean, default: false
+    end
+  end
+
+  signal_routes do
+    route "test.directive", AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction
+
+    route "test.run_instruction.captured",
+          AikidoTest.AgentServer.DirectiveExecTest.CaptureResultAction
+
+    route "test.run_instruction.failure",
+          AikidoTest.AgentServer.DirectiveExecTest.CaptureResultEmitAction
+  end
+end
+
 defmodule AikidoTest.AgentServer.DirectiveExecTest do
   use AikidoTest.Case, async: true
-  alias Aikido.AgentServer
-  alias Aikido.AgentServer.{DirectiveExec, Options, State}
-  alias Aikido.Directives
-  alias Jido.Signal
-
-  defmodule EmitDirectiveAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "emit_directive"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-        argument(:directive, :term, allow_nil?: false)
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(%Jido.Signal{data: %{directive: directive}}, slice, _opts, _ctx) do
-      {:ok, slice || %{}, [directive]}
-    end
-  end
-
-  defmodule TestAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name("directive_exec_test_agent")
-      path(:domain)
-
-      schema do
-        attribute(:counter, :integer, default: 0)
-      end
-    end
-
-    signal_routes do
-      route("test.directive", AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction)
-    end
-  end
-
-  defmodule StopOnSignalAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "stop_on_signal"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-        argument(:reason, :term, default: :normal)
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    alias Aikido.Directives
-
-    defp reduce(%Jido.Signal{data: %{reason: reason}}, %{observer_pid: observer_pid}, _opts, _ctx)
-         when is_pid(observer_pid) do
-      send(observer_pid, {:child_stop_signal_received, reason})
-      {:ok, %{stop_reason: reason}, [%Directives.Stop{reason: reason}]}
-    end
-
-    defp reduce(%Jido.Signal{data: %{reason: reason}}, _slice, _opts, _ctx) do
-      {:ok, %{stop_reason: reason}, [%Directives.Stop{reason: reason}]}
-    end
-  end
-
-  defmodule StopAwareAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name("directive_exec_stop_aware_agent")
-      path(:domain)
-
-      schema do
-        attribute(:observer_pid, :term, default: nil)
-        attribute(:stop_reason, :term, default: nil)
-      end
-    end
-
-    signal_routes do
-      route("aikido.agent.stop", StopOnSignalAction)
-      route("test.directive", AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction)
-    end
-  end
-
-  defmodule CustomDirective do
-    @moduledoc false
-    defstruct [:value]
-  end
-
-  defmodule RunInstructionSuccessAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "run_instruction_success"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, _slice, _opts, _ctx) do
-      {:ok, %{ran: true}, []}
-    end
-  end
-
-  defmodule RunInstructionFailureAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "run_instruction_failure"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, _slice, _opts, _ctx) do
-      {:error, :boom}
-    end
-  end
-
-  defmodule CaptureResultAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "capture_result_action"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-        argument(:status, :atom, allow_nil?: false)
-        argument(:result, :map, default: %{})
-        argument(:reason, :term, default: nil)
-        argument(:effects, :term, default: [])
-        argument(:instruction, :term, default: nil)
-        argument(:meta, :map, default: %{})
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(%Jido.Signal{data: params}, slice, _opts, _ctx) do
-      slice = slice || %{}
-
-      {:ok,
-       Map.merge(slice, %{
-         captured_status: params.status,
-         captured_result: params.result,
-         captured_reason: params[:reason],
-         captured_meta: params.meta
-       }), []}
-    end
-  end
-
-  defmodule CaptureResultEmitAction do
-    @moduledoc false
-    use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-    @persist {:aikido_action_metadata, %{name: "capture_result_emit_action"}}
-    actions do
-      action(:run, Aikido.ActionResult) do
-        argument(:state, :term)
-        argument(:status, :atom, allow_nil?: false)
-        argument(:result, :map, default: %{})
-        argument(:reason, :term, default: nil)
-        argument(:effects, :term, default: [])
-        argument(:instruction, :term, default: nil)
-        argument(:meta, :map, default: %{})
-
-        run(fn input, _context ->
-          runtime = input.context[:aikido] || %{}
-          params = Map.delete(input.arguments, :state)
-          signal = Map.fetch!(runtime, :signal)
-          signal = %{signal | data: Map.merge(signal.data || %{}, params)}
-
-          case reduce(signal, input.arguments.state, runtime[:action_opts] || %{}, runtime) do
-            {:ok, state, directives} ->
-              Aikido.ActionResult.new(state: state, directives: directives)
-
-            {:error, _} = error ->
-              error
-
-            other ->
-              {:error, "Unexpected return shape: #{inspect(other)}"}
-          end
-        end)
-      end
-    end
-
-    defp reduce(_signal, slice, _opts, _ctx) do
-      slice = slice || %{}
-      directive = Directives.emit(%{type: "capture.result.event"})
-      {:ok, Map.put(slice, :captured_emit, true), [directive]}
-    end
-  end
-
-  defmodule RunInstructionRoutedAgent do
-    @moduledoc false
-    use Aikido.Agent
-
-    agent do
-      name("run_instruction_routed_agent")
-      path(:domain)
-
-      schema do
-        attribute(:captured_status, :atom, default: nil)
-        attribute(:captured_result, :map, default: %{})
-        attribute(:captured_reason, :term, default: nil)
-        attribute(:captured_meta, :map, default: %{})
-        attribute(:captured_emit, :boolean, default: false)
-      end
-    end
-
-    signal_routes do
-      route("test.directive", AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction)
-
-      route(
-        "test.run_instruction.captured",
-        AikidoTest.AgentServer.DirectiveExecTest.CaptureResultAction
-      )
-
-      route(
-        "test.run_instruction.failure",
-        AikidoTest.AgentServer.DirectiveExecTest.CaptureResultEmitAction
-      )
-    end
-  end
 
   setup %{aikido: aikido} do
-    agent = TestAgent.new()
-    {:ok, opts} = Options.new(%{agent_module: TestAgent, id: "test-agent-123", aikido: aikido})
-    {:ok, state} = State.from_options(opts, TestAgent, agent)
-    input_signal = Signal.new!(%{type: "test.signal", source: "/test", data: %{}})
+    agent = AikidoTest.AgentServer.DirectiveExecTest.TestAgent.new()
+
+    {:ok, opts} =
+      Aikido.AgentServer.Options.new(%{
+        agent_module: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
+        id: "test-agent-123",
+        aikido: aikido
+      })
+
+    {:ok, state} =
+      Aikido.AgentServer.State.from_options(
+        opts,
+        AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
+        agent
+      )
+
+    input_signal = Jido.Signal.new!(%{type: "test.signal", source: "/test", data: %{}})
     %{state: state, input_signal: input_signal, agent: agent}
   end
 
@@ -323,16 +300,16 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       state: state,
       input_signal: input_signal
     }) do
-      signal = Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
-      directive = %Directives.Emit{signal: signal, dispatch: nil}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
-      assert_receive {:signal, %Signal{type: "test.emitted"}}
+      signal = Jido.Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
+      directive = %Aikido.Directives.Emit{signal: signal, dispatch: nil}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
+      assert_receive {:signal, %Jido.Signal{type: "test.emitted"}}
     end
 
     test("returns ok when dispatch config provided", %{state: state, input_signal: input_signal}) do
-      signal = Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
-      directive = %Directives.Emit{signal: signal, dispatch: {:logger, level: :info}}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      signal = Jido.Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
+      directive = %Aikido.Directives.Emit{signal: signal, dispatch: {:logger, level: :info}}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
     end
 
     test("uses default_dispatch from state when directive dispatch is nil", %{
@@ -341,17 +318,17 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       aikido: aikido
     }) do
       {:ok, opts} =
-        Options.new(%{
-          agent_module: TestAgent,
+        Aikido.AgentServer.Options.new(%{
+          agent_module: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
           id: "test-agent-dispatch",
           default_dispatch: {:logger, level: :debug},
           aikido: aikido
         })
 
-      {:ok, state} = State.from_options(opts, agent.__struct__, agent)
-      signal = Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
-      directive = %Directives.Emit{signal: signal, dispatch: nil}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      {:ok, state} = Aikido.AgentServer.State.from_options(opts, agent.__struct__, agent)
+      signal = Jido.Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
+      directive = %Aikido.Directives.Emit{signal: signal, dispatch: nil}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
     end
   end
 
@@ -361,8 +338,8 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       input_signal: input_signal
     }) do
       error = Aikido.Error.validation_error("Test error")
-      directive = %Directives.Error{error: error, context: :test}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      directive = %Aikido.Directives.Error{error: error, context: :test}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
     end
   end
 
@@ -380,17 +357,17 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       end
 
       {:ok, opts} =
-        Options.new(%{
-          agent_module: TestAgent,
+        Aikido.AgentServer.Options.new(%{
+          agent_module: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
           id: "test-agent-spawn",
           spawn_fun: spawn_fun,
           aikido: aikido
         })
 
-      {:ok, state} = State.from_options(opts, agent.__struct__, agent)
+      {:ok, state} = Aikido.AgentServer.State.from_options(opts, agent.__struct__, agent)
       child_spec = {Task, fn -> :ok end}
-      directive = %Directives.Spawn{child_spec: child_spec, tag: :worker}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      directive = %Aikido.Directives.Spawn{child_spec: child_spec, tag: :worker}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
       assert_receive {:spawn_called, ^child_spec}
     end
 
@@ -402,17 +379,17 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       spawn_fun = fn _child_spec -> {:error, :spawn_failed} end
 
       {:ok, opts} =
-        Options.new(%{
-          agent_module: TestAgent,
+        Aikido.AgentServer.Options.new(%{
+          agent_module: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
           id: "test-agent-spawn-fail",
           spawn_fun: spawn_fun,
           aikido: aikido
         })
 
-      {:ok, state} = State.from_options(opts, agent.__struct__, agent)
+      {:ok, state} = Aikido.AgentServer.State.from_options(opts, agent.__struct__, agent)
       child_spec = {Task, fn -> :ok end}
-      directive = %Directives.Spawn{child_spec: child_spec, tag: :worker}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      directive = %Aikido.Directives.Spawn{child_spec: child_spec, tag: :worker}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
     end
 
     test("handles spawn returning {:ok, pid, info} tuple", %{
@@ -428,17 +405,17 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       end
 
       {:ok, opts} =
-        Options.new(%{
-          agent_module: TestAgent,
+        Aikido.AgentServer.Options.new(%{
+          agent_module: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
           id: "test-agent-spawn-info",
           spawn_fun: spawn_fun,
           aikido: aikido
         })
 
-      {:ok, state} = State.from_options(opts, agent.__struct__, agent)
+      {:ok, state} = Aikido.AgentServer.State.from_options(opts, agent.__struct__, agent)
       child_spec = {Task, fn -> :ok end}
-      directive = %Directives.Spawn{child_spec: child_spec, tag: :worker}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      directive = %Aikido.Directives.Spawn{child_spec: child_spec, tag: :worker}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
       assert_receive {:spawn_called, ^child_spec}
     end
 
@@ -450,32 +427,41 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       spawn_fun = fn _child_spec -> :ignored end
 
       {:ok, opts} =
-        Options.new(%{
-          agent_module: TestAgent,
+        Aikido.AgentServer.Options.new(%{
+          agent_module: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
           id: "test-agent-spawn-ignored",
           spawn_fun: spawn_fun,
           aikido: aikido
         })
 
-      {:ok, state} = State.from_options(opts, agent.__struct__, agent)
+      {:ok, state} = Aikido.AgentServer.State.from_options(opts, agent.__struct__, agent)
       child_spec = {Task, fn -> :ok end}
-      directive = %Directives.Spawn{child_spec: child_spec, tag: :worker}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      directive = %Aikido.Directives.Spawn{child_spec: child_spec, tag: :worker}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
     end
   end
 
   describe("RunInstruction directive (signal-routed result)") do
     test("executes instruction and routes result via result_signal_type", %{aikido: aikido}) do
-      pid = start_server(%{aikido: aikido}, RunInstructionRoutedAgent, id: "run-instr-success")
-      instruction = Aikido.Instruction.new!(%{action: RunInstructionSuccessAction})
+      pid =
+        start_server(
+          %{aikido: aikido},
+          AikidoTest.AgentServer.DirectiveExecTest.RunInstructionRoutedAgent,
+          id: "run-instr-success"
+        )
+
+      instruction =
+        Aikido.Instruction.new!(%{
+          action: AikidoTest.AgentServer.DirectiveExecTest.RunInstructionSuccessAction
+        })
 
       directive =
-        Directives.run_instruction(instruction,
+        Aikido.Directives.run_instruction(instruction,
           result_signal_type: "test.run_instruction.captured",
           meta: %{source: :test}
         )
 
-      AgentServer.cast(pid, signal_carrying_directive(directive))
+      Aikido.AgentServer.cast(pid, signal_carrying_directive(directive))
 
       domain =
         await_state_value(pid, fn s ->
@@ -491,15 +477,24 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
     end
 
     test("normalizes failures and the routed action sees status :error", %{aikido: aikido}) do
-      pid = start_server(%{aikido: aikido}, RunInstructionRoutedAgent, id: "run-instr-failure")
-      instruction = Aikido.Instruction.new!(%{action: RunInstructionFailureAction})
+      pid =
+        start_server(
+          %{aikido: aikido},
+          AikidoTest.AgentServer.DirectiveExecTest.RunInstructionRoutedAgent,
+          id: "run-instr-failure"
+        )
+
+      instruction =
+        Aikido.Instruction.new!(%{
+          action: AikidoTest.AgentServer.DirectiveExecTest.RunInstructionFailureAction
+        })
 
       directive =
-        Directives.run_instruction(instruction,
+        Aikido.Directives.run_instruction(instruction,
           result_signal_type: "test.run_instruction.failure"
         )
 
-      AgentServer.cast(pid, signal_carrying_directive(directive))
+      Aikido.AgentServer.cast(pid, signal_carrying_directive(directive))
 
       domain =
         await_state_value(pid, fn s ->
@@ -511,35 +506,38 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       assert domain.captured_emit == true
     end
 
-    # CaptureResultEmitAction emitted a `capture.result.event` signal —
-    # Emit's local dispatch sends `{:signal, signal}` to self(), but
-    # since we're not the agent process here, we won't receive it.
-    # The `captured_emit` slice update is the observable side-effect.
     test("directive itself does not write agent.state — strict ADR 0019 separation", %{
       aikido: aikido
     }) do
-      pid = start_server(%{aikido: aikido}, RunInstructionRoutedAgent, id: "run-instr-strict")
-      instruction = Aikido.Instruction.new!(%{action: RunInstructionSuccessAction})
+      pid =
+        start_server(
+          %{aikido: aikido},
+          AikidoTest.AgentServer.DirectiveExecTest.RunInstructionRoutedAgent,
+          id: "run-instr-strict"
+        )
+
+      instruction =
+        Aikido.Instruction.new!(%{
+          action: AikidoTest.AgentServer.DirectiveExecTest.RunInstructionSuccessAction
+        })
 
       directive =
-        Directives.run_instruction(instruction,
+        Aikido.Directives.run_instruction(instruction,
           result_signal_type: "test.run_instruction.captured",
           meta: %{source: :test}
         )
 
-      input_signal = Signal.new!(%{type: "test.harness", source: "/test", data: %{}})
+      input_signal = Jido.Signal.new!(%{type: "test.harness", source: "/test", data: %{}})
 
       {:ok, %{before: before_state, after: after_state}} =
-        AgentServer.state(pid, fn s ->
+        Aikido.AgentServer.state(pid, fn s ->
           before_state = s.agent.state
-          :ok = DirectiveExec.exec(directive, input_signal, s)
+          :ok = Aikido.Directive.exec(directive, input_signal, s)
           {:ok, %{before: before_state, after: s.agent.state}}
         end)
 
       assert before_state == after_state
 
-      # The natural cascade — the result signal routed to
-      # CaptureResultAction — populates the slice on a later mailbox turn.
       domain =
         await_state_value(pid, fn s ->
           if s.agent.state.domain.captured_status do
@@ -553,16 +551,16 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
 
   describe("Schedule directive") do
     test("sends scheduled signal after delay", %{state: state, input_signal: input_signal}) do
-      signal = Signal.new!(%{type: "scheduled.ping", source: "/test", data: %{}})
-      directive = %Directives.Schedule{delay_ms: 10, message: signal}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      signal = Jido.Signal.new!(%{type: "scheduled.ping", source: "/test", data: %{}})
+      directive = %Aikido.Directives.Schedule{delay_ms: 10, message: signal}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
       assert_receive {:scheduled_signal, received_signal}, 100
       assert received_signal.type == "scheduled.ping"
     end
 
     test("wraps non-signal message in signal", %{state: state, input_signal: input_signal}) do
-      directive = %Directives.Schedule{delay_ms: 10, message: :timeout}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      directive = %Aikido.Directives.Schedule{delay_ms: 10, message: :timeout}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
       assert_receive {:scheduled_signal, received_signal}, 100
       assert received_signal.type == "aikido.scheduled"
       assert received_signal.data.message == :timeout
@@ -571,15 +569,17 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
 
   describe("Stop directive") do
     test("returns stop tuple with reason", %{state: state, input_signal: input_signal}) do
-      directive = %Directives.Stop{reason: :normal}
-      assert {:stop, :normal} = DirectiveExec.exec(directive, input_signal, state)
+      directive = %Aikido.Directives.Stop{reason: :normal}
+
+      assert {:stop, :normal} =
+               Aikido.Directive.exec(directive, input_signal, state)
     end
 
     test("returns stop tuple with custom reason", %{state: state, input_signal: input_signal}) do
-      directive = %Directives.Stop{reason: {:shutdown, :user_requested}}
+      directive = %Aikido.Directives.Stop{reason: {:shutdown, :user_requested}}
 
       assert {:stop, {:shutdown, :user_requested}} =
-               DirectiveExec.exec(directive, input_signal, state)
+               Aikido.Directive.exec(directive, input_signal, state)
     end
   end
 
@@ -587,16 +587,19 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
     test("natural child.started cascade adds the child after the directive returns", %{
       aikido: aikido
     }) do
-      parent_pid = start_server(%{aikido: aikido}, TestAgent, id: "spawn-cascade-parent")
+      parent_pid =
+        start_server(%{aikido: aikido}, AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
+          id: "spawn-cascade-parent"
+        )
 
-      directive = %Directives.SpawnAgent{
-        agent: TestAgent,
+      directive = %Aikido.Directives.SpawnAgent{
+        agent: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
         tag: :child_worker,
         opts: %{},
         meta: %{role: :worker}
       }
 
-      AgentServer.cast(parent_pid, signal_carrying_directive(directive))
+      Aikido.AgentServer.cast(parent_pid, signal_carrying_directive(directive))
 
       child_info =
         await_state_value(
@@ -606,7 +609,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
         )
 
       assert is_pid(child_info.pid)
-      assert child_info.module == TestAgent
+      assert child_info.module == AikidoTest.AgentServer.DirectiveExecTest.TestAgent
       assert child_info.tag == :child_worker
       assert child_info.meta == %{role: :worker}
       GenServer.stop(child_info.pid)
@@ -615,42 +618,41 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
     test("directive itself does not write state.children — strict ADR 0019 separation", %{
       aikido: aikido
     }) do
-      parent_pid = start_server(%{aikido: aikido}, TestAgent, id: "spawn-strict-parent")
+      parent_pid =
+        start_server(%{aikido: aikido}, AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
+          id: "spawn-strict-parent"
+        )
 
-      directive = %Directives.SpawnAgent{
-        agent: TestAgent,
+      directive = %Aikido.Directives.SpawnAgent{
+        agent: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
         tag: :strict_child,
         opts: %{},
         meta: %{}
       }
 
-      input_signal = Signal.new!(%{type: "test.harness", source: "/test", data: %{}})
+      input_signal = Jido.Signal.new!(%{type: "test.harness", source: "/test", data: %{}})
 
       {:ok, before_children} =
-        AgentServer.state(parent_pid, fn s ->
+        Aikido.AgentServer.state(parent_pid, fn s ->
           children_before = s.children
-          :ok = DirectiveExec.exec(directive, input_signal, s)
+          :ok = Aikido.Directive.exec(directive, input_signal, s)
           {:ok, %{before: children_before, after: s.children}}
         end)
 
-      # The directive's exec doesn't mutate state — `before` and `after`
-      # captured inside the same selector turn must be identical.
       assert before_children.before == before_children.after
-
-      # The natural child.started cascade fires on the next mailbox turn.
       child_pid = await_child_pid(parent_pid, :strict_child)
       GenServer.stop(child_pid)
     end
 
     test("handles spawn failure gracefully", %{state: state, input_signal: input_signal}) do
-      directive = %Directives.SpawnAgent{
+      directive = %Aikido.Directives.SpawnAgent{
         agent: NonExistentAgentModule,
         tag: :failing_child,
         opts: %{},
         meta: %{}
       }
 
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
       refute Map.has_key?(state.children, :failing_child)
     end
 
@@ -658,28 +660,28 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       state: state,
       input_signal: input_signal
     }) do
-      directive = %Directives.SpawnAgent{
+      directive = %Aikido.Directives.SpawnAgent{
         agent: "not_a_module_or_struct",
         tag: :unknown_agent,
         opts: %{},
         meta: %{}
       }
 
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
     end
 
     test("rejects unsupported lifecycle opts even for raw SpawnAgent structs", %{
       state: state,
       input_signal: input_signal
     }) do
-      directive = %Directives.SpawnAgent{
-        agent: TestAgent,
+      directive = %Aikido.Directives.SpawnAgent{
+        agent: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
         tag: :managed_child,
         opts: %{pool: :managed_agents},
         meta: %{}
       }
 
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
       refute Map.has_key?(state.children, :managed_child)
     end
 
@@ -687,101 +689,122 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       state: state,
       input_signal: input_signal
     }) do
-      directive = %Directives.SpawnAgent{
-        agent: TestAgent,
+      directive = %Aikido.Directives.SpawnAgent{
+        agent: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
         tag: :bad_opts_child,
         opts: [:not_a_map],
         meta: %{}
       }
 
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
       refute Map.has_key?(state.children, :bad_opts_child)
     end
   end
 
   describe("StopChild directive") do
     test("sends aikido.agent.stop to child", %{aikido: aikido}) do
-      parent_pid = start_server(%{aikido: aikido}, StopAwareAgent, id: "stop-aware-parent-1")
+      parent_pid =
+        start_server(%{aikido: aikido}, AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent,
+          id: "stop-aware-parent-1"
+        )
 
-      spawn_directive = %Directives.SpawnAgent{
-        agent: StopAwareAgent,
+      spawn_directive = %Aikido.Directives.SpawnAgent{
+        agent: AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent,
         tag: :stop_signal_child,
         opts: %{initial_state: %{observer_pid: self()}},
         meta: %{}
       }
 
-      AgentServer.cast(parent_pid, signal_carrying_directive(spawn_directive))
+      Aikido.AgentServer.cast(parent_pid, signal_carrying_directive(spawn_directive))
       child_pid = await_child_pid(parent_pid, :stop_signal_child)
       child_ref = Process.monitor(child_pid)
-      stop_directive = %Directives.StopChild{tag: :stop_signal_child, reason: :shutdown}
-      AgentServer.cast(parent_pid, signal_carrying_directive(stop_directive))
-      assert_receive {:child_stop_signal_received, :shutdown}, 1000
+      stop_directive = %Aikido.Directives.StopChild{tag: :stop_signal_child, reason: :shutdown}
+      Aikido.AgentServer.cast(parent_pid, signal_carrying_directive(stop_directive))
+      assert_receive {:signal, %{type: "test.child.stopping", data: %{reason: :shutdown}}}, 1000
       assert_receive {:DOWN, ^child_ref, :process, ^child_pid, :shutdown}, 1000
     end
 
     test("wraps custom stop reasons as clean shutdowns", %{aikido: aikido}) do
-      parent_pid = start_server(%{aikido: aikido}, StopAwareAgent, id: "stop-aware-parent-2")
+      parent_pid =
+        start_server(%{aikido: aikido}, AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent,
+          id: "stop-aware-parent-2"
+        )
 
-      spawn_directive = %Directives.SpawnAgent{
-        agent: StopAwareAgent,
+      spawn_directive = %Aikido.Directives.SpawnAgent{
+        agent: AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent,
         tag: :custom_reason_child,
         opts: %{initial_state: %{observer_pid: self()}},
         meta: %{}
       }
 
-      AgentServer.cast(parent_pid, signal_carrying_directive(spawn_directive))
+      Aikido.AgentServer.cast(parent_pid, signal_carrying_directive(spawn_directive))
       child_pid = await_child_pid(parent_pid, :custom_reason_child)
       child_ref = Process.monitor(child_pid)
-      stop_directive = %Directives.StopChild{tag: :custom_reason_child, reason: :cleanup}
-      AgentServer.cast(parent_pid, signal_carrying_directive(stop_directive))
-      assert_receive {:child_stop_signal_received, {:shutdown, :cleanup}}, 1000
+      stop_directive = %Aikido.Directives.StopChild{tag: :custom_reason_child, reason: :cleanup}
+      Aikido.AgentServer.cast(parent_pid, signal_carrying_directive(stop_directive))
+
+      assert_receive {:signal,
+                      %{type: "test.child.stopping", data: %{reason: {:shutdown, :cleanup}}}},
+                     1000
+
       assert_receive {:DOWN, ^child_ref, :process, ^child_pid, {:shutdown, :cleanup}}, 1000
     end
 
     test("stops existing child", %{aikido: aikido}) do
-      parent_pid = start_server(%{aikido: aikido}, TestAgent, id: "stop-child-parent")
+      parent_pid =
+        start_server(%{aikido: aikido}, AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
+          id: "stop-child-parent"
+        )
 
-      spawn_directive = %Directives.SpawnAgent{
-        agent: TestAgent,
+      spawn_directive = %Aikido.Directives.SpawnAgent{
+        agent: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
         tag: :child_to_stop,
         opts: %{},
         meta: %{}
       }
 
-      AgentServer.cast(parent_pid, signal_carrying_directive(spawn_directive))
+      Aikido.AgentServer.cast(parent_pid, signal_carrying_directive(spawn_directive))
       child_pid = await_child_pid(parent_pid, :child_to_stop)
-      stop_directive = %Directives.StopChild{tag: :child_to_stop, reason: :normal}
-      AgentServer.cast(parent_pid, signal_carrying_directive(stop_directive))
+      stop_directive = %Aikido.Directives.StopChild{tag: :child_to_stop, reason: :normal}
+      Aikido.AgentServer.cast(parent_pid, signal_carrying_directive(stop_directive))
       refute_eventually(Process.alive?(child_pid))
     end
 
     test("returns ok when child tag not found", %{state: state, input_signal: input_signal}) do
-      directive = %Directives.StopChild{tag: :nonexistent_child, reason: :normal}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+      directive = %Aikido.Directives.StopChild{tag: :nonexistent_child, reason: :normal}
+      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
     end
   end
 
-  describe("Any (fallback) directive") do
-    test("returns ok for unknown directive types", %{state: state, input_signal: input_signal}) do
-      directive = %CustomDirective{value: 42}
-      assert :ok = DirectiveExec.exec(directive, input_signal, state)
+  describe("unknown directives") do
+    test("rejects types without an execution implementation", %{
+      state: state,
+      input_signal: input_signal
+    }) do
+      directive = %AikidoTest.AgentServer.DirectiveExecTest.CustomDirective{value: 42}
+      assert {:error, errors} = Aikido.Types.Directive.cast_input(directive, [])
+      assert inspect(errors) =~ "does not implement"
+      assert {:error, _} = Aikido.ActionResult.new(state: %{}, directives: [directive])
+
+      assert_raise UndefinedFunctionError, fn ->
+        Aikido.Directive.exec(directive, input_signal, state)
+      end
+    end
+
+    test "accepts implemented directives and rejects arbitrary terms" do
+      directive = %Aikido.Directives.Stop{reason: :shutdown}
+      assert {:ok, ^directive} = Aikido.Types.Directive.cast_input(directive, [])
+
+      for value <- [nil, :unknown, %{}, "unknown"] do
+        assert {:error, _} = Aikido.Types.Directive.cast_input(value, [])
+      end
     end
   end
 
-  # Cast a synthetic signal whose default `signal_routes` route
-  # (`test.directive` → `EmitDirectiveAction`) yields `directive` from
-  # the action's directive list. This pushes the directive through the
-  # agent's actual pipeline so cascade callbacks can fire.
   defp signal_carrying_directive(directive) do
-    Signal.new!(%{type: "test.directive", source: "/test", data: %{directive: directive}})
+    Jido.Signal.new!(%{type: "test.directive", source: "/test", data: %{directive: directive}})
   end
 
-  # Subscribe-based child wait that closes the registration race in
-  # `AgentServer.await_child/3` (the underlying API doesn't re-check
-  # state after subscribing — when the natural `child.started` cast
-  # arrives between the initial `:get_child_pid` call and the
-  # `subscribe` call, the subscriber misses it). `await_state_value/3`
-  # has the re-check built in.
   defp await_child_pid(parent_pid, tag) do
     info =
       await_state_value(

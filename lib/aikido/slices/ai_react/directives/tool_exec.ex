@@ -2,7 +2,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   @moduledoc """
   Side-effect directive: runs one tool call.
 
-  Emitted by `Aikido.Slices.AiReact.Actions.LLMTurn`, one per tool call in a turn that
+  Emitted by `Aikido.Slices.AiReact.LLMTurn`, one per tool call in a turn that
   asked for tools. The executor spawns a Task that resolves the tool by
   name, coerces arguments through the action's schema, runs the action
   via `Aikido.Exec.run/4`, and casts back an `"ai.react.tool.completed"`
@@ -21,15 +21,14 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
           request_id: String.t()
         }
 
-  @enforce_keys [:tool_call, :request_id]
-  defstruct tool_call: nil,
-            tool_modules: [],
-            tool_context: %{},
-            request_id: nil
-end
+  use Aikido.Directive
 
-defimpl Aikido.AgentServer.DirectiveExec, for: Aikido.Slices.AiReact.Directives.ToolExec do
-  @moduledoc false
+  typed_struct do
+    field :tool_call, :map, allow_nil?: false
+    field :tool_modules, {:array, :term}, allow_nil?: false, default: []
+    field :tool_context, :map, allow_nil?: false, default: %{}
+    field :request_id, :string, allow_nil?: false
+  end
 
   alias Aikido.Action.Tool, as: ActionTool
   alias Aikido.AgentServer

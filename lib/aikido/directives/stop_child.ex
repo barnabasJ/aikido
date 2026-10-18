@@ -34,19 +34,19 @@ defmodule Aikido.Directives.StopChild do
   are still removed cleanly.
   """
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :tag, :term, allow_nil?: false, description: "Tag of the child to stop"
     field :reason, :term, allow_nil?: false, default: :normal, description: "Reason for stopping"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
 
-  @doc "Returns the Ash type for StopChild."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
+  alias Aikido.AgentServer.StopChildRuntime
+
+  @impl true
+  def exec(%{tag: tag, reason: reason}, input_signal, state) do
+    StopChildRuntime.exec(tag, reason, input_signal, state)
+  end
 end

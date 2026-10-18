@@ -54,7 +54,7 @@ defmodule Aikido.Directives.SpawnAgent do
       }
   """
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :agent, :term,
@@ -81,12 +81,127 @@ defmodule Aikido.Directives.SpawnAgent do
       description: "Restart policy for the child"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
 
-  @doc "Returns the Ash type for SpawnAgent."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
+  @doc """
+  Pure I/O directive: spawns the child via the agent supervisor and
+  persists the parent ⇒ child relationship in `Aikido.RuntimeStore`. The
+  child's own `notify_parent_of_startup/1` then casts
+  `aikido.agent.child.started` back to this agent, where
+  `maybe_track_child_started/2` records the `%ChildInfo{}` and creates
+  the parent-side monitor.
+
+  Async window: between the directive returning and the natural
+  `child.started` arriving, `state.children[tag]` is `nil`. Tests should
+  use `AgentServer.await_child/3` rather than peeking at `state.children`
+  immediately.
+  """
+
+  alias Aikido.AgentServer
+  alias Aikido.Directives
+  alias Aikido.RuntimeStore
+
+  require Logger
+
+  @relationship_hive :relationships
+  @reserved_child_opts [:agent, :agent_module, :id, :aikido, :parent, :partition]
+
+  @impl true
+  def exec(
+        %{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart},
+        _input_signal,
+        state
+      ) do
+    with :ok <- Directives.validate_restart_policy(restart),
+         :ok <- Directives.validate_spawn_agent_opts(opts) do
+      spawn_child(state, agent, tag, opts, meta, restart)
+    else
+      {:error, reason} ->
+        Logger.error("AgentServer #{state.id} failed to spawn child: #{reason}")
+        :ok
+    end
+  end
+
+  defp resolve_agent_module(agent) when is_atom(agent), do: agent
+  defp resolve_agent_module(%{__struct__: module}), do: module
+  defp resolve_agent_module(_), do: nil
+
+  defp spawn_child(state, agent, tag, opts, meta, restart) do
+    child_id = opts[:id] || "#{state.id}/#{tag}"
+    child_partition = Map.get(opts, :partition, state.partition)
+    agent_module = resolve_agent_module(agent)
+
+    parent_ref = %{
+      pid: self(),
+      id: state.id,
+      partition: state.partition,
+      tag: tag,
+      meta: meta
+    }
+
+    child_opts =
+      opts
+      |> Map.drop(@reserved_child_opts)
+      |> Map.put(:agent_module, agent_module)
+      |> Map.put(:id, child_id)
+      |> Map.put(:partition, child_partition)
+      |> Map.put(:parent, parent_ref)
+      |> maybe_put_aikido(state.aikido)
+      |> Map.to_list()
+
+    child_spec = Supervisor.child_spec({AgentServer, child_opts}, restart: restart)
+
+    supervisor =
+      if state.aikido,
+        do: Aikido.agent_supervisor_name(state.aikido),
+        else: Aikido.AgentSupervisor
+
+    case DynamicSupervisor.start_child(supervisor, child_spec) do
+      {:ok, pid} ->
+        case persist_relationship(state, child_id, child_partition, tag, meta) do
+          :ok ->
+            Logger.debug(
+              "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
+            )
+
+            :ok
+
+          {:error, reason} ->
+            _ = DynamicSupervisor.terminate_child(supervisor, pid)
+
+            Logger.error(
+              "AgentServer #{state.id} failed to persist relationship for child #{child_id}: #{inspect(reason)}"
+            )
+
+            :ok
+        end
+
+      {:error, reason} ->
+        Logger.error(
+          "AgentServer #{state.id} failed to spawn child with restart #{inspect(restart)}: #{inspect(reason)}"
+        )
+
+        :ok
+    end
+  end
+
+  defp persist_relationship(state, child_id, child_partition, tag, meta) do
+    RuntimeStore.put(
+      state.aikido,
+      @relationship_hive,
+      Aikido.partition_key(child_id, child_partition),
+      %{
+        parent_id: state.id,
+        parent_partition: state.partition,
+        tag: tag,
+        meta: normalize_meta(meta)
+      }
+    )
+  end
+
+  defp normalize_meta(meta) when is_map(meta), do: meta
+  defp normalize_meta(_meta), do: %{}
+
+  defp maybe_put_aikido(opts, nil), do: opts
+  defp maybe_put_aikido(opts, aikido), do: Map.put(opts, :aikido, aikido)
 end

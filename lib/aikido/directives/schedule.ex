@@ -10,7 +10,7 @@ defmodule Aikido.Directives.Schedule do
   - `message` - Message to send after delay
   """
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :delay_ms, :integer,
@@ -21,12 +21,32 @@ defmodule Aikido.Directives.Schedule do
     field :message, :term, allow_nil?: false, description: "Message to send after delay"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
 
-  @doc "Returns the Ash type for Schedule."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
+  alias Aikido.AgentServer.Signal.Scheduled
+  alias Aikido.Tracing.Context, as: TraceContext
+
+  @impl true
+  def exec(%{delay_ms: delay, message: message}, input_signal, state) do
+    signal =
+      case message do
+        %Jido.Signal{} = s ->
+          s
+
+        other ->
+          Scheduled.new!(
+            %{message: other},
+            source: "/agent/#{state.id}"
+          )
+      end
+
+    traced_signal =
+      case TraceContext.propagate_to(signal, input_signal.id) do
+        {:ok, s} -> s
+        {:error, _} -> signal
+      end
+
+    Process.send_after(self(), {:scheduled_signal, traced_signal}, delay)
+    :ok
+  end
 end

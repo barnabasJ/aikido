@@ -18,19 +18,46 @@ defmodule Aikido.Directives.Spawn do
   - `tag` - Optional correlation tag for logging (not used for tracking)
   """
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :child_spec, :term, allow_nil?: false, description: "Supervisor child_spec"
     field :tag, :term, allow_nil?: true, description: "Optional correlation tag"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
 
-  @doc "Returns the Ash type for Spawn."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
+  require Logger
+
+  @impl true
+  def exec(%{child_spec: child_spec, tag: tag}, _input_signal, state) do
+    result =
+      if is_function(state.spawn_fun, 1) do
+        state.spawn_fun.(child_spec)
+      else
+        agent_sup =
+          if state.aikido,
+            do: Aikido.agent_supervisor_name(state.aikido),
+            else: Aikido.AgentSupervisor
+
+        DynamicSupervisor.start_child(agent_sup, child_spec)
+      end
+
+    case result do
+      {:ok, pid} ->
+        Logger.debug("Spawned child process #{inspect(pid)} with tag #{inspect(tag)}")
+        :ok
+
+      {:ok, pid, _info} ->
+        Logger.debug("Spawned child process #{inspect(pid)} with tag #{inspect(tag)}")
+        :ok
+
+      {:error, reason} ->
+        Logger.error("Failed to spawn child: #{inspect(reason)}")
+        :ok
+
+      :ignored ->
+        :ok
+    end
+  end
 end

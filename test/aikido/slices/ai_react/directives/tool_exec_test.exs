@@ -58,7 +58,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     :ok =
       run_in(agent, fn ->
-        Aikido.AgentServer.DirectiveExec.exec(directive(), :input_signal, fake_state(aikido))
+        Aikido.Directive.exec(directive(), :input_signal, fake_state(aikido))
       end)
 
     assert_receive {:cast, signal}, @receive_timeout
@@ -79,7 +79,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     :ok =
       run_in(agent, fn ->
-        Aikido.AgentServer.DirectiveExec.exec(failing, :input_signal, fake_state(aikido))
+        Aikido.Directive.exec(failing, :input_signal, fake_state(aikido))
       end)
 
     assert_receive {:cast, signal}, @receive_timeout
@@ -96,7 +96,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     :ok =
       run_in(agent, fn ->
-        Aikido.AgentServer.DirectiveExec.exec(missing, :input_signal, fake_state(aikido))
+        Aikido.Directive.exec(missing, :input_signal, fake_state(aikido))
       end)
 
     assert_receive {:cast, signal}, @receive_timeout

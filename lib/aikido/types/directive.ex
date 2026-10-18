@@ -1,20 +1,20 @@
 defmodule Aikido.Types.Directive do
-  @moduledoc "An executable directive with a concrete DirectiveExec implementation."
+  @moduledoc "A directive struct whose module implements `Aikido.Directive`."
   use Ash.Type
 
   @impl true
   def storage_type(_), do: :term
 
   @impl true
-  def cast_input(value, _) do
-    case Aikido.AgentServer.DirectiveExec.impl_for(value) do
-      Aikido.AgentServer.DirectiveExec.Any ->
-        {:error, message: "must have a concrete Aikido.AgentServer.DirectiveExec implementation"}
-
-      _ ->
-        {:ok, value}
+  def cast_input(%module{} = value, _) do
+    with {:ok, _module} <-
+           Ash.Type.apply_constraints(:module, module, behaviour: Aikido.Directive) do
+      {:ok, value}
     end
   end
+
+  def cast_input(_value, _constraints),
+    do: {:error, message: "must be a struct implementing Aikido.Directive"}
 
   @impl true
   def cast_stored(value, constraints), do: cast_input(value, constraints)

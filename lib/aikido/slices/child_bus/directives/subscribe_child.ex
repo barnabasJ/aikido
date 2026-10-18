@@ -9,12 +9,15 @@ defmodule Aikido.Slices.ChildBus.Directives.SubscribeChild do
           child_module: module()
         }
 
-  @enforce_keys [:bus, :tag, :path, :target_pid, :child_module]
-  defstruct bus: nil, tag: nil, path: nil, target_pid: nil, child_module: nil
-end
+  use Aikido.Directive
 
-defimpl Aikido.AgentServer.DirectiveExec, for: Aikido.Slices.ChildBus.Directives.SubscribeChild do
-  @moduledoc false
+  typed_struct do
+    field :bus, :atom, allow_nil?: false
+    field :tag, :term, allow_nil?: false
+    field :path, :string, allow_nil?: false
+    field :target_pid, :term, allow_nil?: false
+    field :child_module, :module, allow_nil?: false
+  end
 
   require Logger
 
@@ -23,6 +26,7 @@ defimpl Aikido.AgentServer.DirectiveExec, for: Aikido.Slices.ChildBus.Directives
   alias Jido.Signal.Bus
   alias Aikido.Slices.ChildBus.Directives.SubscribeChild
 
+  @impl true
   def exec(%SubscribeChild{} = d, _input_signal, state) do
     case Bus.subscribe(d.bus, d.path, dispatch: {:pid, target: d.target_pid}) do
       {:ok, sub_id} ->

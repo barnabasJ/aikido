@@ -14,7 +14,7 @@ defmodule Aikido.Directives.Reply do
   correctly (e.g. "which of my nodes is running right now?").
 
   Directive executors receive the full `%AgentServer.State{}` as a
-  documented part of the `DirectiveExec` protocol. So we push query
+  documented part of the `Aikido.Directive` behaviour. So we push query
   resolution through a directive: the action's job is only to translate
   "a query signal came in" into "emit a Reply directive"; the
   directive's executor then reads whatever state it needs and produces
@@ -42,8 +42,14 @@ defmodule Aikido.Directives.Reply do
   `Aikido.Signal.Call.reply_from_state/4` is the recommended builder.
   """
 
-  @enforce_keys [:input_signal, :reply_type, :error_type, :build]
-  defstruct [:input_signal, :reply_type, :error_type, :build]
+  use Aikido.Directive
+
+  typed_struct do
+    field :input_signal, :term, allow_nil?: false
+    field :reply_type, :string, allow_nil?: false
+    field :error_type, :string, allow_nil?: false
+    field :build, :term, allow_nil?: false
+  end
 
   @type builder ::
           {module :: module(), fun :: atom(), extra_args :: [term()]}
@@ -54,4 +60,48 @@ defmodule Aikido.Directives.Reply do
           error_type: String.t(),
           build: builder()
         }
+
+  alias Jido.Signal
+  alias Jido.Signal.Dispatch
+
+  require Logger
+
+  @impl true
+  def exec(%{input_signal: nil}, _input_signal, _state), do: :ok
+
+  def exec(%{input_signal: %{jido_dispatch: nil}}, _input_signal, _state) do
+    # No reply channel on the input signal — caller wasn't using
+    # Signal.Call.call/3, so there's no one to reply to.
+    :ok
+  end
+
+  def exec(
+        %Aikido.Directives.Reply{
+          input_signal: input,
+          reply_type: reply_type,
+          error_type: error_type,
+          build: {module, fun, extra_args}
+        },
+        _input_signal,
+        state
+      ) do
+    {type, data} =
+      case apply(module, fun, [state | extra_args]) do
+        {:ok, data} when is_map(data) -> {reply_type, data}
+        {:error, reason} -> {error_type, %{reason: reason}}
+      end
+
+    case Signal.new(type, data, subject: input.id) do
+      {:ok, reply_signal} ->
+        _ = Dispatch.dispatch(reply_signal, input.jido_dispatch)
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "Reply directive: failed to build #{inspect(type)} reply signal: #{inspect(reason)}"
+        )
+    end
+
+    :ok
+  end
 end

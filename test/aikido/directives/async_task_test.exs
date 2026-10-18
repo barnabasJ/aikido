@@ -1,9 +1,69 @@
+defmodule Aikido.Directives.AsyncTaskTest.TestAgent do
+  @moduledoc false
+  use Aikido.Agent
+
+  agent do
+    name "async_task_test_agent"
+    path :domain
+
+    schema do
+      attribute :value, :term, default: nil
+    end
+  end
+end
+
+defmodule Aikido.Directives.AsyncTaskTest.Work do
+  @moduledoc false
+  @spec ok(test_pid :: pid()) :: {:ok, map()}
+  def ok(test_pid) do
+    send(test_pid, :ok_work_ran)
+    {:ok, %{answer: 42}}
+  end
+
+  @spec error(test_pid :: pid()) :: {:error, atom()}
+  def error(test_pid) do
+    send(test_pid, :error_work_ran)
+    {:error, :boom}
+  end
+
+  @spec plain(test_pid :: pid()) :: String.t()
+  def plain(test_pid) do
+    send(test_pid, :plain_work_ran)
+    "plain-result"
+  end
+
+  @spec custom_signal() :: Jido.Signal.t()
+  def custom_signal do
+    Jido.Signal.new!("custom.done", %{value: 7}, source: "/work/custom")
+  end
+
+  @spec multiple_signals() :: {:signals, [Jido.Signal.t()]}
+  def multiple_signals do
+    {:signals,
+     [
+       Jido.Signal.new!("custom.one", %{index: 1}, source: "/work/multi"),
+       Jido.Signal.new!("custom.two", %{index: 2}, source: "/work/multi")
+     ]}
+  end
+
+  @spec raise_error() :: no_return()
+  def raise_error do
+    raise ArgumentError, "bad input"
+  end
+
+  @spec throw_value() :: no_return()
+  def throw_value do
+    throw(:thrown_value)
+  end
+
+  @spec exit_value() :: no_return()
+  def exit_value do
+    exit(:exited_value)
+  end
+end
+
 defmodule Aikido.Directives.AsyncTaskTest do
   use ExUnit.Case, async: true
-
-  alias Aikido.AgentServer.{DirectiveExec, Options, State}
-  alias Aikido.Directives
-  alias Jido.Signal
 
   setup_all do
     {:ok, _apps} = Application.ensure_all_started(:jido_signal)
@@ -27,80 +87,27 @@ defmodule Aikido.Directives.AsyncTaskTest do
     %{aikido: aikido}
   end
 
-  defmodule TestAgent do
-    @moduledoc false
-
-    use Aikido.Agent
-
-    agent do
-      name("async_task_test_agent")
-      path(:domain)
-
-      schema do
-        attribute(:value, :term, default: nil)
-      end
-    end
-  end
-
-  defmodule Work do
-    @moduledoc false
-
-    @spec ok(test_pid :: pid()) :: {:ok, map()}
-    def ok(test_pid) do
-      send(test_pid, :ok_work_ran)
-      {:ok, %{answer: 42}}
-    end
-
-    @spec error(test_pid :: pid()) :: {:error, atom()}
-    def error(test_pid) do
-      send(test_pid, :error_work_ran)
-      {:error, :boom}
-    end
-
-    @spec plain(test_pid :: pid()) :: String.t()
-    def plain(test_pid) do
-      send(test_pid, :plain_work_ran)
-      "plain-result"
-    end
-
-    @spec custom_signal() :: Signal.t()
-    def custom_signal do
-      Signal.new!("custom.done", %{value: 7}, source: "/work/custom")
-    end
-
-    @spec multiple_signals() :: {:signals, [Signal.t()]}
-    def multiple_signals do
-      {:signals,
-       [
-         Signal.new!("custom.one", %{index: 1}, source: "/work/multi"),
-         Signal.new!("custom.two", %{index: 2}, source: "/work/multi")
-       ]}
-    end
-
-    @spec raise_error() :: no_return()
-    def raise_error do
-      raise ArgumentError, "bad input"
-    end
-
-    @spec throw_value() :: no_return()
-    def throw_value do
-      throw(:thrown_value)
-    end
-
-    @spec exit_value() :: no_return()
-    def exit_value do
-      exit(:exited_value)
-    end
-  end
-
   defp input_signal do
-    Signal.new!("test.async_task", %{request_id: "req_1"}, source: "/test")
+    Jido.Signal.new!("test.async_task", %{request_id: "req_1"}, source: "/test")
   end
 
   defp state(aikido) do
-    agent = TestAgent.new()
-    {:ok, opts} = Options.new(%{agent_module: TestAgent, id: "async-task-agent", aikido: aikido})
-    {:ok, state} = State.from_options(opts, TestAgent, agent)
+    agent = Aikido.Directives.AsyncTaskTest.TestAgent.new()
+
+    {:ok, opts} =
+      Aikido.AgentServer.Options.new(%{
+        agent_module: Aikido.Directives.AsyncTaskTest.TestAgent,
+        id: "async-task-agent",
+        aikido: aikido
+      })
+
+    {:ok, state} =
+      Aikido.AgentServer.State.from_options(
+        opts,
+        Aikido.Directives.AsyncTaskTest.TestAgent,
+        agent
+      )
+
     state
   end
 
@@ -133,18 +140,21 @@ defmodule Aikido.Directives.AsyncTaskTest do
     end
   end
 
-  test "wraps {:ok, result} in the configured success signal", %{aikido: aikido} do
+  test("wraps {:ok, result} in the configured success signal", %{aikido: aikido}) do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
 
     directive =
-      Directives.async_task({Work, :ok, [test_pid]},
+      Aikido.Directives.async_task({Aikido.Directives.AsyncTaskTest.Work, :ok, [test_pid]},
         success_type: "work.completed",
         error_type: "work.failed",
         payload: %{request_id: "req_1"}
       )
 
-    :ok = run_in(agent, fn -> DirectiveExec.exec(directive, input_signal(), state(aikido)) end)
+    :ok =
+      run_in(agent, fn ->
+        Aikido.Directive.exec(directive, input_signal(), state(aikido))
+      end)
 
     assert_receive :ok_work_ran, 1000
     assert_receive {:cast, signal}, 1000
@@ -153,18 +163,21 @@ defmodule Aikido.Directives.AsyncTaskTest do
     assert signal.data == %{request_id: "req_1", result: %{answer: 42}}
   end
 
-  test "wraps {:error, reason} in the configured error signal", %{aikido: aikido} do
+  test("wraps {:error, reason} in the configured error signal", %{aikido: aikido}) do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
 
     directive =
-      Directives.async_task({Work, :error, [test_pid]},
+      Aikido.Directives.async_task({Aikido.Directives.AsyncTaskTest.Work, :error, [test_pid]},
         success_type: "work.completed",
         error_type: "work.failed",
         payload: %{request_id: "req_2"}
       )
 
-    :ok = run_in(agent, fn -> DirectiveExec.exec(directive, input_signal(), state(aikido)) end)
+    :ok =
+      run_in(agent, fn ->
+        Aikido.Directive.exec(directive, input_signal(), state(aikido))
+      end)
 
     assert_receive :error_work_ran, 1000
     assert_receive {:cast, signal}, 1000
@@ -172,13 +185,19 @@ defmodule Aikido.Directives.AsyncTaskTest do
     assert signal.data == %{request_id: "req_2", reason: :boom}
   end
 
-  test "wraps plain return values as success results", %{aikido: aikido} do
+  test("wraps plain return values as success results", %{aikido: aikido}) do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
 
-    directive = Directives.async_task({Work, :plain, [test_pid]}, success_type: "work.completed")
+    directive =
+      Aikido.Directives.async_task({Aikido.Directives.AsyncTaskTest.Work, :plain, [test_pid]},
+        success_type: "work.completed"
+      )
 
-    :ok = run_in(agent, fn -> DirectiveExec.exec(directive, input_signal(), state(aikido)) end)
+    :ok =
+      run_in(agent, fn ->
+        Aikido.Directive.exec(directive, input_signal(), state(aikido))
+      end)
 
     assert_receive :plain_work_ran, 1000
     assert_receive {:cast, signal}, 1000
@@ -186,12 +205,17 @@ defmodule Aikido.Directives.AsyncTaskTest do
     assert signal.data == %{result: "plain-result"}
   end
 
-  test "casts a signal returned by the MFA without wrapping it", %{aikido: aikido} do
+  test("casts a signal returned by the MFA without wrapping it", %{aikido: aikido}) do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
-    directive = Directives.async_task({Work, :custom_signal, []})
 
-    :ok = run_in(agent, fn -> DirectiveExec.exec(directive, input_signal(), state(aikido)) end)
+    directive =
+      Aikido.Directives.async_task({Aikido.Directives.AsyncTaskTest.Work, :custom_signal, []})
+
+    :ok =
+      run_in(agent, fn ->
+        Aikido.Directive.exec(directive, input_signal(), state(aikido))
+      end)
 
     assert_receive {:cast, signal}, 1000
     assert signal.type == "custom.done"
@@ -199,12 +223,17 @@ defmodule Aikido.Directives.AsyncTaskTest do
     assert signal.data == %{value: 7}
   end
 
-  test "casts every signal returned by {:signals, signals}", %{aikido: aikido} do
+  test("casts every signal returned by {:signals, signals}", %{aikido: aikido}) do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
-    directive = Directives.async_task({Work, :multiple_signals, []})
 
-    :ok = run_in(agent, fn -> DirectiveExec.exec(directive, input_signal(), state(aikido)) end)
+    directive =
+      Aikido.Directives.async_task({Aikido.Directives.AsyncTaskTest.Work, :multiple_signals, []})
+
+    :ok =
+      run_in(agent, fn ->
+        Aikido.Directive.exec(directive, input_signal(), state(aikido))
+      end)
 
     assert_receive {:cast, first}, 1000
     assert_receive {:cast, second}, 1000
@@ -214,19 +243,22 @@ defmodule Aikido.Directives.AsyncTaskTest do
     assert second.data == %{index: 2}
   end
 
-  test "passes runtime context to unary function work", %{aikido: aikido} do
+  test("passes runtime context to unary function work", %{aikido: aikido}) do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
 
     directive =
-      Directives.async_task(
+      Aikido.Directives.async_task(
         fn context ->
           {:ok, %{agent_id: context.agent_id, input_type: context.input_signal.type}}
         end,
         success_type: "work.context"
       )
 
-    :ok = run_in(agent, fn -> DirectiveExec.exec(directive, input_signal(), state(aikido)) end)
+    :ok =
+      run_in(agent, fn ->
+        Aikido.Directive.exec(directive, input_signal(), state(aikido))
+      end)
 
     assert_receive {:cast, signal}, 1000
     assert signal.type == "work.context"
@@ -236,12 +268,19 @@ defmodule Aikido.Directives.AsyncTaskTest do
            }
   end
 
-  test "converts raised exceptions into error signals", %{aikido: aikido} do
+  test("converts raised exceptions into error signals", %{aikido: aikido}) do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
-    directive = Directives.async_task({Work, :raise_error, []}, error_type: "work.failed")
 
-    :ok = run_in(agent, fn -> DirectiveExec.exec(directive, input_signal(), state(aikido)) end)
+    directive =
+      Aikido.Directives.async_task({Aikido.Directives.AsyncTaskTest.Work, :raise_error, []},
+        error_type: "work.failed"
+      )
+
+    :ok =
+      run_in(agent, fn ->
+        Aikido.Directive.exec(directive, input_signal(), state(aikido))
+      end)
 
     assert_receive {:cast, signal}, 1000
     assert signal.type == "work.failed"
@@ -249,41 +288,58 @@ defmodule Aikido.Directives.AsyncTaskTest do
     assert %ArgumentError{message: "bad input"} = signal.data.reason
   end
 
-  test "converts thrown values into error signals", %{aikido: aikido} do
+  test("converts thrown values into error signals", %{aikido: aikido}) do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
-    directive = Directives.async_task({Work, :throw_value, []}, error_type: "work.failed")
 
-    :ok = run_in(agent, fn -> DirectiveExec.exec(directive, input_signal(), state(aikido)) end)
+    directive =
+      Aikido.Directives.async_task({Aikido.Directives.AsyncTaskTest.Work, :throw_value, []},
+        error_type: "work.failed"
+      )
+
+    :ok =
+      run_in(agent, fn ->
+        Aikido.Directive.exec(directive, input_signal(), state(aikido))
+      end)
 
     assert_receive {:cast, signal}, 1000
     assert signal.type == "work.failed"
     assert signal.data == %{kind: :throw, reason: :thrown_value}
   end
 
-  test "converts exits into error signals", %{aikido: aikido} do
+  test("converts exits into error signals", %{aikido: aikido}) do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
-    directive = Directives.async_task({Work, :exit_value, []}, error_type: "work.failed")
 
-    :ok = run_in(agent, fn -> DirectiveExec.exec(directive, input_signal(), state(aikido)) end)
+    directive =
+      Aikido.Directives.async_task({Aikido.Directives.AsyncTaskTest.Work, :exit_value, []},
+        error_type: "work.failed"
+      )
+
+    :ok =
+      run_in(agent, fn ->
+        Aikido.Directive.exec(directive, input_signal(), state(aikido))
+      end)
 
     assert_receive {:cast, signal}, 1000
     assert signal.type == "work.failed"
     assert signal.data == %{kind: :exit, reason: :exited_value}
   end
 
-  test "does not crash when the reply target is unavailable", %{aikido: aikido} do
+  test("does not crash when the reply target is unavailable", %{aikido: aikido}) do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
 
     directive =
-      Directives.async_task({Work, :ok, [test_pid]},
+      Aikido.Directives.async_task({Aikido.Directives.AsyncTaskTest.Work, :ok, [test_pid]},
         success_type: "work.completed",
         target: :missing_async_task_target
       )
 
-    :ok = run_in(agent, fn -> DirectiveExec.exec(directive, input_signal(), state(aikido)) end)
+    :ok =
+      run_in(agent, fn ->
+        Aikido.Directive.exec(directive, input_signal(), state(aikido))
+      end)
 
     assert_receive :ok_work_ran, 1000
     refute_receive {:cast, _signal}, 100

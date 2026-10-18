@@ -13,6 +13,7 @@ config :spark, :formatter,
     extensions: [Aikido.Ash.Agent, Aikido.Ash.Slice, Aikido.Ash.Team, Aikido.Ash.AI]
   ],
   "Ash.Domain": [extensions: [Aikido.Ash.Domain]],
+  "Aikido.Directive": [],
   "Ash.TypedStruct": []
 
 config :aikido, default: Aikido.DefaultInstance

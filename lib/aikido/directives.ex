@@ -16,7 +16,7 @@ defmodule Aikido.Directives do
     callbacks `process_signal/2` invokes (`maybe_track_child_started/2`,
     `handle_child_down/3`, `maybe_track_cron_registered/2`, …), not inside
     the directive's `exec/3` body.
-  - **The type system enforces it.** `Aikido.AgentServer.DirectiveExec.exec/3`
+  - **The type system enforces it.** `Aikido.Directive.exec/3`
     returns `:ok | {:stop, term()}` — there is no state slot in the return
     shape, so a directive author cannot accidentally write one.
   - **All `agent.state` writes flow through the action's return value.**

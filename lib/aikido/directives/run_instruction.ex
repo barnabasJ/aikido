@@ -40,7 +40,7 @@ defmodule Aikido.Directives.RunInstruction do
       }
   """
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :instruction, :term, allow_nil?: false, description: "%Aikido.Instruction{} to execute"
@@ -55,12 +55,60 @@ defmodule Aikido.Directives.RunInstruction do
       description: "Optional metadata for result payload"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
 
-  @doc "Returns the Ash type for RunInstruction."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
+  @doc """
+  Pure I/O directive: runs the instruction and emits a result signal of
+  type `result_signal_type`. The directive does not call `cmd/2`
+  directly — the agent's `signal_routes` binds `result_signal_type` to
+  a handler action that performs the slice update via its return value.
+  The handler runs on the next mailbox turn through the normal pipeline.
+  """
+
+  alias Aikido.AgentServer
+  alias Aikido.Observe.Config, as: ObserveConfig
+
+  @impl true
+  def exec(
+        %{instruction: instruction, result_signal_type: signal_type, meta: meta},
+        _input_signal,
+        state
+      ) do
+    enriched_instruction = %{
+      instruction
+      | context: Map.put(instruction.context || %{}, :state, state.agent.state)
+    }
+
+    execution_payload =
+      enriched_instruction
+      |> then(fn instruction ->
+        exec_opts = ObserveConfig.action_exec_opts(state.aikido, instruction.opts)
+        Aikido.Exec.run(%{instruction | opts: exec_opts})
+      end)
+      |> normalize_result_payload()
+      |> Map.put(:instruction, instruction)
+      |> Map.put(:meta, meta || %{})
+
+    result_signal =
+      Jido.Signal.new!(signal_type, execution_payload, source: "/agent/#{state.id}")
+
+    _ = AgentServer.cast(self(), result_signal)
+    :ok
+  end
+
+  defp normalize_result_payload({:ok, result, effects}) do
+    %{
+      status: :ok,
+      result: result,
+      effects: List.wrap(effects)
+    }
+  end
+
+  defp normalize_result_payload({:error, reason}) do
+    %{
+      status: :error,
+      reason: reason,
+      effects: []
+    }
+  end
 end

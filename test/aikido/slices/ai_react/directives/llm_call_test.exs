@@ -71,7 +71,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
 
     :ok =
       run_in(agent, fn ->
-        Aikido.AgentServer.DirectiveExec.exec(directive(), :input_signal, fake_state(aikido))
+        Aikido.Directive.exec(directive(), :input_signal, fake_state(aikido))
       end)
 
     assert_receive {:reqllm_called, 1, [_]}, 1_000
@@ -93,7 +93,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
 
     :ok =
       run_in(agent, fn ->
-        Aikido.AgentServer.DirectiveExec.exec(directive(), :input_signal, fake_state(aikido))
+        Aikido.Directive.exec(directive(), :input_signal, fake_state(aikido))
       end)
 
     assert_receive {:cast, signal}, 1_000

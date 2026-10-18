@@ -11,19 +11,33 @@ defmodule Aikido.Directives.Error do
   - `context` - Optional atom describing error context (e.g., `:normalize`, `:instruction`)
   """
 
-  use Ash.TypedStruct
+  use Aikido.Directive
 
   typed_struct do
     field :error, :term, allow_nil?: false, description: "Aikido.Error struct"
     field :context, :atom, allow_nil?: true, description: "Error context"
   end
 
-  @schema __MODULE__
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
 
-  @doc "Returns the Ash type for Error."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
+  # The framework-level error policy is gone (C4 of ADR 0014). Error
+  # directives just log and continue; users who need stop-on-error or
+  # max-errors semantics write a small middleware that pattern-matches on
+  # `%Directives.Error{}` in the chain result. A formal error-handling
+  # surface lands in a follow-up PR per task 0004 S6.
+
+  require Logger
+
+  @impl true
+  def exec(%Aikido.Directives.Error{error: error, context: context}, _input_signal, state) do
+    Logger.error("Agent #{state.id}#{format_context(context)}: #{format_error(error)}")
+
+    :ok
+  end
+
+  defp format_context(nil), do: ""
+  defp format_context(ctx), do: " [#{ctx}]"
+
+  defp format_error(%{message: message}) when is_binary(message), do: message
+  defp format_error(error), do: inspect(error)
 end
