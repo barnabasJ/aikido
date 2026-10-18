@@ -43,8 +43,8 @@ defmodule AikidoTest.Thread.SliceTest do
     end
 
     test "schema is bound to Aikido.Slices.Thread.schema/0" do
-      assert Aikido.Schema.keys(Aikido.Dsl.Slice.Info.schema(Aikido.Slices.Thread)) ==
-               Aikido.Schema.keys(Aikido.Slices.Thread)
+      assert Ash.Resource.Info.attribute_names(Aikido.Dsl.Slice.Info.schema(Aikido.Slices.Thread)) ==
+               Ash.Resource.Info.attribute_names(Aikido.Slices.Thread)
     end
 
     test "exposes one signal route per action" do

@@ -70,36 +70,18 @@ defmodule Aikido.Agent do
   enumeration — that role moves entirely into `slices do … end`.
   """
 
-  use Spark.Dsl,
-    default_extensions: [extensions: [Aikido.Dsl.Agent]],
-    untyped_extensions?: false,
-    opt_schema: [
-      extensions: [
-        type: {:list, :any},
-        default: [],
-        doc:
-          "Modules whose typed DSL section the host wants to call into " <>
-            "(e.g. `Aikido.Slices.AiReact` to unlock `react do … end`). " <>
-            "Slice / plugin enumeration goes in `slices do … end`."
-      ],
-      middleware: [
-        type: {:list, :any},
-        default: [],
-        doc:
-          "Ordered list of middleware modules. Order is the wrap-chain " <>
-            "order. Plugin modules with middleware behaviour also appear " <>
-            "here for ordering, in addition to `slices do … end` for path."
-      ],
-      aikido: [
-        type: :atom,
-        doc: "Optional Aikido instance module for resolving default slices at compile time."
-      ],
-      default_slices: [
-        type: :any,
-        doc:
-          "Override default slices: false to disable all, or %{path => false | Module | {Module, config}}."
-      ]
-    ]
+  defmacro __using__(opts) do
+    {opts, _bindings} = Code.eval_quoted(opts, [], __CALLER__)
+
+    quote do
+      use Ash.Resource,
+        data_layer: :embedded,
+        validate_domain_inclusion?: false,
+        extensions: unquote([Aikido.Dsl.Agent] ++ (opts[:extensions] || []))
+
+      unquote(Aikido.Agent.handle_opts(opts))
+    end
+  end
 
   alias Aikido.Agent
   alias Aikido.Agent.State, as: StateHelper
@@ -217,7 +199,7 @@ defmodule Aikido.Agent do
     restore: 2
   ]
 
-  @impl Spark.Dsl
+  @doc false
   def handle_opts(opts) do
     user_middleware =
       opts

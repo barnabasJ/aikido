@@ -155,7 +155,7 @@ defmodule AikidoTest.SliceTest do
 
       assert Ash.Type.ash_type?(Aikido.Dsl.Slice.Info.schema(AikidoTest.SliceTest.FullSlice))
 
-      assert Ash.Type.ash_type?(
+      assert Aikido.ActionRef.valid?(
                Aikido.Dsl.Slice.Info.config_schema(AikidoTest.SliceTest.FullSlice)
              )
     end

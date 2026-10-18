@@ -15,7 +15,11 @@ defmodule Aikido.Dsl.Agent.Seeder do
       }
 
       changeset =
-        resource |> Ash.Changeset.new() |> Ash.Changeset.force_change_attributes(user_value)
+        resource
+        |> Ash.Changeset.new()
+        |> Ash.Changeset.force_change_attributes(
+          Map.take(user_value, Enum.to_list(Ash.Resource.Info.attribute_names(resource)))
+        )
 
       case changeset
            |> Ash.Changeset.for_create(action, %{}, require?: false)
@@ -26,7 +30,7 @@ defmodule Aikido.Dsl.Agent.Seeder do
            )
            |> Ash.Changeset.apply_attributes() do
         {:ok, record} ->
-          Map.take(record, resource.__aikido_state_fields__())
+          Map.merge(user_value, Map.take(record, resource.__aikido_state_fields__()))
 
         {:error, errors} ->
           raise SliceValidationError, path: nil, module: resource, errors: errors
@@ -63,7 +67,7 @@ defmodule Aikido.Dsl.Agent.Seeder do
           value =
             if is_struct(value) &&
                  is_nil(Spark.Dsl.Extension.get_persisted(slice_module, :aikido_slice_schema)),
-               do: Map.from_struct(value),
+               do: Map.take(value, Ash.Resource.Info.attribute_names(schema) |> Enum.to_list()),
                else: value
 
           case Spark.Dsl.Extension.get_opt(slice_module, [:slice], :state_transform) do

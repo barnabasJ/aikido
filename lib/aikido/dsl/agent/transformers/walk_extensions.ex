@@ -170,7 +170,8 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
     native_slice? =
       Spark.Dsl.is?(module, Ash.Resource) && Aikido.Ash.Slice in Spark.extensions(module)
 
-    unless native_slice? || Spark.Dsl.is?(module, Aikido.Slice) do
+    unless native_slice? ||
+             (Spark.Dsl.is?(module, Ash.Resource) && Aikido.Dsl.Slice in Spark.extensions(module)) do
       raise CompileError,
         description:
           "Module #{inspect(module)} mounted in `slices do …` is not a " <>

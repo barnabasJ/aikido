@@ -142,7 +142,7 @@ defmodule Aikido.Dsl.Agent do
       @schedules_section
     ],
     transformers: [
-      Aikido.Dsl.Transformers.CompileSchemas,
+      Aikido.Dsl.Transformers.Attributes,
       Aikido.Dsl.Agent.Transformers.WalkExtensions,
       Aikido.Dsl.Agent.Transformers.MergeSchemas,
       Aikido.Dsl.Agent.Transformers.ExpandRoutes,

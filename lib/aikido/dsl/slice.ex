@@ -147,6 +147,6 @@ defmodule Aikido.Dsl.Slice do
       @capabilities_section,
       @requires_section
     ],
-    transformers: [Aikido.Dsl.Transformers.CompileSchemas],
+    transformers: [Aikido.Dsl.Transformers.Attributes],
     verifiers: [Aikido.Dsl.Slice.Verifiers.HasSchemaAndRoutes]
 end

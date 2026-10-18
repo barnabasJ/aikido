@@ -32,7 +32,7 @@ defmodule Aikido.Dsl.Sensor do
   use Spark.Dsl.Extension,
     sections: [@sensor_section],
     transformers: [
-      Aikido.Dsl.Transformers.CompileSchemas,
+      Aikido.Dsl.Transformers.Attributes,
       Aikido.Dsl.Sensor.Transformers.GenerateAccessors
     ]
 end

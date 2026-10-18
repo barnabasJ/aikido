@@ -45,7 +45,14 @@ defmodule Aikido.Slice do
   separate `actions` section.
   """
 
-  use Spark.Dsl, default_extensions: [extensions: [Aikido.Dsl.Slice]]
+  defmacro __using__(_opts) do
+    quote do
+      use Ash.Resource,
+        data_layer: :embedded,
+        validate_domain_inclusion?: false,
+        extensions: [Aikido.Dsl.Slice]
+    end
+  end
 
   @doc false
   @spec validate_slice_name(String.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}

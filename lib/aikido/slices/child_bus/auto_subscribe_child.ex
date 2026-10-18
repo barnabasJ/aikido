@@ -34,7 +34,7 @@ defmodule Aikido.Slices.ChildBus.AutoSubscribeChild do
   end
 
   defp fetch_routes(child_module) do
-    if Spark.Dsl.is?(child_module, Aikido.Slice) or
+    if Aikido.Dsl.Slice in Spark.extensions(child_module) or
          (Spark.Dsl.is?(child_module, Ash.Resource) and
             Aikido.Ash.Slice in Spark.extensions(child_module)) do
       {:ok, Aikido.Dsl.Slice.Info.signal_routes(child_module)}

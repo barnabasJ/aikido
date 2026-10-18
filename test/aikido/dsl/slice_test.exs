@@ -164,14 +164,14 @@ defmodule Aikido.Dsl.SliceTest do
 
       assert Ash.Type.ash_type?(Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.FullSlice))
 
-      assert Ash.Type.ash_type?(
+      assert Aikido.ActionRef.valid?(
                Aikido.Dsl.Slice.Info.config_schema(Aikido.Dsl.SliceTest.FullSlice)
              )
     end
 
     test "Spark.Dsl.is?(mod, Aikido.Slice) is true for slice modules" do
-      assert Spark.Dsl.is?(Aikido.Dsl.SliceTest.MinimalSlice, Aikido.Slice)
-      assert Spark.Dsl.is?(Aikido.Dsl.SliceTest.FullSlice, Aikido.Slice)
+      assert Aikido.Dsl.Slice in Spark.extensions(Aikido.Dsl.SliceTest.MinimalSlice)
+      assert Aikido.Dsl.Slice in Spark.extensions(Aikido.Dsl.SliceTest.FullSlice)
     end
   end
 
@@ -179,7 +179,7 @@ defmodule Aikido.Dsl.SliceTest do
     test "schema/1 returns the same Ash contract passed into the section" do
       schema = Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.SchemaSlice)
       assert Ash.Type.ash_type?(schema)
-      assert {:ok, %{counter: 0}} = Aikido.Schema.cast(schema, %{})
+      assert {:ok, %{counter: 0}} = Ash.Type.cast_input(schema, %{})
     end
 
     test "schema/1 returns the slice's declared schema struct" do

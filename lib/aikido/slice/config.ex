@@ -55,9 +55,11 @@ defmodule Aikido.Slice.Config do
     config_schema = Aikido.Dsl.Slice.Info.config_schema(slice_module)
 
     if config_schema do
-      case Ash.Type.cast_input(config_schema, config) do
+      {resource, action} = config_schema
+
+      case resource |> Ash.ActionInput.for_action(action, config) |> Ash.run_action() do
         {:ok, validated} ->
-          values = Map.from_struct(validated)
+          values = validated
 
           case Spark.Dsl.Extension.get_opt(slice_module, [:slice], :config_transform) do
             nil ->

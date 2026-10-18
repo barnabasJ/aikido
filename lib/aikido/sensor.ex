@@ -60,7 +60,16 @@ defmodule Aikido.Sensor do
   - `{:emit, signal}` - Emit a signal immediately
   """
 
-  use Spark.Dsl, default_extensions: [extensions: [Aikido.Dsl.Sensor]]
+  defmacro __using__(_opts) do
+    quote do
+      use Ash.Resource,
+        data_layer: :embedded,
+        validate_domain_inclusion?: false,
+        extensions: [Aikido.Dsl.Sensor]
+
+      @behaviour Aikido.Sensor
+    end
+  end
 
   @type sensor_directive ::
           {:schedule, pos_integer()}
@@ -144,11 +153,4 @@ defmodule Aikido.Sensor do
   - `:ok` - Shutdown complete
   """
   @callback terminate(reason :: term(), state :: term()) :: :ok
-
-  @impl Spark.Dsl
-  def handle_opts(_opts) do
-    quote do
-      @behaviour Aikido.Sensor
-    end
-  end
 end

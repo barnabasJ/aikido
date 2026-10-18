@@ -33,17 +33,8 @@ defmodule Aikido.Ash.Transformers.Slice do
 
       true ->
         resource = Transformer.get_persisted(dsl, :module)
-        config = Transformer.get_entities(dsl, [:slice, :config_schema])
         dsl = Transformer.persist(dsl, :aikido_slice_schema, resource)
-
-        if config == [] do
-          {:ok, dsl}
-        else
-          contract =
-            Aikido.Dsl.Schema.create_typed_struct_module(Module.concat(resource, Config), config)
-
-          {:ok, Transformer.set_option(dsl, [:slice], :config_schema, contract)}
-        end
+        {:ok, Aikido.Dsl.Transformers.Attributes.configure(dsl, :slice, resource)}
     end
   end
 

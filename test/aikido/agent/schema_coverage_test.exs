@@ -69,22 +69,24 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
 
   test "Ash casts values and enforces bounds" do
     schema = [count: [type: :integer, allow_nil?: false, constraints: [min: 1]]]
-    assert {:ok, %{count: 2}} = Aikido.Schema.cast(schema, %{"count" => "2"})
-    assert {:error, _} = Aikido.Schema.cast(schema, %{count: 0})
-    assert {:error, _} = Aikido.Schema.cast(schema, %{})
-    assert {:error, _} = Aikido.Schema.cast(schema, %{count: nil})
+
+    assert {:ok, %{count: 2}} =
+             Ash.Type.apply_constraints(:map, %{"count" => "2"}, fields: schema)
+
+    assert {:error, _} = Ash.Type.apply_constraints(:map, %{count: 0}, fields: schema)
+    assert {:error, _} = Ash.Type.apply_constraints(:map, %{}, fields: schema)
+    assert {:error, _} = Ash.Type.apply_constraints(:map, %{count: nil}, fields: schema)
   end
 
   test "false and nil defaults are retained" do
     schema = AikidoTest.Agent.SchemaCoverageTest.Defaults
-    assert Aikido.Schema.defaults(schema) == %{enabled: false}
-    assert {:ok, %{enabled: false, value: nil}} = Aikido.Schema.cast(schema, %{})
+    assert {:ok, %{enabled: false, value: nil}} = schema.new(%{})
   end
 
   test "Ash evaluates function and MFA defaults on each construction and preserves explicit nil" do
     schema = AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults
-    assert {:ok, first} = Aikido.Schema.cast(schema, %{})
-    assert {:ok, second} = Aikido.Schema.cast(schema, %{token: nil})
+    assert {:ok, first} = Ash.Type.cast_input(schema, %{})
+    assert {:ok, second} = Ash.Type.cast_input(schema, %{token: nil})
     assert is_binary(first.token)
     assert second.token == nil
     assert is_integer(first.time)
@@ -114,26 +116,31 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
 
   test "nested Ash fields apply defaults before casting" do
     schema = AikidoTest.Agent.SchemaCoverageTest.NestedDefaults
-    assert {:ok, %{nested: %{count: 3}}} = Aikido.Schema.cast(schema, %{})
+    assert {:ok, %{nested: %{count: 3}}} = schema.new(%{})
   end
 
   test "array constraints apply to each value" do
     schema = [values: [type: {:array, :integer}, constraints: [items: [min: 0]]]]
-    assert {:ok, %{values: [1, 2]}} = Aikido.Schema.cast(schema, %{values: ["1", "2"]})
-    assert {:error, _} = Aikido.Schema.cast(schema, %{values: [-1]})
+
+    assert {:ok, %{values: [1, 2]}} =
+             Ash.Type.apply_constraints(:map, %{values: ["1", "2"]}, fields: schema)
+
+    assert {:error, _} = Ash.Type.apply_constraints(:map, %{values: [-1]}, fields: schema)
   end
 
   test "typed struct casting returns the declared struct" do
     assert {:ok, %Aikido.Directives.Schedule{delay_ms: 1}} =
-             Aikido.Schema.cast(Aikido.Directives.Schedule, %{delay_ms: "1", message: :tick})
+             Aikido.Directives.Schedule.new(%{delay_ms: "1", message: :tick})
 
     assert {:error, _} =
-             Aikido.Schema.cast(Aikido.Directives.Schedule, %{delay_ms: -1, message: :tick})
+             Aikido.Directives.Schedule.new(%{delay_ms: -1, message: :tick})
   end
 
   test "required Ash strings reject values cast to nil" do
     assert {:error, _} =
-             Aikido.Schema.cast([name: [type: :string, allow_nil?: false]], %{name: ""})
+             Ash.Type.apply_constraints(:map, %{name: ""},
+               fields: [name: [type: :string, allow_nil?: false]]
+             )
   end
 
   test "tool conversion uses Ash casting without accepting numeric suffixes" do
@@ -150,17 +157,6 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
              )
 
     assert error =~ "count"
-  end
-
-  test "explicit normalization preserves tagged errors" do
-    assert {:ok, %{}} = Aikido.Schema.transform(%{}, nil)
-
-    assert {:error, :invalid_config} =
-             Aikido.Schema.transform(%{}, {__MODULE__, :reject_config, []})
-  end
-
-  def reject_config(_value, _context) do
-    {:error, :invalid_config}
   end
 
   test "JSON tool schemas retain Ash constraints and enum choices" do

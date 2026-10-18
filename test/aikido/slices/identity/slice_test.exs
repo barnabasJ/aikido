@@ -44,8 +44,10 @@ defmodule AikidoTest.Identity.SliceTest do
     end
 
     test "schema is bound to Aikido.Slices.Identity.schema/0" do
-      assert Aikido.Schema.keys(Aikido.Dsl.Slice.Info.schema(Aikido.Slices.Identity)) ==
-               Aikido.Schema.keys(Aikido.Slices.Identity)
+      assert Ash.Resource.Info.attribute_names(
+               Aikido.Dsl.Slice.Info.schema(Aikido.Slices.Identity)
+             ) ==
+               Ash.Resource.Info.attribute_names(Aikido.Slices.Identity)
     end
 
     test "exposes one signal route per action" do

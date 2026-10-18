@@ -121,7 +121,7 @@ defmodule Aikido.Dsl.SensorTest do
     test "schema/1 round-trips a Ash field contract" do
       schema = Aikido.Dsl.Sensor.Info.schema(Aikido.Dsl.SensorTest.FullSensor)
       assert Ash.Type.ash_type?(schema)
-      assert {:ok, %{interval: 5000}} = Aikido.Schema.cast(schema, %{interval: 5000})
+      assert {:ok, %{interval: 5000}} = Ash.Type.cast_input(schema, %{interval: 5000})
     end
 
     test "schema/1 returns nil when omitted" do
@@ -129,8 +129,8 @@ defmodule Aikido.Dsl.SensorTest do
     end
 
     test "Spark.Dsl.is?(mod, Aikido.Sensor) is true for sensor modules" do
-      assert Spark.Dsl.is?(Aikido.Dsl.SensorTest.FullSensor, Aikido.Sensor)
-      assert Spark.Dsl.is?(Aikido.Dsl.SensorTest.MinimalSensor, Aikido.Sensor)
+      assert Aikido.Dsl.Sensor in Spark.extensions(Aikido.Dsl.SensorTest.FullSensor)
+      assert Aikido.Dsl.Sensor in Spark.extensions(Aikido.Dsl.SensorTest.MinimalSensor)
     end
   end
 
