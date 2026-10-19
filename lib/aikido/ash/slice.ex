@@ -71,8 +71,6 @@ defmodule Aikido.Ash.Slice do
   }
   @schedules %Spark.Dsl.Section{name: :schedules, entities: [@schedule]}
   use Spark.Dsl.Extension,
-    sections:
-      [@slice, @schedules] ++
-        Enum.filter(Aikido.Dsl.Slice.sections(), &(&1.name in [:capabilities, :requires])),
+    sections: [@slice, @schedules],
     transformers: [Aikido.Ash.Transformers.Slice]
 end

@@ -177,7 +177,7 @@ end
       on_exit(fn -> unload_module(module) end)
 
       agent =
-        AikidoTest.InstanceTest.RedisTestAgent.new(id: "redis-instance-agent")
+        AikidoTest.InstanceTest.RedisTestAgent.initialize!(%{id: "redis-instance-agent"})
         |> then(fn agent ->
           %{agent | state: %{agent.state | domain: %{agent.state.domain | counter: 42}}}
         end)
@@ -204,13 +204,13 @@ end
       on_exit(fn -> unload_module(module) end)
 
       unpartitioned =
-        AikidoTest.InstanceTest.RedisTestAgent.new(id: "shared-partition-key")
+        AikidoTest.InstanceTest.RedisTestAgent.initialize!(%{id: "shared-partition-key"})
         |> then(fn agent ->
           %{agent | state: %{agent.state | domain: %{agent.state.domain | counter: 10}}}
         end)
 
       partitioned =
-        AikidoTest.InstanceTest.RedisTestAgent.new(id: "shared-partition-key")
+        AikidoTest.InstanceTest.RedisTestAgent.initialize!(%{id: "shared-partition-key"})
         |> then(fn agent ->
           %{
             agent

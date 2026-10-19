@@ -27,7 +27,7 @@ end
 defmodule AikidoTest.SignalCtxTest do
   @moduledoc """
   Tests for `Aikido.SignalCtx` helpers and end-to-end ctx delivery into the
-  action's `run/4` callback via `Aikido.Exec.run/*`.
+  native Ash action implementation.
   """
   use ExUnit.Case, async: true
 
@@ -80,25 +80,35 @@ defmodule AikidoTest.SignalCtxTest do
     end
   end
 
-  describe("ctx delivery into action.run/4") do
+  describe("context delivery into native actions") do
     (
       nil
       nil
     )
 
-    test "Aikido.Exec.run delivers signal ctx to the action's ctx arg" do
+    test "native action receives the signal context" do
       {:ok, sig} = Jido.Signal.new("trace_probe", %{}, source: "/test")
 
       sig =
         sig |> Aikido.SignalCtx.put(:trace_id, "abc-123") |> Aikido.SignalCtx.put(:user, "alice")
 
       assert {:ok, %{trace_id: "abc-123", user: "alice"}, []} =
-               Aikido.Exec.run(AikidoTest.SignalCtxTest.TraceProbe, %{}, %{signal: sig})
+               AikidoTest.NativeAction.run(
+                 AikidoTest.SignalCtxTest.TraceProbe,
+                 sig,
+                 %{},
+                 Aikido.SignalCtx.ctx(sig)
+               )
     end
 
     test "without an explicit signal, ctx defaults to %{}" do
       assert {:ok, %{trace_id: nil, user: nil}, []} =
-               Aikido.Exec.run(AikidoTest.SignalCtxTest.TraceProbe, %{}, %{})
+               AikidoTest.NativeAction.run(
+                 AikidoTest.SignalCtxTest.TraceProbe,
+                 struct!(Jido.Signal, id: nil, type: "test", source: "/test"),
+                 %{},
+                 %{}
+               )
     end
   end
 end

@@ -85,7 +85,7 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest.RestoreCount
       _ -> :ok
     end
 
-    agent = new(id: data.id)
+    agent = initialize!(%{id: data.id})
     restored_state = Map.merge(agent.state, Map.get(data, :state, %{}))
     {:ok, %{agent | state: restored_state}}
   end
@@ -454,8 +454,10 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
       end)
 
       agent =
-        AikidoTest.Integration.SchedulerDurabilityIntegrationTest.RestoreCountingAgent.new(
-          id: "restore-once-agent"
+        AikidoTest.Integration.SchedulerDurabilityIntegrationTest.RestoreCountingAgent.initialize!(
+          %{
+            id: "restore-once-agent"
+          }
         )
 
       agent = %{agent | state: %{agent.state | domain: %{agent.state.domain | counter: 41}}}

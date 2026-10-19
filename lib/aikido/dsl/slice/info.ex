@@ -6,8 +6,7 @@ defmodule Aikido.Dsl.Slice.Info do
   Spark `dsl_state`.
 
   `signal_routes/1` and `schedules/1` return route and schedule tuples;
-  `capabilities/1` returns capability names and `requires/1` returns
-  requirement tuples. `actions/1` derives the unique action targets from
+  `actions/1` derives the unique action targets from
   the route table on each call.
   """
 
@@ -62,22 +61,6 @@ defmodule Aikido.Dsl.Slice.Info do
       entry = if native_slice?(module), do: %{entry | action: {module, entry.action}}, else: entry
       schedule_tuple(entry)
     end)
-  end
-
-  @doc "Returns the capabilities provided by this slice."
-  @spec capabilities(module()) :: [atom()]
-  def capabilities(module) do
-    module
-    |> Extension.get_entities([:capabilities])
-    |> Enum.map(& &1.name)
-  end
-
-  @doc "Returns the requirements for this slice as `{kind, name}` tuples."
-  @spec requires(module()) :: [{atom(), atom() | String.t()}]
-  def requires(module) do
-    module
-    |> Extension.get_entities([:requires])
-    |> Enum.map(fn %{kind: kind, name: name} -> {kind, name} end)
   end
 
   @doc """

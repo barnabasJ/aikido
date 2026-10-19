@@ -19,6 +19,25 @@ defmodule Aikido.Ash.Transformers.Slice do
     end
 
     dsl = Enum.reduce(declared, dsl, &Transformer.add_entity(&2, [:attributes], &1))
+
+    accepted =
+      dsl
+      |> Ash.Resource.Info.attributes()
+      |> Enum.filter(& &1.writable?)
+      |> Enum.map(& &1.name)
+
+    {:ok, dsl} =
+      Ash.Resource.Builder.add_new_action(dsl, :create, :create,
+        primary?: true,
+        accept: accepted
+      )
+
+    {:ok, dsl} =
+      Ash.Resource.Builder.add_new_action(dsl, :update, :update,
+        primary?: true,
+        accept: accepted
+      )
+
     routes = Transformer.get_entities(dsl, [:slice])
     schedules = Transformer.get_entities(dsl, [:schedules])
 

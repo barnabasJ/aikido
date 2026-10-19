@@ -25,7 +25,7 @@ defmodule AikidoTest.Signal.CallTest.SilentAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.ActionResult.new(state: %{}, directives: [])
   end
 end

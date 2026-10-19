@@ -111,7 +111,6 @@ defmodule Aikido.PreparedToolsTest do
                  {Aikido.Slices.AiReact, :tools_ready},
                  signal,
                  current,
-                 %{},
                  %{}
                )
     end

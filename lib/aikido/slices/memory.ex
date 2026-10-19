@@ -102,10 +102,6 @@ defmodule Aikido.Slices.Memory do
     route "aikido.memory.append_to_space", :append_to_space
   end
 
-  capabilities do
-    capability :memory
-  end
-
   @memory_section %Spark.Dsl.Section{
     name: :memory,
     describe: "Configuration block contributed by Aikido.Slices.Memory.",

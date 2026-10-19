@@ -29,7 +29,6 @@ defmodule Aikido.Slices.AiReact.FailedTest do
         {Aikido.Slices.AiReact, :failed},
         signal("req_match", :rate_limited),
         running_slice("req_match"),
-        %{},
         %{}
       )
 
@@ -45,7 +44,6 @@ defmodule Aikido.Slices.AiReact.FailedTest do
         {Aikido.Slices.AiReact, :failed},
         signal("req_old", :anything),
         slice,
-        %{},
         %{}
       )
 
@@ -60,7 +58,6 @@ defmodule Aikido.Slices.AiReact.FailedTest do
         {Aikido.Slices.AiReact, :failed},
         signal("req_done", :late),
         slice,
-        %{},
         %{}
       )
 

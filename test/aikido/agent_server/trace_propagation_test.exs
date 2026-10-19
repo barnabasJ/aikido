@@ -2,7 +2,7 @@ defmodule AikidoTest.AgentServer.TracePropagationTest.EmitAction.Implementation 
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     signal =
       struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{value: 42}, source: "/test")
 

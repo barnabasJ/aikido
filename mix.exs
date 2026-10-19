@@ -155,7 +155,6 @@ defmodule Aikido.MixProject do
       {:crontab, "~> 1.2"},
       {:time_zone_info, "~> 0.7"},
       {:uniq, "~> 0.6.1"},
-      {:private, "~> 0.1.2"},
 
       # Development & Test Dependencies
       {:benchee, "~> 1.5", only: :dev, runtime: false},
@@ -181,7 +180,7 @@ defmodule Aikido.MixProject do
   defp aliases do
     dsl_extensions =
       Enum.join(
-        ~w(Aikido.Dsl.Agent Aikido.Dsl.Slice Aikido.Dsl.Middleware
+        ~w(Aikido.Dsl.Agent Aikido.Dsl.Slice
            Aikido.Dsl.Instance Aikido.Ash.Agent Aikido.Ash.Slice
            Aikido.Ash.Team Aikido.Ash.AI Aikido.Ash.Domain Aikido.Slices.AiReact
            Aikido.Slices.Memory Aikido.Slices.Identity Aikido.Slices.Thread Ash.TypedStruct.Dsl),

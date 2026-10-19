@@ -2,7 +2,7 @@
 
 ## Intent
 Build reliable multi-agent systems by keeping decision logic pure and runtime effects explicit.
-<!-- package.aikido.pure_cmd package.aikido.runtime_separation -->
+<!-- package.aikido.pure_actions package.aikido.runtime_separation -->
 
 ## The Bright Line
 - **Actions are pure.** They return the next state and directives and must never perform side effects. The action's return value is the **sole channel** for `agent.state` writes.
@@ -12,7 +12,7 @@ Build reliable multi-agent systems by keeping decision logic pure and runtime ef
 Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/effect separation rules in this file are canonical.
 
 ## Core Contracts
-- Treat `cmd/2` as the core agent contract: `{updated_agent, directives}`.
+- Define reducers as native Ash actions returning `Aikido.ActionResult`.
 - Keep agent logic pure. Actions must not send messages, perform network or database I/O, spawn processes, or schedule timers. Return directives for all side effects; directives never mutate state of any kind.
 - Use **Ash types** for data contracts and **Spark.Options** for DSL/configuration validation.
 - Preserve tagged tuple and structured error contracts at public boundaries.
@@ -22,10 +22,10 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Author actions for domain behavior; let agents orchestrate state + directive emission.
 - Use `Directive.SpawnAgent` / `Directive.StopChild` for hierarchy, not ad-hoc child tracking.
 - Use signals for cross-agent communication instead of direct process coupling.
-- Keep slice capabilities isolated and composable.
+- Keep slice state and actions isolated and composable.
 
 ## QA Patterns
-- Start with pure `cmd/2` tests, then add AgentServer integration tests.
+- Start with pure Ash action tests, then add AgentServer integration tests.
 - Use `AikidoTest.Case`, subscription helpers and process monitors for async runtime assertions.
 - Run `mix q` (`mix quality`) and coverage checks before release.
 

@@ -22,9 +22,6 @@ defmodule AikidoTest.SliceTest.FullSlice do
   slice do
     name "full"
     description "A test slice"
-    category "test"
-    vsn "0.1.0"
-    tags ["a", "b"]
 
     schema do
       attribute :counter, :integer, allow_nil?: false, default: 0
@@ -33,14 +30,6 @@ defmodule AikidoTest.SliceTest.FullSlice do
     config_schema do
       attribute :enabled, :boolean, allow_nil?: false, default: true
     end
-  end
-
-  capabilities do
-    capability :speak
-  end
-
-  requires do
-    requires :config, :token
   end
 
   signal_routes do
@@ -114,13 +103,6 @@ defmodule AikidoTest.SliceTest do
                AikidoTest.PluginTestAction
              ]
 
-      assert Map.get(
-               Aikido.Dsl.Slice.Info.slice_options(AikidoTest.SliceTest.MinimalSlice),
-               :tags
-             ) == []
-
-      assert Aikido.Dsl.Slice.Info.capabilities(AikidoTest.SliceTest.MinimalSlice) == []
-
       assert Aikido.Dsl.Slice.Info.signal_routes(AikidoTest.SliceTest.MinimalSlice) == [
                {"minimal.noop", AikidoTest.PluginTestAction}
              ]
@@ -134,20 +116,6 @@ defmodule AikidoTest.SliceTest do
                Aikido.Dsl.Slice.Info.slice_options(AikidoTest.SliceTest.FullSlice),
                :description
              ) == "A test slice"
-
-      assert Map.get(
-               Aikido.Dsl.Slice.Info.slice_options(AikidoTest.SliceTest.FullSlice),
-               :category
-             ) == "test"
-
-      assert Map.get(Aikido.Dsl.Slice.Info.slice_options(AikidoTest.SliceTest.FullSlice), :vsn) ==
-               "0.1.0"
-
-      assert Map.get(Aikido.Dsl.Slice.Info.slice_options(AikidoTest.SliceTest.FullSlice), :tags) ==
-               ["a", "b"]
-
-      assert Aikido.Dsl.Slice.Info.capabilities(AikidoTest.SliceTest.FullSlice) == [:speak]
-      assert Aikido.Dsl.Slice.Info.requires(AikidoTest.SliceTest.FullSlice) == [config: :token]
 
       assert Aikido.Dsl.Slice.Info.signal_routes(AikidoTest.SliceTest.FullSlice) == [
                {"send", AikidoTest.PluginTestAction}
@@ -166,7 +134,7 @@ defmodule AikidoTest.SliceTest do
     nil
 
     test "Agent.new/1 seeds slice state from the schema's defaults" do
-      agent = AikidoTest.SliceTest.SchemaAgent.new()
+      agent = AikidoTest.SliceTest.SchemaAgent.initialize!()
       assert agent.state.schema == %{counter: 0}
     end
 
@@ -184,7 +152,7 @@ defmodule AikidoTest.SliceTest do
         end
       end
 
-      agent = AikidoTest.SliceTest.SchemaAgentConfigured.new()
+      agent = AikidoTest.SliceTest.SchemaAgentConfigured.initialize!()
       assert agent.state.schema == %{counter: 42}
     end
   end

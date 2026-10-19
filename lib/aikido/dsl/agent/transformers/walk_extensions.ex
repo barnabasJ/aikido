@@ -6,7 +6,7 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
     * `:slice_instances` — bare-slice mounts (`use Aikido.Slice` modules).
     * `:middleware_list` — ordered middleware (from `middleware: […]`).
     * `:slice_paths_for_action` — compile-time lookup
-      `%{action_module => [mount_path, …]}` so `cmd/2` can fan an
+      `%{action_module => [mount_path, …]}` so AgentServer can fan an
       action's return value out across every mount that owns it.
       Multi-instance mounts of the same slice contribute multiple
       entries; agent-level `signal_routes` entries contribute the
@@ -76,11 +76,6 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
 
     middleware_list = Enum.map(user_middleware, &normalize_middleware!/1)
 
-    slice_pseudo_specs =
-      Enum.map(slice_instances, fn instance ->
-        %{path: instance.path, schema: SliceInfo.schema(instance.module)}
-      end)
-
     slice_paths = Enum.map(slice_instances, & &1.path)
 
     plugin_actions =
@@ -98,7 +93,6 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
       dsl_state
       |> Transformer.persist(:slice_instances, slice_instances)
       |> Transformer.persist(:middleware_list, middleware_list)
-      |> Transformer.persist(:slice_pseudo_specs, slice_pseudo_specs)
       |> Transformer.persist(:slice_paths, slice_paths)
       |> Transformer.persist(:plugin_actions, plugin_actions)
       |> Transformer.persist(:slice_paths_for_action, slice_paths_for_action)

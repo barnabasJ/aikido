@@ -67,24 +67,17 @@ defmodule Aikido.Dsl.AgentOptionalPathTest do
       assert Aikido.Dsl.Agent.Info.slices(Aikido.Dsl.AgentOptionalPathTest.NoOpAgent) == []
     end
 
-    test "new/1 produces an agent with empty state and no nil-keyed entry" do
-      agent = Aikido.Dsl.AgentOptionalPathTest.NoOpAgent.new()
+    test "initialize produces an agent with empty state and no nil-keyed entry" do
+      agent = Aikido.Dsl.AgentOptionalPathTest.NoOpAgent.initialize!()
       assert %Aikido.Agent{} = agent
       assert agent.state == %{}
       refute Map.has_key?(agent.state, nil)
     end
 
-    test "new/1 with user-state preserves keys without wrapping under nil" do
-      agent = Aikido.Dsl.AgentOptionalPathTest.NoOpAgent.new(state: %{anything: 1})
+    test "initialize with user-state preserves keys without wrapping under nil" do
+      agent = Aikido.Dsl.AgentOptionalPathTest.NoOpAgent.initialize!(%{state: %{anything: 1}})
       refute Map.has_key?(agent.state, nil)
       assert agent.state[:anything] == 1
-    end
-
-    test "set/2 does not wrap flat attrs under a nil key" do
-      agent = Aikido.Dsl.AgentOptionalPathTest.NoOpAgent.new()
-      {:ok, agent} = Aikido.Dsl.AgentOptionalPathTest.NoOpAgent.set(agent, %{counter: 5})
-      refute Map.has_key?(agent.state, nil)
-      assert agent.state[:counter] == 5
     end
 
     nil
@@ -109,7 +102,7 @@ defmodule Aikido.Dsl.AgentOptionalPathTest do
     end
 
     test "the agent struct's path-related state stays free of a nil-keyed entry" do
-      agent = Aikido.Dsl.AgentOptionalPathTest.CompositionAgent.new()
+      agent = Aikido.Dsl.AgentOptionalPathTest.CompositionAgent.initialize!()
       refute Map.has_key?(agent.state, nil)
     end
   end
@@ -205,8 +198,8 @@ defmodule Aikido.Dsl.AgentOptionalPathTest do
       assert :identity in paths
     end
 
-    test "no nil-keyed state entry after new/1" do
-      agent = Aikido.Dsl.AgentOptionalPathTest.PathLessWithDefaults.new()
+    test "no nil-keyed state entry after initialization" do
+      agent = Aikido.Dsl.AgentOptionalPathTest.PathLessWithDefaults.initialize!()
       refute Map.has_key?(agent.state, nil)
     end
   end

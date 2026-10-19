@@ -22,13 +22,6 @@ defmodule AikidoTest.Memory.SliceTest do
       assert Map.get(Aikido.Dsl.Slice.Info.slice_options(Aikido.Slices.Memory), :name) == "memory"
     end
 
-    test "path is :memory" do
-    end
-
-    test "has memory capability" do
-      assert :memory in Aikido.Dsl.Slice.Info.capabilities(Aikido.Slices.Memory)
-    end
-
     test "exposes the eight Aikido.Slices.Memory.* modules via actions/1" do
       action_set = MapSet.new(Aikido.Dsl.Slice.Info.actions(Aikido.Slices.Memory))
 
@@ -114,10 +107,11 @@ defmodule AikidoTest.Memory.SliceTest do
     end
 
     test "memory can be attached after creation via Ensure action" do
-      agent = AikidoTest.Memory.SliceTest.AgentWithMemory.new()
+      agent = AikidoTest.Memory.SliceTest.AgentWithMemory.initialize!()
 
       {:ok, agent, []} =
-        AikidoTest.Memory.SliceTest.AgentWithMemory.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Memory.SliceTest.AgentWithMemory,
           agent,
           {{Aikido.Slices.Memory, :ensure}, %{}}
         )
@@ -126,10 +120,11 @@ defmodule AikidoTest.Memory.SliceTest do
     end
 
     test "PutInSpace action mutates agent.state.memory.spaces[:world]" do
-      agent = AikidoTest.Memory.SliceTest.AgentWithMemory.new()
+      agent = AikidoTest.Memory.SliceTest.AgentWithMemory.initialize!()
 
       {:ok, agent, []} =
-        AikidoTest.Memory.SliceTest.AgentWithMemory.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Memory.SliceTest.AgentWithMemory,
           agent,
           {{Aikido.Slices.Memory, :put_in_space}, %{space: :world, key: :temperature, value: 22}}
         )

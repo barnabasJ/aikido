@@ -136,7 +136,7 @@ defmodule AikidoTest.AshTest do
   test "resource agents reuse their attributes without a generated schema resource" do
     runtime = AikidoTest.AshFixtures.Counter.__aikido_runtime__()
     schema = Spark.Dsl.Extension.get_opt(runtime, [:agent], :schema)
-    assert schema == AikidoTest.AshFixtures.Counter
+    assert schema == runtime
     assert Ash.Resource.Info.attribute(schema, :count).type == Ash.Type.Integer
 
     assert {:ok, record} =
@@ -337,7 +337,7 @@ defmodule AikidoTest.AshTest do
 
   test "scheduled-only Ash actions mutate their mounted slice" do
     runtime = AikidoTest.AshFixtures.Composed.__aikido_runtime__()
-    agent = runtime.new()
+    agent = runtime.initialize!()
 
     signal =
       Jido.Signal.new!("aikido.ash.schedule.ash_counter_slice.tick", %{amount: 4},
@@ -345,7 +345,8 @@ defmodule AikidoTest.AshTest do
       )
 
     assert {:ok, updated, []} =
-             runtime.cmd(
+             AikidoTest.NativeAction.apply(
+               runtime,
                agent,
                {{AikidoTest.AshFixtures.CounterSlice, :tick}, %{amount: 4}},
                input_signal: signal
@@ -361,12 +362,11 @@ defmodule AikidoTest.AshTest do
     state = %{count: 2}
 
     assert {:ok, %{count: 5}, []} =
-             Aikido.Exec.run(
+             AikidoTest.NativeAction.run(
                {AikidoTest.AshFixtures.CounterSlice, :increment},
-               signal.data,
-               %{signal: signal, state: state},
-               timeout: 0,
-               telemetry: :silent
+               signal,
+               state,
+               %{}
              )
 
     assert state == %{count: 2}

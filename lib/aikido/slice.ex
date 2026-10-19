@@ -41,11 +41,9 @@ defmodule Aikido.Slice do
   ## Sections
 
   - `slice do … end` — slice identity (`name`, `description`,
-    `category`, `vsn`, `otp_app`, `schema`, `config_schema`, `tags`).
+    `otp_app`, `schema`, `config_schema`).
   - `signal_routes do … end` — `route "type", Action, opts` entries.
   - `schedules do … end` — `schedule "cron", Action, %{data}` entries.
-  - `capabilities do … end` — `capability :name` entries.
-  - `requires do … end` — `requires :kind, :name` entries.
 
   Declare reducers in the native `actions do … end` section. Implement them
   with `Ash.Resource.Actions.Implementation` and return directives for I/O.
@@ -69,19 +67,6 @@ defmodule Aikido.Slice do
 
       _ ->
         {:ok, name}
-    end
-  end
-
-  @doc false
-  @spec validate_slice_actions([module()], keyword()) ::
-          {:ok, [module()]} | {:error, String.t()}
-  def validate_slice_actions(actions, _opts \\ []) do
-    case Aikido.Util.validate_actions(actions, []) do
-      {:error, %{message: message}} when is_binary(message) ->
-        {:error, message}
-
-      _ ->
-        {:ok, actions}
     end
   end
 end

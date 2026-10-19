@@ -53,14 +53,14 @@ defmodule Aikido.Igniter.Templates do
       alias Aikido.Dsl.Agent.Info, as: AgentInfo
       alias #{module}
 
-      describe "new/1" do
+      describe "initialize" do
         test "creates agent with default state" do
-          agent = #{alias_name}.new()
+          agent = #{alias_name}.initialize!()
           assert agent.name == Map.get(AgentInfo.agent_options(#{alias_name}), :name)
         end
 
         test "creates agent with custom id" do
-          agent = #{alias_name}.new(id: "custom-id")
+          agent = #{alias_name}.initialize!(%{id: "custom-id"})
           assert agent.id == "custom-id"
         end
       end

@@ -2,7 +2,7 @@ defmodule AikidoTest.PluginTestAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.ActionResult.new(state: %{}, directives: [])
   end
 end
@@ -158,7 +158,7 @@ defmodule AikidoTest.TestActions.EmitAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     signal = %{type: "test.emitted", data: %{value: 42}}
     Aikido.ActionResult.new(state: %{emitted: true}, directives: [Aikido.Directives.emit(signal)])
   end
@@ -181,7 +181,7 @@ defmodule AikidoTest.TestActions.MultiEffectAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     effects = [
       Aikido.Directives.emit(%{type: "event.1"}),
       Aikido.Directives.schedule(1000, :check)
@@ -208,7 +208,7 @@ defmodule AikidoTest.TestActions.MultiSliceAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.ActionResult.new(
       state: %Aikido.Agent.SliceUpdate{
         slices: %{domain: %{primary: "result"}, audit: %{last_event: :touched}}

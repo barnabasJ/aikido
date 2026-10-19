@@ -117,18 +117,19 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
        slice).
 
   Steps 2 and 3 yield a single-element list so the runtime fan-out fold
-  in `__run_instruction__` is uniform across single-mount and
+  in the native action pipeline is uniform across single-mount and
   multi-mount cases.
   """
   use ExUnit.Case, async: true
 
   describe("slice that routes to the action wins") do
     test "BumpAction (in CounterSlice's signal_routes) writes to :counter, not :domain" do
-      agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.new()
+      agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.initialize!()
       assert agent.state.counter == %{count: 0}
 
       {:ok, agent, _dirs} =
-        Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent,
           agent,
           Aikido.Dsl.SlicePathResolutionTest.BumpAction
         )
@@ -147,10 +148,11 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
 
   describe("explicit slice ownership") do
     test "EscapeAction writes to the counter slice that declares its route" do
-      agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.new()
+      agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.initialize!()
 
       {:ok, agent, _dirs} =
-        Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent,
           agent,
           Aikido.Dsl.SlicePathResolutionTest.EscapeAction
         )
@@ -171,10 +173,11 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
 
   describe("fall back to agent's own path") do
     test "UnboundAction (no slice routes, no own path) writes to the agent's :domain slice" do
-      agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.new()
+      agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.initialize!()
 
       {:ok, agent, _dirs} =
-        Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent,
           agent,
           Aikido.Dsl.SlicePathResolutionTest.UnboundAction
         )

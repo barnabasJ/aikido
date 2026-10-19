@@ -27,7 +27,12 @@ defmodule AikidoTest.Integration.HibernateThawTest do
   describe("basic round-trip: create agent → hibernate → thaw → verify") do
     test "agent id is preserved after hibernate/thaw" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "basic-roundtrip-1")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{
+          id: "basic-roundtrip-1"
+        })
+
       :ok = Aikido.Persist.hibernate(aikido, agent)
 
       {:ok, thawed} =
@@ -42,7 +47,12 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "agent module metadata is preserved" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "basic-roundtrip-2")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{
+          id: "basic-roundtrip-2"
+        })
+
       :ok = Aikido.Persist.hibernate(aikido, agent)
 
       {:ok, thawed} =
@@ -58,7 +68,12 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "default state values are preserved" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "basic-roundtrip-3")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{
+          id: "basic-roundtrip-3"
+        })
+
       :ok = Aikido.Persist.hibernate(aikido, agent)
 
       {:ok, thawed} =
@@ -79,16 +94,20 @@ defmodule AikidoTest.Integration.HibernateThawTest do
   ) do
     test "thread is restored with correct id" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "thread-test-1")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "thread-test-1"})
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :ensure}, %{id: "thread-for-agent-1"}}
         )
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :append},
            %{entry: %{kind: :message, payload: %{content: "hello"}}}}
@@ -109,16 +128,20 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "thread rev matches entry count" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "thread-test-2")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "thread-test-2"})
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :ensure}, %{id: "thread-rev-test"}}
         )
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :append},
            %{
@@ -146,16 +169,20 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "entry seq numbers are correct and ordered" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "thread-test-3")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "thread-test-3"})
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :ensure}, %{id: "seq-test-thread"}}
         )
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :append},
            %{
@@ -188,16 +215,20 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "entry payloads are preserved" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "thread-test-4")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "thread-test-4"})
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :ensure}, %{id: "payload-test-thread"}}
         )
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :append},
            %{entry: %{kind: :message, payload: %{complex: %{nested: "data"}, list: [1, 2, 3]}}}}
@@ -222,7 +253,10 @@ defmodule AikidoTest.Integration.HibernateThawTest do
   describe("state mutations: create → modify state → hibernate → thaw → verify state") do
     test "modified step value is preserved" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "state-mut-1")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "state-mut-1"})
+
       agent = %{agent | state: %{agent.state | domain: %{agent.state.domain | step: 5}}}
       :ok = Aikido.Persist.hibernate(aikido, agent)
 
@@ -238,7 +272,9 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "modified status value is preserved" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "state-mut-2")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "state-mut-2"})
 
       agent = %{
         agent
@@ -259,7 +295,9 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "modified data map is preserved" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "state-mut-3")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "state-mut-3"})
 
       agent = %{
         agent
@@ -283,7 +321,9 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "all state fields are preserved together" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "state-mut-4")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "state-mut-4"})
 
       agent = %{
         agent
@@ -316,21 +356,25 @@ defmodule AikidoTest.Integration.HibernateThawTest do
   describe("multiple agents: hibernate/thaw multiple agents with different IDs") do
     test "multiple agents can be hibernated and thawed independently" do
       aikido = create_aikido_instance(unique_table())
-      agent1 = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "multi-agent-1")
+
+      agent1 =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "multi-agent-1"})
 
       agent1 = %{
         agent1
         | state: %{agent1.state | domain: %{agent1.state.domain | step: 1, status: :first}}
       }
 
-      agent2 = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "multi-agent-2")
+      agent2 =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "multi-agent-2"})
 
       agent2 = %{
         agent2
         | state: %{agent2.state | domain: %{agent2.state.domain | step: 2, status: :second}}
       }
 
-      agent3 = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "multi-agent-3")
+      agent3 =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "multi-agent-3"})
 
       agent3 = %{
         agent3
@@ -375,30 +419,41 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "multiple agents with threads can be hibernated and thawed independently" do
       aikido = create_aikido_instance(unique_table())
-      agent1 = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "multi-thread-1")
+
+      agent1 =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{
+          id: "multi-thread-1"
+        })
 
       {:ok, agent1, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent1,
           {{Aikido.Slices.Thread, :ensure}, %{id: "thread-multi-1"}}
         )
 
       {:ok, agent1, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent1,
           {{Aikido.Slices.Thread, :append}, %{entry: %{kind: :note, payload: %{text: "agent1"}}}}
         )
 
-      agent2 = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "multi-thread-2")
+      agent2 =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{
+          id: "multi-thread-2"
+        })
 
       {:ok, agent2, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent2,
           {{Aikido.Slices.Thread, :ensure}, %{id: "thread-multi-2"}}
         )
 
       {:ok, agent2, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent2,
           {{Aikido.Slices.Thread, :append}, %{entry: %{kind: :note, payload: %{text: "agent2"}}}}
         )
@@ -430,7 +485,7 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "thawing nonexistent agent returns {:error, :not_found}" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "exists")
+      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "exists"})
       :ok = Aikido.Persist.hibernate(aikido, agent)
 
       assert {:error, :not_found} =
@@ -447,7 +502,9 @@ defmodule AikidoTest.Integration.HibernateThawTest do
   ) do
     test "second hibernate overwrites first checkpoint" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "overwrite-1")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "overwrite-1"})
 
       agent_v1 = %{
         agent
@@ -476,7 +533,10 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "thaw → modify → hibernate → thaw preserves modifications" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "overwrite-2")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "overwrite-2"})
+
       agent = %{agent | state: %{agent.state | domain: %{agent.state.domain | step: 1}}}
       :ok = Aikido.Persist.hibernate(aikido, agent)
 
@@ -509,16 +569,20 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "thread updates are preserved on re-hibernate" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "overwrite-3")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "overwrite-3"})
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :ensure}, %{id: "overwrite-thread"}}
         )
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :append},
            %{entry: %{kind: :message, payload: %{content: "first"}}}}
@@ -536,7 +600,8 @@ defmodule AikidoTest.Integration.HibernateThawTest do
       assert Aikido.Slices.Thread.entry_count(thawed1.state[:thread]) == 1
 
       {:ok, updated, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           thawed1,
           {{Aikido.Slices.Thread, :append},
            %{
@@ -566,16 +631,20 @@ defmodule AikidoTest.Integration.HibernateThawTest do
     test "checkpoint never contains full Thread struct, only pointer" do
       table = unique_table()
       aikido = create_aikido_instance(table)
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "invariant-1")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "invariant-1"})
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :ensure}, %{id: "invariant-thread"}}
         )
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :append},
            %{entry: %{kind: :message, payload: %{content: "test"}}}}
@@ -597,7 +666,10 @@ defmodule AikidoTest.Integration.HibernateThawTest do
     test "agent.id is preserved exactly" do
       aikido = create_aikido_instance(unique_table())
       original_id = "exact-id-preservation-test-#{System.unique_integer([:positive])}"
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: original_id)
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: original_id})
+
       :ok = Aikido.Persist.hibernate(aikido, agent)
 
       {:ok, thawed} =
@@ -612,16 +684,20 @@ defmodule AikidoTest.Integration.HibernateThawTest do
 
     test "thread entries preserve kind field" do
       aikido = create_aikido_instance(unique_table())
-      agent = AikidoTest.Integration.HibernateThawTest.WorkflowAgent.new(id: "kind-test")
+
+      agent =
+        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.initialize!(%{id: "kind-test"})
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :ensure}, %{id: "kind-test-thread"}}
         )
 
       {:ok, agent, []} =
-        AikidoTest.Integration.HibernateThawTest.WorkflowAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Integration.HibernateThawTest.WorkflowAgent,
           agent,
           {{Aikido.Slices.Thread, :append},
            %{

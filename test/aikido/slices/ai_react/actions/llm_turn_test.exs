@@ -42,7 +42,6 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
           {Aikido.Slices.AiReact, :llm_turn},
           signal("req_1", final_turn("42")),
           running_slice(),
-          %{},
           %{}
         )
 
@@ -64,7 +63,6 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
           {Aikido.Slices.AiReact, :llm_turn},
           signal("req_1", tool_turn(calls)),
           running_slice(),
-          %{},
           %{}
         )
 
@@ -92,7 +90,6 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
           {Aikido.Slices.AiReact, :llm_turn},
           signal("req_1", tool_turn(calls)),
           running_slice(),
-          %{},
           %{}
         )
 
@@ -110,7 +107,6 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
           {Aikido.Slices.AiReact, :llm_turn},
           signal("req_1", tool_turn(calls)),
           slice,
-          %{},
           %{}
         )
 
@@ -130,7 +126,6 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
           {Aikido.Slices.AiReact, :llm_turn},
           signal("req_old", final_turn("ignored")),
           slice,
-          %{},
           %{}
         )
 
@@ -145,7 +140,6 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
           {Aikido.Slices.AiReact, :llm_turn},
           signal("req_1", final_turn("ignored")),
           slice,
-          %{},
           %{}
         )
 

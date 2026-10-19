@@ -2,22 +2,18 @@ defmodule Aikido.Dsl.Slice do
   @moduledoc """
   Spark DSL extension for `Aikido.Slice`.
 
-  Defines five host-owned sections:
+  Defines three host-owned sections:
 
     * `slice do … end` — slice identity (`name`, `path`, `description`,
-      `category`, `vsn`, `otp_app`, `schema`, `config_schema`, `tags`).
+      `otp_app`, `schema`, `config_schema`).
     * `signal_routes do … end` — `route "type", Action, opts` entries.
     * `schedules do … end` — `schedule "cron", Action, %{data}` entries.
-    * `capabilities do … end` — `capability :name` entries.
-    * `requires do … end` — `requires :kind, :name` entries.
 
   Introspection happens through `Aikido.Dsl.Slice.Info`, which reads each
   field (and the derived `actions/1`) from the slice's Spark
   `dsl_state`.
   """
 
-  alias Aikido.Slice.CapabilityEntry
-  alias Aikido.Slice.RequiresEntry
   alias Aikido.Slice.RouteEntry
   alias Aikido.Slice.ScheduleEntry
 
@@ -35,12 +31,9 @@ defmodule Aikido.Dsl.Slice do
         doc: "Slice name (letters, numbers, underscores)."
       ],
       description: [type: :string],
-      category: [type: :string],
-      vsn: [type: :string],
       otp_app: [type: :atom],
       state_transform: [type: :mfa],
-      config_transform: [type: :mfa],
-      tags: [type: {:list, :string}, default: []]
+      config_transform: [type: :mfa]
     ]
   }
 
@@ -88,44 +81,11 @@ defmodule Aikido.Dsl.Slice do
     entities: [@schedule]
   }
 
-  @capability %Spark.Dsl.Entity{
-    name: :capability,
-    describe: "Capability provided by this slice.",
-    target: CapabilityEntry,
-    args: [:name],
-    schema: [name: [type: :atom, required: true]]
-  }
-
-  @capabilities_section %Spark.Dsl.Section{
-    name: :capabilities,
-    describe: "Capabilities advertised by this slice.",
-    entities: [@capability]
-  }
-
-  @requires_entity %Spark.Dsl.Entity{
-    name: :requires,
-    describe: "Required dependency (config / app / plugin / slice).",
-    target: RequiresEntry,
-    args: [:kind, :name],
-    schema: [
-      kind: [type: {:in, [:config, :app, :plugin, :slice]}, required: true],
-      name: [type: {:or, [:atom, :string]}, required: true]
-    ]
-  }
-
-  @requires_section %Spark.Dsl.Section{
-    name: :requires,
-    describe: "Dependencies required by this slice.",
-    entities: [@requires_entity]
-  }
-
   use Spark.Dsl.Extension,
     sections: [
       @slice_section,
       @signal_routes_section,
-      @schedules_section,
-      @capabilities_section,
-      @requires_section
+      @schedules_section
     ],
     transformers: [Aikido.Dsl.Transformers.Attributes],
     verifiers: [Aikido.Dsl.Slice.Verifiers.HasSchemaAndRoutes]

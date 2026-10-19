@@ -6,6 +6,18 @@
 
 ### Changed
 
+- Replace generated agent constructors, setters and whole-agent validators with
+  a configured native initialization action and Ash code interface. Embedded
+  resource create/update actions own defaults, casting and validation.
+
+- Dispatch signals directly to native Ash actions in AgentServer. Remove the
+  generated agent command API, custom instructions, executor and RunInstruction
+  directive. Keep state transitions atomic and execute effects after success.
+
+- Remove unused slice capabilities and requirements, middleware DSL metadata,
+  agent/slice categories, tags and versions, inactive command/strategy telemetry,
+  and helpers without runtime consumers. Middleware remains a plain behaviour.
+
 - Replace repeated-check test helpers with subscriptions, process monitors and
   lifecycle events, including AgentServer readiness telemetry. Document completion
   waits through `AgentServer.call_until/5`.

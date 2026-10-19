@@ -20,6 +20,17 @@ delivery, database writes, model requests and process creation; the runtime
 executes them after applying the action result.
 The resource DSL generates the internal agent modules; consumers call the domain.
 
+Internal agent hosts expose an `:initialize` generic action implemented by
+`Aikido.Agent.Initialize`, configured by the transformer with the state path
+and slice mounts. It creates embedded resource values through native Ash create
+actions. Its native code interface accepts a parameter map, such as
+`MyAgent.initialize!(%{id: "example", state: %{count: 1}})`.
+
+Embedded resources also expose an update action for typed attribute changes.
+Use `Ash.Changeset.for_create/4` or `for_update/4` to validate proposed inputs
+without executing an action. There is no separate whole-agent validation API.
+Commands to running agents continue to use the public domain's signal actions.
+
 ## An agent resource
 
 Start a Aikido instance in your application supervision tree:

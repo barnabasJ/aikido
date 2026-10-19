@@ -63,11 +63,11 @@ defmodule Aikido.AI.Execution do
         []
       )
 
-    if Aikido.Exec.Retry.should_retry?(result, number, Keyword.get(opts, :retries, 0), []) &&
+    if number < Keyword.get(opts, :retries, 0) && Aikido.Error.retryable?(result) &&
          match?({:error, _}, result) && now() < deadline && result != {:error, :cancelled} do
       delay =
         min(
-          Aikido.Exec.Retry.calculate_backoff(number, Keyword.get(opts, :backoff, 200)),
+          min(round(Keyword.get(opts, :backoff, 200) * :math.pow(2, number)), 30_000),
           max(deadline - now(), 0)
         )
 

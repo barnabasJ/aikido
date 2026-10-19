@@ -5,16 +5,12 @@ defmodule Aikido.Dsl.Agent.Info do
   Reads the agent host's Spark `dsl_state` for the `:agent` /
   `:signal_routes` / `:schedules` sections, plus the cross-section values
   the agent's transformer pipeline persists (plugin instances, slice
-  instances, plugin actions, expanded routes, merged schema, …).
+  instances, plugin actions, expanded routes, …).
   """
 
   use Spark.InfoGenerator, extension: Aikido.Dsl.Agent, sections: [:agent]
 
   alias Spark.Dsl.Extension
-
-  @doc "Returns the merged schema (base + plugin schemas)."
-  @spec schema(module()) :: term()
-  def schema(module), do: Extension.get_persisted(module, :merged_schema, [])
 
   @doc "Returns the middleware modules attached to this agent."
   @spec middleware(module()) :: [module() | {module(), map()}]
@@ -42,17 +38,6 @@ defmodule Aikido.Dsl.Agent.Info do
   @doc "Returns the deduplicated list of action modules from all attached slices."
   @spec actions(module()) :: [module()]
   def actions(module), do: Extension.get_persisted(module, :plugin_actions, [])
-
-  @doc "Returns the union of all capabilities from all mounted slices."
-  @spec capabilities(module()) :: [atom()]
-  def capabilities(module) do
-    module
-    |> slice_instances()
-    |> Enum.flat_map(fn instance ->
-      Aikido.Dsl.Slice.Info.capabilities(instance.module)
-    end)
-    |> Enum.uniq()
-  end
 
   @doc "Returns the expanded and validated routes for this agent."
   @spec routes(module()) :: [{String.t(), module(), integer()}]
@@ -84,7 +69,7 @@ defmodule Aikido.Dsl.Agent.Info do
 
   @doc """
   Returns the compile-time `action_module => [mount_path, …]` map used by
-  `cmd/2` to fan an action out across every mount that owns it.
+  AgentServer to fan an action out across every mount that owns it.
 
   Multi-instance mounts of the same slice produce multi-element lists;
   single-mount actions are one-element lists; agent-level `signal_routes`

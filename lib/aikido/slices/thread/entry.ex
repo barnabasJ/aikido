@@ -3,7 +3,7 @@ defmodule Aikido.Slices.Thread.Entry do
   A single entry in a Thread. Typed by `kind` with kind-specific payload.
 
   Entries are immutable once appended. The `refs` map provides cross-links
-  to other Aikido primitives (signals, instructions, actions).
+  to other Aikido primitives (signals and actions).
 
   ## Entry Kinds
 
@@ -12,7 +12,6 @@ defmodule Aikido.Slices.Thread.Entry do
   - `:tool_call` - Tool execution request
   - `:tool_result` - Tool execution result
   - `:signal_in` / `:signal_out` - Signal events
-  - `:instruction_start` / `:instruction_end` - Instruction execution
   - `:note` - Human annotation
   - `:error` - Error occurred
   - `:checkpoint` - State snapshot marker
@@ -21,8 +20,7 @@ defmodule Aikido.Slices.Thread.Entry do
 
   Common ref keys (not enforced):
   - `signal_id` - Associated signal ID
-  - `instruction_id` - Associated instruction ID
-  - `action` - Action module name
+  - `action` - Native Ash action reference
   - `agent_id` - Agent ID
   - `parent_thread_id` / `child_thread_id` - Thread relationships
   """

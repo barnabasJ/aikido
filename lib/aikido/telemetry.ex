@@ -50,11 +50,6 @@ defmodule Aikido.Telemetry do
 
   ## Events
 
-  ### Agent Events
-  - `[:aikido, :agent, :cmd, :start]` - Agent command execution started
-  - `[:aikido, :agent, :cmd, :stop]` - Agent command execution completed
-  - `[:aikido, :agent, :cmd, :exception]` - Agent command execution failed
-
   ### AgentServer Events
   - `[:aikido, :agent_server, :signal, :start]` - Signal processing started
   - `[:aikido, :agent_server, :signal, :stop]` - Signal processing completed
@@ -68,16 +63,6 @@ defmodule Aikido.Telemetry do
   - `[:aikido, :agent_server, :cron, :restart_succeeded]` - Dynamic cron restart completed
   - `[:aikido, :agent_server, :cron, :persist_failure]` - Cron persistence failed
 
-  ### Strategy Events
-  - `[:aikido, :agent, :strategy, :init, :start]` - Strategy initialization started
-  - `[:aikido, :agent, :strategy, :init, :stop]` - Strategy initialization completed
-  - `[:aikido, :agent, :strategy, :init, :exception]` - Strategy initialization failed
-  - `[:aikido, :agent, :strategy, :cmd, :start]` - Strategy command execution started
-  - `[:aikido, :agent, :strategy, :cmd, :stop]` - Strategy command execution completed
-  - `[:aikido, :agent, :strategy, :cmd, :exception]` - Strategy command execution failed
-  - `[:aikido, :agent, :strategy, :tick, :start]` - Strategy tick started
-  - `[:aikido, :agent, :strategy, :tick, :stop]` - Strategy tick completed
-  - `[:aikido, :agent, :strategy, :tick, :exception]` - Strategy tick failed
   """
 
   require Logger
@@ -105,7 +90,6 @@ defmodule Aikido.Telemetry do
   @type metadata :: %{
           optional(:agent_id) => String.t(),
           optional(:agent_module) => module(),
-          optional(:strategy) => module(),
           optional(:action) => term(),
           optional(:directive_count) => non_neg_integer(),
           optional(:error) => term(),
@@ -137,18 +121,6 @@ defmodule Aikido.Telemetry do
     tag_values = &instance_tag_values/1
 
     [
-      Telemetry.Metrics.counter("aikido.agent.cmd.stop.count",
-        event_name: [:aikido, :agent, :cmd, :stop],
-        tags: [:aikido_instance],
-        tag_values: tag_values,
-        description: "Total number of agent commands executed"
-      ),
-      Telemetry.Metrics.summary("aikido.agent.cmd.stop.duration",
-        tags: [:aikido_instance],
-        tag_values: tag_values,
-        unit: {:native, :millisecond},
-        description: "Agent command duration summary"
-      ),
       Telemetry.Metrics.counter("aikido.agent_server.signal.stop.count",
         event_name: [:aikido, :agent_server, :signal, :stop],
         tags: [:aikido_instance, :signal_type],
@@ -178,18 +150,6 @@ defmodule Aikido.Telemetry do
 
   defp events do
     [
-      [:aikido, :agent, :cmd, :start],
-      [:aikido, :agent, :cmd, :stop],
-      [:aikido, :agent, :cmd, :exception],
-      [:aikido, :agent, :strategy, :init, :start],
-      [:aikido, :agent, :strategy, :init, :stop],
-      [:aikido, :agent, :strategy, :init, :exception],
-      [:aikido, :agent, :strategy, :cmd, :start],
-      [:aikido, :agent, :strategy, :cmd, :stop],
-      [:aikido, :agent, :strategy, :cmd, :exception],
-      [:aikido, :agent, :strategy, :tick, :start],
-      [:aikido, :agent, :strategy, :tick, :stop],
-      [:aikido, :agent, :strategy, :tick, :exception],
       [:aikido, :agent_server, :signal, :start],
       [:aikido, :agent_server, :signal, :stop],
       [:aikido, :agent_server, :signal, :exception],
@@ -205,187 +165,12 @@ defmodule Aikido.Telemetry do
   end
 
   @doc """
-  Handles telemetry events for agent and strategy operations.
+  Handles telemetry events for AgentServer signals, directives and schedules.
 
   Uses intelligent filtering to reduce noise while preserving actionable information.
   Events are logged based on "interestingness" criteria configured via `Aikido.Observe.Config`.
   """
   @spec handle_event(event_name(), measurements(), metadata(), config :: term()) :: :ok
-
-  # ---------------------------------------------------------------------------
-  # Agent Command Events
-  # ---------------------------------------------------------------------------
-
-  def handle_event([:aikido, :agent, :cmd, :start], _measurements, _metadata, _config) do
-    :ok
-  end
-
-  def handle_event([:aikido, :agent, :cmd, :stop], measurements, metadata, _config) do
-    instance = metadata[:aikido_instance]
-    duration = Map.get(measurements, :duration, 0)
-    duration_ms = Formatter.to_ms(duration)
-    directive_count = metadata[:directive_count] || 0
-
-    if interesting_agent_cmd?(instance, duration_ms, directive_count, metadata) do
-      Logger.debug(
-        fn ->
-          "[agent.cmd] #{format_module(metadata[:agent_module])} " <>
-            "action=#{Formatter.format_action(metadata[:action])} " <>
-            "directives=#{directive_count} " <>
-            "duration=#{Formatter.format_duration(duration)}"
-        end,
-        agent_id: metadata[:agent_id],
-        trace_id: metadata[:aikido_trace_id],
-        span_id: metadata[:aikido_span_id]
-      )
-    end
-
-    :ok
-  end
-
-  def handle_event([:aikido, :agent, :cmd, :exception], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0)
-
-    Logger.warning(
-      "[agent.cmd.error] #{format_module(metadata[:agent_module])} " <>
-        "action=#{Formatter.format_action(metadata[:action])} " <>
-        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
-        "duration=#{Formatter.format_duration(duration)}",
-      agent_id: metadata[:agent_id],
-      trace_id: metadata[:aikido_trace_id],
-      span_id: metadata[:aikido_span_id],
-      stacktrace: metadata[:stacktrace]
-    )
-  end
-
-  # ---------------------------------------------------------------------------
-  # Strategy Events
-  # ---------------------------------------------------------------------------
-
-  def handle_event([:aikido, :agent, :strategy, :init, :start], _measurements, _metadata, _config) do
-    :ok
-  end
-
-  def handle_event([:aikido, :agent, :strategy, :init, :stop], measurements, metadata, _config) do
-    instance = metadata[:aikido_instance]
-    duration = Map.get(measurements, :duration, 0)
-
-    if ObserveConfig.trace_enabled?(instance) do
-      Logger.debug(
-        fn ->
-          "[strategy.init] #{format_module(metadata[:strategy])} " <>
-            "duration=#{Formatter.format_duration(duration)}"
-        end,
-        agent_id: metadata[:agent_id],
-        trace_id: metadata[:aikido_trace_id]
-      )
-    end
-
-    :ok
-  end
-
-  def handle_event(
-        [:aikido, :agent, :strategy, :init, :exception],
-        measurements,
-        metadata,
-        _config
-      ) do
-    duration = Map.get(measurements, :duration, 0)
-
-    Logger.warning(
-      "[strategy.init.error] #{format_module(metadata[:strategy])} " <>
-        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
-        "duration=#{Formatter.format_duration(duration)}",
-      agent_id: metadata[:agent_id],
-      trace_id: metadata[:aikido_trace_id],
-      stacktrace: metadata[:stacktrace]
-    )
-  end
-
-  def handle_event([:aikido, :agent, :strategy, :cmd, :start], _measurements, _metadata, _config) do
-    :ok
-  end
-
-  def handle_event([:aikido, :agent, :strategy, :cmd, :stop], measurements, metadata, _config) do
-    instance = metadata[:aikido_instance]
-    duration = Map.get(measurements, :duration, 0)
-    duration_ms = Formatter.to_ms(duration)
-    directive_count = metadata[:directive_count] || 0
-
-    if interesting_strategy_cmd?(instance, duration_ms, directive_count) do
-      Logger.debug(
-        fn ->
-          "[strategy.cmd] #{format_module(metadata[:strategy])} " <>
-            "directives=#{directive_count} " <>
-            "duration=#{Formatter.format_duration(duration)}"
-        end,
-        agent_id: metadata[:agent_id],
-        trace_id: metadata[:aikido_trace_id]
-      )
-    end
-
-    :ok
-  end
-
-  def handle_event(
-        [:aikido, :agent, :strategy, :cmd, :exception],
-        measurements,
-        metadata,
-        _config
-      ) do
-    duration = Map.get(measurements, :duration, 0)
-
-    Logger.warning(
-      "[strategy.cmd.error] #{format_module(metadata[:strategy])} " <>
-        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
-        "duration=#{Formatter.format_duration(duration)}",
-      agent_id: metadata[:agent_id],
-      trace_id: metadata[:aikido_trace_id],
-      stacktrace: metadata[:stacktrace]
-    )
-  end
-
-  def handle_event([:aikido, :agent, :strategy, :tick, :start], _measurements, _metadata, _config) do
-    :ok
-  end
-
-  def handle_event([:aikido, :agent, :strategy, :tick, :stop], measurements, metadata, _config) do
-    instance = metadata[:aikido_instance]
-    duration = Map.get(measurements, :duration, 0)
-    duration_ms = Formatter.to_ms(duration)
-
-    # Only log slow ticks - ticks are high frequency
-    if duration_ms > ObserveConfig.slow_signal_threshold_ms(instance) do
-      Logger.debug(
-        fn ->
-          "[strategy.tick] #{format_module(metadata[:strategy])} " <>
-            "duration=#{Formatter.format_duration(duration)} (slow)"
-        end,
-        agent_id: metadata[:agent_id],
-        trace_id: metadata[:aikido_trace_id]
-      )
-    end
-
-    :ok
-  end
-
-  def handle_event(
-        [:aikido, :agent, :strategy, :tick, :exception],
-        measurements,
-        metadata,
-        _config
-      ) do
-    duration = Map.get(measurements, :duration, 0)
-
-    Logger.warning(
-      "[strategy.tick.error] #{format_module(metadata[:strategy])} " <>
-        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
-        "duration=#{Formatter.format_duration(duration)}",
-      agent_id: metadata[:agent_id],
-      trace_id: metadata[:aikido_trace_id],
-      stacktrace: metadata[:stacktrace]
-    )
-  end
 
   # ---------------------------------------------------------------------------
   # AgentServer Signal Events - The main source of log noise
@@ -608,30 +393,4 @@ defmodule Aikido.Telemetry do
 
     is_slow or has_error or is_interesting_type
   end
-
-  defp interesting_agent_cmd?(instance, duration_ms, directive_count, metadata) do
-    is_slow = duration_ms > ObserveConfig.slow_signal_threshold_ms(instance)
-    has_directives = directive_count > 0
-    has_error = metadata[:error] != nil
-
-    is_slow or has_directives or has_error
-  end
-
-  defp interesting_strategy_cmd?(instance, duration_ms, directive_count) do
-    is_slow = duration_ms > ObserveConfig.slow_signal_threshold_ms(instance)
-    has_directives = directive_count > 0
-
-    is_slow or has_directives
-  end
-
-  defp format_module(nil), do: "unknown"
-
-  defp format_module(module) when is_atom(module) do
-    case to_string(module) do
-      "Elixir." <> rest -> rest
-      other -> other
-    end
-  end
-
-  defp format_module(other), do: Formatter.safe_inspect(other, 50)
 end

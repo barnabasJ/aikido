@@ -22,13 +22,6 @@ defmodule AikidoTest.Thread.SliceTest do
       assert Map.get(Aikido.Dsl.Slice.Info.slice_options(Aikido.Slices.Thread), :name) == "thread"
     end
 
-    test "path is :thread" do
-    end
-
-    test "has thread capability" do
-      assert :thread in Aikido.Dsl.Slice.Info.capabilities(Aikido.Slices.Thread)
-    end
-
     test "exposes Thread.Actions.{Ensure,Append,Clear} via actions/1" do
       action_set = MapSet.new(Aikido.Dsl.Slice.Info.actions(Aikido.Slices.Thread))
 
@@ -121,7 +114,7 @@ defmodule AikidoTest.Thread.SliceTest do
     end
 
     test "agent.state[:thread] starts nil (lazy init)" do
-      agent = AikidoTest.Thread.SliceTest.AgentWithThread.new()
+      agent = AikidoTest.Thread.SliceTest.AgentWithThread.initialize!()
       assert Map.get(agent.state, :thread) == nil
     end
 
@@ -132,10 +125,11 @@ defmodule AikidoTest.Thread.SliceTest do
     end
 
     test "thread can be attached after creation via Ensure action" do
-      agent = AikidoTest.Thread.SliceTest.AgentWithThread.new()
+      agent = AikidoTest.Thread.SliceTest.AgentWithThread.initialize!()
 
       {:ok, agent, []} =
-        AikidoTest.Thread.SliceTest.AgentWithThread.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Thread.SliceTest.AgentWithThread,
           agent,
           {{Aikido.Slices.Thread, :ensure}, %{}}
         )
@@ -144,10 +138,11 @@ defmodule AikidoTest.Thread.SliceTest do
     end
 
     test "Append action mutates agent.state.thread" do
-      agent = AikidoTest.Thread.SliceTest.AgentWithThread.new()
+      agent = AikidoTest.Thread.SliceTest.AgentWithThread.initialize!()
 
       {:ok, agent, []} =
-        AikidoTest.Thread.SliceTest.AgentWithThread.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Thread.SliceTest.AgentWithThread,
           agent,
           {{Aikido.Slices.Thread, :append}, %{entry: %{kind: :message, payload: %{text: "hi"}}}}
         )

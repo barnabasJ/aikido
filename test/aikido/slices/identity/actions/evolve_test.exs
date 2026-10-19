@@ -14,7 +14,6 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
                  {Aikido.Slices.Identity, :evolve},
                  sig(%{days: 0, years: 0}),
                  nil,
-                 %{},
                  %{}
                )
 
@@ -29,7 +28,6 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
                  {Aikido.Slices.Identity, :evolve},
                  sig(%{days: 0, years: 5}),
                  identity,
-                 %{},
                  %{}
                )
 
@@ -44,7 +42,6 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
                  {Aikido.Slices.Identity, :evolve},
                  sig(%{days: 730, years: 0}),
                  identity,
-                 %{},
                  %{}
                )
 
@@ -59,7 +56,6 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
                  {Aikido.Slices.Identity, :evolve},
                  sig(%{days: 365, years: 3}),
                  identity,
-                 %{},
                  %{}
                )
 
@@ -75,7 +71,6 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
                  {Aikido.Slices.Identity, :evolve},
                  sig(%{days: 0, years: 1}),
                  identity,
-                 %{},
                  %{}
                )
 

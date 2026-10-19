@@ -14,7 +14,6 @@ defmodule AikidoTest.Actions.ControlTest do
           {Aikido.AgentServer.RuntimeActions, :cancel},
           sig("cancel", %{reason: :cancelled}),
           %{},
-          %{},
           %{}
         )
 
@@ -26,7 +25,6 @@ defmodule AikidoTest.Actions.ControlTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :cancel},
           sig("cancel", %{reason: :user_requested}),
-          %{},
           %{},
           %{}
         )
@@ -41,7 +39,6 @@ defmodule AikidoTest.Actions.ControlTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :noop},
           sig("noop"),
-          %{},
           %{},
           %{}
         )
@@ -59,7 +56,6 @@ defmodule AikidoTest.Actions.ControlTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :forward},
           sig("forward", data),
-          %{},
           %{},
           %{}
         )
@@ -79,7 +75,6 @@ defmodule AikidoTest.Actions.ControlTest do
           {Aikido.AgentServer.RuntimeActions, :forward},
           sig("forward", data),
           %{},
-          %{},
           %{}
         )
 
@@ -94,7 +89,6 @@ defmodule AikidoTest.Actions.ControlTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :forward},
           sig("forward", data),
-          %{},
           %{},
           %{}
         )
@@ -116,7 +110,6 @@ defmodule AikidoTest.Actions.ControlTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :broadcast},
           sig("broadcast", data),
-          %{},
           %{},
           %{}
         )
@@ -144,7 +137,6 @@ defmodule AikidoTest.Actions.ControlTest do
           {Aikido.AgentServer.RuntimeActions, :reply},
           input,
           %{},
-          %{},
           %{}
         )
 
@@ -167,7 +159,6 @@ defmodule AikidoTest.Actions.ControlTest do
           {Aikido.AgentServer.RuntimeActions, :reply},
           input,
           %{},
-          %{},
           %{}
         )
 
@@ -186,7 +177,6 @@ defmodule AikidoTest.Actions.ControlTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :reply},
           input,
-          %{},
           %{},
           %{}
         )

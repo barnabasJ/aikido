@@ -79,8 +79,7 @@ defmodule Aikido.Ash.Transformers.Agent do
 
             # Ash has already cast these attributes and applied their defaults.
             # Reuse the resource's contracts; do not create a second schema type.
-            @persist {:aikido_agent_schema, unquote(resource)}
-            @persist {:aikido_resource, unquote(resource)}
+            @persist {:aikido_runtime_attributes, unquote(Macro.escape(attributes))}
 
             @doc false
             def __aikido_resource__, do: unquote(resource)

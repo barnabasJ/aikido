@@ -244,7 +244,7 @@ defmodule Aikido.HooksTest do
     signal = Jido.Signal.new!("ai.react.cancel", %{request_id: "run"})
 
     {:ok, cancelled, []} =
-      AikidoTest.NativeAction.run({Aikido.Slices.AiReact, :cancel}, signal, waiting, %{}, %{})
+      AikidoTest.NativeAction.run({Aikido.Slices.AiReact, :cancel}, signal, waiting, %{})
 
     assert cancelled.status == :failed
 
@@ -308,7 +308,7 @@ defmodule Aikido.HooksTest do
     signal = Jido.Signal.new!("ai.react.llm.completed", %{request_id: "run", turn: turn})
 
     {:ok, unchanged, []} =
-      AikidoTest.NativeAction.run({Aikido.Slices.AiReact, :llm_turn}, signal, waiting, %{}, %{})
+      AikidoTest.NativeAction.run({Aikido.Slices.AiReact, :llm_turn}, signal, waiting, %{})
 
     assert unchanged == waiting
 

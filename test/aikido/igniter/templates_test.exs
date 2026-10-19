@@ -23,7 +23,7 @@ defmodule AikidoTest.Igniter.TemplatesTest do
       template =
         Templates.agent_test_template("MyApp.Agents.Example", "AikidoTest.Agents.Example")
 
-      assert template =~ "agent = Example.new()"
+      assert template =~ "agent = Example.initialize!()"
       assert template =~ "assert agent.name == Map.get(AgentInfo.agent_options(Example), :name)"
     end
   end

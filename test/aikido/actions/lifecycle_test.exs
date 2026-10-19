@@ -19,7 +19,6 @@ defmodule AikidoTest.Actions.LifecycleTest do
           {Aikido.AgentServer.RuntimeActions, :notify_parent},
           sig("notify_parent", data),
           %{},
-          %{},
           %{parent: parent}
         )
 
@@ -37,7 +36,6 @@ defmodule AikidoTest.Actions.LifecycleTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :notify_parent},
           sig("notify_parent", data),
-          %{},
           %{},
           %{parent: nil}
         )
@@ -63,7 +61,6 @@ defmodule AikidoTest.Actions.LifecycleTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :notify_pid},
           sig("notify_pid", data),
-          %{},
           %{},
           %{}
         )
@@ -93,7 +90,6 @@ defmodule AikidoTest.Actions.LifecycleTest do
           {Aikido.AgentServer.RuntimeActions, :notify_pid},
           sig("notify_pid", data),
           %{},
-          %{},
           %{}
         )
 
@@ -117,7 +113,6 @@ defmodule AikidoTest.Actions.LifecycleTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :spawn_child},
           sig("spawn_child", data),
-          %{},
           %{},
           %{}
         )
@@ -145,7 +140,6 @@ defmodule AikidoTest.Actions.LifecycleTest do
           {Aikido.AgentServer.RuntimeActions, :spawn_child},
           sig("spawn_child", data),
           %{},
-          %{},
           %{}
         )
 
@@ -161,7 +155,6 @@ defmodule AikidoTest.Actions.LifecycleTest do
           {Aikido.AgentServer.RuntimeActions, :stop_self},
           sig("stop_self", %{reason: :normal}),
           %{},
-          %{},
           %{}
         )
 
@@ -175,7 +168,6 @@ defmodule AikidoTest.Actions.LifecycleTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :stop_self},
           sig("stop_self", %{reason: :work_complete}),
-          %{},
           %{},
           %{}
         )
@@ -194,7 +186,6 @@ defmodule AikidoTest.Actions.LifecycleTest do
           {Aikido.AgentServer.RuntimeActions, :stop_child},
           sig("stop_child", data),
           %{},
-          %{},
           %{}
         )
 
@@ -211,7 +202,6 @@ defmodule AikidoTest.Actions.LifecycleTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :stop_child},
           sig("stop_child", data),
-          %{},
           %{},
           %{}
         )

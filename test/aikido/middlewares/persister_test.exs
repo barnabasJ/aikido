@@ -30,7 +30,7 @@ defmodule AikidoTest.Middleware.PersisterTest do
 
   describe("starting signal — thaw round-trip") do
     test "with no storage, passes through unchanged" do
-      agent = AikidoTest.Middleware.PersisterTest.TestAgent.new(id: "no-storage")
+      agent = AikidoTest.Middleware.PersisterTest.TestAgent.initialize!(%{id: "no-storage"})
       next = fn sig, c -> {:ok, Map.put(c, :ran, true), done: sig.type} end
 
       assert {:ok, new_ctx, dirs} =
@@ -46,7 +46,7 @@ defmodule AikidoTest.Middleware.PersisterTest do
     end
 
     test "with storage but no checkpoint, emits thaw.failed and continues" do
-      agent = AikidoTest.Middleware.PersisterTest.TestAgent.new(id: "missing")
+      agent = AikidoTest.Middleware.PersisterTest.TestAgent.initialize!(%{id: "missing"})
       storage = ets_storage()
       next = fn _sig, c -> {:ok, c, []} end
 
@@ -66,10 +66,10 @@ defmodule AikidoTest.Middleware.PersisterTest do
 
     test "with stored checkpoint, replaces ctx.agent with thawed copy" do
       agent =
-        AikidoTest.Middleware.PersisterTest.TestAgent.new(
+        AikidoTest.Middleware.PersisterTest.TestAgent.initialize!(%{
           id: "round-trip",
           state: %{app: %{counter: 99}}
-        )
+        })
 
       storage = ets_storage()
       assert :ok = Aikido.Persist.hibernate(storage, agent)
@@ -93,10 +93,10 @@ defmodule AikidoTest.Middleware.PersisterTest do
 
     test "passes a chain {:error, ctx, _} through verbatim with the thawed agent in ctx" do
       agent =
-        AikidoTest.Middleware.PersisterTest.TestAgent.new(
+        AikidoTest.Middleware.PersisterTest.TestAgent.initialize!(%{
           id: "round-trip-err",
           state: %{app: %{counter: 1}}
-        )
+        })
 
       storage = ets_storage()
       assert :ok = Aikido.Persist.hibernate(storage, agent)
@@ -116,7 +116,7 @@ defmodule AikidoTest.Middleware.PersisterTest do
 
   describe("stopping signal — hibernate round-trip") do
     test "with no storage, passes through unchanged" do
-      agent = AikidoTest.Middleware.PersisterTest.TestAgent.new(id: "stop-no-storage")
+      agent = AikidoTest.Middleware.PersisterTest.TestAgent.initialize!(%{id: "stop-no-storage"})
       next = fn _sig, c -> {:ok, c, []} end
 
       assert {:ok, _ctx, dirs} =
@@ -132,10 +132,10 @@ defmodule AikidoTest.Middleware.PersisterTest do
 
     test "with storage, persists agent and emits hibernate.completed" do
       agent =
-        AikidoTest.Middleware.PersisterTest.TestAgent.new(
+        AikidoTest.Middleware.PersisterTest.TestAgent.initialize!(%{
           id: "save-me",
           state: %{app: %{counter: 7}}
-        )
+        })
 
       storage = ets_storage()
       next = fn _sig, c -> {:ok, c, []} end
@@ -166,7 +166,7 @@ defmodule AikidoTest.Middleware.PersisterTest do
 
   describe("non-lifecycle signal — passthrough") do
     test "any other signal type is passed through next/2 unchanged" do
-      agent = AikidoTest.Middleware.PersisterTest.TestAgent.new(id: "passthrough")
+      agent = AikidoTest.Middleware.PersisterTest.TestAgent.initialize!(%{id: "passthrough"})
       next = fn _sig, c -> {:ok, Map.put(c, :passed, true), []} end
 
       assert {:ok, final_ctx, dirs} =

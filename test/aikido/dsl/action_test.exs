@@ -47,9 +47,7 @@ defmodule Aikido.NativeActionTest.Actions.Implementation do
       ) do
     runtime = input.context.aikido
 
-    Aikido.ActionResult.new(
-      state: Map.take(runtime, [:agent_id, :signal, :slice_config, :action_opts])
-    )
+    Aikido.ActionResult.new(state: Map.take(runtime, [:agent_id, :signal, :slice_config]))
   end
 
   @impl true
@@ -107,9 +105,18 @@ defmodule Aikido.NativeActionTest do
   use ExUnit.Case, async: true
 
   defp run(action, params \\ %{}, context \\ %{state: %{count: 2}}) do
-    Aikido.Exec.run({Aikido.NativeActionTest.Actions, action}, params, context,
-      timeout: 0,
-      telemetry: :silent
+    signal =
+      Map.get(context, :signal) ||
+        struct!(Jido.Signal, id: nil, type: "test.action", data: params, source: "/test")
+
+    signal = %{signal | data: params}
+    runtime = Map.merge(Aikido.SignalCtx.ctx(signal), Map.get(context, :ctx, %{}))
+
+    AikidoTest.NativeAction.run(
+      {Aikido.NativeActionTest.Actions, action},
+      signal,
+      Map.get(context, :state, %{}),
+      runtime
     )
   end
 
@@ -213,27 +220,20 @@ defmodule Aikido.NativeActionTest do
     assert {:ok, %Aikido.ActionResult{state: %{count: 6}}} = Ash.run_action(input)
   end
 
-  test "invalid action references return structured errors" do
-    assert {:error, %Aikido.Error.ValidationError{}} =
-             Aikido.Exec.run({Aikido.NativeActionTest.Actions, :missing}, %{}, %{}, timeout: 0)
-  end
-
   test "runtime context preserves signal and mount configuration" do
     signal = Jido.Signal.new!("native.runtime", %{})
 
     context = %{
       state: %{},
       signal: signal,
-      ctx: %{agent_id: "agent", slice_config: %{label: "mount"}},
-      action_opts: %{mode: :test}
+      ctx: %{agent_id: "agent", slice_config: %{label: "mount"}}
     }
 
     assert {:ok,
             %{
               agent_id: "agent",
               signal: ^signal,
-              slice_config: %{label: "mount"},
-              action_opts: %{mode: :test}
+              slice_config: %{label: "mount"}
             }, []} = run(:runtime, %{}, context)
   end
 end

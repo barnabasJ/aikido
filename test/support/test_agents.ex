@@ -47,34 +47,12 @@ defmodule AikidoTest.TestAgents.Basic do
   agent do
     name "basic_agent"
     description "A basic test agent"
-    category "test"
-    tags ["test", "basic"]
-    vsn "1.0.0"
     path :domain
 
     schema do
       attribute :counter, :integer, default: 0
       attribute :status, :atom, default: :idle
     end
-  end
-end
-
-defmodule AikidoTest.TestAgents.Hook do
-  @moduledoc false
-  use Aikido.Agent
-
-  agent do
-    name "hook_agent"
-    path :domain
-
-    schema do
-      attribute :counter, :integer, default: 0
-    end
-  end
-
-  def on_after_cmd(agent, _action, directives) do
-    new_agent = %{agent | state: put_in(agent.state, [:domain, :hook_called], true)}
-    {:ok, new_agent, directives}
   end
 end
 

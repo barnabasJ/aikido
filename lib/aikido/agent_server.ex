@@ -3,7 +3,7 @@ defmodule Aikido.AgentServer do
   GenServer runtime for Aikido agents.
 
   AgentServer is the "Act" side of the Aikido framework: while Agents "think"
-  (pure decision logic via `cmd/2`), AgentServer "acts" by executing the
+  (pure native Ash actions), AgentServer "acts" by executing the
   directives they emit. Signal routing happens in AgentServer, keeping
   Agents purely action-oriented.
 
@@ -35,7 +35,7 @@ defmodule Aikido.AgentServer do
   ```
   Signal → AgentServer.call/4 (or cast/3)
         → middleware chain (`on_signal/4` wrap)
-            → routing → Aikido.Agent.cmd/2 → {agent, directives}
+            → routing → Ash.run_action → {agent, directives}
         → Directives executed inline via Aikido.Directive behaviour
         → call/4 selector runs over post-pipeline state and the result
           is returned to the caller
@@ -50,7 +50,7 @@ defmodule Aikido.AgentServer do
 
   - `:aikido` - Aikido instance name for registry scoping (default: `Aikido`)
   - `:agent_module` - Agent module (required). The agent struct is always
-    constructed via `agent_module.new(id: ..., state: ...)`.
+    initialized through its native Ash `:initialize` action.
   - `:id` - Instance ID (auto-generated if not provided)
   - `:initial_state` - Initial state map for agent
   - `:registry` - Registry module (default: `Aikido.Registry`)
@@ -89,7 +89,7 @@ defmodule Aikido.AgentServer do
 
       # Subscribe before sending the command, then await its terminal state:
       selector = fn runtime ->
-        path = Aikido.Dsl.Agent.Info.path(runtime.agent_module)
+        path = Spark.Dsl.Extension.get_opt(runtime.agent_module, [:agent], :path)
         slice = Map.fetch!(runtime.agent.state, path)
 
         case slice.status do
@@ -1028,18 +1028,9 @@ defmodule Aikido.AgentServer do
   end
 
   defp build_agent(agent_module, %Options{id: id, initial_state: state}) do
-    cond do
-      function_exported?(agent_module, :new, 1) ->
-        agent_module.new(id: id, state: state)
-
-      function_exported?(agent_module, :new, 0) ->
-        agent_module.new()
-
-      true ->
-        raise Aikido.Error.validation_error(
-                "agent module #{inspect(agent_module)} does not implement new/0 or new/1"
-              )
-    end
+    agent_module
+    |> Ash.ActionInput.for_action(:initialize, %{id: id, state: state})
+    |> Ash.run_action!()
   end
 
   defp lifecycle_starting_signal(%State{} = state) do
@@ -1546,14 +1537,14 @@ defmodule Aikido.AgentServer do
     exception -> {:error, {:selector_raised, exception, __STACKTRACE__}}
   end
 
-  # Middleware chain → routing → cmd/2. The outermost middleware wraps the
-  # whole pipeline; the innermost `next` runs routing + cmd/2.
+  # Middleware chain → routing → native Ash actions. The outermost middleware wraps the
+  # whole pipeline; the innermost `next` runs routing + native Ash actions.
   #
   # The chain returns either branch with a fresh ctx; this function
   # commits ctx.agent to state.agent unconditionally so middleware-staged
   # state mutations (e.g. Persister's thaw) land regardless of whether
   # the action errored downstream. Action-level rollback already happened
-  # inside cmd/2.
+  # before accepting the action results.
   #
   defp run_chain(%Signal{} = signal, %State{middleware_chain: chain} = state)
        when is_function(chain, 2) do
@@ -2002,51 +1993,91 @@ defmodule Aikido.AgentServer do
     end)
   end
 
-  # Innermost continuation: routing → cmd/2.
-  #
-  # Returns a tagged tuple:
-  #   - `{:ok, ctx, dirs}` on chain success
-  #   - `{:error, ctx, reason}` on routing failure or `cmd/2` error
-  #
-  # The error tuple carries `ctx` so middleware-staged state mutations
-  # (`Persister`'s thaw, etc.) commit to `state.agent` regardless. cmd/2
-  # is the action boundary: rollback semantics live there — on action
-  # error, `cmd/2` returns the input agent unchanged, which is exactly
-  # `ctx.agent` at this layer (containing prior middleware mutations).
-  #
-  # Routing and action failures return errors through the chain.
-  # Successful actions may return `%Directives.Error{}` for logging or auditing.
+  # Route directly to native Ash actions. The original context is retained on
+  # any failure so partial slice updates and directives cannot escape the turn.
   defp core_next(%Signal{} = signal, ctx) do
-    %{agent_module: agent_module, agent: agent, __signal_router__: router} = ctx
-
-    case route_to_actions(router, signal) do
+    case route_to_actions(ctx.__signal_router__, signal) do
       {:ok, targets} ->
-        action_arg =
-          case targets do
-            [single] -> single
-            list when is_list(list) -> list
-          end
-
-        case agent_module.cmd(agent, action_arg, ctx: ctx, input_signal: signal) do
-          {:ok, new_agent, directives} ->
-            {:ok, Map.put(ctx, :agent, new_agent), List.wrap(directives)}
-
-          {:error, reason} ->
-            # Action errored; cmd/2 returned the input agent unchanged.
-            # ctx.agent is still that input agent + middleware mutations,
-            # which run_chain will commit to state.
-            {:error, ctx, reason}
-        end
+        apply_actions(signal, ctx, targets)
 
       {:error, reason} ->
-        routing_error =
+        error =
           Aikido.Error.routing_error("No route for signal #{inspect(signal.type)}", %{
             signal_type: signal.type,
             reason: reason
           })
 
-        log_routing_error(ctx, routing_error)
-        {:error, ctx, routing_error}
+        log_routing_error(ctx, error)
+        {:error, ctx, error}
+    end
+  end
+
+  @doc false
+  def apply_actions(%Signal{} = signal, ctx, targets) do
+    Enum.reduce_while(targets, {:ok, ctx, []}, fn {reference, params}, {:ok, current, effects} ->
+      paths =
+        current.agent_module
+        |> Aikido.Dsl.Agent.Info.slice_paths_for_action()
+        |> Map.get(reference, [Spark.Dsl.Extension.get_opt(current.agent_module, [:agent], :path)])
+
+      Enum.reduce_while(paths, {:ok, current, effects}, fn path, {:ok, current, effects} ->
+        case run_action(reference, params || %{}, signal, current, path) do
+          {:ok, result} ->
+            state =
+              case result.state do
+                %Aikido.Agent.SliceUpdate{slices: slices} ->
+                  Map.merge(current.agent.state, slices)
+
+                slice ->
+                  Map.put(current.agent.state, path, slice)
+              end
+
+            current = Map.put(current, :agent, %{current.agent | state: state})
+            {:cont, {:ok, current, effects ++ result.directives}}
+
+          {:error, reason} ->
+            {:halt, {:error, ctx, reason}}
+        end
+      end)
+      |> case do
+        {:ok, _, _} = result -> {:cont, result}
+        {:error, _, _} = error -> {:halt, error}
+      end
+    end)
+  rescue
+    error -> {:error, ctx, Ash.Error.to_error_class(error)}
+  end
+
+  defp run_action(reference, params, signal, ctx, path) do
+    {resource, name} = Aikido.ActionRef.normalize(reference)
+    definition = Ash.Resource.Info.action(resource, name)
+    state = Map.get(ctx.agent.state, path, %{})
+
+    arguments =
+      if Enum.any?(definition.arguments, &(&1.name == :data)),
+        do: %{data: params, state: state},
+        else: Map.put(params, :state, state)
+
+    runtime =
+      Map.merge(ctx, %{
+        signal: %{signal | data: params},
+        slice_path: path,
+        slice_config: Map.get(Aikido.Dsl.Agent.Info.mount_config_map(ctx.agent_module), path, %{})
+      })
+
+    options =
+      Ash.Scope.to_opts(ctx, context: Map.put(Map.get(ctx, :context) || %{}, :aikido, runtime))
+
+    resource
+    |> Ash.ActionInput.for_action(
+      name,
+      arguments,
+      Keyword.put(options, :skip_unknown_inputs, [:*])
+    )
+    |> Ash.run_action(options)
+    |> case do
+      {:ok, result} -> Aikido.ActionResult.new(result)
+      error -> error
     end
   end
 
@@ -2714,7 +2745,7 @@ defmodule Aikido.AgentServer do
     Logger.warning(
       "AgentServer #{state.id} received {:stop, #{inspect(reason)}, ...} from directive #{directive_type}.
 
-This is a HARD STOP: pending directives and async work will be lost, and on_after_cmd/3 will NOT run.
+This is a HARD STOP: pending directives and async work will be lost,
 
 For normal completion, set state.status to :completed/:failed instead and avoid returning {:stop, ...}.
 External code should subscribe before dispatch, using AgentServer.call_until/5 to await terminal state.

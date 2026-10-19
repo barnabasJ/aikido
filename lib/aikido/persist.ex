@@ -417,18 +417,12 @@ defmodule Aikido.Persist do
 
   @spec default_restore(agent_module(), checkpoint()) :: {:ok, agent()} | {:error, term()}
   defp default_restore(agent_module, checkpoint) do
-    case agent_module.new(id: checkpoint.id) do
-      {:ok, agent} ->
-        merged_state = Map.merge(agent.state, checkpoint.state || %{})
-        {:ok, %{agent | state: merged_state}}
+    agent =
+      agent_module
+      |> Ash.ActionInput.for_action(:initialize, %{id: checkpoint.id})
+      |> Ash.run_action!()
 
-      agent when is_struct(agent) ->
-        merged_state = Map.merge(agent.state, checkpoint.state || %{})
-        {:ok, %{agent | state: merged_state}}
-
-      {:error, _} = error ->
-        error
-    end
+    {:ok, %{agent | state: Map.merge(agent.state, checkpoint.state || %{})}}
   end
 
   @spec rehydrate_thread(module(), keyword(), agent(), checkpoint()) ::

@@ -47,10 +47,6 @@ defmodule AikidoTest.Fixtures.CollidingSectionExtension do
     route "fixture.colliding_section.noop", AikidoTest.PluginTestAction
   end
 
-  capabilities do
-    capability :colliding_section
-  end
-
   @section %Spark.Dsl.Section{
     name: :shared_section,
     describe:
@@ -112,10 +108,6 @@ defmodule AikidoTest.Fixtures.OtherCollidingSectionExtension do
 
   signal_routes do
     route "fixture.other_colliding_section.noop", AikidoTest.PluginTestAction
-  end
-
-  capabilities do
-    capability :other_colliding_section
   end
 
   @section %Spark.Dsl.Section{

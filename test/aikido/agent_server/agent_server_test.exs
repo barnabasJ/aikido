@@ -2,7 +2,7 @@ defmodule AikidoTest.AgentServerTest.EmitTestAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     signal =
       struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test")
 
@@ -26,7 +26,7 @@ defmodule AikidoTest.AgentServerTest.ScheduleTestAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     scheduled_signal =
       struct!(Jido.Signal, id: nil, type: "scheduled.ping", data: %{}, source: "/test")
 
@@ -53,7 +53,7 @@ defmodule AikidoTest.AgentServerTest.StopTestAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.ActionResult.new(state: %{}, directives: [%Aikido.Directives.Stop{reason: :normal}])
   end
 end
@@ -74,7 +74,7 @@ defmodule AikidoTest.AgentServerTest.ErrorTestAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     error = Aikido.Error.validation_error("Test error", %{field: :test})
 
     Aikido.ActionResult.new(
@@ -126,7 +126,7 @@ defmodule AikidoTest.AgentServerTest.ScheduledAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.ActionResult.new(state: %{scheduled: true}, directives: [])
   end
 end
@@ -345,7 +345,7 @@ defmodule AikidoTest.AgentServerTest do
           @moduledoc false
           use Ash.Resource.Actions.Implementation
           @impl true
-          def run(input, _opts, _context) do
+          def run(_input, _opts, _context) do
             AikidoTest.TestActions.SlowAction.work(80)
             Aikido.ActionResult.new(state: %{slow_done: true}, directives: [])
           end
@@ -1417,7 +1417,7 @@ defmodule AikidoTest.AgentServerTest do
           @moduledoc false
           use Ash.Resource.Actions.Implementation
           @impl true
-          def run(input, _opts, _context) do
+          def run(_input, _opts, _context) do
             AikidoTest.TestActions.SlowAction.work(20)
             Aikido.ActionResult.new(state: %{processed: true}, directives: [])
           end

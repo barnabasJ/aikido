@@ -27,7 +27,7 @@ Provide stable, reusable testing patterns for pure agents, AgentServer runtime b
 - Use unique IDs/helpers to avoid test cross-talk
 
 ## High-Value Coverage
-- `cmd/2` immutability and directive emission semantics
+- Native Ash action immutability and directive emission semantics
 - AgentServer signal routing and runtime directive execution
 - Parent-child lifecycle (`SpawnAgent`, `StopChild`) and state synchronization
 - Slice-return action shapes — single slice via `path:`, multi-slice via `%Aikido.Agent.SliceUpdate{}`

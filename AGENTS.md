@@ -32,13 +32,13 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - `mix docs` (local docs)
 
 ## Architecture Snapshot
-- `Aikido.Agent`: pure agent module with immutable state and `cmd/2`
+- `Aikido.Agent`: immutable agent state and native Ash resource actions
 - `Aikido.AgentServer`: GenServer runtime for directives, lifecycle, and message flow
 - `Aikido.Agent.Directive.*`: typed pure-I/O descriptors (`Emit`, `SpawnAgent`, `StopChild`, etc.)
 - Slices provide capability composition without coupling core agent logic
 
 ## Standards
-- Keep `cmd/2` pure: same input => same `{agent, directives}` output
+- Keep Ash reducer actions pure: the same input returns the same state and directives
 - Directives mutate **no** state — neither `agent.state` (domain) nor `%AgentServer.State{}` (runtime). State changes flow through the action's return value; runtime bookkeeping flows through GenServer callbacks and `process_signal/2` cascade callbacks
 - Use **Ash types** for data contracts and **Spark.Options** for DSL/configuration validation
 - Preserve tagged tuple and structured error contracts at public boundaries

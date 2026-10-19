@@ -92,7 +92,7 @@ defmodule Aikido.Directives.AsyncTaskTest do
   end
 
   defp state(aikido) do
-    agent = Aikido.Directives.AsyncTaskTest.TestAgent.new()
+    agent = Aikido.Directives.AsyncTaskTest.TestAgent.initialize!()
 
     {:ok, opts} =
       Aikido.AgentServer.Options.new(%{

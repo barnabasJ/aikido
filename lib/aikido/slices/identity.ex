@@ -65,10 +65,6 @@ defmodule Aikido.Slices.Identity do
     route "aikido.identity.update_profile", :update_profile
   end
 
-  capabilities do
-    capability :identity
-  end
-
   @identity_section %Spark.Dsl.Section{
     name: :identity,
     describe: "Configuration block contributed by Aikido.Slices.Identity.",

@@ -35,7 +35,6 @@ defmodule Aikido.Directives do
   - `Aikido.Directives.AdoptChild` — attach an orphaned child to current parent
   - `Aikido.Directives.StopChild` — request a tracked child agent to stop gracefully
   - `Aikido.Directives.Schedule` — schedule a delayed message
-  - `Aikido.Directives.RunInstruction` — execute an instruction and route the result via signal_routes
   - `Aikido.Directives.Stop` — stop the agent process (self)
   - `Aikido.Directives.Cron` — register a cron schedule
   - `Aikido.Directives.CronCancel` — cancel a cron schedule
@@ -56,9 +55,6 @@ defmodule Aikido.Directives do
       # Schedule for later
       %Directives.Schedule{delay_ms: 5000, message: :timeout}
 
-      # Execute instruction at runtime
-      %Directives.RunInstruction{instruction: instruction, result_signal_type: "fsm.instruction.replied"}
-
   ## Extensibility
 
   External packages can define their own directive structs:
@@ -77,7 +73,6 @@ defmodule Aikido.Directives do
     CronCancel,
     Emit,
     Error,
-    RunInstruction,
     Schedule,
     Spawn,
     SpawnAgent,
@@ -103,7 +98,6 @@ defmodule Aikido.Directives do
           | AdoptChild.t()
           | StopChild.t()
           | Schedule.t()
-          | RunInstruction.t()
           | Stop.t()
           | Cron.t()
           | CronCancel.t()
@@ -358,39 +352,6 @@ defmodule Aikido.Directives do
   @spec schedule(non_neg_integer(), term()) :: Schedule.t()
   def schedule(delay_ms, message) do
     %Schedule{delay_ms: delay_ms, message: message}
-  end
-
-  @doc """
-  Creates a RunInstruction directive.
-
-  ## Options
-
-  - `:result_signal_type` - Required signal type used to route the
-    execution result. Bind it via the agent's `signal_routes/1` to an
-    action that consumes the result payload.
-  - `:meta` - Optional metadata echoed in result payload (map)
-
-  ## Examples
-
-      Directives.run_instruction(instruction,
-        result_signal_type: "myapp.instruction.replied"
-      )
-
-      # In the agent:
-      def signal_routes(_ctx) do
-        [{"myapp.instruction.replied", MyApp.HandleInstructionResult}]
-      end
-  """
-  @spec run_instruction(Aikido.Instruction.t(), keyword()) :: RunInstruction.t()
-  def run_instruction(%Aikido.Instruction{} = instruction, opts) do
-    result_signal_type =
-      Keyword.fetch!(opts, :result_signal_type)
-
-    %RunInstruction{
-      instruction: instruction,
-      result_signal_type: result_signal_type,
-      meta: Keyword.get(opts, :meta, %{})
-    }
   end
 
   @doc """

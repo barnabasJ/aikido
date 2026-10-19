@@ -2,7 +2,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementatio
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     signal = struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{}, source: "/test")
     Aikido.ActionResult.new(state: %{}, directives: [%Aikido.Directives.Emit{signal: signal}])
   end
@@ -24,7 +24,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implement
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.ActionResult.new(
       state: %{},
       directives: [%Aikido.Directives.Schedule{delay_ms: 100, message: :tick}]
@@ -68,7 +68,6 @@ end
 
 defmodule AikidoTest.AgentServer.TelemetryTest do
   use AikidoTest.Case, async: false
-  import ExUnit.CaptureLog
 
   setup context do
     test_pid = self()
@@ -91,20 +90,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
       nil
     )
 
-    action_handler_id = "test-action-telemetry-handler-#{:erlang.unique_integer()}"
-
-    :telemetry.attach_many(
-      action_handler_id,
-      [[:aikido, :action, :start], [:aikido, :action, :stop]],
-      fn event, measurements, metadata, _config ->
-        send(test_pid, {:action_telemetry_event, event, measurements, metadata})
-      end,
-      nil
-    )
-
     on_exit(fn ->
       :telemetry.detach(handler_id)
-      :telemetry.detach(action_handler_id)
     end)
 
     {:ok, aikido: context.aikido}
@@ -152,57 +139,6 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], _, metadata}
       assert metadata.directive_count == 1
       assert metadata.directive_types == %{"Emit" => 1}
-      GenServer.stop(pid)
-    end
-  end
-
-  describe("action logging integration") do
-    test("suppresses aikido_action start logs when args are not full", %{aikido: aikido}) do
-      {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
-          id: "telemetry-log-default",
-          aikido: aikido
-        )
-
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
-
-      log =
-        capture_log(fn ->
-          assert {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-        end)
-
-      refute log =~ "Executing AikidoTest.TestActions.IncrementAction"
-      refute log =~ "with params:"
-      refute_receive {:action_telemetry_event, [:aikido, :action, :start], _, _}, 50
-      GenServer.stop(pid)
-    end
-
-    test("enables verbose aikido_action logs when instance debug is verbose", %{aikido: aikido}) do
-      Aikido.Debug.enable(aikido, :verbose)
-      on_exit(fn -> Aikido.Debug.disable(aikido) end)
-
-      {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
-          id: "telemetry-log-verbose",
-          aikido: aikido
-        )
-
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
-
-      log =
-        capture_log(fn ->
-          assert {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-        end)
-
-      assert log =~ "Executing AikidoTest.TestActions.IncrementAction"
-      assert log =~ "with params:"
-
-      assert_receive {:action_telemetry_event, [:aikido, :action, :start], _,
-                      %{action: AikidoTest.TestActions.IncrementAction}}
-
-      assert_receive {:action_telemetry_event, [:aikido, :action, :stop], _, _}
       GenServer.stop(pid)
     end
   end

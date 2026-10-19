@@ -1,7 +1,7 @@
 defmodule Aikido.AgentServer.Signal.LifecycleStarting do
   @moduledoc """
   Emitted by the AgentServer at the start of `init/1`, after the agent
-  struct is constructed via `agent_module.new/1` and before any plugin
+  struct is constructed via the native `:initialize` Ash action and before any plugin
   children, subscriptions, schedules, or routers are wired up.
 
   Routed through the middleware chain. `Aikido.Middlewares.Persister`, when

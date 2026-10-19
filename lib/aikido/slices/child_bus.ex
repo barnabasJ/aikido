@@ -76,10 +76,6 @@ defmodule Aikido.Slices.ChildBus do
     route "child_bus.subscribe_failed", :record_subscription_failure
   end
 
-  capabilities do
-    capability :bus_wiring
-  end
-
   actions do
     action :auto_subscribe_child, Aikido.ActionResult do
       public? false

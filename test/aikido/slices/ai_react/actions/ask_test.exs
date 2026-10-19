@@ -45,7 +45,6 @@ defmodule Aikido.Slices.AiReact.AskTest do
         {Aikido.Slices.AiReact, :ask},
         ask_signal(),
         idle_slice(),
-        %{},
         %{}
       )
 
@@ -85,7 +84,6 @@ defmodule Aikido.Slices.AiReact.AskTest do
         {Aikido.Slices.AiReact, :ask},
         ask_signal(%{system_prompt: nil}),
         idle_slice(),
-        %{},
         %{}
       )
 
@@ -112,7 +110,6 @@ defmodule Aikido.Slices.AiReact.AskTest do
         {Aikido.Slices.AiReact, :ask},
         ask_signal(),
         slice,
-        %{},
         %{}
       )
 
@@ -132,7 +129,6 @@ defmodule Aikido.Slices.AiReact.AskTest do
                {Aikido.Slices.AiReact, :ask},
                ask_signal(),
                slice,
-               %{},
                %{}
              )
   end
@@ -143,7 +139,6 @@ defmodule Aikido.Slices.AiReact.AskTest do
         {Aikido.Slices.AiReact, :ask},
         ask_signal(),
         nil,
-        %{},
         %{}
       )
   end

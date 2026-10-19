@@ -80,7 +80,7 @@ defmodule AikidoTest.AgentServerCoverageTest.CompleteAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.ActionResult.new(state: %{status: :completed, last_answer: "done!"}, directives: [])
   end
 end
@@ -101,7 +101,7 @@ defmodule AikidoTest.AgentServerCoverageTest.FailAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.ActionResult.new(
       state: %{status: :failed, error: "something went wrong"},
       directives: []
@@ -184,7 +184,6 @@ defmodule AikidoTest.AgentServerCoverageTest do
   - resolve_server with {:via, ...} that returns nil
   - Agent resolution with new/0 vs new/1
   - Pre-built struct with agent_module option
-  - Lifecycle hooks (on_before_cmd, on_after_cmd)
   - Queue overflow scenario
   - Multiple await_completion waiters
   - Invalid signal handling
@@ -290,8 +289,8 @@ defmodule AikidoTest.AgentServerCoverageTest do
   end
 
   describe("pre-built struct with agent_module option") do
-    test("uses explicit agent_module for cmd routing", %{aikido: aikido}) do
-      agent = AikidoTest.TestAgents.Counter.new(id: "prebuilt-struct-test")
+    test("uses explicit agent_module for action routing", %{aikido: aikido}) do
+      agent = AikidoTest.TestAgents.Counter.initialize!(%{id: "prebuilt-struct-test"})
       agent = %{agent | state: put_in(agent.state, [:domain, :counter], 50)}
 
       {:ok, pid} =

@@ -45,7 +45,6 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
         {Aikido.Slices.AiReact, :tool_result},
         signal("req_1", "call_1", "test_add", "{\"result\":3}"),
         slice,
-        %{},
         %{}
       )
 
@@ -65,7 +64,6 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
         {Aikido.Slices.AiReact, :tool_result},
         signal("req_1", "call_1", "test_add", "{\"result\":3}"),
         slice,
-        %{},
         %{}
       )
 
@@ -90,7 +88,6 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
         {Aikido.Slices.AiReact, :tool_result},
         signal("req_1", "call_1", "test_add", "{\"result\":3}"),
         slice,
-        %{},
         %{}
       )
 
@@ -111,7 +108,6 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
         {Aikido.Slices.AiReact, :tool_result},
         signal("req_1", "call_1", "test_add", "{\"result\":3}"),
         slice,
-        %{},
         %{}
       )
 
@@ -128,7 +124,6 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
         {Aikido.Slices.AiReact, :tool_result},
         signal("req_old", "call_1", "test_add", "{}"),
         slice,
-        %{},
         %{}
       )
 
@@ -144,7 +139,6 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
         {Aikido.Slices.AiReact, :tool_result},
         signal("req_1", "call_1", "test_add", "{}"),
         slice,
-        %{},
         %{}
       )
 

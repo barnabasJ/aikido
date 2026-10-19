@@ -90,10 +90,6 @@ defmodule Aikido.Slices.Thread do
     route "aikido.thread.clear", :clear
   end
 
-  capabilities do
-    capability :thread
-  end
-
   @thread_section %Spark.Dsl.Section{
     name: :thread,
     describe: "Configuration block contributed by Aikido.Slices.Thread.",

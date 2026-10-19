@@ -19,7 +19,7 @@ defmodule Aikido.AgentServer.Options do
   typed_struct do
     field :agent_module, :atom,
       allow_nil?: false,
-      description: "Agent module; required. Always constructed via new/1."
+      description: "Agent module; required. Initialized through its :initialize Ash action."
 
     field :aikido, :atom,
       allow_nil?: true,
@@ -169,10 +169,11 @@ defmodule Aikido.AgentServer.Options do
   defp validate_agent_module(mod) when is_atom(mod) do
     case Code.ensure_loaded(mod) do
       {:module, _} ->
-        if function_exported?(mod, :new, 0) or function_exported?(mod, :new, 1) do
+        if Spark.Dsl.is?(mod, Ash.Resource) && Ash.Resource.Info.action(mod, :initialize, :action) do
           {:ok, mod}
         else
-          {:error, Aikido.Error.validation_error("agent_module must implement new/0 or new/1")}
+          {:error,
+           Aikido.Error.validation_error("agent_module must define an :initialize Ash action")}
         end
 
       {:error, _} ->

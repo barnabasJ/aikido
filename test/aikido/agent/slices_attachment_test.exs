@@ -18,10 +18,6 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice do
   signal_routes do
     route "simple.noop", AikidoTest.PluginTestAction
   end
-
-  capabilities do
-    capability :simple
-  end
 end
 
 defmodule AikidoTest.Agent.SlicesAttachmentTest.RoutedSlice do
@@ -80,7 +76,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
         end
       end
 
-      agent = AikidoTest.Agent.SlicesAttachmentTest.AgentBareSlice.new()
+      agent = AikidoTest.Agent.SlicesAttachmentTest.AgentBareSlice.initialize!()
       assert agent.state.simple == %{counter: 0, label: "default"}
 
       assert AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice in Aikido.Dsl.Agent.Info.slices(
@@ -102,7 +98,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
         end
       end
 
-      agent = AikidoTest.Agent.SlicesAttachmentTest.AgentConfiguredSlice.new()
+      agent = AikidoTest.Agent.SlicesAttachmentTest.AgentConfiguredSlice.initialize!()
       assert agent.state.simple == %{counter: 42, label: "from_config"}
     end
 
@@ -119,7 +115,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
         end
       end
 
-      agent = AikidoTest.Agent.SlicesAttachmentTest.AgentKeywordSlice.new()
+      agent = AikidoTest.Agent.SlicesAttachmentTest.AgentKeywordSlice.initialize!()
       assert agent.state.simple.counter == 7
     end
 
@@ -164,27 +160,9 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
 
       assert AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice in modules
       assert AikidoTest.Agent.SlicesAttachmentTest.OtherSlice in modules
-      agent = AikidoTest.Agent.SlicesAttachmentTest.AgentMultipleSlices.new()
+      agent = AikidoTest.Agent.SlicesAttachmentTest.AgentMultipleSlices.initialize!()
       assert Map.has_key?(agent.state, :simple)
       assert Map.has_key?(agent.state, :other)
-    end
-
-    test "slice capabilities are aggregated" do
-      defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.AgentSliceCaps do
-        use Aikido.Agent, default_slices: false
-
-        agent do
-          name "slice_caps_agent"
-        end
-
-        slices do
-          slice :simple, AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice
-        end
-      end
-
-      assert :simple in Aikido.Dsl.Agent.Info.capabilities(
-               AikidoTest.Agent.SlicesAttachmentTest.AgentSliceCaps
-             )
     end
   end
 

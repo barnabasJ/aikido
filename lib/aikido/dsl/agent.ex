@@ -42,9 +42,6 @@ defmodule Aikido.Dsl.Agent do
         doc: "Agent name (letters, numbers, underscores)."
       ],
       description: [type: :string],
-      category: [type: :string],
-      tags: [type: {:list, :string}, default: []],
-      vsn: [type: :string],
       path: [
         type: :atom,
         doc:
@@ -142,9 +139,8 @@ defmodule Aikido.Dsl.Agent do
     transformers: [
       Aikido.Dsl.Transformers.Attributes,
       Aikido.Dsl.Agent.Transformers.WalkExtensions,
-      Aikido.Dsl.Agent.Transformers.MergeSchemas,
       Aikido.Dsl.Agent.Transformers.ExpandRoutes,
-      Aikido.Dsl.Agent.Transformers.GenerateAccessors
+      Aikido.Dsl.Agent.Transformers.AddInitialization
     ],
     verifiers: [
       Aikido.Dsl.Agent.Verifiers.PathSchemaPair,

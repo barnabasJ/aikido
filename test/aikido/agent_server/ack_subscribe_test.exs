@@ -30,7 +30,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.FailingAction.Implementation d
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     {:error, :intentional_action_failure}
   end
 end

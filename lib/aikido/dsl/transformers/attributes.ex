@@ -8,21 +8,36 @@ defmodule Aikido.Dsl.Transformers.Attributes do
   def transform(dsl) do
     module = Transformer.get_persisted(dsl, :module)
     section = Enum.find([:agent, :slice], &Map.has_key?(dsl, [&1]))
-    declared = Transformer.get_entities(dsl, [section, :schema])
+
+    declared =
+      Transformer.get_entities(dsl, [section, :schema]) ++
+        Transformer.get_persisted(dsl, :aikido_runtime_attributes, [])
+
     dsl = Enum.reduce(declared, dsl, &Transformer.add_entity(&2, [:attributes], &1))
 
-    {:ok, create} =
-      Ash.Resource.Builder.build_action(:create, :create,
+    accepted =
+      dsl
+      |> Ash.Resource.Info.attributes()
+      |> Enum.filter(& &1.writable?)
+      |> Enum.map(& &1.name)
+
+    {:ok, dsl} =
+      Ash.Resource.Builder.add_new_action(dsl, :create, :create,
         primary?: true,
-        accept: Enum.map(Ash.Resource.Info.attributes(dsl), & &1.name)
+        accept: accepted
       )
 
-    dsl = Transformer.add_entity(dsl, [:actions], create)
-    resource = Transformer.get_persisted(dsl, :aikido_agent_schema, module)
+    {:ok, dsl} =
+      Ash.Resource.Builder.add_new_action(dsl, :update, :update,
+        primary?: true,
+        accept: accepted
+      )
+
+    resource = module
 
     dsl =
       if Map.has_key?(dsl, [section, :schema]) ||
-           Transformer.get_persisted(dsl, :aikido_agent_schema),
+           Transformer.get_persisted(dsl, :aikido_runtime_attributes),
          do: Transformer.set_option(dsl, [section], :schema, resource),
          else: dsl
 

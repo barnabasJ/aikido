@@ -21,7 +21,6 @@ defmodule AikidoTest.Actions.SchedulingTest do
           {Aikido.AgentServer.RuntimeActions, :schedule_signal},
           sig("schedule_signal", data),
           %{},
-          %{},
           %{}
         )
 
@@ -40,7 +39,6 @@ defmodule AikidoTest.Actions.SchedulingTest do
           {Aikido.AgentServer.RuntimeActions, :schedule_signal},
           sig("schedule_signal", data),
           %{},
-          %{},
           %{}
         )
 
@@ -56,7 +54,6 @@ defmodule AikidoTest.Actions.SchedulingTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :schedule_timeout},
           sig("schedule_timeout", data),
-          %{},
           %{},
           %{}
         )
@@ -75,7 +72,6 @@ defmodule AikidoTest.Actions.SchedulingTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :schedule_timeout},
           sig("schedule_timeout", data),
-          %{},
           %{},
           %{}
         )
@@ -98,7 +94,6 @@ defmodule AikidoTest.Actions.SchedulingTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :schedule_cron},
           sig("schedule_cron", data),
-          %{},
           %{},
           %{}
         )
@@ -124,7 +119,6 @@ defmodule AikidoTest.Actions.SchedulingTest do
           {Aikido.AgentServer.RuntimeActions, :schedule_cron},
           sig("schedule_cron", data),
           %{},
-          %{},
           %{}
         )
 
@@ -140,7 +134,6 @@ defmodule AikidoTest.Actions.SchedulingTest do
         AikidoTest.NativeAction.run(
           {Aikido.AgentServer.RuntimeActions, :cancel_cron},
           sig("cancel_cron", data),
-          %{},
           %{},
           %{}
         )

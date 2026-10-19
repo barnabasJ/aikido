@@ -7,7 +7,6 @@ defmodule Aikido.Dsl.ScaffoldTest do
     Aikido.Dsl.Agent,
     Aikido.Dsl.Instance,
     Aikido.Dsl.Slice,
-    Aikido.Dsl.Middleware,
     Ash.Resource.Dsl
   ]
 
@@ -34,13 +33,6 @@ defmodule Aikido.Dsl.ScaffoldTest do
     assert :slice in section_names
     assert :signal_routes in section_names
     assert :schedules in section_names
-    assert :capabilities in section_names
-    assert :requires in section_names
-  end
-
-  test "Aikido.Dsl.Middleware contributes the `middleware` section" do
-    section_names = Enum.map(Aikido.Dsl.Middleware.sections(), & &1.name)
-    assert :middleware in section_names
   end
 
   test "native Ash provides the actions section" do

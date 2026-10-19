@@ -2,7 +2,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.TestAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.ActionResult.new(state: %{}, directives: [])
   end
 end
@@ -23,7 +23,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.AnotherAction.Implementation d
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.ActionResult.new(state: %{}, directives: [])
   end
 end
@@ -115,7 +115,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
     %Aikido.AgentServer.State{
       id: "router-test-#{System.unique_integer([:positive])}",
       agent_module: agent_module,
-      agent: agent_module.new(),
+      agent: agent_module.initialize!(),
       status: :idle,
       parent: nil,
       orphaned_from: nil,

@@ -23,9 +23,12 @@ defmodule Aikido.Durable.AgentServer do
     Code.ensure_loaded!(module)
 
     agent =
-      if function_exported?(module, :new, 1),
-        do: module.new(id: Keyword.fetch!(options, :id), state: options[:initial_state] || %{}),
-        else: module.new()
+      module
+      |> Ash.ActionInput.for_action(:initialize, %{
+        id: Keyword.fetch!(options, :id),
+        state: options[:initial_state] || %{}
+      })
+      |> Ash.run_action!()
 
     agent = Persister.transform_agent(agent, module, :externalize)
 

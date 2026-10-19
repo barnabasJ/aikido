@@ -8,7 +8,7 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Impleme
     followup = struct!(Jido.Signal, id: nil, type: "step1.followup", source: "/test", data: %{})
 
     Aikido.ActionResult.new(
-      state: Map.put(slice, :step1_cmd_ran, true),
+      state: Map.put(slice, :step1_action_ran, true),
       directives: [Aikido.Directives.emit(followup)]
     )
   end
@@ -60,8 +60,12 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Impleme
   def run(input, _opts, _context) do
     slice = input.arguments.state
     slice = slice || %{}
-    saw_cmd = Map.get(slice, :step1_cmd_ran, false)
-    Aikido.ActionResult.new(state: Map.put(slice, :step2_saw_cmd_ran, saw_cmd), directives: [])
+    saw_action = Map.get(slice, :step1_action_ran, false)
+
+    Aikido.ActionResult.new(
+      state: Map.put(slice, :step2_saw_action_ran, saw_action),
+      directives: []
+    )
   end
 end
 
@@ -88,9 +92,9 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent do
     path :domain
 
     schema do
-      attribute :step1_cmd_ran, :boolean, default: false
+      attribute :step1_action_ran, :boolean, default: false
       attribute :step1_followup_ran, :boolean, default: false
-      attribute :step2_saw_cmd_ran, :boolean, default: false
+      attribute :step2_saw_action_ran, :boolean, default: false
     end
   end
 
@@ -106,25 +110,25 @@ end
 
 defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest do
   @moduledoc """
-  Tests the ordering guarantee between signal processing (Agent.cmd/2)
+  Tests the ordering guarantee between signal processing (native Ash actions)
   and directive execution under inline signal processing.
 
   Directives mutate no state; the cascade-driven
   state changes happen on whatever turn observes the resulting signal.
   Signal A emits an `Emit` directive whose dispatched signal routes via
   `signal_routes` to a state-mutating action; signal A also returns a
-  cmd-level slice change. Signal B is cast immediately after.
+  action-returned slice change. Signal B is cast immediately after.
 
-  When two async signals are cast, signal A runs fully — cmd/2 *and*
+  When two async signals are cast, signal A runs fully — action *and*
   any inline directive I/O — before signal B is picked up from the
-  mailbox. So signal B's cmd/2 always sees signal A's slice
+  mailbox. So signal B's action always sees signal A's slice
   return; the dispatched signal arrives later in the mailbox and is
   processed in its own turn.
   """
   use AikidoTest.Case, async: true
 
   describe("inline signal processing ordering") do
-    test("signal B sees signal A's cmd-level slice update", %{aikido: aikido}) do
+    test("signal B sees signal A's action-returned slice update", %{aikido: aikido}) do
       pid =
         start_server(
           %{aikido: aikido},
@@ -136,13 +140,13 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest do
 
       agent_state =
         await_state_value(pid, fn s ->
-          if s.agent.state.domain.step2_saw_cmd_ran do
+          if s.agent.state.domain.step2_saw_action_ran do
             s.agent.state.domain
           end
         end)
 
-      assert agent_state.step1_cmd_ran == true
-      assert agent_state.step2_saw_cmd_ran == true
+      assert agent_state.step1_action_ran == true
+      assert agent_state.step2_saw_action_ran == true
     end
 
     test("the emitted follow-up signal eventually runs and updates state", %{aikido: aikido}) do

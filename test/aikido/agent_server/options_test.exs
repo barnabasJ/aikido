@@ -167,9 +167,9 @@ defmodule AikidoTest.AgentServer.OptionsTest do
       assert error.message =~ "agent_module is required"
     end
 
-    test "rejects module without new function" do
+    test "rejects module without an initialization action" do
       {:error, error} = Aikido.AgentServer.Options.new(@base_opts ++ [agent_module: Enum])
-      assert error.message =~ "must implement new/0 or new/1"
+      assert error.message =~ "must define an :initialize Ash action"
     end
 
     test "rejects non-existent module" do

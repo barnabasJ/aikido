@@ -1,38 +1,15 @@
 defmodule Aikido.Agent do
   @moduledoc """
-  An Agent is an immutable data structure that holds state and can be updated
-  via commands. This module provides a minimal, purely functional API:
+  An immutable container for agent identity and typed domain state.
 
-  - `new/1` - Create a new agent
-  - `set/2` - Update state directly
-  - `validate/2` - Validate agent state against schema
-  - `cmd/2` - Execute actions: `(agent, action) -> {:ok, agent, [directive]} | {:error, reason}`
-
-  ## Core Pattern
-
-  The fundamental operation is `cmd/2`:
-
-      {:ok, agent, directives} = MyAgent.cmd(agent, MyAction)
-      {:ok, agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}})
-      {:ok, agent, directives} = MyAgent.cmd(agent, [Action1, Action2])
-
-  Multi-instruction `cmd` is **all-or-nothing**: the first `{:error, _}` halts
-  the batch, the input agent is returned unchanged, and no directives execute.
-
-  Key invariants:
-  - Actions are pure: return the next state and directives; never perform side effects.
-  - Side effects belong only in directives, executed by the runtime after `cmd/2`.
-  - On success the returned `agent` is **always complete** — no "apply
-    directives" step needed.
-  - On error the input agent is returned via the caller's error branch;
-    successful prior instructions' slice changes vanish.
-  - `directives` are **external effects only** — they never modify agent state.
-  - `cmd/2` is a **pure function** — given same inputs, always same outputs.
+  Native Ash actions return `Aikido.ActionResult` values. AgentServer supplies
+  the current state, accepts successful state transitions and executes the
+  returned directives. Actions are pure; all side effects belong in directives.
 
   ## Defining an Agent Module
 
-  `use Aikido.Agent` creates an embedded Ash resource host and generates the
-  pure command API. State schemas become attributes on that same resource.
+  `use Aikido.Agent` creates an embedded Ash resource host. State schemas
+  become attributes on that same resource.
   Reducers are native Ash actions implemented by separate callback modules.
 
   ```elixir
@@ -91,102 +68,17 @@ defmodule Aikido.Agent do
     end
   end
 
-  alias Aikido.Agent
-  alias Aikido.Agent.State, as: StateHelper
-  alias Aikido.Directives
-  alias Aikido.Error
-  alias Aikido.Instruction
+  use Ash.TypedStruct
 
-  require OK
-
-  (
-    @schema_fields id: [
-                     type: :string,
-                     allow_nil?: true,
-                     description: "Unique agent identifier",
-                     constraints: [trim?: false, allow_empty?: true]
-                   ],
-                   agent_module: [
-                     type: :atom,
-                     allow_nil?: true,
-                     description: "Concrete agent module that created this struct"
-                   ],
-                   name: [
-                     type: :string,
-                     allow_nil?: true,
-                     description: "Agent name",
-                     constraints: [trim?: false, allow_empty?: true]
-                   ],
-                   description: [
-                     type: :string,
-                     allow_nil?: true,
-                     description: "Agent description",
-                     constraints: [trim?: false, allow_empty?: true]
-                   ],
-                   category: [
-                     type: :string,
-                     allow_nil?: true,
-                     description: "Agent category",
-                     constraints: [trim?: false, allow_empty?: true]
-                   ],
-                   tags: [
-                     type: {:array, :string},
-                     allow_nil?: false,
-                     default: [],
-                     description: "Tags",
-                     constraints: [items: [trim?: false, allow_empty?: true]]
-                   ],
-                   vsn: [
-                     type: :string,
-                     allow_nil?: true,
-                     description: "Version",
-                     constraints: [trim?: false, allow_empty?: true]
-                   ],
-                   schema: [
-                     type: :term,
-                     allow_nil?: false,
-                     default: [],
-                     description: "Ash field contract for validating the Agent's state"
-                   ],
-                   state: [
-                     type: :map,
-                     allow_nil?: false,
-                     default: %{},
-                     description: "Current state"
-                   ]
-    @enforce_keys []
-    defstruct id: nil,
-              agent_module: nil,
-              name: nil,
-              description: nil,
-              category: nil,
-              tags: [],
-              vsn: nil,
-              schema: [],
-              state: %{}
-
-    {:ok, struct_constraints} =
-      Ash.Type.init(:struct,
-        instance_of: __MODULE__,
-        fields:
-          Enum.map(@schema_fields, fn {name, options} ->
-            {name, Keyword.delete(options, :default)}
-          end)
-      )
-
-    @struct_constraints struct_constraints
-  )
+  typed_struct do
+    field :id, :string, allow_nil?: false, default: &Aikido.Util.generate_id/0
+    field :agent_module, :atom
+    field :name, :string
+    field :description, :string
+    field :state, :map, allow_nil?: false, default: %{}
+  end
 
   @type t :: %__MODULE__{}
-
-  # Action input types
-  @type action :: module() | {module(), map()} | Instruction.t() | [action()]
-
-  # Directive types (external effects only - never modify agent state)
-  @type directive :: Directives.t()
-
-  @type agent_result :: {:ok, t()} | {:error, Error.t()}
-  @type cmd_result :: {:ok, t(), [directive()]} | {:error, term()}
 
   @doc """
   Returns signal routes for this agent.
@@ -217,75 +109,9 @@ defmodule Aikido.Agent do
     quote location: :keep do
       @behaviour Aikido.Agent
 
-      alias Aikido.Agent
-      alias Aikido.Agent.SliceUpdate
-      alias Aikido.Agent.State, as: AgentState
-      alias Aikido.Directives, as: AgentDirective
-      alias Aikido.Instruction
-      alias Aikido.Observe.Config, as: ObserveConfig
-      require OK
-
       @persist {:aikido_user_middleware, unquote(Macro.escape(user_middleware))}
       @persist {:aikido_instance_module, unquote(opts[:aikido])}
       @persist {:default_slices_override, unquote(Macro.escape(opts[:default_slices]))}
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Base module functions (for direct use without `use`)
-  # ---------------------------------------------------------------------------
-
-  @doc """
-  Creates a new agent from attributes.
-
-  For module-based agents, use `MyAgent.new/1` instead.
-  """
-  @spec new(map() | keyword()) :: {:ok, t()} | {:error, term()}
-  def new(attrs) when is_list(attrs), do: new(Map.new(attrs))
-
-  def new(attrs) when is_map(attrs) do
-    attrs_with_id = normalize_agent_id(attrs)
-
-    values = Map.merge(Map.from_struct(struct(__MODULE__)), attrs_with_id)
-
-    case Ash.Type.apply_constraints(:struct, values, @struct_constraints) do
-      {:ok, agent} ->
-        {:ok, agent}
-
-      {:error, errors} ->
-        {:error, Error.validation_error("Agent validation failed", %{errors: errors})}
-    end
-  end
-
-  @doc """
-  Updates agent state by merging new attributes.
-  """
-  @spec set(t(), map() | keyword()) :: agent_result()
-  def set(%Agent{} = agent, attrs) do
-    new_state = StateHelper.merge(agent.state, Map.new(attrs))
-    OK.success(%{agent | state: new_state})
-  end
-
-  @doc """
-  Validates agent state against its schema.
-  """
-  @spec validate(t(), keyword()) :: agent_result()
-  def validate(%Agent{} = agent, opts \\ []) do
-    case StateHelper.validate(agent.state, agent.schema, opts) do
-      {:ok, validated_state} ->
-        OK.success(%{agent | state: validated_state})
-
-      {:error, reason} ->
-        Error.validation_error("State validation failed", %{reason: reason})
-        |> OK.failure()
-    end
-  end
-
-  defp normalize_agent_id(attrs) do
-    case Map.get(attrs, :id) do
-      nil -> Map.put(attrs, :id, Aikido.Util.generate_id())
-      "" -> Map.put(attrs, :id, Aikido.Util.generate_id())
-      _ -> attrs
     end
   end
 end

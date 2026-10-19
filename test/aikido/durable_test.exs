@@ -43,12 +43,14 @@ defmodule AikidoTest.DurableTest.CodecAgent do
     %{value: String.to_integer(value)}
   end
 
+  @impl true
   def checkpoint(agent, _context) do
     {:ok, %{id: agent.id, custom_state: agent.state}}
   end
 
+  @impl true
   def restore(checkpoint, _context) do
-    agent = new(id: checkpoint.id)
+    agent = initialize!(%{id: checkpoint.id})
     {:ok, %{agent | state: checkpoint.custom_state}}
   end
 end

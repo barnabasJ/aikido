@@ -23,13 +23,6 @@ defmodule AikidoTest.Identity.SliceTest do
                "identity"
     end
 
-    test "path is :identity" do
-    end
-
-    test "has identity capability" do
-      assert :identity in Aikido.Dsl.Slice.Info.capabilities(Aikido.Slices.Identity)
-    end
-
     test "exposes Identity.Actions.{Ensure,Evolve,UpdateProfile} via actions/1" do
       action_set = MapSet.new(Aikido.Dsl.Slice.Info.actions(Aikido.Slices.Identity))
 
@@ -76,7 +69,7 @@ defmodule AikidoTest.Identity.SliceTest do
     end
 
     test "agent.state[:identity] starts nil (lazy init)" do
-      agent = AikidoTest.Identity.SliceTest.AgentWithIdentity.new()
+      agent = AikidoTest.Identity.SliceTest.AgentWithIdentity.initialize!()
       assert Map.get(agent.state, :identity) == nil
     end
 
@@ -87,10 +80,11 @@ defmodule AikidoTest.Identity.SliceTest do
     end
 
     test "identity can be attached after creation via Ensure action" do
-      agent = AikidoTest.Identity.SliceTest.AgentWithIdentity.new()
+      agent = AikidoTest.Identity.SliceTest.AgentWithIdentity.initialize!()
 
       {:ok, agent, []} =
-        AikidoTest.Identity.SliceTest.AgentWithIdentity.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Identity.SliceTest.AgentWithIdentity,
           agent,
           {{Aikido.Slices.Identity, :ensure}, %{}}
         )
@@ -99,10 +93,11 @@ defmodule AikidoTest.Identity.SliceTest do
     end
 
     test "UpdateProfile action mutates agent.state.identity" do
-      agent = AikidoTest.Identity.SliceTest.AgentWithIdentity.new()
+      agent = AikidoTest.Identity.SliceTest.AgentWithIdentity.initialize!()
 
       {:ok, agent, []} =
-        AikidoTest.Identity.SliceTest.AgentWithIdentity.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Identity.SliceTest.AgentWithIdentity,
           agent,
           {{Aikido.Slices.Identity, :update_profile}, %{profile: %{nickname: "Sam"}}}
         )

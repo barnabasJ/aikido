@@ -5,9 +5,6 @@ defmodule Aikido.Dsl.AgentTest.SimpleAgent do
   agent do
     name "simple_agent"
     description "Bare agent — no plugins, no slices."
-    category "test"
-    tags ["simple", "test"]
-    vsn "1.0.0"
     path :domain
 
     schema do
@@ -47,23 +44,6 @@ defmodule Aikido.Dsl.AgentTest do
              ) == "Bare agent — no plugins, no slices."
     end
 
-    test "category/1" do
-      assert Map.get(
-               Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentTest.SimpleAgent),
-               :category
-             ) == "test"
-    end
-
-    test "tags/1" do
-      assert Map.get(Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentTest.SimpleAgent), :tags) ==
-               ["simple", "test"]
-    end
-
-    test "vsn/1" do
-      assert Map.get(Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentTest.SimpleAgent), :vsn) ==
-               "1.0.0"
-    end
-
     test "path/1" do
       assert Map.get(Aikido.Dsl.Agent.Info.agent_options(Aikido.Dsl.AgentTest.SimpleAgent), :path) ==
                :domain
@@ -90,9 +70,9 @@ defmodule Aikido.Dsl.AgentTest do
     end
   end
 
-  describe("new/1 + cmd/2 + set/2") do
-    test "new/1 seeds the agent slice with schema defaults" do
-      agent = Aikido.Dsl.AgentTest.SimpleAgent.new()
+  describe("agent state helpers") do
+    test "initialize seeds the agent slice with schema defaults" do
+      agent = Aikido.Dsl.AgentTest.SimpleAgent.initialize!()
       assert %Aikido.Agent{} = agent
       assert agent.agent_module == Aikido.Dsl.AgentTest.SimpleAgent
       assert agent.name == "simple_agent"
@@ -100,15 +80,19 @@ defmodule Aikido.Dsl.AgentTest do
       assert get_in(agent.state, [:domain, :status]) == :idle
     end
 
-    test "new/1 accepts user-supplied state and merges over defaults" do
-      agent = Aikido.Dsl.AgentTest.SimpleAgent.new(state: %{counter: 5})
+    test "initialize accepts user-supplied state and merges over defaults" do
+      agent = Aikido.Dsl.AgentTest.SimpleAgent.initialize!(%{state: %{counter: 5}})
       assert get_in(agent.state, [:domain, :counter]) == 5
     end
 
-    test "set/2 wraps flat attrs into the path slice" do
-      agent = Aikido.Dsl.AgentTest.SimpleAgent.new()
-      {:ok, agent} = Aikido.Dsl.AgentTest.SimpleAgent.set(agent, %{status: :running})
-      assert get_in(agent.state, [:domain, :status]) == :running
+    test "embedded actions apply defaults, cast updates and expose validation errors" do
+      record = Ash.create!(Aikido.Dsl.AgentTest.SimpleAgent, %{})
+      assert record.counter == 0
+      updated = Ash.update!(record, %{counter: "5"})
+      assert updated.counter == 5
+      changeset = Ash.Changeset.for_update(record, :update, %{counter: "invalid"})
+      refute changeset.valid?
+      assert changeset.errors != []
     end
   end
 

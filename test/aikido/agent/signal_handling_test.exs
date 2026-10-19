@@ -2,7 +2,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     signal =
       struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test")
 
@@ -44,45 +44,15 @@ defmodule AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent do
   end
 end
 
-defmodule AikidoTest.Agent.SignalHandlingTest.PreProcessingAgent do
-  @moduledoc false
-  use Aikido.Agent
-
-  agent do
-    name "pre_processing_agent"
-    path :domain
-
-    schema do
-      attribute :counter, :integer, default: 0
-      attribute :last_action_type, :string, default: nil
-    end
-  end
-
-  signal_routes do
-    route "increment", AikidoTest.TestActions.IncrementAction
-    route "decrement", AikidoTest.TestActions.DecrementAction
-  end
-
-  def on_before_cmd(agent, {action_mod, _params} = action) when is_atom(action_mod) do
-    action_name = action_mod.__action_metadata__().name
-    agent = %{agent | state: put_in(agent.state, [:domain, :last_action_type], action_name)}
-    {:ok, agent, action}
-  end
-
-  def on_before_cmd(agent, action) do
-    {:ok, agent, action}
-  end
-end
-
 defmodule AikidoTest.Agent.SignalHandlingTest do
   @moduledoc """
   Tests signal routing through AgentServer.
 
   Signal handling architecture:
   1. Signals arrive at AgentServer
-  2. AgentServer routes signals to actions via strategy.signal_routes or default mapping
-  3. Actions are executed via Agent.cmd/2
-  4. on_before_cmd/2 can intercept actions for pre-processing
+  2. AgentServer routes signals to native Ash actions
+  3. Ash validates and executes the actions
+  4. AgentServer accepts the returned state and executes its directives
   """
   use AikidoTest.Case, async: true
 
@@ -174,12 +144,13 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
     end
   end
 
-  describe("direct cmd/2 usage") do
-    test "cmd/2 works directly with action module tuples" do
-      agent = AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent.new()
+  describe("native action state application") do
+    test "native action references update state" do
+      agent = AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent.initialize!()
 
       {:ok, updated, _directives} =
-        AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
           agent,
           {AikidoTest.TestActions.IncrementAction, %{amount: 5}}
         )

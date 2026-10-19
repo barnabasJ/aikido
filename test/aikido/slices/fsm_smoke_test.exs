@@ -42,7 +42,7 @@ defmodule Aikido.Slices.FSMSmokeTest do
 
   describe("agent boot") do
     test "an agent with `plugins: [Aikido.Slices.FSM]` starts with default slice state" do
-      agent = Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.new()
+      agent = Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.initialize!()
       assert agent.state.fsm.state == "idle"
       assert agent.state.fsm.history == []
       assert agent.state.fsm.terminal? == false
@@ -52,7 +52,7 @@ defmodule Aikido.Slices.FSMSmokeTest do
     end
 
     test "per-agent config seeds the slice via mount/2" do
-      agent = Aikido.Slices.FSMSmokeTest.ConfiguredFSMAgent.new()
+      agent = Aikido.Slices.FSMSmokeTest.ConfiguredFSMAgent.initialize!()
       assert agent.state.fsm.state == "ready"
       assert agent.state.fsm.initial_state == "ready"
       assert agent.state.fsm.terminal_states == ["done", "errored"]
@@ -61,10 +61,11 @@ defmodule Aikido.Slices.FSMSmokeTest do
 
   describe("transition action") do
     test "a routed transition signal mutates `agent.state.fsm.state`" do
-      agent = Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.new()
+      agent = Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.initialize!()
 
       {:ok, agent, _directives} =
-        Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          Aikido.Slices.FSMSmokeTest.DefaultFSMAgent,
           agent,
           {{Aikido.Slices.FSM, :transition}, %{to: "processing"}}
         )
@@ -74,16 +75,18 @@ defmodule Aikido.Slices.FSMSmokeTest do
     end
 
     test "transitioning into a terminal state flips `terminal?`" do
-      agent = Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.new()
+      agent = Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.initialize!()
 
       {:ok, agent, _} =
-        Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          Aikido.Slices.FSMSmokeTest.DefaultFSMAgent,
           agent,
           {{Aikido.Slices.FSM, :transition}, %{to: "processing"}}
         )
 
       {:ok, agent, _} =
-        Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          Aikido.Slices.FSMSmokeTest.DefaultFSMAgent,
           agent,
           {{Aikido.Slices.FSM, :transition}, %{to: "completed"}}
         )
@@ -93,22 +96,25 @@ defmodule Aikido.Slices.FSMSmokeTest do
     end
 
     test "history records one entry per successful transition, oldest first" do
-      agent = Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.new()
+      agent = Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.initialize!()
 
       {:ok, agent, _} =
-        Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          Aikido.Slices.FSMSmokeTest.DefaultFSMAgent,
           agent,
           {{Aikido.Slices.FSM, :transition}, %{to: "processing"}}
         )
 
       {:ok, agent, _} =
-        Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          Aikido.Slices.FSMSmokeTest.DefaultFSMAgent,
           agent,
           {{Aikido.Slices.FSM, :transition}, %{to: "idle"}}
         )
 
       {:ok, agent, _} =
-        Aikido.Slices.FSMSmokeTest.DefaultFSMAgent.cmd(
+        AikidoTest.NativeAction.apply(
+          Aikido.Slices.FSMSmokeTest.DefaultFSMAgent,
           agent,
           {{Aikido.Slices.FSM, :transition}, %{to: "processing"}}
         )
