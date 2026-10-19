@@ -14,7 +14,12 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     %ToolExec{
       tool_call: call,
-      tools: Keyword.get(opts, :tools, [:test_add, :test_fails]),
+      registry:
+        AshAi.build_tools_and_registry(
+          otp_app: :aikido,
+          tools: Keyword.get(opts, :tools, [:test_add, :test_fails])
+        )
+        |> elem(1),
       request_id: Keyword.get(opts, :request_id, "req_1")
     }
   end

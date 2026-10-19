@@ -371,7 +371,8 @@ teams, delegate work, list templates, and stop or remove owned subtrees.
 
 Supply Ash AI tool names in `tools` and native source configuration in
 `tool_options`, such as `otp_app` or `actions`. Aikido calls
-`AshAi.build_tools_and_registry/1` internally and uses its registry directly;
+`AshAi.build_tools_and_registry/1` once per run and reuses its descriptions
+and registry across turns and tool calls;
 there is no custom per-tool tuple, module shorthand or callback wrapper.
 Arguments follow Ash AI's `%{"input" => %{...}}` shape. Actor, tenant and
 application context reach the native Ash actions. Snapshots retain declarative

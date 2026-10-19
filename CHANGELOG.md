@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Prepare native Ash AI tools once per ReAct run and reuse their descriptions
+  and registry across model turns, parallel calls and retries. Exclude generated
+  callbacks from snapshots and rebuild them for new runs after restoration.
+
 - Accept native Ash AI tool names and source configuration. Build execution
   registries internally instead of persisting generated functions. Remove the
   custom tool adapter, per-tool callback-pair input and example callback wrappers.

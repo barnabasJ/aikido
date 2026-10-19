@@ -89,6 +89,8 @@ defmodule Aikido.Slices.AiReact do
     description "ReAct reasoning slice attached via `slices:` on a Aikido.Agent."
 
     schema do
+      attribute :prepared_tools, :term
+      attribute :tool_preparation, {:array, :term}, default: [], allow_nil?: false
       attribute :run_scope, :map, default: %{}
       attribute :run_metadata, :map, public?: true, default: %{}
       attribute :options, Aikido.AI.Options, public?: true, default: %{}, allow_nil?: false
@@ -166,6 +168,7 @@ defmodule Aikido.Slices.AiReact do
     end
 
     config_transform {__MODULE__, :__fold_llm_opts__, []}
+    route "ai.react.tools.ready", :tools_ready
     route "ai.react.ask", :ask
     route "ai.react.message", :message
     route "ai.react.deliver", :deliver
@@ -278,7 +281,17 @@ defmodule Aikido.Slices.AiReact do
     |> Enum.join("|")
   end
 
+  @behaviour Aikido.Persist.Transform
+
   actions do
+    action :tools_ready, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :request_id, :string, allow_nil?: false
+      argument :prepared_tools, :term, allow_nil?: false
+      run {Aikido.Slices.AiReact.Implementation, action: :tools_ready}
+    end
+
     action :ask, Aikido.ActionResult do
       argument :state, :term
       argument :options, Aikido.AI.Options
@@ -394,9 +407,12 @@ defmodule Aikido.Slices.AiReact do
   end
 
   @doc false
+  @impl true
   def externalize(state),
     do:
       Map.merge(state, %{
+        prepared_tools: nil,
+        tool_preparation: [],
         hooks_pending: %{},
         hook_terminal: nil,
         run_scope: %{},
@@ -405,6 +421,7 @@ defmodule Aikido.Slices.AiReact do
       })
 
   @doc false
+  @impl true
   def reinstate(state) do
     state =
       if state.status in [:running, :waiting],
@@ -412,6 +429,8 @@ defmodule Aikido.Slices.AiReact do
         else: state
 
     Map.merge(state, %{
+      prepared_tools: nil,
+      tool_preparation: [],
       context: if(state.context, do: Aikido.AI.ContextCompactor.close_tool_calls(state.context)),
       hooks_pending: %{},
       hook_terminal: nil,

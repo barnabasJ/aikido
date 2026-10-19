@@ -110,13 +110,14 @@ team = Agents.research_team_start!(%{
 Aikido infers the source OTP app from the agent/domain, or accepts native
 `tool_options` such as `[otp_app: :agent_examples]` or
 `[actions: [{AgentExamples.AI.LuaSurface, [:eval, :docs]}]]`.
-It calls `AshAi.build_tools_and_registry/1` inside I/O tasks and invokes the
-returned registry directly. Ash AI owns schemas, argument casting, authorization
+It calls `AshAi.build_tools_and_registry/1` once per run in an I/O task, reuses
+the descriptions across model turns, and invokes the returned registry directly
+for tool calls. Ash AI owns schemas, argument casting, authorization
 filtering, action execution and result serialization. Callers do not build,
 repackage or wrap callback functions.
 
 Snapshots retain tool names and configuration. Generated descriptions and
-execution functions are rebuilt as needed. Runtime-only functions supplied via
+execution functions are excluded from snapshots and rebuilt for new runs. Runtime-only functions supplied via
 other native Ash AI options require application serialization/reconstruction.
 
 Lua's outer execution/docs tools and its inner function surface are separate.

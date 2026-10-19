@@ -3,8 +3,8 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   Side-effect directive: runs one tool call.
 
   Emitted by the ReAct action, one per requested tool call. The executor
-  spawns a Task that rebuilds Ash AI's native registry from the configured
-  tool selection, invokes its named callback, and casts an
+  spawns a Task that invokes the named callback in the run's prepared
+  Ash AI registry and casts an
   `"ai.react.tool.completed"` signal carrying Ash AI's serialized result.
 
   Native tool errors pass through as model content; runtime failures become
@@ -18,11 +18,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   typed_struct do
     field :options, :term, default: %{}
     field :tool_call, :map, allow_nil?: false
-    field :tools, {:array, :atom}, allow_nil?: false, default: []
-
-    field :tool_options, Aikido.Types.Native,
-      default: [otp_app: :aikido],
-      constraints: [kind: :keyword_list]
+    field :registry, :map, allow_nil?: false, default: %{}
 
     field :tool_context, :map, allow_nil?: false, default: %{}
     field :request_id, :string, allow_nil?: false
@@ -79,7 +75,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         agent_pid,
         d.request_id,
         supervisor,
-        fn _notify, _attempt -> run_tool(d.tool_call, d.tools, d.tool_options, context) end,
+        fn _notify, _attempt -> run_tool(d.tool_call, d.registry, context) end,
         timeout: options.tool_timeout_ms,
         retries: options.tool_max_retries,
         backoff: options.retry_backoff_ms
@@ -110,17 +106,11 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
       )
   end
 
-  defp run_tool(%{name: name, arguments: args}, tools, options, context) do
+  defp run_tool(%{name: name, arguments: args}, registry, context) do
     ash_context =
       Map.put(Map.get(context, :context) || %{}, :aikido, Map.delete(context, :context))
 
     context = Map.put(context, :context, ash_context)
-
-    {_, registry} =
-      options
-      |> Keyword.merge(Ash.Scope.to_opts(context))
-      |> Keyword.put(:tools, tools)
-      |> AshAi.build_tools_and_registry()
 
     case Map.fetch(registry, name) do
       {:ok, callback} ->

@@ -27,11 +27,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     field :model, :term, allow_nil?: false
     field :client, :module, allow_nil?: false, default: ReqLLM.Generation
     field :context, :term, allow_nil?: false
-    field :tools, {:array, :atom}, allow_nil?: false, default: []
-
-    field :tool_options, Aikido.Types.Native,
-      default: [otp_app: :aikido],
-      constraints: [kind: :keyword_list]
+    field :tools, {:array, :term}, allow_nil?: false, default: []
 
     field :request_id, :string, allow_nil?: false
     field :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list], default: []
@@ -66,13 +62,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   defp run_and_dispatch(%LLMCall{} = d, agent_pid, source, scope, supervisor) do
     options = Aikido.AI.Options.resolve(d.options)
 
-    {tools, _registry} =
-      d.tool_options
-      |> Keyword.merge(Ash.Scope.to_opts(scope))
-      |> Keyword.put(:tools, d.tools)
-      |> AshAi.build_tools_and_registry()
-
-    llm_opts = Keyword.put(d.llm_opts, :tools, tools)
+    llm_opts = Keyword.put(d.llm_opts, :tools, d.tools)
     messages = Context.to_list(d.context)
 
     result =

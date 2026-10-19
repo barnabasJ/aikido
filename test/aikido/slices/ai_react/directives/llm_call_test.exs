@@ -19,7 +19,12 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
     %LLMCall{
       model: Keyword.get(opts, :model, "anthropic:claude-haiku-4-5-20251001"),
       context: Keyword.get(opts, :context, Context.new([Context.user("hi")])),
-      tools: Keyword.get(opts, :tools, [:test_add]),
+      tools:
+        AshAi.build_tools_and_registry(
+          otp_app: :aikido,
+          tools: Keyword.get(opts, :tools, [:test_add])
+        )
+        |> elem(0),
       request_id: Keyword.get(opts, :request_id, "req_1"),
       llm_opts: Keyword.get(opts, :llm_opts, max_tokens: 64)
     }

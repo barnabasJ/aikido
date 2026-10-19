@@ -1,6 +1,6 @@
 defmodule Aikido.Slices.AiReact.AskTest do
   use ExUnit.Case, async: true
-  alias Aikido.Slices.AiReact.Directives.LLMCall
+  alias Aikido.Slices.AiReact.Directives.{LLMCall, PrepareTools}
   alias ReqLLM.Context
 
   defp ask_signal(overrides \\ %{}) do
@@ -66,14 +66,17 @@ defmodule Aikido.Slices.AiReact.AskTest do
     assert Enum.at(messages, 0).role == :system
     assert Enum.at(messages, 1).role == :user
 
-    assert %LLMCall{
-             model: "anthropic:claude-haiku-4-5-20251001",
-             tools: [:test_add],
-             request_id: "req_test_1",
-             llm_opts: [max_tokens: 64]
-           } = directive
+    assert %PrepareTools{} = directive
 
-    assert directive.context == new_slice.context
+    assert [
+             %LLMCall{
+               model: "anthropic:claude-haiku-4-5-20251001",
+               request_id: "req_test_1",
+               llm_opts: [max_tokens: 64]
+             }
+           ] = new_slice.tool_preparation
+
+    assert hd(new_slice.tool_preparation).context == new_slice.context
   end
 
   test "omits the system message when no system_prompt is given" do
@@ -135,7 +138,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
   end
 
   test "accepts the ask when the slice is nil (uninitialized)" do
-    {:ok, %{status: :running}, [%LLMCall{}]} =
+    {:ok, %{status: :running}, [%PrepareTools{}]} =
       AikidoTest.NativeAction.run(
         {Aikido.Slices.AiReact, :ask},
         ask_signal(),

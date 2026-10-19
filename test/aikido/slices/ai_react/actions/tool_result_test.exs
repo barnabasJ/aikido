@@ -7,6 +7,7 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
   defp slice_with_pending(calls, opts \\ []) do
     %{
       status: :running,
+      prepared_tools: {[], %{}},
       request_id: Keyword.get(opts, :request_id, "req_1"),
       context: Keyword.get(opts, :context, Context.new([Context.user("hi")])),
       iteration: Keyword.get(opts, :iteration, 1),
@@ -73,7 +74,7 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
     assert new_slice.previous_tool_signature == AiReact.tool_call_signature(calls)
     assert directive.context == new_slice.context
     assert directive.model == slice.model
-    assert directive.tools == slice.tools
+    assert directive.tools == elem(slice.prepared_tools, 0)
     assert directive.request_id == slice.request_id
     assert directive.llm_opts == slice.llm_opts
   end

@@ -2,14 +2,100 @@ defmodule Aikido.Slices.AiReact.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
 
+  alias Aikido.Slices.AiReact.Directives.{LLMCall, PrepareTools, ToolExec}
+
   @impl true
-  def run(input, [action: :hook_completed], _context),
+  def run(input, opts, context) do
+    case handle(input, opts, context) do
+      {:ok, %{state: state, directives: []}} = unchanged when state == input.arguments.state ->
+        unchanged
+
+      result ->
+        prepare_tools(result)
+    end
+  end
+
+  defp prepare_tools({:ok, result}) do
+    state = result.state
+
+    cond do
+      state.status not in [:running, :waiting] ->
+        {:ok,
+         %{
+           result
+           | state:
+               Map.merge(state, %{
+                 prepared_tools: nil,
+                 tool_preparation: []
+               })
+         }}
+
+      prepared = Map.get(state, :prepared_tools) ->
+        directives =
+          Enum.map(result.directives, fn
+            %LLMCall{} = effect -> %{effect | tools: elem(prepared, 0)}
+            %ToolExec{} = effect -> %{effect | registry: elem(prepared, 1)}
+            effect -> effect
+          end)
+
+        {:ok, %{result | directives: directives}}
+
+      true ->
+        {waiting, other} =
+          Enum.split_with(
+            result.directives,
+            &match?(%{__struct__: module} when module in [LLMCall, ToolExec], &1)
+          )
+
+        pending = Map.get(state, :tool_preparation, []) ++ waiting
+        state = Map.put(state, :tool_preparation, pending)
+
+        if pending != [] && Map.get(result.state, :tool_preparation, []) == [] do
+          effect = %PrepareTools{
+            tools: state.tools,
+            tool_options: state.tool_options,
+            request_id: state.request_id
+          }
+
+          {:ok,
+           %{
+             result
+             | state: state,
+               directives: other ++ [effect]
+           }}
+        else
+          {:ok, %{result | state: state, directives: other}}
+        end
+    end
+  end
+
+  defp prepare_tools(error), do: error
+
+  defp handle(input, [action: :tools_ready], _context) do
+    state = input.arguments.state
+
+    if state.request_id == input.arguments.request_id && state.status == :running &&
+         Map.get(state, :tool_preparation, []) != [] do
+      directives = state.tool_preparation
+
+      state =
+        state
+        |> Map.put(:prepared_tools, input.arguments.prepared_tools)
+        |> Map.put(:tool_preparation, [])
+
+      Aikido.ActionResult.new(state: state, directives: directives)
+    else
+      Aikido.ActionResult.new(state: state)
+    end
+  end
+
+  defp handle(input, [action: :hook_completed], _context),
     do: Aikido.Hooks.completed(input.arguments.state, Map.delete(input.arguments, :state))
 
-  def run(input, [action: :hook_context], _context),
+  defp handle(input, [action: :hook_context], _context),
     do: Aikido.Hooks.context(input.arguments.state, Map.delete(input.arguments, :state))
 
-  def run(input, [action: action], context) when action in [:message, :deliver] do
+  defp handle(input, [action: action], context) when action in [:message, :deliver] do
     state = input.arguments.state
     scope = caller_scope(input)
 
@@ -21,7 +107,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  def run(input, [action: :handoff], _context) do
+  defp handle(input, [action: :handoff], _context) do
     state = input.arguments.state
 
     if state.status in [:running, :waiting] do
@@ -33,7 +119,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  def run(input, [action: :todo_changed], _context) do
+  defp handle(input, [action: :todo_changed], _context) do
     state = input.arguments.state
 
     if state.status == :waiting do
@@ -47,7 +133,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  def run(input, [action: :stream], _context) do
+  defp handle(input, [action: :stream], _context) do
     data = input.arguments
     state = data.state
 
@@ -71,12 +157,16 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  def run(%{arguments: %{state: %{hook_terminal: terminal}}} = input, [action: action], _context)
-      when not is_nil(terminal) and action in [:llm_turn, :tool_result, :failed] do
+  defp handle(
+         %{arguments: %{state: %{hook_terminal: terminal}}} = input,
+         [action: action],
+         _context
+       )
+       when not is_nil(terminal) and action in [:llm_turn, :tool_result, :failed] do
     Aikido.ActionResult.new(state: input.arguments.state)
   end
 
-  def run(input, [action: action] = opts, context) do
+  defp handle(input, [action: action] = opts, context) do
     result = decide(input, opts, context)
     result = if action == :ask, do: bind_scope(result, input), else: result
 
@@ -372,6 +462,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
     new_slice = %{
       status: :running,
+      prepared_tools: nil,
+      tool_preparation: [],
       options: options,
       run_metadata: data[:metadata] || %{},
       queued_messages: [],
@@ -409,8 +501,6 @@ defmodule Aikido.Slices.AiReact.Implementation do
       client: client,
       model: model,
       context: context,
-      tools: tools,
-      tool_options: new_slice.tool_options,
       request_id: data.request_id,
       llm_opts: llm_opts
     }
@@ -477,8 +567,6 @@ defmodule Aikido.Slices.AiReact.Implementation do
         client: Map.get(slice, :client, ReqLLM.Generation),
         model: slice.model,
         context: context,
-        tools: slice.tools,
-        tool_options: Map.get(slice, :tool_options, otp_app: :aikido),
         request_id: slice.request_id,
         llm_opts: slice.llm_opts,
         options: Map.get(slice, :options, %{}),
@@ -536,8 +624,6 @@ defmodule Aikido.Slices.AiReact.Implementation do
         %Aikido.Slices.AiReact.Directives.ToolExec{
           options: Map.get(slice, :options, %{}),
           tool_call: call,
-          tools: slice.tools,
-          tool_options: Map.get(slice, :tool_options, otp_app: :aikido),
           tool_context: Map.get(slice, :tool_context, %{}),
           request_id: slice.request_id
         }
@@ -600,8 +686,6 @@ defmodule Aikido.Slices.AiReact.Implementation do
       client: Map.get(slice, :client, ReqLLM.Generation),
       model: slice.model,
       context: warned_context,
-      tools: slice.tools,
-      tool_options: Map.get(slice, :tool_options, otp_app: :aikido),
       request_id: slice.request_id,
       llm_opts: slice.llm_opts
     }

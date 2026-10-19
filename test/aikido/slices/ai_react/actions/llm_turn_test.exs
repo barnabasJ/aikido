@@ -7,6 +7,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
   defp running_slice(opts \\ []) do
     %{
       status: :running,
+      prepared_tools: {[], %{}},
       request_id: Keyword.get(opts, :request_id, "req_1"),
       context: Keyword.get(opts, :context, Context.new([Context.user("hi")])),
       iteration: Keyword.get(opts, :iteration, 0),
@@ -73,7 +74,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
       assert new_slice.tool_results_received == []
       # LLMTurn does NOT update previous_tool_signature — that's ToolResult's job.
       assert new_slice.previous_tool_signature == nil
-      assert [%ToolExec{tool_call: tc, tools: [:test_add], request_id: "req_1"}] = directives
+      assert [%ToolExec{tool_call: tc, registry: %{}, request_id: "req_1"}] = directives
       assert tc.id == "call_1"
       messages = Context.to_list(new_slice.context)
       assistant = List.last(messages)

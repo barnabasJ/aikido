@@ -267,8 +267,17 @@ registry directly. There is no per-tool Aikido tuple or callback wrapper.
 Native tool action errors reach the model unchanged as Ash AI's formatted content;
 execution deadlines and crashes are handled by the bounded I/O task.
 
-Snapshots retain tool names and configuration; generated tool descriptions and
-callback registries exist only inside I/O tasks and are rebuilt after restoration.
+Aikido builds descriptions and the callback registry once per ReAct run, before
+its first model or tool effect. Later turns and parallel tool calls reuse them;
+callbacks still receive the current invocation context. Finishing or cancelling
+the run releases the prepared tools. A new run builds from its selected tools
+and caller scope again.
+
+The prepared tools live in transient slice state, populated by a preparation
+result signal. The slice's persistence callbacks remove them from snapshots;
+only tool names and configuration are retained. Restoring an active run keeps
+the existing interrupted-run behavior; the next run prepares fresh tools before
+executing. Restoration does not replay an in-flight tool automatically.
 Configuration intended for persistence must be declarative. Native Ash AI
 options that contain application functions are not reconstructable configuration;
 applications supplying those must handle them in their serialization callbacks.
