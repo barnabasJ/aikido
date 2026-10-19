@@ -4,7 +4,12 @@ defmodule AgentExamples.AI.Demo do
 
   def run do
     with_resource(
-      Agents.assistant_start!(AI.offline(%{tools: AI.Tools.for_assistant("single")})),
+      Agents.assistant_start!(
+        AI.offline(%{
+          tool_context: %{context: %{stamp_label: "single"}},
+          tools: AI.Tools.for_assistant()
+        })
+      ),
       fn assistant ->
         {:ok, answer} = AI.ask(assistant, "Signals carry results")
         IO.puts("Single agent: #{answer}")
@@ -14,7 +19,8 @@ defmodule AgentExamples.AI.Demo do
     with_resource(
       Agents.research_team_start!(
         AI.offline(%{
-          tools: AI.Tools.for_assistant("research") ++ AI.Tools.from_ash_ai()
+          tool_context: %{context: %{stamp_label: "research"}},
+          tools: AI.Tools.for_assistant() ++ AI.Tools.from_ash_ai()
         })
       ),
       fn team ->
@@ -46,7 +52,8 @@ defmodule AgentExamples.AI.Demo do
     # Inline specs support model IDs newer than the installed model catalog.
     configuration = %{
       model: %{provider: provider, id: id},
-      tools: AI.Tools.for_assistant("live") ++ AI.Tools.from_ash_ai()
+      tool_context: %{context: %{stamp_label: "live"}},
+      tools: AI.Tools.for_assistant() ++ AI.Tools.from_ash_ai()
     }
 
     with_resource(Agents.research_team_start!(configuration), fn team ->

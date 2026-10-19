@@ -72,11 +72,11 @@ Both resource kinds accept runtime configuration and tools:
 ```elixir
 alias AgentExamples.{Agents, AI}
 
-tools = AI.Tools.for_assistant("my workspace") ++ AI.Tools.from_ash_ai()
+tools = AI.Tools.for_assistant() ++ AI.Tools.from_ash_ai()
 team = Agents.research_team_start!(AI.offline(%{tools: tools}))
 {:ok, answer} = AI.ask(team, "orchestrate: Signals carry results")
 
-assistant = Agents.assistant_start!(AI.offline(%{tools: AI.Tools.for_assistant("solo")}))
+assistant = Agents.assistant_start!(AI.offline(%{tools: AI.Tools.for_assistant()}))
 {:ok, answer} = AI.ask(assistant, "Signals carry results")
 
 Agents.research_team_stop!(team)
@@ -90,42 +90,39 @@ and subscribe to `ai.react.**` for intermediate state. The caller need not know
 whether the resource delegates work internally. Tools run in supervised tasks;
 they never block a directive executor or write agent state directly.
 
-## Tools are runtime values
+## Native Ash AI tool configuration
 
-The agent DSL does not enumerate its tools. Pass the list in `create` input.
-The same resource can have different tools in every instance. Supported entries:
-
-- A `%ReqLLM.Tool{}` created at runtime, with an anonymous callback or MFA.
-- A `{%ReqLLM.Tool{}, callback}` pair, where `callback` accepts arguments and
-  runtime context. This is the shape used by Ash AI's callback registry.
-- An `{AshResource, :generic_action}` pair or a `Aikido.Action` module.
-
-`AI.Tools.for_assistant/1` uses Ash AI to generate both tool schemas and callbacks
-from native Ash actions. Its caller-specific label is injected into the Ash
-action context; no JSON schema or tool executor is hand-written. Model tool calls resolve only
-against the supplied runtime list; nothing scans a global tool registry.
-
-For Ash AI, retain its real execution callbacks:
+Pass Ash AI tool names at creation or per request. Different instances of the
+same resource can select different tools:
 
 ```elixir
-{definitions, registry} = AshAi.build_tools_and_registry(
-  otp_app: :agent_examples,
-  tools: [:ash_text_stats, :run_lua, :lua_docs]
-)
-
-tools = Enum.map(definitions, &{&1, Map.fetch!(registry, &1.name)})
 team = Agents.research_team_start!(%{
   model: runtime_model,
-  tools: AI.Tools.for_assistant("workspace") ++ tools,
-  tool_context: %{actor: current_user, tenant: workspace_id}
+  tools: [:text_stats, :stamp, :run_lua, :lua_docs],
+  tool_context: %{context: %{stamp_label: "workspace"}}
 })
+
+{:ok, answer} = AI.ask(team, "orchestrate: Signals carry results",
+  ash: [actor: current_user, tenant: workspace_id]
+)
 ```
 
-The definition alone contains Ash AI's stub callback. Passing the paired
-registry callback executes the actual Ash action, preserving its result and
-runtime context. `tool_context` is passed to contextual callbacks, including
-Ash AI's actor/tenant handling. Applications remain responsible for choosing
-and authorizing that context.
+Aikido infers the source OTP app from the agent/domain, or accepts native
+`tool_options` such as `[otp_app: :agent_examples]` or
+`[actions: [{AgentExamples.AI.LuaSurface, [:eval, :docs]}]]`.
+It calls `AshAi.build_tools_and_registry/1` inside I/O tasks and invokes the
+returned registry directly. Ash AI owns schemas, argument casting, authorization
+filtering, action execution and result serialization. Callers do not build,
+repackage or wrap callback functions.
+
+Snapshots retain tool names and configuration. Generated descriptions and
+execution functions are rebuilt as needed. Runtime-only functions supplied via
+other native Ash AI options require application serialization/reconstruction.
+
+Lua's outer execution/docs tools and its inner function surface are separate.
+The application can derive both `AshLua.Eval.run/2` and `docs/2` entrypoints
+from the same per-agent shared context. The scoped Lua integration tests cover
+different per-agent manifests, matching docs, actor/tenant and durable restart.
 
 `AgentExamples.AI.LuaSurface` uses `AshLua.EvalActions` to generate `:eval` and
 `:docs`. `AgentExamples.Agents` exposes those through Ash AI as `run_lua` and

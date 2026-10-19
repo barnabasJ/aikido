@@ -67,8 +67,8 @@ Elixir 1.19 and OTP 28 or later are required. The app includes `Aikido` in its s
 its own agents, so it can be run repeatedly. It reserves IDs beginning `demo-`.
 
 The [AI examples](AI.md) add a top-level AI orchestrator, fixed workers,
-dynamic workers created by the orchestrator and its workers, runtime tool
-objects, Ash AI action tools, and an AshLua tool surface. Run `mix ai.demo`
+dynamic workers created by the orchestrator and its workers, native Ash AI tool
+selection and configuration, and an AshLua tool surface. Run `mix ai.demo`
 offline or `mix ai.live` with a z.ai key.
 
 ## Examples

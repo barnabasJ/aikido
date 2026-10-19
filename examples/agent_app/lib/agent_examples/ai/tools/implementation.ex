@@ -71,7 +71,15 @@ defmodule AgentExamples.AI.Tools.Implementation do
 
   defp initial_state(caller, resource, specialty) do
     caller
-    |> Map.take([:tools, :tool_context, :model, :client, :max_iterations, :llm_opts])
+    |> Map.take([
+      :tools,
+      :tool_options,
+      :tool_context,
+      :model,
+      :client,
+      :max_iterations,
+      :llm_opts
+    ])
     |> Map.put(:specialty, specialty)
     |> Map.filter(fn {name, _} -> Ash.Resource.Info.attribute(resource, name) end)
   end

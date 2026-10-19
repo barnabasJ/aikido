@@ -13,7 +13,7 @@ defmodule AgentExamples.ResearchSquad do
   end
 
   team do
-    inherit [:tools, :tool_context, :model, :client, :max_iterations]
+    inherit [:tools, :tool_options, :tool_context, :model, :client, :max_iterations]
     member :analyst, AgentExamples.Researcher
     worker :researcher, AgentExamples.Researcher, max_members: 6
   end

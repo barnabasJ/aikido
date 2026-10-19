@@ -3,7 +3,14 @@ defmodule AgentExamples.AI do
 
   @doc "Explicit configuration for offline examples and tests."
   def offline(attributes \\ %{}) do
-    Map.merge(%{model: "offline", client: AgentExamples.AI.ScriptedClient}, attributes)
+    Map.merge(
+      %{
+        model: "offline",
+        client: AgentExamples.AI.ScriptedClient,
+        tool_options: [otp_app: :agent_examples]
+      },
+      attributes
+    )
   end
 
   def ask(record, query, opts \\ []) do

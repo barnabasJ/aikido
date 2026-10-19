@@ -362,12 +362,12 @@ defmodule AgentExamples.Playground do
           end
         end)
 
-      tools = AI.Tools.for_assistant("browser")
+      tools = AI.Tools.for_assistant()
       tools = if options["lua"] == "true", do: tools ++ AI.Tools.from_ash_ai(), else: tools
 
       tools =
         if example.kind == :ai_team && options["lua"] != "true" do
-          tools ++ [{AI.Tools, :team_roster}, {AI.Tools, :spawn_worker}, {AI.Tools, :delegate}]
+          tools ++ [:team_roster, :spawn_worker, :delegate]
         else
           tools
         end

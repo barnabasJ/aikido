@@ -70,7 +70,7 @@ defmodule AgentExamples.AITest do
   end
 
   test "AI teams accept caller-defined topology and inherit runtime model and tools" do
-    tools = AI.Tools.for_assistant("custom-topology")
+    tools = AI.Tools.for_assistant()
 
     team =
       track(
@@ -95,14 +95,24 @@ defmodule AgentExamples.AITest do
     assistant =
       track(
         snapshot_result(
-          Agents.assistant_start!(AI.offline(%{tools: AI.Tools.for_assistant("solo")}))
+          Agents.assistant_start!(
+            AI.offline(%{
+              tool_context: %{context: %{stamp_label: "solo"}},
+              tools: AI.Tools.for_assistant()
+            })
+          )
         )
       )
 
     team =
       track(
         snapshot_result(
-          Agents.research_team_start!(AI.offline(%{tools: AI.Tools.for_assistant("team")}))
+          Agents.research_team_start!(
+            AI.offline(%{
+              tool_context: %{context: %{stamp_label: "team"}},
+              tools: AI.Tools.for_assistant()
+            })
+          )
         )
       )
 
@@ -115,7 +125,7 @@ defmodule AgentExamples.AITest do
   end
 
   test "orchestrator and fixed worker both create and delegate to dynamic workers" do
-    tools = AI.Tools.for_team("inherited")
+    tools = AI.Tools.for_team()
     team = track(snapshot_result(Agents.research_team_start!(AI.offline(%{tools: tools}))))
     assert Map.keys(team.team.members) |> Enum.sort() == [:analyst, :reviewer]
 
@@ -159,7 +169,7 @@ defmodule AgentExamples.AITest do
   test "actual Ash AI callbacks and AshLua tools run through the model loop" do
     tools = AI.Tools.from_ash_ai()
 
-    assert Enum.sort(Enum.map(tools, fn {tool, _} -> tool.name end)) ==
+    assert Enum.sort(Enum.map(tools, &to_string/1)) ==
              ["ash_text_stats", "lua_docs", "run_lua"]
 
     assistant = track(snapshot_result(Agents.assistant_start!(AI.offline(%{tools: tools}))))
@@ -170,36 +180,20 @@ defmodule AgentExamples.AITest do
     refute answer =~ "Tool error:"
   end
 
-  test "a runtime callback pair receives its context and never executes the schema stub" do
-    owner = self()
-
-    {tool, _native_callback} =
-      Enum.find(AI.Tools.for_assistant(), fn {tool, _} -> tool.name == "stamp" end)
-
-    tool = %{tool | callback: fn _ -> flunk("The schema stub must never run") end}
-
-    callback = fn arguments, context ->
-      send(owner, {:tool_context, context.actor, context.tenant, arguments})
-      {:ok, Jason.encode!(%{label: "callback", text: arguments["input"]["text"]}), %{raw: true}}
-    end
-
+  test "native Ash AI tools receive per-instance application context" do
     assistant =
       track(
         snapshot_result(
           Agents.assistant_start!(
             AI.offline(%{
-              tools: [{tool, callback}],
-              tool_context: %{actor: %{id: "caller"}, tenant: "workspace"}
+              tools: [:stamp],
+              tool_context: %{context: %{stamp_label: "context"}}
             })
           )
         )
       )
 
-    assert {:ok, "callback: hello"} =
-             AI.ask(assistant, "hello", ash: [actor: %{id: "caller"}, tenant: "workspace"])
-
-    assert_receive {:tool_context, %{id: "caller"}, "workspace",
-                    %{"input" => %{"text" => "hello"}}}
+    assert {:ok, "context: hello"} = AI.ask(assistant, "hello")
   end
 
   test "an AI orchestrator and its worker spawn agents using only AshLua tools" do
@@ -213,7 +207,7 @@ defmodule AgentExamples.AITest do
     assert current.team.topology.nodes["analyst-helper"].owner == :analyst
     assert map_size(current.team.members) == 4
     assert Enum.all?(current.team.tasks, fn {_, task} -> task.status == :completed end)
-    assert Enum.all?(tools, fn {tool, _} -> tool.name not in ["spawn_worker", "delegate"] end)
+    assert Enum.all?(tools, &(&1 not in [:spawn_worker, :delegate]))
   end
 
   test "Lua can spawn teams, scope nested team management, and stop and remove owned workers" do
@@ -320,14 +314,24 @@ defmodule AgentExamples.AITest do
     first =
       track(
         snapshot_result(
-          Agents.assistant_start!(AI.offline(%{tools: AI.Tools.for_assistant("first")}))
+          Agents.assistant_start!(
+            AI.offline(%{
+              tool_context: %{context: %{stamp_label: "first"}},
+              tools: AI.Tools.for_assistant()
+            })
+          )
         )
       )
 
     second =
       track(
         snapshot_result(
-          Agents.assistant_start!(AI.offline(%{tools: AI.Tools.for_assistant("second")}))
+          Agents.assistant_start!(
+            AI.offline(%{
+              tool_context: %{context: %{stamp_label: "second"}},
+              tools: AI.Tools.for_assistant()
+            })
+          )
         )
       )
 
@@ -335,7 +339,7 @@ defmodule AgentExamples.AITest do
     assert {:ok, second_answer} = AI.ask(second, "hello")
     assert first_answer =~ "first: hello"
     assert second_answer =~ "second: hello"
-    assert {:error, _} = snapshot_result(Agents.assistant_start(%{tools: ["unknown"]}))
+    assert {:error, _} = snapshot_result(Agents.assistant_start(%{tools: [%{}]}))
 
     assert {:error, _} =
              snapshot_result(Agents.assistant_start(%{tools: [{AI.Tools, :missing_action}]}))

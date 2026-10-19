@@ -22,6 +22,11 @@ defmodule AgentExamples.Agents do
   end
 
   tools do
+    tool :team_roster, AgentExamples.AI.Tools, :team_roster
+    tool :spawn_worker, AgentExamples.AI.Tools, :spawn_worker
+    tool :delegate, AgentExamples.AI.Tools, :delegate
+    tool :stop_worker, AgentExamples.AI.Tools, :stop_worker
+    tool :remove_worker, AgentExamples.AI.Tools, :remove_worker
     tool :text_stats, AgentExamples.AI.Tools, :text_stats
     tool :stamp, AgentExamples.AI.Tools, :stamp
     tool :ash_text_stats, AgentExamples.AI.Tools, :text_stats
