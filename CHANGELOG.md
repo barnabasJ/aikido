@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Remove the unused sensor abstraction, runtime, DSL, generator and fixtures,
+  including sensor subscription declarations on slices. Use agents, slices,
+  directives and schedules for event-producing capabilities.
+
 - Remove generated runtime wrappers and private configuration accessors from
   instance modules. Keep supervision entry points on the Spark host, read DSL
   configuration through `Aikido.Dsl.Instance.Info`, and use `Aikido.config/2`

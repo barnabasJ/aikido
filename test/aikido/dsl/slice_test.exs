@@ -104,7 +104,6 @@ defmodule Aikido.Dsl.SliceTest do
                {"minimal.noop", AikidoTest.PluginTestAction}
              ]
 
-      assert Aikido.Dsl.Slice.Info.subscriptions(Aikido.Dsl.SliceTest.MinimalSlice) == []
       assert Aikido.Dsl.Slice.Info.schedules(Aikido.Dsl.SliceTest.MinimalSlice) == []
       assert Aikido.Dsl.Slice.Info.requires(Aikido.Dsl.SliceTest.MinimalSlice) == []
 

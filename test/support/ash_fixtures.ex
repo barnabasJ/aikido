@@ -195,10 +195,6 @@ defmodule AikidoTest.AshFixtures.CounterSlice do
     route "slice.internal", :internal
   end
 
-  subscriptions do
-    subscription Aikido.Sensors.Heartbeat, %{interval: 3_600_000}
-  end
-
   schedules do
     schedule "0 0 1 1 *", :tick, data: %{amount: 1}
   end

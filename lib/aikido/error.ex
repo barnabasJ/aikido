@@ -8,7 +8,7 @@ defmodule Aikido.Error do
 
   | Error | Use Case |
   |-------|----------|
-  | `ValidationError` | Invalid inputs, actions, sensors, configs |
+  | `ValidationError` | Invalid inputs, actions, configs |
   | `ExecutionError` | Runtime failures during execution or planning |
   | `RoutingError` | Signal routing and dispatch failures |
   | `TimeoutError` | Operation timeouts |
@@ -112,12 +112,12 @@ defmodule Aikido.Error do
     @moduledoc """
     Error for validation failures.
 
-    Covers invalid inputs, actions, sensors, and configurations.
+    Covers invalid inputs, actions, and configurations.
 
     ## Fields
 
     - `message` - Human-readable error message
-    - `kind` - Category: `:input`, `:action`, `:sensor`, `:config`
+    - `kind` - Category: `:input`, `:action`, `:config`
     - `subject` - The invalid value (field name, action module, etc.)
     - `details` - Additional context
     """
@@ -127,7 +127,7 @@ defmodule Aikido.Error do
 
     @type t :: %__MODULE__{
             message: String.t(),
-            kind: :input | :action | :sensor | :config | nil,
+            kind: :input | :action | :config | nil,
             subject: any(),
             details: map()
           }
@@ -275,11 +275,10 @@ defmodule Aikido.Error do
 
   ## Options
 
-  - `:kind` - Category: `:input`, `:action`, `:sensor`, `:config`
+  - `:kind` - Category: `:input`, `:action`, `:config`
   - `:subject` - The invalid value
   - `:field` - Alias for `:subject` (for input validation)
   - `:action` - Alias for `:subject` with `kind: :action`
-  - `:sensor` - Alias for `:subject` with `kind: :sensor`
   - `:details` - Additional context map
 
   ## Examples
@@ -295,7 +294,6 @@ defmodule Aikido.Error do
     {kind, subject} =
       cond do
         opts[:action] -> {:action, opts[:action]}
-        opts[:sensor] -> {:sensor, opts[:sensor]}
         opts[:field] -> {:input, opts[:field]}
         true -> {opts[:kind], opts[:subject]}
       end
@@ -304,7 +302,7 @@ defmodule Aikido.Error do
       message: message,
       kind: kind,
       subject: subject,
-      details: merge_extra_details(opts, [:kind, :subject, :action, :sensor, :field])
+      details: merge_extra_details(opts, [:kind, :subject, :action, :field])
     )
   end
 
@@ -532,7 +530,6 @@ defmodule Aikido.Error do
 
   # Maps error structs to unified type atoms
   defp unified_type(%ValidationError{kind: :action}), do: :invalid_action
-  defp unified_type(%ValidationError{kind: :sensor}), do: :invalid_sensor
   defp unified_type(%ValidationError{kind: :config}), do: :config_error
   defp unified_type(%ValidationError{}), do: :validation_error
   defp unified_type(%ExecutionError{phase: :planning}), do: :planning_error

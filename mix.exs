@@ -108,7 +108,6 @@ defmodule Aikido.MixProject do
         Slices: [~r/^Aikido\.(?:Slice|Slices)(?:\.|$)/],
         Runtime: [Aikido, Aikido.Agent, Aikido.AgentServer, ~r/^Aikido\.AgentServer\./],
         "Types and DSL": [~r/^Aikido\.(?:Types|Dsl)(?:\.|$)/],
-        Sensors: [~r/^Aikido\.(?:Sensor|Sensors)(?:\.|$)/],
         Observability: [~r/^Aikido\.(?:Observe|Debug|Telemetry|Tracing)(?:\.|$)/]
       ]
     ]
@@ -181,7 +180,7 @@ defmodule Aikido.MixProject do
     dsl_extensions =
       Enum.join(
         ~w(Aikido.Dsl.Agent Aikido.Dsl.Slice Aikido.Dsl.Middleware
-           Aikido.Dsl.Sensor Aikido.Dsl.Instance Aikido.Ash.Agent Aikido.Ash.Slice
+           Aikido.Dsl.Instance Aikido.Ash.Agent Aikido.Ash.Slice
            Aikido.Ash.Team Aikido.Ash.AI Aikido.Ash.Domain Aikido.Slices.AiReact
            Aikido.Slices.Memory Aikido.Slices.Identity Aikido.Slices.Thread Ash.TypedStruct.Dsl),
         ","

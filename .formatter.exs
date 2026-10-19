@@ -70,8 +70,6 @@ spark_locals_without_parens = [
   state_transform: 1,
   static: 1,
   storage: 1,
-  subscription: 2,
-  subscription: 3,
   system_prompt: 1,
   tags: 1,
   temperature: 1,

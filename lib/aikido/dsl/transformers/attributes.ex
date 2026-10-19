@@ -7,7 +7,7 @@ defmodule Aikido.Dsl.Transformers.Attributes do
 
   def transform(dsl) do
     module = Transformer.get_persisted(dsl, :module)
-    section = Enum.find([:agent, :slice, :sensor], &Map.has_key?(dsl, [&1]))
+    section = Enum.find([:agent, :slice], &Map.has_key?(dsl, [&1]))
     declared = Transformer.get_entities(dsl, [section, :schema])
     dsl = Enum.reduce(declared, dsl, &Transformer.add_entity(&2, [:attributes], &1))
 

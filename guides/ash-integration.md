@@ -255,15 +255,10 @@ may be omitted. The agent pipeline applies the returned state and executes the
 directives. Runtime action context is available under `input.context.aikido`.
 Keep these action implementations pure.
 
-Resource slices also support `subscriptions` and `schedules` sections. Sensor
-subscriptions use the existing Aikido sensor modules. Schedules reference generic
-Ash action names and send their configured data through the same action adapter:
+Resource slices support a `schedules` section. Schedules reference generic Ash
+action names and send their configured data through the same action adapter:
 
 ```elixir
-subscriptions do
-  subscription Aikido.Sensors.Heartbeat, %{interval: 60_000}
-end
-
 schedules do
   schedule "*/5 * * * *", :increment, data: %{amount: 1}
 end
@@ -345,7 +340,7 @@ process side effects cannot be rolled back as a database transaction.
 
 ## Migration
 
-`Aikido.Agent`, `Aikido.Slice`, and `Aikido.Sensor` are convenience macros over
+`Aikido.Agent` and `Aikido.Slice` are convenience macros over
 native Ash resource hosts. Their state declarations become resource attributes.
 Use `Ash.Resource` with `Aikido.Ash.Agent` and domain interfaces for the public
 agent API. The generated `Runtime` module supplies the pure decision engine.
@@ -358,7 +353,7 @@ callbacks with `Ash.Resource.Actions.Implementation` modules and reference them
 with `run MyApp.Implementation` on the owning resource.
 
 Agent and slice `schema do` declarations become attributes on their existing
-Ash resources. Sensors also own native attributes. Slice configuration is cast
+Ash resources. Slice configuration is cast
 through a private native generic action on the same resource, including argument
 defaults and constraints. No generated schema modules are needed. Native
 Ash constructors and changesets handle defaults, casting, and validation;

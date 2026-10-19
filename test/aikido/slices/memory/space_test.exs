@@ -38,8 +38,8 @@ defmodule AikidoTest.Memory.SpaceTest do
     end
 
     test "creates map space with metadata" do
-      space = Space.new_kv(metadata: %{source: :sensor})
-      assert space.metadata == %{source: :sensor}
+      space = Space.new_kv(metadata: %{source: :external})
+      assert space.metadata == %{source: :external}
     end
   end
 

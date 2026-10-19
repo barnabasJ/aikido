@@ -22,7 +22,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Author actions for domain behavior; let agents orchestrate state + directive emission.
 - Use `Directive.SpawnAgent` / `Directive.StopChild` for hierarchy, not ad-hoc child tracking.
 - Use signals for cross-agent communication instead of direct process coupling.
-- Keep plugin/sensor concerns isolated and composable.
+- Keep slice capabilities isolated and composable.
 
 ## QA Patterns
 - Start with pure `cmd/2` tests, then add AgentServer integration tests.

@@ -1,7 +1,7 @@
 defmodule Aikido.Slice do
   @moduledoc """
   A Slice is a declarative bundle of agent-state schema, actions, signal
-  routes, sensor subscriptions, and schedules.
+  routes and schedules.
 
   The mounting agent assigns its key in `agent.state`. Native Ash actions
   receive the slice in `input.arguments.state` and return `Aikido.ActionResult`.
@@ -43,7 +43,6 @@ defmodule Aikido.Slice do
   - `slice do … end` — slice identity (`name`, `description`,
     `category`, `vsn`, `otp_app`, `schema`, `config_schema`, `tags`).
   - `signal_routes do … end` — `route "type", Action, opts` entries.
-  - `subscriptions do … end` — `subscription Sensor, %{config}` entries.
   - `schedules do … end` — `schedule "cron", Action, %{data}` entries.
   - `capabilities do … end` — `capability :name` entries.
   - `requires do … end` — `requires :kind, :name` entries.

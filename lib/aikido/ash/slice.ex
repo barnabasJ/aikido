@@ -57,13 +57,6 @@ defmodule Aikido.Ash.Slice do
     schema: Enum.find(Aikido.Dsl.Slice.sections(), &(&1.name == :slice)).schema,
     entities: [@route]
   }
-  @subscription %Spark.Dsl.Entity{
-    name: :subscription,
-    target: Aikido.Slice.SubscriptionEntry,
-    args: [:sensor, :config],
-    schema: [sensor: [type: :module, required: true], config: [type: :map, default: %{}]]
-  }
-  @subscriptions %Spark.Dsl.Section{name: :subscriptions, entities: [@subscription]}
   @schedule %Spark.Dsl.Entity{
     name: :schedule,
     target: Schedule,
@@ -79,7 +72,7 @@ defmodule Aikido.Ash.Slice do
   @schedules %Spark.Dsl.Section{name: :schedules, entities: [@schedule]}
   use Spark.Dsl.Extension,
     sections:
-      [@slice, @subscriptions, @schedules] ++
+      [@slice, @schedules] ++
         Enum.filter(Aikido.Dsl.Slice.sections(), &(&1.name in [:capabilities, :requires])),
     transformers: [Aikido.Ash.Transformers.Slice]
 end

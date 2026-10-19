@@ -2,12 +2,11 @@ defmodule Aikido.Dsl.Slice do
   @moduledoc """
   Spark DSL extension for `Aikido.Slice`.
 
-  Defines six host-owned sections:
+  Defines five host-owned sections:
 
     * `slice do … end` — slice identity (`name`, `path`, `description`,
       `category`, `vsn`, `otp_app`, `schema`, `config_schema`, `tags`).
     * `signal_routes do … end` — `route "type", Action, opts` entries.
-    * `subscriptions do … end` — `subscription Sensor, %{config}` entries.
     * `schedules do … end` — `schedule "cron", Action, %{data}` entries.
     * `capabilities do … end` — `capability :name` entries.
     * `requires do … end` — `requires :kind, :name` entries.
@@ -21,7 +20,6 @@ defmodule Aikido.Dsl.Slice do
   alias Aikido.Slice.RequiresEntry
   alias Aikido.Slice.RouteEntry
   alias Aikido.Slice.ScheduleEntry
-  alias Aikido.Slice.SubscriptionEntry
 
   @slice_section %Spark.Dsl.Section{
     name: :slice,
@@ -65,23 +63,6 @@ defmodule Aikido.Dsl.Slice do
     name: :signal_routes,
     describe: "Compile-time signal routes contributed by this slice.",
     entities: [@route]
-  }
-
-  @subscription %Spark.Dsl.Entity{
-    name: :subscription,
-    describe: "Sensor subscription declared by this slice.",
-    target: SubscriptionEntry,
-    args: [:sensor, :config],
-    schema: [
-      sensor: [type: :atom, required: true],
-      config: [type: :map, default: %{}]
-    ]
-  }
-
-  @subscriptions_section %Spark.Dsl.Section{
-    name: :subscriptions,
-    describe: "Sensor subscriptions contributed by this slice.",
-    entities: [@subscription]
   }
 
   @schedule %Spark.Dsl.Entity{
@@ -142,7 +123,6 @@ defmodule Aikido.Dsl.Slice do
     sections: [
       @slice_section,
       @signal_routes_section,
-      @subscriptions_section,
       @schedules_section,
       @capabilities_section,
       @requires_section

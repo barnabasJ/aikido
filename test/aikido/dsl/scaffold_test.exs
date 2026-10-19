@@ -1,18 +1,14 @@
 defmodule Aikido.Dsl.ScaffoldTest do
   use ExUnit.Case, async: true
 
-  # All `Aikido.Dsl.*` extensions are now filled in. Task 0034 wired
-  # `Aikido.Dsl.Agent` and `Aikido.Dsl.Instance`. Task 0035 wired
-  # `Aikido.Dsl.Slice` and `Aikido.Dsl.Middleware`. Task 0036 wired
-  # `Aikido.Dsl.Action` and `Aikido.Dsl.Sensor`.
+  # Public DSL extensions share Spark's extension contract.
 
   @migrated_modules [
     Aikido.Dsl.Agent,
     Aikido.Dsl.Instance,
     Aikido.Dsl.Slice,
     Aikido.Dsl.Middleware,
-    Ash.Resource.Dsl,
-    Aikido.Dsl.Sensor
+    Ash.Resource.Dsl
   ]
 
   for module <- @migrated_modules do
@@ -37,7 +33,6 @@ defmodule Aikido.Dsl.ScaffoldTest do
     section_names = Enum.map(Aikido.Dsl.Slice.sections(), & &1.name)
     assert :slice in section_names
     assert :signal_routes in section_names
-    assert :subscriptions in section_names
     assert :schedules in section_names
     assert :capabilities in section_names
     assert :requires in section_names
@@ -51,10 +46,5 @@ defmodule Aikido.Dsl.ScaffoldTest do
   test "native Ash provides the actions section" do
     section_names = Enum.map(Ash.Resource.Dsl.sections(), & &1.name)
     assert :actions in section_names
-  end
-
-  test "Aikido.Dsl.Sensor contributes the `sensor` section (task 0036)" do
-    section_names = Enum.map(Aikido.Dsl.Sensor.sections(), & &1.name)
-    assert :sensor in section_names
   end
 end

@@ -17,7 +17,7 @@ defmodule Aikido.Slices.Memory.Space do
 
       # List space (task list)
       tasks = Space.new_list()
-      tasks = %{tasks | data: tasks.data ++ [%{id: "t1", text: "Check sensor"}]}
+      tasks = %{tasks | data: tasks.data ++ [%{id: "t1", text: "Check metric"}]}
   """
 
   use Ash.TypedStruct

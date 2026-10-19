@@ -35,7 +35,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - `Aikido.Agent`: pure agent module with immutable state and `cmd/2`
 - `Aikido.AgentServer`: GenServer runtime for directives, lifecycle, and message flow
 - `Aikido.Agent.Directive.*`: typed pure-I/O descriptors (`Emit`, `SpawnAgent`, `StopChild`, etc.)
-- Plugins/sensors provide capability composition without coupling core agent logic
+- Slices provide capability composition without coupling core agent logic
 
 ## Standards
 - Keep `cmd/2` pure: same input => same `{agent, directives}` output

@@ -8,7 +8,7 @@ defmodule Aikido.Dsl.Slice.Info do
   `GenerateAccessors` transformer used to emit.
 
   Entity-bearing sections expose the same tuple shape today's
-  `signal_routes/0` / `subscriptions/0` / `schedules/0` /
+  `signal_routes/0` / `schedules/0` /
   `capabilities/0` / `requires/0` accessors return; `actions/1` is
   derived from the route table (`Enum.uniq` of route action targets) on
   each call.
@@ -54,16 +54,6 @@ defmodule Aikido.Dsl.Slice.Info do
       |> Extension.get_entities([:signal_routes])
       |> Enum.map(&route_tuple/1)
     end
-  end
-
-  @doc "Returns the sensor subscriptions for this slice."
-  @spec subscriptions(module()) :: [module() | {module(), map()}]
-  def subscriptions(module) do
-    module
-    |> Extension.get_entities([:subscriptions])
-    |> Enum.map(fn %{sensor: sensor, config: config} ->
-      if config == %{}, do: sensor, else: {sensor, config}
-    end)
   end
 
   @doc "Returns the schedules for this slice as `{cron, action[, opts]}` tuples."

@@ -326,11 +326,8 @@ defmodule AikidoTest.AshTest do
     assert is_pid(Aikido.whereis(AikidoTest.AshFixtures.Instance, "protected"))
   end
 
-  test "slice subscriptions and schedules retain their runtime declarations" do
+  test "slice schedules retain their runtime declarations" do
     slice = AikidoTest.AshFixtures.CounterSlice
-
-    assert [{Aikido.Sensors.Heartbeat, %{interval: 3_600_000}}] =
-             Aikido.Dsl.Slice.Info.subscriptions(slice)
 
     assert [{"0 0 1 1 *", {AikidoTest.AshFixtures.CounterSlice, :tick}, options}] =
              Aikido.Dsl.Slice.Info.schedules(slice)
