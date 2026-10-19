@@ -9,6 +9,7 @@ defmodule AgentExamples.Source do
              "examples/agent_app/lib/agent_examples/**/implementation.ex",
              "examples/agent_app/lib/agent_examples/agents.ex",
              "examples/agent_app/lib/agent_examples/ai.ex",
+             "examples/agent_app/lib/agent_examples/playground.ex",
              "lib/aikido/slices/ai_react.ex",
              "lib/aikido/slices/ai_worker.ex",
              "lib/aikido/slices/ai_worker/**/*.ex",
@@ -124,6 +125,8 @@ defmodule AgentExamples.Source do
       })
     )
   end
+
+  defp modules("hook-requests"), do: [AgentExamples.Playground]
 
   defp modules("counter"), do: []
   defp modules("checklist"), do: []

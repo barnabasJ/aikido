@@ -22,7 +22,9 @@ defmodule Aikido.Hooks.Execute do
 
     task = %Aikido.Directives.AsyncTask{
       work: fn ->
-        result = evaluate(directive.hook, directive.event, pid, directive.request_id)
+        result =
+          evaluate(directive.hook, directive.event, pid, directive.request_id)
+
         Jido.Signal.new!("ai.react.hook.completed", Map.put(payload, :result, result))
       end,
       payload: payload,
@@ -41,9 +43,10 @@ defmodule Aikido.Hooks.Execute do
         max_string_bytes: hook.max_string_bytes
       )
       |> Lua.set!([:event], AshLua.Encoder.encode_result(event))
+      |> install_request(hook, event, request_id)
 
-    # Only async hooks can emit. Sync decisions are returned to the owning
-    # action, so a denied gate cannot have already sent application signals.
+    # Only async hooks get fire-and-forget signal helpers. Both modes can
+    # request a response; the owning action still applies the final decision.
     lua = if hook.mode == :async, do: install_signals(lua, pid, request_id, hook.name), else: lua
     {values, _lua} = Lua.eval!(lua, hook.script)
     values = Enum.map(values, &AshLua.Encoder.decode_input/1)
@@ -92,6 +95,34 @@ defmodule Aikido.Hooks.Execute do
       payload = data |> Map.delete("request_id") |> Map.put(:request_id, request_id)
       :ok = Aikido.AgentServer.cast(pid, Jido.Signal.new!(type, payload))
       {[true], state}
+    end)
+  end
+
+  defp install_request(lua, hook, event, request_id) do
+    Lua.set!(lua, [:aikido, :request], fn args, vm ->
+      [type, payload] = Lua.decode_list!(vm, args)
+      payload = AshLua.Encoder.decode_input(payload)
+      true = is_binary(type) and is_map(payload)
+
+      result =
+        if hook.request do
+          hook.request.(%{type: type, payload: payload}, %{
+            hook: hook.name,
+            request_id: request_id,
+            event: event
+          })
+        else
+          {:error, :request_callback_not_configured}
+        end
+
+      values =
+        case result do
+          {:ok, response} -> [AshLua.Encoder.encode_result(response), nil]
+          {:error, reason} -> [nil, %{message: inspect(reason)}]
+          other -> [nil, %{message: "Invalid request callback result: #{inspect(other)}"}]
+        end
+
+      Lua.encode_list!(vm, values)
     end)
   end
 end

@@ -91,6 +91,23 @@ defmodule AgentExamples.Catalog do
       flow: ["Sync briefing", "Model & tool gates", "Async context signal", "Next model call"]
     },
     %{
+      slug: "hook-requests",
+      title: "Lua request / response",
+      eyebrow: "Experimental · human in the loop",
+      resource: AgentExamples.InteractiveAssistant,
+      kind: :ai,
+      description:
+        "Let a Lua hook call an application callback, wait for your answer, and continue the same script.",
+      detail:
+        "Send a task, then answer the request card for the stamp tool. The Lua script interprets your response and decides whether to continue or stop. Other tools can run before this gate. The agent stays responsive while the hook task waits. Requests expire after two minutes; stopping the example closes the wait. This experiment does not resume Lua tasks after a process restart.",
+      flow: [
+        "Lua request",
+        "Application callback → LiveView",
+        "Callback returns your answer",
+        "Same Lua script continues"
+      ]
+    },
+    %{
       slug: "researcher",
       title: "AI researcher",
       eyebrow: "Worker interface",

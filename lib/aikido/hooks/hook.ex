@@ -7,6 +7,14 @@ defmodule Aikido.Hooks.Hook do
   hooks do not gate execution and can call `aikido.send_context(text)` or
   `aikido.send_signal(type, data)` on their originating agent. Neither mode
   can write agent state directly.
+
+  Both modes can call `aikido.request(type, payload)` and receive a response
+  inside Lua. Supply `request: fn request, context -> {:ok, response} end`.
+  The callback receives `%{type: type, payload: payload}` and context containing
+  `hook`, `request_id`, and the lifecycle `event`. It runs in the Lua task and
+  may return `{:ok, response}` or `{:error, reason}`. The application owns any
+  waiting, deadlines, cancellation and UI communication. Without a callback,
+  `aikido.request` returns an error to Lua.
   """
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
@@ -36,6 +44,12 @@ defmodule Aikido.Hooks.Hook do
       public?: true
 
     attribute :script, :string, allow_nil?: false, public?: true
+
+    attribute :request, :function,
+      constraints: [arity: 2],
+      public?: true,
+      description:
+        "Application callback for Lua requests; returns {:ok, response} or {:error, reason}."
 
     attribute :max_instructions, :integer,
       constraints: [min: 1],

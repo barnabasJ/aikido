@@ -61,6 +61,14 @@
 
 ### Added
 
+- Experiment with generic Lua hook request/response: `aikido.request` waits in
+  the hook task for an application-supplied callback to return a response.
+  Keep UI delivery, waiting and cancellation in the application; add no core
+  request service, agent actions or interaction state.
+  Add a standalone LiveView example for answering requests, reconnecting,
+  denying tool execution in Lua, and cancellation. No approval-specific hook
+  decision or UI dependency is added to the core.
+
 - Add bounded Lua lifecycle hooks to ReAct agents and teams. Ordered synchronous
   gates return typed decisions; asynchronous observers can send signals and
   inject context into later model requests. Add an offline LiveView hooks example.

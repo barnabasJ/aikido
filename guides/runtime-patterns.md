@@ -83,8 +83,9 @@ before the run's last model request; use a synchronous hook when that context
 must be present. Gates use request IDs and sequence tokens to ignore stale or
 duplicate completions, and cancellation invalidates their continuations.
 
-Each invocation gets a fresh sandboxed VM. Sync hooks only receive `event` and
-the safe Lua standard library; only async hooks receive the signal helpers.
+Each invocation gets a fresh sandboxed VM with `event` and the safe Lua standard
+library. Both modes can request a response; only async hooks receive the
+fire-and-forget signal helpers.
 They cannot access the model's tool registry or write agent state. Ash types
 validate hook configuration and decisions; Ash Lua owns value encoding.
 Defaults are 100,000 VM instructions, a call depth of 64, and 1 MiB per string.
@@ -94,3 +95,62 @@ run state does not itself resume an interrupted VM or replay an external effect.
 
 Run the example app and open `/examples/hooks` for an offline demonstration,
 including the hook context panel, signal timeline, and expandable source code.
+
+### Experimental request / response from Lua
+
+Both sync and async hooks can call `aikido.request(type, payload)`. The Lua task
+invokes the hook's application-supplied `request` callback and returns its answer
+to the same script. Aikido supplies no request registry or UI transport. Only Lua
+decides what the response means:
+
+```lua
+local answer, err = aikido.request("tool.review", {
+  title = "Run this tool?",
+  details = event.tool_call,
+  choices = {"approve", "deny"}
+})
+if err then return {decision = "deny", message = err.message} end
+if answer.choice == "approve" then return {decision = "continue"} end
+return {decision = "deny", message = "Declined"}
+```
+
+Configure the callback at startup or on a per-run hook:
+
+```elixir
+%{
+  name: "review_tool",
+  event: :before_tool,
+  script: script,
+  request: fn request, context ->
+    MyApp.Interactions.request(current_user, request, context)
+  end
+}
+```
+
+The callback receives `%{type: type, payload: payload}` and a context map with
+`hook`, `request_id` (the AI run ID), and `event` (the hook's event snapshot).
+It returns `{:ok, response}` or `{:error, reason}`. Ash's function type validates
+that it accepts two arguments. Without a callback, Lua receives
+`nil, {message = ":request_callback_not_configured"}`. Errors become the second
+Lua return value; callback exceptions fail the hook normally.
+
+The callback runs in the hook task and may wait without blocking the agent
+mailbox. The application owns authorization, UI communication, deadlines and
+cancellation. Aikido does not wait for a special approval signal, inspect the
+agent for pending interactions, or add a response action. Closures can capture
+application context such as the current user or browser session. As with other
+runtime callbacks, a saved function does not restore a waiting Lua continuation.
+
+The example app supplies a callback when starting `InteractiveAssistant`. Its
+existing `Playground` process holds the pending UI card and the callback caller,
+then publishes its normal PubSub update. LiveView replies through Playground,
+which returns `{:ok, response}` to the callback. That return resumes Lua. The
+application removes cards on reply, timeout, caller exit, cancellation or stop;
+LiveView reconnection can redisplay cards while Playground and the waiting task
+survive. There is no additional Aikido service in the supervision tree.
+
+Open `/examples/hook-requests` to try the complete flow offline. The Lua script
+asks only about the `stamp` tool; other tools may run before that gate. The
+example callback's deadline is two minutes, and the card also offers cancellation.
+Set external caller timeouts long enough for the interaction. Pending requests
+and Lua continuations are ephemeral and do not survive process restarts.

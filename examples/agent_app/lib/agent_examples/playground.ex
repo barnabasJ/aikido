@@ -14,10 +14,14 @@ defmodule AgentExamples.Playground do
   def command(owner, slug, action, input),
     do: GenServer.call(__MODULE__, {:command, owner, slug, action, input}, 15_000)
 
+  @doc "The example app's request callback. Only this caller waits; LiveView stays responsive."
+  def request(key, request, context, timeout \\ 120_000),
+    do: GenServer.call(__MODULE__, {:request, key, request, context, timeout}, :infinity)
+
   def stop(owner, slug), do: GenServer.call(__MODULE__, {:stop, owner, slug}, 15_000)
 
   @impl true
-  def init(_), do: {:ok, %{runs: %{}, tasks: %{}, subscriptions: %{}}}
+  def init(_), do: {:ok, %{runs: %{}, tasks: %{}, subscriptions: %{}, requests: %{}}}
 
   @impl true
   def handle_call({:get, owner, slug}, _, state), do: {:reply, state.runs[{owner, slug}], state}
@@ -60,6 +64,51 @@ defmodule AgentExamples.Playground do
 
       _ ->
         {:reply, {:error, "Start an idle example before sending a prompt."}, state}
+    end
+  end
+
+  def handle_call({:request, key, request, context, timeout}, from, state) do
+    case state.runs[key] do
+      %{status: :running} = run ->
+        id = Ash.UUIDv7.generate()
+
+        card =
+          Map.merge(request, %{
+            id: id,
+            hook: context.hook,
+            expires_at: System.system_time(:millisecond) + timeout
+          })
+
+        waiter = %{
+          from: from,
+          key: key,
+          monitor: Process.monitor(elem(from, 0)),
+          timer: Process.send_after(self(), {:request_expired, id}, timeout),
+          deadline: System.monotonic_time(:millisecond) + timeout
+        }
+
+        state = put_in(state.requests[id], waiter)
+        {:noreply, put_run(state, key, %{run | requests: run.requests ++ [card]})}
+
+      _ ->
+        {:reply, {:error, :run_not_active}, state}
+    end
+  end
+
+  def handle_call({:command, owner, slug, :respond, input}, _, state) do
+    key = {owner, slug}
+
+    case state.requests[input.interaction_id] do
+      %{key: ^key, deadline: deadline} ->
+        if System.monotonic_time(:millisecond) < deadline do
+          {:reply, :ok, finish_request(state, input.interaction_id, {:ok, input.response})}
+        else
+          {:reply, {:error, :request_expired},
+           finish_request(state, input.interaction_id, {:error, :timeout})}
+        end
+
+      _ ->
+        {:reply, {:error, :request_not_pending}, state}
     end
   end
 
@@ -116,6 +165,13 @@ defmodule AgentExamples.Playground do
         case Aikido.Ash.command(run.record, input, action: action) do
           {:ok, _receipt} ->
             run = %{run | error: nil}
+
+            state =
+              if action == :cancel,
+                do: finish_requests(state, key, {:error, :cancelled}),
+                else: state
+
+            run = %{run | requests: state.runs[key].requests}
             {:reply, :ok, put_run(state, key, run)}
 
           {:error, reason} ->
@@ -134,13 +190,14 @@ defmodule AgentExamples.Playground do
       %{status: status} = run when status != :stopped ->
         case Aikido.Ash.stop(run.record) do
           {:ok, _receipt} ->
+            state = finish_requests(state, key, {:error, :stopped})
             for {_ref, {^key, task}} <- state.tasks, do: Task.shutdown(task, :brutal_kill)
             tasks = Map.reject(state.tasks, fn {_, {task_key, _}} -> task_key == key end)
 
             subscriptions =
               Map.reject(state.subscriptions, fn {_, subscription} -> subscription.key == key end)
 
-            run = %{run | status: :stopped}
+            run = %{run | status: :stopped, requests: []}
 
             {:reply, :ok,
              put_run(%{state | tasks: tasks, subscriptions: subscriptions}, key, run)}
@@ -160,8 +217,12 @@ defmodule AgentExamples.Playground do
     finish_task(ref, result, state)
   end
 
-  def handle_info({:DOWN, ref, :process, _, reason}, state),
-    do: finish_task(ref, {:error, "Run failed: #{inspect(reason)}"}, state)
+  def handle_info({:DOWN, ref, :process, _, reason}, state) do
+    case Enum.find(state.requests, fn {_, waiter} -> waiter.monitor == ref end) do
+      {id, _} -> {:noreply, finish_request(state, id, {:error, :caller_stopped})}
+      nil -> finish_task(ref, {:error, "Run failed: #{inspect(reason)}"}, state)
+    end
+  end
 
   def handle_info(
         {:aikido_subscription, ref, %{result: {:ok, snapshot}, signal_type: type}},
@@ -198,12 +259,16 @@ defmodule AgentExamples.Playground do
     end
   end
 
+  def handle_info({:request_expired, id}, state),
+    do: {:noreply, finish_request(state, id, {:error, :timeout})}
+
   def handle_info(_, state), do: {:noreply, state}
 
   defp create_run(_key, nil, _, state), do: {:reply, {:error, "Unknown example"}, state}
 
   defp create_run(key, example, options, state) do
     with {:ok, attributes} <- attributes(example, options),
+         attributes = with_request_callback(example, attributes, key),
          {:ok, record} <- Aikido.Ash.start(example.resource, attributes) do
       pid = Aikido.whereis(Aikido.Default, record.id)
       {:ok, ref} = Aikido.AgentServer.subscribe(pid, "**", &snapshot/1)
@@ -218,6 +283,7 @@ defmodule AgentExamples.Playground do
 
       run = %{
         record: record,
+        requests: [],
         status: :ready,
         mode: options["mode"] || "offline",
         messages: [],
@@ -267,6 +333,14 @@ defmodule AgentExamples.Playground do
       end
     end)
   end
+
+  defp with_request_callback(%{resource: AgentExamples.InteractiveAssistant}, attributes, key) do
+    callback = fn request, context -> request(key, request, context) end
+    hooks = Ash.Resource.Info.attribute(AgentExamples.InteractiveAssistant, :hooks).default
+    Map.put(attributes, :hooks, Enum.map(hooks, &Map.put(&1, :request, callback)))
+  end
+
+  defp with_request_callback(_, attributes, _key), do: attributes
 
   defp attributes(example, options) do
     if Catalog.ai?(example) do
@@ -422,6 +496,7 @@ defmodule AgentExamples.Playground do
         {:noreply, state}
 
       {{key, _task}, tasks} ->
+        state = finish_requests(state, key, {:error, :run_finished})
         run = state.runs[key]
 
         run =
@@ -438,6 +513,27 @@ defmodule AgentExamples.Playground do
           end
 
         {:noreply, put_run(%{state | tasks: tasks}, key, run)}
+    end
+  end
+
+  defp finish_requests(state, key, result) do
+    Enum.reduce(state.requests, state, fn {id, waiter}, state ->
+      if waiter.key == key, do: finish_request(state, id, result), else: state
+    end)
+  end
+
+  defp finish_request(state, id, result) do
+    case Map.pop(state.requests, id) do
+      {nil, _} ->
+        state
+
+      {waiter, requests} ->
+        Process.cancel_timer(waiter.timer)
+        Process.demonitor(waiter.monitor, [:flush])
+        GenServer.reply(waiter.from, result)
+        state = %{state | requests: requests}
+        run = state.runs[waiter.key]
+        put_run(state, waiter.key, %{run | requests: Enum.reject(run.requests, &(&1.id == id))})
     end
   end
 

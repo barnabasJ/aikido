@@ -60,6 +60,23 @@ defmodule AgentExamplesWeb.ExampleLive do
 
   def handle_event("ask", %{"query" => query}, socket), do: command(socket, :ask, %{query: query})
 
+  def handle_event("respond", %{"id" => id, "choice" => choice}, socket) do
+    requests =
+      if socket.assigns.run,
+        do: socket.assigns.run.requests,
+        else: []
+
+    request = Enum.find(requests, &(&1.id == id))
+
+    if request && choice in Map.get(request.payload, "choices", []) do
+      command(socket, :respond, %{interaction_id: id, response: %{choice: choice}})
+    else
+      {:noreply, assign(socket, error: "This request is no longer available.")}
+    end
+  end
+
+  def handle_event("cancel_run", _, socket), do: command(socket, :cancel, %{})
+
   def handle_event("add", %{"amount" => amount}, socket),
     do: command(socket, :add, %{amount: amount})
 
@@ -235,6 +252,26 @@ defmodule AgentExamplesWeb.ExampleLive do
             </form>
           </section>
           <section :if={Catalog.ai?(@example)} class="panel conversation">
+            <section :if={active?(@run)} id="hook-requests">
+              <article
+                :for={request <- @run.requests}
+                id={"request-#{request.id}"}
+                class="panel"
+              >
+                <h3>{Map.get(request.payload, "title", request.type)}</h3>
+                <pre>{inspect(Map.get(request.payload, "details", request.payload), pretty: true)}</pre>
+                <div class="inline-form">
+                  <button
+                    :for={choice <- Map.get(request.payload, "choices", [])}
+                    class="button secondary"
+                    phx-click="respond"
+                    phx-value-id={request.id}
+                    phx-value-choice={choice}
+                  >{choice}</button>
+                  <button class="button danger" phx-click="cancel_run">Cancel run</button>
+                </div>
+              </article>
+            </section>
             <div class="section-heading">
               <h2>Conversation</h2><span>{if @run,
                 do: "#{@run.mode} model",
@@ -431,7 +468,7 @@ defmodule AgentExamplesWeb.ExampleLive do
           </section>
         </div>
         <aside class="inspector">
-          <section :if={@example.slug == "hooks"} class="panel" id="hook-inspector">
+          <section :if={@example.slug in ["hooks", "hook-requests"]} class="panel" id="hook-inspector">
             <h2>Hook context</h2>
             <p class="muted">
               Synchronous hooks finish before the next step. Async context enters the next eligible model request.

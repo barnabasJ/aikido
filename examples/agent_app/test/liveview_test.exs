@@ -154,6 +154,107 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert render(view) =~ "The example tool gate denied this run."
   end
 
+  test "a Lua request can be answered from LiveView and the same script continues", %{conn: conn} do
+    {:ok, view, html} = live(conn, "/examples/hook-requests")
+    assert html =~ "aikido.request"
+    owner = start(view, "hook-requests", %{mode: "offline", lua: "true"})
+    view |> form("#prompt-form", %{query: "Signals carry results"}) |> render_submit()
+    await(owner, "hook-requests", &(&1.requests != []))
+    [request] = Playground.get(owner, "hook-requests").requests
+    assert has_element?(view, "#request-#{request.id}", "Allow the stamp tool to run?")
+    assert Playground.get(owner, "hook-requests").status == :running
+
+    assert {:error, :request_not_pending} =
+             Playground.command("another-browser", "hook-requests", :respond, %{
+               interaction_id: request.id,
+               response: %{choice: "approve"}
+             })
+
+    # A new LiveView reconstructs the card from Playground state, outside the agent.
+    {:ok, reconnected, _} = live(conn, "/examples/hook-requests")
+    assert has_element?(reconnected, "#request-#{request.id}")
+
+    reconnected
+    |> element("button[phx-value-id='#{request.id}'][phx-value-choice=approve]")
+    |> render_click()
+
+    await(owner, "hook-requests", &(&1.status == :completed))
+    assert has_element?(reconnected, "#hook-context", "Lua received the response: approve")
+    refute has_element?(reconnected, "#request-#{request.id}")
+
+    assert {:error, :request_not_pending} =
+             Playground.command(owner, "hook-requests", :respond, %{
+               interaction_id: request.id,
+               response: %{choice: "deny"}
+             })
+
+    assert has_element?(reconnected, "#messages", "Words: 3")
+
+    reconnected |> form("#prompt-form", %{query: "Try denial"}) |> render_submit()
+    await(owner, "hook-requests", &(&1.requests != []))
+    reconnected |> element("#hook-requests button[phx-value-choice=deny]") |> render_click()
+    await(owner, "hook-requests", &(&1.status == :failed))
+    assert render(reconnected) =~ "Lua chose to stop after the response."
+  end
+
+  test "cancelling a request closes the card without waiting for the hook timeout", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/hook-requests")
+    owner = start(view, "hook-requests", %{mode: "offline", lua: "true"})
+    view |> form("#prompt-form", %{query: "Signals carry results"}) |> render_submit()
+    await(owner, "hook-requests", &(&1.requests != []))
+    view |> element("#hook-requests button[phx-click=cancel_run]") |> render_click()
+    await(owner, "hook-requests", &(&1.status == :failed && &1.requests == []))
+    refute has_element?(view, "#hook-requests button[phx-click=respond]")
+  end
+
+  test "the application callback owns timeouts and caller-exit cleanup", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/hook-requests")
+    owner = start(view, "hook-requests", %{mode: "offline"})
+    view |> form("#prompt-form", %{query: "Wait for a response"}) |> render_submit()
+    await(owner, "hook-requests", &(length(&1.requests) == 1))
+
+    # The app can apply its own deadline without any Aikido timeout machinery.
+    timeout =
+      Task.async(fn ->
+        Playground.request(
+          {owner, "hook-requests"},
+          %{type: "extra", payload: %{}},
+          %{hook: "application"},
+          20
+        )
+      end)
+
+    assert {:error, :timeout} = Task.await(timeout)
+    await(owner, "hook-requests", &(length(&1.requests) == 1))
+
+    caller =
+      spawn(fn ->
+        Playground.request({owner, "hook-requests"}, %{type: "extra", payload: %{}}, %{
+          hook: "application"
+        })
+      end)
+
+    await(owner, "hook-requests", &(length(&1.requests) == 2))
+    Process.exit(caller, :kill)
+    await(owner, "hook-requests", &(length(&1.requests) == 1))
+  end
+
+  test "stopping the example closes its callback's pending UI card", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/hook-requests")
+    owner = start(view, "hook-requests", %{mode: "offline"})
+    view |> form("#prompt-form", %{query: "Wait for a response"}) |> render_submit()
+    await(owner, "hook-requests", &(&1.requests != []))
+    [request] = Playground.get(owner, "hook-requests").requests
+    assert :ok = Playground.stop(owner, "hook-requests")
+    assert %{status: :stopped, requests: []} = Playground.get(owner, "hook-requests")
+
+    assert {:error, :request_not_pending} =
+             Playground.command(owner, "hook-requests", :respond, %{
+               interaction_id: request.id,
+               response: %{choice: "approve"}
+             })
+  end
+
   test "nested teams expose fixed and dynamic subtrees and remove all descendants", %{conn: conn} do
     {:ok, view, _} = live(conn, "/examples/nested-teams")
     owner = start(view, "nested-teams")
