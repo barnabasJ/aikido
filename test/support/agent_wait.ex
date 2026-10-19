@@ -2,7 +2,7 @@ defmodule AikidoTest.AgentWait do
   @moduledoc """
   Subscribe-based wait helpers for agent state changes.
 
-  Per ADR 0021, tests must not poll agent state. Use these helpers for
+  Tests must not poll agent state. Use these helpers for
   any wait whose stop condition is a predicate over the agent's state;
   the legacy state-polling helper has been removed.
 
@@ -21,8 +21,7 @@ defmodule AikidoTest.AgentWait do
      fire message, raising on timeout.
 
   Selectors run in the agent process after the outermost middleware
-  unwinds, so the predicate sees fully post-pipeline state per
-  ADR 0016 §2.
+  unwinds, so the predicate sees the fully processed state.
   """
 
   alias Aikido.AgentServer

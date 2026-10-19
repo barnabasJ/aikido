@@ -805,7 +805,7 @@ defmodule AikidoTest.AgentServerTest do
 
   describe("unknown signals") do
     test(
-      "logs routing error and surfaces {:error, %RoutingError{}} per ADR 0020",
+      "logs routing error and surfaces {:error, %RoutingError{}}",
       %{aikido: aikido}
     ) do
       {:ok, pid} =

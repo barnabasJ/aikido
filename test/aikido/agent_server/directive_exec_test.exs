@@ -333,7 +333,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
   end
 
   describe("Error directive") do
-    test("logs and returns ok (error policy is gone, ADR 0014 C4)", %{
+    test("logs the error and returns ok", %{
       state: state,
       input_signal: input_signal
     }) do
@@ -506,7 +506,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       assert domain.captured_emit == true
     end
 
-    test("directive itself does not write agent.state — strict ADR 0019 separation", %{
+    test("directive itself does not write agent.state", %{
       aikido: aikido
     }) do
       pid =
@@ -615,7 +615,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       GenServer.stop(child_info.pid)
     end
 
-    test("directive itself does not write state.children — strict ADR 0019 separation", %{
+    test("directive itself does not write state.children", %{
       aikido: aikido
     }) do
       parent_pid =

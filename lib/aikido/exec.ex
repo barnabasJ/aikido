@@ -79,7 +79,7 @@ defmodule Aikido.Exec do
           optional(:monitor_ref) => reference()
         }
 
-  # Execution result types — see ADR 0018
+  # Normalized execution result types
   @type exec_success :: {:ok, map(), [Aikido.Directives.t()]}
   @type exec_error :: {:error, term()}
 
@@ -668,10 +668,9 @@ defmodule Aikido.Exec do
     defp maybe_put(map, _key, nil), do: map
     defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-    # Per ADR 0018, actions return `{:ok, slice, [directive]}` or
-    # `{:error, reason}`. Always a 3-tuple on success, with the directive
-    # list defaulting to []. Anything else is rejected as a contract
-    # violation with a structured ExecutionError.
+    # Native Ash action results are normalized to `{:ok, state, directives}`
+    # or `{:error, reason}`. The directive list defaults to []. Unexpected
+    # result shapes become a structured ExecutionError.
 
     defp handle_action_result({:ok, result, dirs}, action, log_level, _opts) do
       log_success(action, result, log_level, List.wrap(dirs))

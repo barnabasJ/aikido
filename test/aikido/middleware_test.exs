@@ -112,7 +112,7 @@ defmodule AikidoTest.MiddlewareTest do
     end
   end
 
-  describe("tagged-tuple chain semantics (ADR 0018)") do
+  describe("tagged-tuple chain semantics") do
     nil
 
     test "middleware that swallows {:error, _, _} returns {:ok, ctx, []}" do

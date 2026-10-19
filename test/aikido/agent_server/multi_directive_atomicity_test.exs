@@ -90,17 +90,14 @@ end
 
 defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest do
   @moduledoc """
-  Per ADR 0019 / task 0015 (terminal cleanup), directives mutate no
-  state — only `cmd/2`'s return slice and the cascade callbacks
-  invoked from `process_signal/2` write to `agent.state` /
-  `%AgentServer.State{}`. The "multi-directive atomicity" question
-  shifts: what's interesting now is that an action returning a
-  multi-key slice is committed atomically before the next signal is
-  pulled from the mailbox.
+  Directives mutate no state. Action results own domain state changes;
+  cascade callbacks invoked from `process_signal/2` own runtime bookkeeping.
+  An action returning a multi-key slice is committed atomically before the
+  next signal is pulled from the mailbox.
 
   Signal A's action returns a slice with `{a: true, b: true, c: true}`.
-  Signal B is cast right after. Under inline signal processing
-  (ADR 0009), signal B's `cmd/2` must observe **all three keys** set —
+  Signal B is cast right after. With inline signal processing, signal B's
+  `cmd/2` must observe **all three keys** set —
   not a partial prefix.
   """
   use AikidoTest.Case, async: true

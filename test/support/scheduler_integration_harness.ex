@@ -215,7 +215,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
   @doc """
   Wait for `job_id` to be registered (and alive) in `state.cron_jobs`.
 
-  Subscribe-based per ADR 0021 — see `AikidoTest.AgentWait.await_state_value/3`.
+  Uses subscriptions; see `AikidoTest.AgentWait.await_state_value/3`.
   """
   def wait_for_job(pid, job_id, opts \\ []) do
     AikidoTest.AgentWait.await_state_value(
@@ -240,7 +240,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
   @doc """
   Wait for the agent's domain `tick_count` to reach `count`.
 
-  Subscribe-based per ADR 0021 — each `cron.tick` triggers a pipeline
+  Uses subscriptions: each `cron.tick` triggers a pipeline
   whose post-state the subscription evaluates. No polling.
   """
   def wait_for_tick_count(pid, count, opts \\ []) do

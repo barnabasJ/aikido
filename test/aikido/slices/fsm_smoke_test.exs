@@ -36,8 +36,7 @@ end
 
 defmodule Aikido.Slices.FSMSmokeTest do
   @moduledoc """
-  Narrow smoke coverage for the FSM slice (originally ported from
-  strategy → plugin in C3 of ADR 0014, now a pure slice).
+  Smoke coverage for the pure FSM slice.
   """
   use ExUnit.Case, async: true
 

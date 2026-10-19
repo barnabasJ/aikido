@@ -5,7 +5,7 @@ defmodule AikidoTest.Eventually do
   For agent state changes, **subscribe** via `Aikido.AgentServer.subscribe/4`
   or use one of the `await_*` helpers (`Aikido.AgentServer.await_ready/2`,
   `Aikido.AgentServer.await_child/3`, the Ash team lifecycle actions).
-  Polling agent state is forbidden by ADR 0021 — it hides race conditions
+  Do not poll agent state: polling hides race conditions
   and masks the signal that should be driving the wait.
 
   `eventually/2` survives for genuinely external waits: HTTP endpoints,

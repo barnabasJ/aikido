@@ -107,9 +107,9 @@ end
 defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest do
   @moduledoc """
   Tests the ordering guarantee between signal processing (Agent.cmd/2)
-  and directive execution under inline signal processing (ADR 0009).
+  and directive execution under inline signal processing.
 
-  Per ADR 0019 / task 0015, directives mutate no state; the cascade-driven
+  Directives mutate no state; the cascade-driven
   state changes happen on whatever turn observes the resulting signal.
   Signal A emits an `Emit` directive whose dispatched signal routes via
   `signal_routes` to a state-mutating action; signal A also returns a

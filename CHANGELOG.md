@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Replace references to deleted design documents in comments, module docs and
+  test descriptions with self-contained explanations of the current contracts.
+
 - Add development-only Benchee benchmarking through `mix bench`, with native
   Ash reducer and conversation token-estimate suites and a quick smoke mode.
 

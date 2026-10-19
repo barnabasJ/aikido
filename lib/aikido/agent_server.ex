@@ -1090,7 +1090,7 @@ defmodule Aikido.AgentServer do
           {:reply, invoke_call_selector(selector, new_state), new_state}
 
         {:error, committed_state, reason} ->
-          # ADR 0018 §3: chain error short-circuits selector evaluation;
+          # A chain error short-circuits selector evaluation;
           # reason is delivered to the caller verbatim.
           {:reply, {:error, reason}, committed_state}
 
@@ -1222,8 +1222,8 @@ defmodule Aikido.AgentServer do
         })
 
       # Synthesize a `aikido.agent.child.adopted` after the state mutation
-      # so subscribers see the post-adoption state (per ADR 0021 §2: state
-      # changes need a subscribable channel). `notify_parent_of_startup`
+      # so subscribers can observe the post-adoption state without polling.
+      # `notify_parent_of_startup`
       # on the child side will also cast `aikido.agent.child.started` back
       # to us asynchronously — that signal observes the same registration
       # but with a later, race-prone delivery; this synthesized signal is
@@ -1361,8 +1361,7 @@ defmodule Aikido.AgentServer do
 
                 # Synthesize a lifecycle signal and run it through the
                 # agent's own pipeline so `subscribe/4` subscribers see
-                # the post-restart state (per ADR 0021 §2: state changes
-                # need a subscribable channel — no polling).
+                # the post-restart state without polling.
                 new_pid = Map.fetch!(new_state.cron_jobs, logical_id)
                 signal = cron_restarted_signal(new_state, logical_id, new_pid)
                 new_state = dispatch_synthetic_signal(signal, new_state)
@@ -1498,7 +1497,7 @@ defmodule Aikido.AgentServer do
         {:error, new_state, reason} ->
           # Chain returned an error. `new_state` already has any
           # middleware-staged mutations committed; no directives to run on
-          # this branch. Subscribers still fire per ADR 0018 §3.
+          # this branch. Subscribers still observe the resulting state.
           new_state = fire_post_signal_hooks(new_state, signal)
           {:error, new_state, reason}
       end
@@ -1599,7 +1598,7 @@ defmodule Aikido.AgentServer do
   # the Aikido.Directive docs). `{:stop, reason}` aborts the batch and
   # propagates as `{:stop, reason, state}` to the GenServer.
   #
-  # The directive contract drops state from the return per ADR 0019 §6:
+  # The directive contract has no state slot in its return value:
   # directives mutate no state, so there's no slot for a returned state
   # to land in. `state` threads through unchanged here; the cascade
   # callbacks invoked by `process_signal/2` are the only legal channel
@@ -1808,8 +1807,8 @@ defmodule Aikido.AgentServer do
   # Internal: subscriber dispatch
   #
   # Subscribers fire after the outermost middleware unwinds and directives
-  # have executed (the "post-signal" hook point). Per ADR 0018 §3, they
-  # always run their selector against state, independent of the chain
+  # have executed (the "post-signal" hook point). They always run their
+  # selector against state, independent of the chain
   # outcome. The synchronous `call/4` path delivers its result directly
   # from `handle_call({:signal_with_selector, ...})` — there is no ack
   # table to fire alongside subscribers.
@@ -2535,7 +2534,7 @@ defmodule Aikido.AgentServer do
   # `process_signal/2` pipeline so subscribers see it. Used by handlers
   # that mutate state outside the signal pipeline (DOWN handlers,
   # restart timers, adoption handlers) to give `subscribe/4` consumers
-  # a subscribable channel for state-only transitions per ADR 0021 §2.
+  # a subscribable channel for state-only transitions.
   #
   # Returns the post-pipeline `%State{}`. The caller composes it into
   # whatever return shape the surrounding handler needs (`{:noreply, _}`,

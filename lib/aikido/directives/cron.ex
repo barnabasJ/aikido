@@ -59,8 +59,8 @@ defmodule Aikido.Directives.Cron do
   # the scheduler job, monitors it, and persists the new spec map.
   # Returns the data the cascade callback
   # (`maybe_track_cron_registered/2`) needs to install in the runtime
-  # maps. Does **not** mutate `%AgentServer.State{}` — per ADR 0019 §1,
-  # runtime field writes flow through the cascade.
+  # maps. It does not mutate `%AgentServer.State{}`; runtime field writes
+  # flow through the cascade callbacks.
   @doc false
   @spec register_io(State.t(), term(), term(), term() | nil, term() | nil) ::
           {:ok, io_result()} | {:error, term()}

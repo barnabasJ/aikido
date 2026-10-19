@@ -498,7 +498,7 @@ defmodule Aikido.Persist do
       end
 
     # Runtime identity (partition) lives on the AgentServer state, not on
-    # the agent struct (ADR 0014). The 2-arity `hibernate/2` form persists
+    # the agent struct. The 2-arity `hibernate/2` form persists
     # under a partition-less key; callers needing partition-scoped keys
     # should use the 4-arity `hibernate/4` with an explicit
     # `Aikido.partition_key/2`.

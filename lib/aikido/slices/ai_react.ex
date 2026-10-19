@@ -37,7 +37,7 @@ defmodule Aikido.Slices.AiReact do
                        └─error / cancel──▶ :failed ◀──error / cancel──┘
 
   Concurrent `ai.react.ask` while `:setup` or `:running` is rejected with
-  `{:error, :busy}` (ADR 0022 §5).
+  `{:error, :busy}`.
 
   ## Slice fields
 
@@ -45,8 +45,8 @@ defmodule Aikido.Slices.AiReact do
     * `:request_id` — opaque correlation id minted by `Aikido.AI.ask/3`.
       Every response signal carries it; mismatched signals are dropped as
       stale.
-    * `:context` — the full `ReqLLM.Context` carried verbatim per ADR
-      0022 §3 — system + user + assistant + tool messages.
+    * `:context` — the full `ReqLLM.Context`: system, user, assistant and
+      tool messages.
     * `:iteration` — number of LLM calls completed so far.
     * `:max_iterations` — cap on LLM calls; further `:tool_calls` turns
       after this is reached truncate the run as `:completed`.

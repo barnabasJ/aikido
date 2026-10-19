@@ -38,10 +38,9 @@ defmodule Aikido.Slices.ChildBus do
   (`child_bus.subscribed`, `child_bus.subscribe_failed`) are
   self-emitted by the subscribe-child directive
   when the underlying `Jido.Signal.Bus.subscribe/3` returns. The
-  cascade actions then settle the result onto slice state per
-  ADR 0019: the action returns directives only, the directive does
-  the I/O and casts a result signal, the cascade action mutates the
-  slice.
+  cascade actions then settle the result onto slice state. Actions return
+  state and directives; directives perform I/O and cast result signals,
+  and the receiving actions apply the resulting slice changes.
   """
   use Ash.Resource,
     data_layer: :embedded,

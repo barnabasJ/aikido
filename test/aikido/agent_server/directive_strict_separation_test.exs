@@ -129,14 +129,13 @@ end
 
 defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
   @moduledoc """
-  Per ADR 0019 §1 / task 0015, directives mutate **no** state — neither
+  Directives mutate **no** state — neither
   `agent.state` (domain) nor `%AgentServer.State{}` (runtime). The
   `Aikido.Directive.exec/3` contract enforces this in the type system
   (return is `:ok | {:stop, term()}` only).
 
-  This module tests the runtime end of the rule for the Step-1
-  violators (SpawnAgent, AdoptChild, Cron, CronCancel,
-  RunInstruction):
+  Tests the runtime behavior of SpawnAgent, AdoptChild, Cron, CronCancel
+  and RunInstruction:
 
   1. Apply the directive **inside the agent process** via a `state/3`
      selector, capturing pre/post state. Asserts byte-equality — the

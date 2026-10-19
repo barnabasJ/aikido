@@ -15,7 +15,7 @@ defmodule Aikido.AI do
     if the action rejected (e.g. `:busy`, `:no_model`). Does *not*
     subscribe to anything — observers are out-of-band.
   - `ask_sync/3` — convenience that subscribes for the terminal
-    `:completed` / `:failed` transition (pre-cast, ADR 0021), launches,
+    `:completed` / `:failed` transition before launching the run,
     blocks on the subscription, and returns the final text.
 
   Anything richer than "the final answer" — streaming tokens, tool-call
@@ -67,12 +67,11 @@ defmodule Aikido.AI do
       {:ok, request_id} = Aikido.AI.ask(pid, "What's the status?")
       # receive {:aikido_subscription, ^ref, ...} for every step
 
-  ## ADR conformance
+  ## Coordination guarantees
 
-    * ADR 0021 — `ask_sync/2` `receive`s the subscription fire instead
-      of polling state; subscribes pre-cast to close the registration
-      race.
-    * ADR 0022 §5 — single active run per agent; concurrent `ask/3`
+    * `ask_sync/3` waits for a subscription notification instead of polling
+      state. It subscribes before launching to avoid missing completion.
+    * Only one run may be active per agent; concurrent `ask/3`
       while `:setup` or `:running` returns the action's `{:error, :busy}` chain
       error verbatim through `Aikido.AgentServer.call/4`.
   """
@@ -111,7 +110,7 @@ defmodule Aikido.AI do
   Launch a ReAct run and block on the terminal transition.
 
   Subscribes to the slice's terminal `:completed` / `:failed` for the
-  minted `request_id` *before* casting (ADR 0021), launches via
+  minted `request_id` *before* launching via
   `call/4`, then `receive`s the subscription fire. Returns
   `{:ok, text}` on completion, `{:error, reason}` on LLM failure or
   action rejection, `{:error, :timeout}` if no terminal signal arrives
