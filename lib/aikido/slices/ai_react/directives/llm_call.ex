@@ -67,11 +67,10 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     options = Aikido.AI.Options.resolve(d.options)
 
     {tools, _registry} =
-      AshAi.build_tools_and_registry(
-        d.tool_options
-        |> Keyword.merge(Ash.Scope.to_opts(scope))
-        |> Keyword.put(:tools, d.tools)
-      )
+      d.tool_options
+      |> Keyword.merge(Ash.Scope.to_opts(scope))
+      |> Keyword.put(:tools, d.tools)
+      |> AshAi.build_tools_and_registry()
 
     llm_opts = Keyword.put(d.llm_opts, :tools, tools)
     messages = Context.to_list(d.context)

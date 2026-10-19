@@ -117,11 +117,10 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
     context = Map.put(context, :context, ash_context)
 
     {_, registry} =
-      AshAi.build_tools_and_registry(
-        options
-        |> Keyword.merge(Ash.Scope.to_opts(context))
-        |> Keyword.put(:tools, tools)
-      )
+      options
+      |> Keyword.merge(Ash.Scope.to_opts(context))
+      |> Keyword.put(:tools, tools)
+      |> AshAi.build_tools_and_registry()
 
     case Map.fetch(registry, name) do
       {:ok, callback} ->
