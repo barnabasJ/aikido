@@ -6,7 +6,6 @@ config :spark, :formatter,
   remove_parens?: true,
   "Aikido.Agent": [type: Ash.Resource, extensions: [Aikido.Dsl.Agent]],
   "Aikido.Slice": [type: Ash.Resource, extensions: [Aikido.Dsl.Slice]],
-  "Aikido.Middleware": [],
   "Ash.Resource": [
     extensions: [Aikido.Ash.Agent, Aikido.Ash.Slice, Aikido.Ash.Team, Aikido.Ash.AI]
   ],
@@ -31,14 +30,12 @@ config :logger, :default_formatter,
     :directive_type,
     :duration_μs,
     :error,
-    :instruction_count,
     :queue_size,
     :result,
     :signal_type,
     :span_id,
     :stacktrace,
-    :trace_id,
-    :strategy
+    :trace_id
   ]
 
 # Git hooks and git_ops configuration for conventional commits

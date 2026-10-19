@@ -17,7 +17,7 @@ defmodule Aikido.Middleware do
   error tuple carries `ctx` so middleware-level state mutations
   (e.g. `Persister`'s thaw setting `ctx.agent`) commit to `state.agent`
   regardless of whether the action eventually errored. Action-level
-  rollback lives inside `cmd/2`: the input agent flows back into ctx
+  rollback lives inside AgentServer: the input agent flows back into ctx
   unchanged on error, and the framework commits that input agent (with
   any prior middleware mutations) to state.
 
@@ -59,8 +59,6 @@ defmodule Aikido.Middleware do
       end
   """
 
-  use Spark.Dsl, default_extensions: [extensions: [Aikido.Dsl.Middleware]]
-
   @typep result :: {:ok, map(), [Aikido.Directives.t()]} | {:error, map(), term()}
 
   @callback on_signal(
@@ -72,8 +70,7 @@ defmodule Aikido.Middleware do
 
   @optional_callbacks on_signal: 4
 
-  @impl Spark.Dsl
-  def handle_opts(_opts) do
+  defmacro __using__(_opts) do
     quote do
       @behaviour Aikido.Middleware
     end
