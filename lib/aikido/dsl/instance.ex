@@ -7,11 +7,9 @@ defmodule Aikido.Dsl.Instance do
 
     * `instance do … end` — `otp_app`, `storage`, `default_slices`.
 
-  The `Aikido.Dsl.Instance.Transformers.GenerateAccessors` transformer
-  reads the section options and emits the runtime accessors
-  (`__otp_app__/0`, `__aikido_storage__/0`, `__default_slices__/0`,
-  `start_link/1`, `child_spec/1`, `config/1`, …) that the runtime
-  uses to boot a Aikido instance.
+  Spark validates and stores the configuration. Read it through
+  `Aikido.Dsl.Instance.Info`. Supervision entry points come from the instance
+  host; lifecycle, persistence and debugging use the shared runtime APIs.
   """
 
   @instance_section %Spark.Dsl.Section{
@@ -28,7 +26,5 @@ defmodule Aikido.Dsl.Instance do
     ]
   }
 
-  use Spark.Dsl.Extension,
-    sections: [@instance_section],
-    transformers: [Aikido.Dsl.Instance.Transformers.GenerateAccessors]
+  use Spark.Dsl.Extension, sections: [@instance_section]
 end

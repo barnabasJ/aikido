@@ -1,19 +1,26 @@
 defmodule Aikido.Dsl.Instance.Host do
   @moduledoc """
-  Internal Spark.Dsl wrapper that imports the `instance do … end` section
-  macro from `Aikido.Dsl.Instance` into modules that `use Aikido`.
+  Spark host for runtime instance configuration.
 
-  Users do not call this directly — `use Aikido, otp_app: …` expands to
-  `use Aikido.Dsl.Instance.Host` plus a synthesised `instance` block built
-  from the kwargs. `Aikido.Dsl.Instance.Transformers.GenerateAccessors` then
-  emits the runtime instance surface (`__otp_app__/0` /
-  `__aikido_storage__/0` / `__default_slices__/0`, `child_spec/1`,
-  `start_link/1`, `start_agent/2`, debug helpers, …).
+  `use Aikido` declares the `instance` section on this host. Configuration is
+  read through `Aikido.Dsl.Instance.Info`; runtime operations use the shared
+  Aikido APIs with the instance module as their first argument. The host adds
+  only the entry points needed to place an instance in a supervision tree.
 
-  Lives separate from `Aikido` itself so `use Spark.Dsl`'s generated
-  `init/1` callback doesn't collide with `use Supervisor`'s `init/1` on
-  the `Aikido` module.
+  This host is separate from `Aikido` so Spark's callbacks do not collide with
+  the supervisor implementation.
   """
 
   use Spark.Dsl, default_extensions: [extensions: [Aikido.Dsl.Instance]]
+
+  @impl Spark.Dsl
+  def handle_opts(_opts) do
+    quote do
+      @doc false
+      def child_spec(opts \\ []), do: Aikido.child_spec(Aikido.config(__MODULE__, opts))
+
+      @doc false
+      def start_link(opts \\ []), do: Aikido.start_link(Aikido.config(__MODULE__, opts))
+    end
+  end
 end

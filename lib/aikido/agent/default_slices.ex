@@ -61,27 +61,25 @@ defmodule Aikido.Agent.DefaultSlices do
   @spec package_defaults() :: [default_entry()]
   def package_defaults, do: @package_defaults
 
-  @doc """
-  Resolves default slices for a Aikido instance.
+  @doc "Resolve package, application and DSL defaults for an instance."
+  @spec for_instance(module() | nil) :: [default_entry()]
+  def for_instance(nil), do: package_defaults()
 
-  This is a macro because `Application.compile_env/3` must be called in
-  the module body of the caller, not inside a function.
+  def for_instance(instance) do
+    Code.ensure_compiled(instance)
 
-  Priority (highest wins):
-  1. Explicit `default_slices` option passed to `use Aikido`
-  2. App config: `config :otp_app, AikidoModule, default_slices: [...]`
-  3. Framework defaults
-  """
-  defmacro resolve_instance_defaults(otp_app, aikido_module, explicit_defaults) do
-    package_defaults = @package_defaults
+    if Spark.Dsl.is?(instance, Aikido.Dsl.Instance.Host) do
+      options = Aikido.Dsl.Instance.Info.instance_options(instance)
 
-    quote do
-      if unquote(explicit_defaults) != nil do
-        unquote(explicit_defaults)
-      else
-        app_config = Application.compile_env(unquote(otp_app), unquote(aikido_module), [])
-        Keyword.get(app_config, :default_slices, unquote(Macro.escape(package_defaults)))
+      base =
+        Aikido.config(instance)[:default_slices] || package_defaults()
+
+      case options[:default_slices] do
+        entries when is_list(entries) -> entries
+        override -> apply_agent_overrides(base, override)
       end
+    else
+      package_defaults()
     end
   end
 

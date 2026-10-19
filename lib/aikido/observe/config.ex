@@ -296,32 +296,15 @@ defmodule Aikido.Observe.Config do
 
   # --- Private helpers ---
 
-  defp instance_telemetry(instance, key) do
-    otp_app = instance_otp_app(instance)
+  defp instance_telemetry(instance, key), do: instance_option(instance, :telemetry, key)
+  defp instance_observability(instance, key), do: instance_option(instance, :observability, key)
 
-    if otp_app do
-      otp_app
-      |> Application.get_env(instance, [])
-      |> Keyword.get(:telemetry, [])
+  defp instance_option(instance, section, key) do
+    if Spark.Dsl.is?(instance, Aikido.Dsl.Instance.Host) do
+      instance
+      |> Aikido.config()
+      |> Keyword.get(section, [])
       |> Keyword.get(key)
-    end
-  end
-
-  defp instance_observability(instance, key) do
-    otp_app = instance_otp_app(instance)
-
-    if otp_app do
-      otp_app
-      |> Application.get_env(instance, [])
-      |> Keyword.get(:observability, [])
-      |> Keyword.get(key)
-    end
-  end
-
-  defp instance_otp_app(instance) when is_atom(instance) do
-    case function_exported?(instance, :__otp_app__, 0) do
-      true -> instance.__otp_app__()
-      false -> nil
     end
   end
 

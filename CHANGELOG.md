@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Remove generated runtime wrappers and private configuration accessors from
+  instance modules. Keep supervision entry points on the Spark host, read DSL
+  configuration through `Aikido.Dsl.Instance.Info`, and use `Aikido.config/2`
+  plus the shared lifecycle, persistence and debug APIs.
+
 - Move emitted signal ID/time generation into directive execution. Make identity,
   memory and thread reducers derive timestamps and IDs from their inputs, and
   remove sleeping and mutable counters from reducer test fixtures. Add replay

@@ -112,12 +112,7 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
     aikido_module = Transformer.get_persisted(dsl_state, :aikido_instance_module)
     default_slices_override = Transformer.get_persisted(dsl_state, :default_slices_override)
 
-    base_defaults =
-      if aikido_module != nil and function_exported?(aikido_module, :__default_slices__, 0) do
-        aikido_module.__default_slices__()
-      else
-        Aikido.Agent.DefaultSlices.package_defaults()
-      end
+    base_defaults = Aikido.Agent.DefaultSlices.for_instance(aikido_module)
 
     Aikido.Agent.DefaultSlices.apply_agent_overrides(base_defaults, default_slices_override)
   end

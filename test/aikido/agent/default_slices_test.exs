@@ -284,9 +284,9 @@ defmodule AikidoTest.Agent.DefaultSlicesTest do
 
     test "agent with aikido: option resolves defaults from instance" do
       defmodule Elixir.AikidoTest.Agent.DefaultSlicesTest.FakeAikido do
-        def __default_slices__ do
-          [memory: AikidoTest.Agent.DefaultSlicesTest.FakeMemorySlice]
-        end
+        use Aikido,
+          otp_app: :aikido,
+          default_slices: [memory: AikidoTest.Agent.DefaultSlicesTest.FakeMemorySlice]
       end
 
       defmodule Elixir.AikidoTest.Agent.DefaultSlicesTest.AgentWithAikido do
@@ -306,12 +306,12 @@ defmodule AikidoTest.Agent.DefaultSlicesTest do
 
     test "agent with aikido: and default_slices override map" do
       defmodule Elixir.AikidoTest.Agent.DefaultSlicesTest.FakeAikido2 do
-        def __default_slices__ do
-          [
+        use Aikido,
+          otp_app: :aikido,
+          default_slices: [
             memory: AikidoTest.Agent.DefaultSlicesTest.FakeMemorySlice,
             thread: AikidoTest.Agent.DefaultSlicesTest.FakeThreadSlice
           ]
-        end
       end
 
       defmodule Elixir.AikidoTest.Agent.DefaultSlicesTest.AgentWithAikidoOverride do
@@ -335,12 +335,12 @@ defmodule AikidoTest.Agent.DefaultSlicesTest do
 
     test "agent with aikido: and replacement in default_slices" do
       defmodule Elixir.AikidoTest.Agent.DefaultSlicesTest.FakeAikido3 do
-        def __default_slices__ do
-          [
+        use Aikido,
+          otp_app: :aikido,
+          default_slices: [
             memory: AikidoTest.Agent.DefaultSlicesTest.FakeMemorySlice,
             thread: AikidoTest.Agent.DefaultSlicesTest.FakeThreadSlice
           ]
-        end
       end
 
       defmodule Elixir.AikidoTest.Agent.DefaultSlicesTest.AgentWithReplacement do
@@ -366,9 +366,9 @@ defmodule AikidoTest.Agent.DefaultSlicesTest do
 
     test "defaults mount before user slices" do
       defmodule Elixir.AikidoTest.Agent.DefaultSlicesTest.FakeAikido4 do
-        def __default_slices__ do
-          [memory: AikidoTest.Agent.DefaultSlicesTest.FakeMemorySlice]
-        end
+        use Aikido,
+          otp_app: :aikido,
+          default_slices: [memory: AikidoTest.Agent.DefaultSlicesTest.FakeMemorySlice]
       end
 
       defmodule Elixir.AikidoTest.Agent.DefaultSlicesTest.AgentMountOrder do

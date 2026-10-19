@@ -22,10 +22,10 @@ defmodule Aikido do
 
   Start and manage agents:
 
-      {:ok, pid} = MyApp.Aikido.start_agent(MyAgent, id: "agent-1")
-      pid = MyApp.Aikido.whereis("agent-1")
-      agents = MyApp.Aikido.list_agents()
-      :ok = MyApp.Aikido.stop_agent("agent-1")
+      {:ok, pid} = Aikido.start_agent(MyApp.Aikido, MyAgent, id: "agent-1")
+      pid = Aikido.whereis(MyApp.Aikido, "agent-1")
+      agents = Aikido.list_agents(MyApp.Aikido)
+      :ok = Aikido.stop_agent(MyApp.Aikido, "agent-1")
 
   ## Core Concepts
 
@@ -103,6 +103,24 @@ defmodule Aikido do
         unquote(instance_block)
       end
     end
+  end
+
+  @doc """
+  Resolve an instance's application configuration and runtime overrides.
+
+  The instance's OTP application comes from its Spark configuration. Explicit
+  options override application configuration; the instance module is the default
+  supervisor name. Instance modules do not define their own `config` function.
+  """
+  @spec config(module(), keyword()) :: keyword()
+  def config(instance, overrides \\ []) do
+    otp_app = Aikido.Dsl.Instance.Info.instance_options(instance) |> Map.fetch!(:otp_app)
+
+    otp_app
+    |> Application.get_env(instance, [])
+    |> Keyword.merge(overrides)
+    |> Keyword.put_new(:name, instance)
+    |> Keyword.put_new(:otp_app, otp_app)
   end
 
   @type agent_id :: String.t() | atom()

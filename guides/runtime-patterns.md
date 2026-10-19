@@ -9,6 +9,23 @@ and recovery. Configure its backend with `durable: [...]`. Use `Aikido.Durable`
 for a separately configured keyed pool; it delegates process ownership and storage
 to DurableServer. InstanceManager and the pod API have been removed.
 
+For a named runtime, declare `use Aikido, otp_app: :my_app` on a module and put
+that module in your supervision tree. It supplies only `child_spec/1` and
+`start_link/1` (with optional arguments). Call shared APIs explicitly:
+
+```elixir
+Aikido.start_agent(MyApp.Runtime, MyApp.Worker, id: "worker")
+Aikido.whereis(MyApp.Runtime, "worker")
+Aikido.config(MyApp.Runtime, max_tasks: 2_000)
+Aikido.Dsl.Instance.Info.instance_options(MyApp.Runtime)
+```
+
+Spark validates and stores the instance configuration. The Info module reads
+those options; `Aikido.config/2` combines application configuration and runtime
+overrides. Instance modules do not generate lifecycle, persistence, debug or
+configuration accessor wrappers. Use `Aikido.hibernate/3`, `Aikido.thaw/4` and
+`Aikido.Debug` directly when needed.
+
 `Aikido.Agent` remains the pure action/signal engine. `Aikido.AgentServer` is the
 runtime callback implementation hosted by DurableServer. Configure
 `persistence :temporary` to delete snapshots on stop. Actions are pure: they

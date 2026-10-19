@@ -13,11 +13,11 @@ defmodule Aikido.Debug do
 
   ## Usage
 
-      # Via instance module
-      MyApp.Aikido.debug(:on)
-      MyApp.Aikido.debug(:verbose)
-      MyApp.Aikido.debug(:off)
-      MyApp.Aikido.debug()          # => :off
+      # A named runtime uses the shared debug API
+      Aikido.Debug.enable(MyApp.Aikido, :on)
+      Aikido.Debug.enable(MyApp.Aikido, :verbose)
+      Aikido.Debug.disable(MyApp.Aikido)
+      Aikido.Debug.level(MyApp.Aikido)          # => :off
 
       # Via top-level Aikido module (applies to Aikido.Default)
       Aikido.debug(:on)

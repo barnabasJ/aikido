@@ -472,8 +472,9 @@ defmodule Aikido.Persist do
 
   defp resolve_storage(storage) when is_atom(storage) do
     cond do
-      function_exported?(storage, :__aikido_storage__, 0) ->
-        {:ok, storage.__aikido_storage__()}
+      Spark.Dsl.is?(storage, Aikido.Dsl.Instance.Host) ->
+        config = Aikido.Dsl.Instance.Info.instance_options(storage)
+        {:ok, Aikido.Storage.normalize_storage(Map.fetch!(config, :storage))}
 
       function_exported?(storage, :get_checkpoint, 2) and
         function_exported?(storage, :put_checkpoint, 3) and
