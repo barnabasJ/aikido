@@ -57,7 +57,8 @@ include `query`; before-tool events include `tool_call` (id, name, arguments);
 after-tool events include `tool_call_id`, `name`, and `content`. After-model
 events include the normalized `turn`; completion includes `result`.
 
-Hooks are evaluated in declaration order at an event. A synchronous hook runs
+Hooks are considered in declaration order at an event; asynchronous completion
+order is independent. A synchronous hook runs
 to completion before the affected step proceeds, but runs in a supervised task
 so the agent can still receive cancellation and other signals. It returns nil
 or a table with `decision = "continue"`, optionally with a `context` string.

@@ -25,6 +25,7 @@ spark_locals_without_parens = [
   full_text: 1,
   get_by: 1,
   html_path: 1,
+  hooks: 1,
   identity: 1,
   labels: 1,
   load: 1,

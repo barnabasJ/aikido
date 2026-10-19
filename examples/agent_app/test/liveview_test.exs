@@ -134,6 +134,26 @@ defmodule AgentExamplesWeb.LiveViewTest do
     refute Playground.get("another-browser", "research-team")
   end
 
+  test "the hooks page runs offline and shows applied context and script definitions", %{
+    conn: conn
+  } do
+    {:ok, view, html} = live(conn, "/examples/hooks")
+    assert html =~ "aikido.send_context"
+    assert html =~ "tool_gate"
+    owner = start(view, "hooks", %{mode: "offline", lua: "true"})
+    view |> form("#prompt-form", %{query: "Signals carry results"}) |> render_submit()
+    await(owner, "hooks", &(&1.status == :completed), 10_000)
+    assert has_element?(view, "#hook-context", "Keep the answer concise")
+    assert has_element?(view, "#events", "ai.react.hook.completed")
+    run = Playground.get(owner, "hooks")
+    assert run.snapshot.ai.hook_errors == []
+    assert length(Aikido.Ash.inspect!(run.record.resource, run.record).hooks) == 3
+
+    view |> form("#prompt-form", %{query: "deny-tools for this task"}) |> render_submit()
+    await(owner, "hooks", &(&1.status == :failed), 10_000)
+    assert render(view) =~ "The example tool gate denied this run."
+  end
+
   test "nested teams expose fixed and dynamic subtrees and remove all descendants", %{conn: conn} do
     {:ok, view, _} = live(conn, "/examples/nested-teams")
     owner = start(view, "nested-teams")

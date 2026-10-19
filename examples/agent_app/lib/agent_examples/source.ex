@@ -13,6 +13,8 @@ defmodule AgentExamples.Source do
              "lib/aikido/slices/ai_worker.ex",
              "lib/aikido/slices/ai_worker/**/*.ex",
              "lib/aikido/slices/ai_react/**/*.ex",
+             "lib/aikido/hooks.ex",
+             "lib/aikido/hooks/*.ex",
              "lib/aikido/ash/ai.ex",
              "lib/aikido/ash/team/engine.ex"
            ],
@@ -56,7 +58,7 @@ defmodule AgentExamples.Source do
                              String.starts_with?(name, "Aikido.Slices.AiWorker.") ->
                            :action
 
-                         String.contains?(file, "/directives/") ->
+                         String.contains?(file, "/directives/") || module == Aikido.Hooks.Execute ->
                            :directive
 
                          module == AgentExamples.Agents ->
@@ -109,6 +111,7 @@ defmodule AgentExamples.Source do
       entry.module in modules ||
         (AgentExamples.Catalog.ai?(example) &&
            (entry.module in @ai_names || String.starts_with?(entry.name, "Aikido.Slices.AiReact.") ||
+              String.starts_with?(entry.name, "Aikido.Hooks") ||
               String.starts_with?(entry.name, "Aikido.Slices.AiWorker.")))
     end)
     |> Enum.sort_by(fn entry ->

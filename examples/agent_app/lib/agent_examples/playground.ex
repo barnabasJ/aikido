@@ -351,11 +351,24 @@ defmodule AgentExamples.Playground do
        children: %{},
        own: Map.take(own, [:count, :items, :completed, :title, :status, :result, :error]),
        journal: Map.get(Map.get(state.agent.state, :journal) || %{}, :entries, []),
-       ai: Map.take(ai, [:status, :iteration, :result, :error]),
+       ai:
+         Map.take(ai, [:status, :iteration, :result, :error, :hook_errors])
+         |> Map.put(:hook_messages, hook_messages(ai)),
        members: Enum.sort_by(members, & &1.name),
        tasks: tasks
      }}
   end
+
+  defp hook_messages(%{context: %ReqLLM.Context{} = context}) do
+    context
+    |> ReqLLM.Context.to_list()
+    |> Enum.filter(&(&1.role == :user))
+    |> Enum.flat_map(& &1.content)
+    |> Enum.map(& &1.text)
+    |> Enum.filter(&(is_binary(&1) && String.starts_with?(&1, "[Hook context:")))
+  end
+
+  defp hook_messages(_), do: []
 
   defp subtree(nil, _), do: nil
   defp subtree(snapshot, []), do: snapshot

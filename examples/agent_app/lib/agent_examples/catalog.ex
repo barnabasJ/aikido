@@ -79,6 +79,18 @@ defmodule AgentExamples.Catalog do
       flow: ["Prompt", "Model turn", "Runtime tools", "Answer"]
     },
     %{
+      slug: "hooks",
+      title: "Lua lifecycle hooks",
+      eyebrow: "Sync gates & async observers",
+      resource: AgentExamples.HookedAssistant,
+      kind: :ai,
+      description:
+        "Run Lua hooks before model and tool calls, and inject context asynchronously.",
+      detail:
+        "The briefing hook finishes before the first model call. Tool gates run in declaration order, while the async observer sends context through a signal without delaying the loop. Include deny-tools in your task to see a gate reject execution. Context received during a model call is available for the next call. The event timeline shows hook results; the agent definition below contains every Lua script. Callers can replace hooks at startup.",
+      flow: ["Sync briefing", "Model & tool gates", "Async context signal", "Next model call"]
+    },
+    %{
       slug: "researcher",
       title: "AI researcher",
       eyebrow: "Worker interface",

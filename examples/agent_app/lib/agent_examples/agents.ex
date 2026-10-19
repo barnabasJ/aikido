@@ -31,6 +31,7 @@ defmodule AgentExamples.Agents do
 
   agents do
     agent :assistant, AgentExamples.Assistant
+    agent :hooked_assistant, AgentExamples.HookedAssistant
     agent :researcher, AgentExamples.Researcher
     agent :reviewer, AgentExamples.Reviewer
     agent :research_team, AgentExamples.ResearchTeam
