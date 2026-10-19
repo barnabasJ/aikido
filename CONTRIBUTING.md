@@ -44,6 +44,12 @@ Prefer pure action tests before runtime integration tests. Use subscriptions,
 monitors, and the shared wait helpers for asynchronous assertions. Avoid sleeps
 and repeated agent-state polling. Add coverage for behavior changes and failures.
 
+## Benchmarks
+
+Run `mix bench` for the Benchee suites, `mix bench actions` or `mix bench context`
+for one suite, and `mix bench --quick` for a smoke run. See
+[benchmark scope and methodology](bench/README.md) before comparing results.
+
 ## Changes and releases
 
 Use Conventional Commits and keep ecosystem dependency ranges stable. Update

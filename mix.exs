@@ -54,6 +54,7 @@ defmodule Aikido.MixProject do
   def cli do
     [
       preferred_envs: [
+        bench: :dev,
         coveralls: :test,
         "coveralls.github": :test,
         "coveralls.lcov": :test,
@@ -157,6 +158,7 @@ defmodule Aikido.MixProject do
       {:private, "~> 0.1.2"},
 
       # Development & Test Dependencies
+      {:benchee, "~> 1.5", only: :dev, runtime: false},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test]},
@@ -190,6 +192,7 @@ defmodule Aikido.MixProject do
       # Helper to run tests with trace when needed
       # test: "test --trace --exclude flaky",
       test: "test --exclude flaky",
+      bench: ["run bench/run.exs"],
 
       # Helper to run docs
       docs: "docs -f html --open",

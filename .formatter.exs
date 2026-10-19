@@ -110,7 +110,7 @@ example_locals_without_parens =
   plugins: [Spark.Formatter],
   inputs: [
     "{mix,.formatter}.exs",
-    "{config,lib,test}/**/*.{ex,exs}",
+    "{bench,config,lib,test}/**/*.{ex,exs}",
     "examples/*/{mix,.formatter}.exs",
     "examples/*/{config,lib,test}/**/*.{ex,exs}"
   ],

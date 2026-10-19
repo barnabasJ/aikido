@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Add development-only Benchee benchmarking through `mix bench`, with native
+  Ash reducer and conversation token-estimate suites and a quick smoke mode.
+
 - Remove the unused sensor abstraction, runtime, DSL, generator and fixtures,
   including sensor subscription declarations on slices. Use agents, slices,
   directives and schedules for event-producing capabilities.
