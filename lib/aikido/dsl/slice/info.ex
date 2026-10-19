@@ -3,15 +3,12 @@ defmodule Aikido.Dsl.Slice.Info do
   Introspection surface for `use Aikido.Slice` modules.
 
   Each accessor takes the slice module and reads a field from the slice's
-  Spark `dsl_state`. Replaces the per-slice hand-rolled accessor surface
-  (`MyModule.name/0`, `MyModule.path/0`, …) that the
-  `GenerateAccessors` transformer used to emit.
+  Spark `dsl_state`.
 
-  Entity-bearing sections expose the same tuple shape today's
-  `signal_routes/0` / `schedules/0` /
-  `capabilities/0` / `requires/0` accessors return; `actions/1` is
-  derived from the route table (`Enum.uniq` of route action targets) on
-  each call.
+  `signal_routes/1` and `schedules/1` return route and schedule tuples;
+  `capabilities/1` returns capability names and `requires/1` returns
+  requirement tuples. `actions/1` derives the unique action targets from
+  the route table on each call.
   """
 
   use Spark.InfoGenerator, extension: Aikido.Dsl.Slice, sections: [:slice]

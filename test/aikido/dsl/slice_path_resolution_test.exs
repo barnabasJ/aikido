@@ -122,7 +122,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
   """
   use ExUnit.Case, async: true
 
-  describe("step 1 — slice that routes to the action wins") do
+  describe("slice that routes to the action wins") do
     test "BumpAction (in CounterSlice's signal_routes) writes to :counter, not :domain" do
       agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.new()
       assert agent.state.counter == %{count: 0}
@@ -169,7 +169,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
     end
   end
 
-  describe("step 3 — fall back to agent's own path") do
+  describe("fall back to agent's own path") do
     test "UnboundAction (no slice routes, no own path) writes to the agent's :domain slice" do
       agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.new()
 

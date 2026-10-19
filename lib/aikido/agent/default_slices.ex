@@ -17,10 +17,9 @@ defmodule Aikido.Agent.DefaultSlices do
       {path, module}                # bare default
       {path, module, %{config}}     # default with seed config
 
-  The path is **explicit per entry** — slices and plugins themselves
-  no longer declare a `path` field on their own DSL (the agent's
-  `slices do … end` block owns the path-to-slice binding). For
-  defaults the path travels alongside the module here.
+  The path is explicit per entry. The agent's `slices do … end` block
+  owns the path-to-slice binding; defaults supply the path alongside
+  the module here.
 
   ## Framework defaults
 

@@ -44,7 +44,7 @@ defmodule Aikido.Slices.FSM do
           ]
       end
 
-  The default transition map mirrors the historical FSM strategy:
+  The default transition map allows these transitions:
 
       %{
         "idle" => ["processing"],

@@ -4,15 +4,12 @@ defmodule Aikido.Directives.RunInstruction do
   a signal. The directive does the I/O only — running the instruction
   and emitting a result signal. The state mutation that consumes the
   result happens in an action bound to `result_signal_type` via the
-  agent's `signal_routes/1`.
+  agent's `signal_routes` section.
 
-  The framework does **not** call `cmd/2` directly from the directive
-  body anymore — that crossed the directive/action boundary. Wire a
-  handler:
+  Bind the result signal to a native action on the agent or slice:
 
-      # in the agent
-      def signal_routes(_ctx) do
-        [{"myapp.async.result", MyApp.HandleAsyncResult}]
+      signal_routes do
+        route "myapp.async.result", {MyApp.Agent, :handle_async_result}
       end
 
       # the directive

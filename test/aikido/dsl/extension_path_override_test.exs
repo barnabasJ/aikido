@@ -74,7 +74,7 @@ defmodule Aikido.Dsl.ExtensionPathOverrideTest do
       assert instance.module == Aikido.Slices.Memory
     end
 
-    test "strips the legacy :__path_override__ override key from config" do
+    test "strips the :__path_override__ mount override key from config" do
       instance =
         Aikido.Slice.Instance.new({Aikido.Slices.Memory, %{__path_override__: :renamed}}, :memory)
 

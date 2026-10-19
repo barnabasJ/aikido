@@ -3,14 +3,13 @@ defmodule AikidoTest.AgentWait do
   Subscribe-based wait helpers for agent state changes.
 
   Tests must not poll agent state. Use these helpers for
-  any wait whose stop condition is a predicate over the agent's state;
-  the legacy state-polling helper has been removed.
+  any wait whose stop condition is a predicate over the agent's state.
 
   Each helper:
 
   1. **Fast-paths a `state/3` query** — if the predicate already holds,
      return immediately.
-  2. **Registers a `subscribe/4`** to a signal pattern (default `"*"`,
+  2. **Registers a `subscribe/4`** to a signal pattern (default `"**"`,
      i.e. fire on every signal) with `once: true` and a selector that
      returns `{:ok, value}` when the predicate matches and `:skip`
      otherwise.

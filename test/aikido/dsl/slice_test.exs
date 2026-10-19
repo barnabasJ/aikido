@@ -174,7 +174,7 @@ defmodule Aikido.Dsl.SliceTest do
     end
   end
 
-  describe("schema/1 parity with the legacy macro") do
+  describe("schema/1 Ash state contracts") do
     test "schema/1 returns the same Ash contract passed into the section" do
       schema = Aikido.Dsl.Slice.Info.schema(Aikido.Dsl.SliceTest.SchemaSlice)
       assert Ash.Type.ash_type?(schema)

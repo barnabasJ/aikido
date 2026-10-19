@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Rewrite task-number references and migration commentary in source documentation
+  and test descriptions to describe current behavior.
+
 - Replace references to deleted design documents in comments, module docs and
   test descriptions with self-contained explanations of the current contracts.
 

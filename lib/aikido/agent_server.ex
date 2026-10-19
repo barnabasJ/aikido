@@ -141,8 +141,8 @@ defmodule Aikido.AgentServer do
   - the former parent is preserved in `state.orphaned_from`
 
   Identity (`partition`, `parent`, `orphaned_from`) lives only on
-  `%AgentServer.State{}`; it is no longer mirrored into `agent.state`.
-  Actions reach the current values via the `ctx` arg of `run/4` and emitted
+  `%AgentServer.State{}`. Actions reach the current values via
+  `input.context.aikido` and emitted
   identity-transition signals (`aikido.agent.identity.*`).
 
   Reattachment is explicit. A replacement parent can adopt the live child with
@@ -404,9 +404,7 @@ defmodule Aikido.AgentServer do
 
   ## Options
 
-  Reserved for dispatch overrides, telemetry tags, and future knobs.
-  Currently unused — adding it now means callers don't break when knobs
-  land later.
+  Options are accepted but currently unused.
 
   ## Returns
 
@@ -1992,9 +1990,8 @@ defmodule Aikido.AgentServer do
   # error, `cmd/2` returns the input agent unchanged, which is exactly
   # `ctx.agent` at this layer (containing prior middleware mutations).
   #
-  # `%Directives.Error{}` is no longer manufactured by the cmd reducer or
-  # by routing failures. User code is free to emit one on the success
-  # path for log/audit purposes.
+  # Routing and action failures return errors through the chain.
+  # Successful actions may return `%Directives.Error{}` for logging or auditing.
   defp core_next(%Signal{} = signal, ctx) do
     %{agent_module: agent_module, agent: agent, __signal_router__: router} = ctx
 
@@ -2029,11 +2026,8 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  # Concrete routing failures (invalid pattern, missing route, ...)
-  # previously emitted a `%Directives.Error{}` that `Aikido.Directives.Error`
-  # logged on its success-path execution. The chain now short-circuits
-  # before directives run, so log inline to preserve the operator-visible
-  # signal.
+  # Routing failures short-circuit the chain before directives run.
+  # Log them here so operators can identify signals without a valid route.
   defp log_routing_error(ctx, %{message: message}) do
     Logger.debug("Agent #{Map.get(ctx, :agent_id, "unknown")} [routing]: #{message}")
   end

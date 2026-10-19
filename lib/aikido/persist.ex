@@ -47,14 +47,11 @@ defmodule Aikido.Persist do
 
   If not implemented, default serialization is used.
 
-  ## Forward compatibility
+  ## Checkpoint state
 
-  Legacy checkpoints — written when runtime identity (`:__partition__`,
-  `:__parent__`, `:__orphaned_from__`) was mirrored into `agent.state` — are
-  **not** forward-compatible with this revision. There are no external users
-  to migrate, so no forward-compat shim is maintained. Local development or
-  test-fixture checkpoints from before this PR should be deleted; fresh
-  checkpoints get the new shape automatically.
+  Checkpoints contain domain state and an optional thread pointer. Runtime
+  identity (`partition`, `parent`, `orphaned_from`) belongs to AgentServer
+  state and is supplied by the runtime when the agent starts.
   """
 
   require Logger

@@ -13,8 +13,7 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
       agent's own path (so an action declared in BOTH a slice and the
       agent's own routes fans out across all of them).
 
-  The mount path comes **from the agent's `slices do …` block**, not
-  from the slice's own DSL — slices no longer carry a `path` field.
+  The agent's `slices do …` block supplies each slice's mount path.
 
   When a slice contributes a typed DSL section to the host (the
   Spark DSL section contribution mechanism, e.g. `react do … end`),

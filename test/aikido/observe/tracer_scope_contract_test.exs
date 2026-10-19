@@ -303,7 +303,7 @@ defmodule AikidoTest.Observe.TracerScopeContractTest do
     refute_receive :legacy_exception, 10
   end
 
-  test "with_span/3 falls back to legacy callbacks when scoped callback is missing" do
+  test "with_span/3 falls back to individual span callbacks when scoped callback is missing" do
     Application.put_env(:aikido, :observability,
       tracer: AikidoTest.Observe.TracerScopeContractTest.LegacyTracer
     )

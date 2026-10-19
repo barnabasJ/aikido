@@ -134,12 +134,10 @@ end
 
 defmodule Aikido.Agent.MultiInstanceFanOutTest do
   @moduledoc """
-  Coverage for the multi-instance slice mount fan-out introduced by
-  task 0062. The same slice module mounted at multiple paths
-  (`slice :slack_support, SlackSlice; slice :slack_sales, SlackSlice`)
-  no longer trips `NoRouteConflicts`; instead, when a signal targets the
-  shared action, `cmd/2` fans the action out — once per matching mount
-  with that mount's own slice state and `ctx.slice_config`.
+  Coverage for multi-instance slice mount fan-out. When the same slice
+  module is mounted at multiple paths (`slice :slack_support, SlackSlice;
+  slice :slack_sales, SlackSlice`), `cmd/2` executes a shared action once
+  per matching mount with that mount's state and `ctx.slice_config`.
 
   These tests cover:
 
@@ -151,7 +149,7 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
        errors (the cmd is all-or-nothing).
     5. Edge case: action declared in BOTH a slice's `signal_routes` AND
        the agent's own `signal_routes` fans out across slice mounts AND
-       the agent path (design choice #1).
+       the agent path.
   """
   use ExUnit.Case, async: true
 

@@ -6,8 +6,6 @@ defmodule Aikido.Dsl.Agent.Info do
   `:signal_routes` / `:schedules` sections, plus the cross-section values
   the agent's transformer pipeline persists (plugin instances, slice
   instances, plugin actions, expanded routes, merged schema, …).
-  Replaces the per-agent hand-rolled accessor surface that the
-  `GenerateAccessors` transformer used to emit on the agent module.
   """
 
   use Spark.InfoGenerator, extension: Aikido.Dsl.Agent, sections: [:agent]

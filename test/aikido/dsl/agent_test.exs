@@ -115,7 +115,7 @@ defmodule Aikido.Dsl.AgentTest do
   describe("signal_routes do … end section") do
     nil
 
-    test "section entries become legacy route_spec tuples" do
+    test "section entries become route_spec tuples" do
       routes = Aikido.Dsl.Agent.Info.signal_routes(Aikido.Dsl.AgentTest.RouteAgent)
       assert {"user.created", AikidoTest.PluginTestAction} in routes
       assert {"high.priority", AikidoTest.PluginTestAction, 10} in routes
