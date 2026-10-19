@@ -397,6 +397,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       hook_terminal: nil,
       client: client,
       tools: tools,
+      tool_options: data[:tool_options] || Map.get(slice || %{}, :tool_options, otp_app: :aikido),
       tool_context: tool_context,
       system_prompt: system_prompt,
       llm_opts: llm_opts
@@ -409,6 +410,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       model: model,
       context: context,
       tools: tools,
+      tool_options: new_slice.tool_options,
       request_id: data.request_id,
       llm_opts: llm_opts
     }
@@ -476,6 +478,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
         model: slice.model,
         context: context,
         tools: slice.tools,
+        tool_options: Map.get(slice, :tool_options, otp_app: :aikido),
         request_id: slice.request_id,
         llm_opts: slice.llm_opts,
         options: Map.get(slice, :options, %{}),
@@ -533,7 +536,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
         %Aikido.Slices.AiReact.Directives.ToolExec{
           options: Map.get(slice, :options, %{}),
           tool_call: call,
-          tool_modules: slice.tools,
+          tools: slice.tools,
+          tool_options: Map.get(slice, :tool_options, otp_app: :aikido),
           tool_context: Map.get(slice, :tool_context, %{}),
           request_id: slice.request_id
         }
@@ -597,6 +601,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       model: slice.model,
       context: warned_context,
       tools: slice.tools,
+      tool_options: Map.get(slice, :tool_options, otp_app: :aikido),
       request_id: slice.request_id,
       llm_opts: slice.llm_opts
     }

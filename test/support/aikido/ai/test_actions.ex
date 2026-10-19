@@ -13,7 +13,10 @@ end
 
 defmodule Aikido.AI.TestActions.TestAdd do
   @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  use Ash.Resource,
+    domain: Aikido.AI.TestToolDomain,
+    data_layer: Ash.DataLayer.Simple,
+    validate_domain_inclusion?: false
 
   actions do
     action :test_add, :map do
@@ -40,7 +43,10 @@ end
 
 defmodule Aikido.AI.TestActions.TestMultiply do
   @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  use Ash.Resource,
+    domain: Aikido.AI.TestToolDomain,
+    data_layer: Ash.DataLayer.Simple,
+    validate_domain_inclusion?: false
 
   actions do
     action :test_multiply, :map do
@@ -65,7 +71,10 @@ end
 
 defmodule Aikido.AI.TestActions.TestEcho do
   @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  use Ash.Resource,
+    domain: Aikido.AI.TestToolDomain,
+    data_layer: Ash.DataLayer.Simple,
+    validate_domain_inclusion?: false
 
   actions do
     action :test_echo, :map do
@@ -89,7 +98,10 @@ end
 
 defmodule Aikido.AI.TestActions.TestFails do
   @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  use Ash.Resource,
+    domain: Aikido.AI.TestToolDomain,
+    data_layer: Ash.DataLayer.Simple,
+    validate_domain_inclusion?: false
 
   actions do
     action :test_fails, :map do

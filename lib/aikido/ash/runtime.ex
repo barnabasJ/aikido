@@ -295,6 +295,7 @@ defmodule Aikido.Ash.Runtime do
             Map.take(own_state, [
               :options,
               :tools,
+              :tool_options,
               :tool_context,
               :hooks,
               :model,
@@ -304,6 +305,13 @@ defmodule Aikido.Ash.Runtime do
               :max_iterations
             ])
 
+          tool_options =
+            Keyword.put_new_lazy(configuration.tool_options, :otp_app, fn ->
+              Spark.otp_app(resource) || Spark.otp_app(Ash.Resource.Info.domain(resource)) ||
+                :aikido
+            end)
+
+          configuration = Map.put(configuration, :tool_options, tool_options)
           Map.put(slices, :ai, Map.merge(Map.get(slices, :ai) || %{}, configuration))
         else
           slices

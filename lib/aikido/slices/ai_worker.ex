@@ -41,7 +41,9 @@ defmodule Aikido.Slices.AiWorker do
       argument :text, :string, allow_nil?: false
       argument :model, :term
       argument :client, :atom
-      argument :tools, {:array, :term}
+      argument :tool_context, :map
+      argument :tools, {:array, :atom}
+      argument :tool_options, Aikido.Types.Native, constraints: [kind: :keyword_list]
       argument :system_prompt, :string
       argument :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list]
       argument :max_iterations, :integer, constraints: [min: 1]

@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Accept native Ash AI tool names and source configuration. Build execution
+  registries internally instead of persisting generated functions. Remove the
+  custom tool adapter, per-tool callback-pair input and example callback wrappers.
+  Preserve configured Lua context and tool configuration across team delegation.
+
 - Use native Ash scope extraction for tool-result signals, including Ash's shared
   context propagation rules.
 

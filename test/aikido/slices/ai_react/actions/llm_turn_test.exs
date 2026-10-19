@@ -1,6 +1,5 @@
 defmodule Aikido.Slices.AiReact.LLMTurnTest do
   use ExUnit.Case, async: true
-  alias Aikido.AI.TestActions.TestAdd
   alias Aikido.Slices.AiReact.Directives.ToolExec
   alias Aikido.Slices.AiReact.Turn
   alias ReqLLM.Context
@@ -18,7 +17,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
       tool_results_received: [],
       previous_tool_signature: Keyword.get(opts, :previous_tool_signature, nil),
       model: "anthropic:claude-haiku-4-5-20251001",
-      tools: Keyword.get(opts, :tools, [TestAdd]),
+      tools: Keyword.get(opts, :tools, [:test_add]),
       llm_opts: []
     }
   end
@@ -74,7 +73,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
       assert new_slice.tool_results_received == []
       # LLMTurn does NOT update previous_tool_signature — that's ToolResult's job.
       assert new_slice.previous_tool_signature == nil
-      assert [%ToolExec{tool_call: tc, tool_modules: [TestAdd], request_id: "req_1"}] = directives
+      assert [%ToolExec{tool_call: tc, tools: [:test_add], request_id: "req_1"}] = directives
       assert tc.id == "call_1"
       messages = Context.to_list(new_slice.context)
       assistant = List.last(messages)

@@ -14,7 +14,8 @@ defmodule Aikido.Slices.AiReact do
 
         react do
           model "anthropic:claude-haiku-4-5-20251001"
-          tools [MyApp.Actions.LookupOrder, MyApp.Actions.RefundOrder]
+          tools [:lookup_order, :refund_order]
+          tool_options [otp_app: :my_app]
           system_prompt "You are a support agent."
           max_iterations 5
         end
@@ -69,7 +70,7 @@ defmodule Aikido.Slices.AiReact do
       Optional; the floor enforced by the `Ask` action is `{:error, :no_model}`
       when neither the slice config nor the per-call `Aikido.AI.ask/3` opts
       supply a model.
-    * `:tools` — runtime tool objects, contextual callback pairs, Ash action references, or Aikido actions exposed to the model.
+    * `:tools` — Ash AI tool names. `tool_options` supplies native Ash AI source/filter configuration.
     * `:system_prompt` — system message text prepended to the conversation.
     * `:max_iterations` — cap on LLM calls per run (default 10).
     * `:max_tokens` — folded into `:llm_opts` (default 4096).
@@ -126,7 +127,13 @@ defmodule Aikido.Slices.AiReact do
       attribute :previous_tool_signature, :term, public?: true, allow_nil?: true, default: nil
       attribute :model, :term, public?: true, allow_nil?: true, default: nil
       attribute :client, :atom, public?: true, allow_nil?: false, default: ReqLLM.Generation
-      attribute :tools, {:array, :term}, public?: true, allow_nil?: false, default: []
+      attribute :tools, {:array, :atom}, public?: true, allow_nil?: false, default: []
+
+      attribute :tool_options, Aikido.Types.Native,
+        public?: true,
+        default: [otp_app: :aikido],
+        constraints: [kind: :keyword_list]
+
       attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
       attribute :system_prompt, :term, public?: true, allow_nil?: true, default: nil
       attribute :llm_opts, :term, public?: true, allow_nil?: false, default: []
@@ -143,7 +150,13 @@ defmodule Aikido.Slices.AiReact do
       attribute :hooks, {:array, Aikido.Hooks.Hook}, public?: true, allow_nil?: false, default: []
       attribute :model, :term, public?: true, allow_nil?: true
       attribute :client, :atom, public?: true, allow_nil?: false, default: ReqLLM.Generation
-      attribute :tools, {:array, :term}, public?: true, allow_nil?: false, default: []
+      attribute :tools, {:array, :atom}, public?: true, allow_nil?: false, default: []
+
+      attribute :tool_options, Aikido.Types.Native,
+        public?: true,
+        default: [otp_app: :aikido],
+        constraints: [kind: :keyword_list]
+
       attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
       attribute :system_prompt, :term, public?: true, allow_nil?: true
       attribute :max_iterations, :integer, public?: true, allow_nil?: false, default: 10
@@ -178,12 +191,13 @@ defmodule Aikido.Slices.AiReact do
         default: ReqLLM.Generation,
         doc: "Module implementing the model-call boundary."
       ],
+      tool_options: [type: :keyword_list, default: [otp_app: :aikido]],
       tool_context: [type: :map, default: %{}],
       hooks: [type: {:list, :map}, default: []],
       tools: [
-        type: {:list, :any},
+        type: {:list, :atom},
         default: [],
-        doc: "Aikido.Action modules or {AshResource, generic_action} tool references."
+        doc: "Ash AI tool names, resolved using tool_options."
       ],
       system_prompt: [type: :any, doc: "System message text prepended to the conversation."],
       max_iterations: [type: :integer, default: 10, doc: "Cap on LLM calls per run."],
@@ -268,13 +282,14 @@ defmodule Aikido.Slices.AiReact do
     action :ask, Aikido.ActionResult do
       argument :state, :term
       argument :options, Aikido.AI.Options
+      argument :tool_options, Aikido.Types.Native, constraints: [kind: :keyword_list]
       argument :tool_context, :map
       argument :metadata, :map, default: %{}
       argument :query, :string, allow_nil?: false
       argument :request_id, :string, allow_nil?: false
       argument :model, :term
       argument :client, :atom
-      argument :tools, {:array, :term}
+      argument :tools, {:array, :atom}
       argument :system_prompt, :string
       argument :max_iterations, :integer, constraints: [min: 1]
       argument :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list]

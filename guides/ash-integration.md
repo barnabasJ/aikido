@@ -369,12 +369,14 @@ team without accepting team IDs or modules as model inputs. The example app's
 `agents` Lua namespace uses ordinary team lifecycle actions to spawn agents or
 teams, delegate work, list templates, and stop or remove owned subtrees.
 
-Use `AshAi.build_tools_and_registry/1` to supply Ash tools and their callbacks.
-Resource/action pairs also use Ash AI for schema generation and execution. Module
-shorthand is supported when a resource has exactly one generic action. Their
-arguments follow AshAI's `%{"input" => %{...}}` shape. Actor, tenant, and context
-are passed through to AshAI. Native validation remains authoritative for type
-constraints that AshAI does not currently expose in JSON Schema.
+Supply Ash AI tool names in `tools` and native source configuration in
+`tool_options`, such as `otp_app` or `actions`. Aikido calls
+`AshAi.build_tools_and_registry/1` internally and uses its registry directly;
+there is no custom per-tool tuple, module shorthand or callback wrapper.
+Arguments follow Ash AI's `%{"input" => %{...}}` shape. Actor, tenant and
+application context reach the native Ash actions. Snapshots retain declarative
+tool configuration rather than generated execution functions. Native validation
+remains authoritative for constraints not represented in JSON Schema.
 
 Team lifecycle actions subscribe once before starting their operation and return
 a compact receipt after completion. Inspect explicitly when the caller needs the

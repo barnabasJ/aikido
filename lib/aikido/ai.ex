@@ -35,7 +35,8 @@ defmodule Aikido.AI do
 
         react do
           model "anthropic:claude-haiku-4-5-20251001"
-          tools [MyApp.Actions.LookupOrder, MyApp.Actions.RefundOrder]
+          tools [:lookup_order, :refund_order]
+          tool_options [otp_app: :my_app]
           system_prompt "You are a support agent."
           max_iterations 5
         end
@@ -53,7 +54,7 @@ defmodule Aikido.AI do
       {:ok, text} =
         Aikido.AI.ask_sync(pid, "Use a different model for this one",
           model: "openai:gpt-5",
-          tools: [MyApp.Actions.OneOff]
+          tools: [:one_off]
         )
 
   Custom observation:
@@ -80,7 +81,8 @@ defmodule Aikido.AI do
 
   @type opts :: [
           model: ReqLLM.model_input() | nil,
-          tools: [Aikido.Slices.AiReact.ToolAdapter.action()] | nil,
+          tools: [atom()] | nil,
+          tool_options: keyword(),
           client: module(),
           system_prompt: String.t() | nil,
           max_iterations: pos_integer() | nil,
@@ -160,6 +162,7 @@ defmodule Aikido.AI do
       metadata: Keyword.get(opts, :metadata, %{}),
       options: Keyword.get(opts, :options),
       tool_context: Keyword.get(opts, :tool_context),
+      tool_options: Keyword.get(opts, :tool_options),
       query: query,
       request_id: request_id,
       model: Keyword.get(opts, :model),

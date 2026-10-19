@@ -1,6 +1,5 @@
 defmodule Aikido.Slices.AiReact.ToolResultTest do
   use ExUnit.Case, async: true
-  alias Aikido.AI.TestActions.TestAdd
   alias Aikido.Slices.AiReact
   alias Aikido.Slices.AiReact.Directives.LLMCall
   alias ReqLLM.Context
@@ -18,7 +17,7 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
       tool_results_received: [],
       previous_tool_signature: Keyword.get(opts, :previous_tool_signature, nil),
       model: "anthropic:claude-haiku-4-5-20251001",
-      tools: [TestAdd],
+      tools: [:test_add],
       llm_opts: []
     }
   end

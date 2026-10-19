@@ -2,13 +2,13 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   @moduledoc """
   Side-effect directive: runs one tool call.
 
-  Emitted by `Aikido.Slices.AiReact.LLMTurn`, one per tool call in a turn that
-  asked for tools. The executor spawns a Task that resolves the tool by
-  name and runs native Ash tools through `AshAi.Tools.execute/4`, and casts back an `"ai.react.tool.completed"`
-  signal carrying a JSON-encoded result.
+  Emitted by the ReAct action, one per requested tool call. The executor
+  spawns a Task that rebuilds Ash AI's native registry from the configured
+  tool selection, invokes its named callback, and casts an
+  `"ai.react.tool.completed"` signal carrying Ash AI's serialized result.
 
-  Tool errors and crashes are caught and converted to error JSON inside
-  the same `tool.completed` envelope — tool failures are conversational
+  Native tool errors pass through as model content; runtime failures become
+  error JSON inside the same `tool.completed` envelope. Tool failures are conversational
   data, not run failures, so the LLM can read the error and recover. A
   tool failure never produces an `"ai.react.failed"` signal.
   """
@@ -18,7 +18,12 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   typed_struct do
     field :options, :term, default: %{}
     field :tool_call, :map, allow_nil?: false
-    field :tool_modules, {:array, :term}, allow_nil?: false, default: []
+    field :tools, {:array, :atom}, allow_nil?: false, default: []
+
+    field :tool_options, Aikido.Types.Native,
+      default: [otp_app: :aikido],
+      constraints: [kind: :keyword_list]
+
     field :tool_context, :map, allow_nil?: false, default: %{}
     field :request_id, :string, allow_nil?: false
   end
@@ -26,7 +31,6 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   alias Aikido.AgentServer
   alias Jido.Signal
   alias Aikido.Slices.AiReact.Directives.ToolExec
-  alias Aikido.Slices.AiReact.ToolAdapter
 
   @impl true
   def exec(%ToolExec{} = directive, input_signal, state) do
@@ -52,6 +56,13 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         parent: Map.get(state, :parent)
       })
 
+    context =
+      Map.put(
+        context,
+        :context,
+        DeepMerge.deep_merge(directive.tool_context[:context] || %{}, inherited[:context] || %{})
+      )
+
     {:ok, _pid} =
       Task.Supervisor.start_child(task_sup, fn ->
         run_and_dispatch(directive, agent_pid, source, context, task_sup)
@@ -68,7 +79,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         agent_pid,
         d.request_id,
         supervisor,
-        fn _notify, _attempt -> run_tool(d.tool_call, d.tool_modules, context) end,
+        fn _notify, _attempt -> run_tool(d.tool_call, d.tools, d.tool_options, context) end,
         timeout: options.tool_timeout_ms,
         retries: options.tool_max_retries,
         backoff: options.retry_backoff_ms
@@ -99,50 +110,29 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
       )
   end
 
-  defp run_tool(%{name: name, arguments: args}, modules, context) do
+  defp run_tool(%{name: name, arguments: args}, tools, options, context) do
     ash_context =
       Map.put(Map.get(context, :context) || %{}, :aikido, Map.delete(context, :context))
 
     context = Map.put(context, :context, ash_context)
 
-    case ToolAdapter.lookup_action(name, modules) do
-      {:ok, module} -> safe_invoke(module, args, name, context)
-      {:error, :not_found} -> {:error, "tool not found: #{name}"}
+    {_, registry} =
+      AshAi.build_tools_and_registry(
+        options
+        |> Keyword.merge(Ash.Scope.to_opts(context))
+        |> Keyword.put(:tools, tools)
+      )
+
+    case Map.fetch(registry, name) do
+      {:ok, callback} ->
+        case callback.(args, context) do
+          {:ok, content, _raw} -> {:ok, content}
+          {:error, content} -> {:ok, content}
+        end
+
+      :error ->
+        {:error, "tool not found: #{name}"}
     end
-  end
-
-  defp safe_invoke(tool, args, name, context) do
-    case invoke(tool, args, context) do
-      {:ok, result} -> {:ok, encode_result(result)}
-      {:ok, result, _extra} -> {:ok, encode_result(result)}
-      {:error, reason} -> {:error, reason}
-    end
-  rescue
-    exception ->
-      {:error, "#{name} crashed: #{Exception.message(exception)}"}
-  catch
-    kind, reason ->
-      {:error, "#{name} #{kind}: #{inspect(reason)}"}
-  end
-
-  defp encode_result(value) when is_binary(value), do: value
-  defp encode_result(value), do: Jason.encode!(value)
-
-  defp invoke({%ReqLLM.Tool{}, callback}, args, context) when is_function(callback, 2),
-    do: callback.(args, context)
-
-  defp invoke(%ReqLLM.Tool{} = tool, args, _context), do: ReqLLM.Tool.execute(tool, args)
-
-  defp invoke({resource, action}, args, context) do
-    AshAi.Tools.execute(
-      ToolAdapter.ash_tool({resource, action}),
-      args,
-      context
-    )
-  end
-
-  defp invoke(module, args, context) do
-    AshAi.Tools.execute(ToolAdapter.ash_tool(module), args, context)
   end
 
   defp format_error(%{errors: errors}) when is_list(errors),

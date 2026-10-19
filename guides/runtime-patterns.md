@@ -244,3 +244,38 @@ the application; Aikido carries arbitrary `metadata` without interpreting it.
 
 Open `/examples/conversation` to try streaming, retained history and todo-gated
 completion without a provider key.
+
+### Native Ash AI tool configuration
+
+Pass a list of Ash AI tool names at start or per request:
+
+```elixir
+MyApp.Agents.assistant_start!(%{
+  model: "zai:glm-5.3",
+  tools: [:run_lua, :lua_docs],
+  tool_options: [otp_app: :my_app],
+  tool_context: %{context: %{shared: %{role: "researcher"}}}
+})
+```
+
+For native resource/domain agents, `otp_app` defaults to the resource or domain's
+application. `tool_options` is passed to `AshAi.build_tools_and_registry/1`;
+for example, `actions: [{MyApp.Lua, [:eval, :docs]}]` selects a resource's
+exposed actions. Ash AI owns tool schemas, registry construction, authorization
+filtering, argument casting and action execution. Aikido uses the returned
+registry directly. There is no per-tool Aikido tuple or callback wrapper.
+Native tool action errors reach the model unchanged as Ash AI's formatted content;
+execution deadlines and crashes are handled by the bounded I/O task.
+
+Snapshots retain tool names and configuration; generated tool descriptions and
+callback registries exist only inside I/O tasks and are rebuilt after restoration.
+Configuration intended for persistence must be declarative. Native Ash AI
+options that contain application functions are not reconstructable configuration;
+applications supplying those must handle them in their serialization callbacks.
+
+Lua's outer execution/docs tools and its inner function surface are separate.
+The application can derive `AshLua.Eval.run/2` and `docs/2` `action_entrypoints`
+from the same per-agent shared context, as Makewright does. Supply that context
+through `tool_context.context.shared` or the caller's Ash context. Aikido
+preserves actor, tenant and configured application context when invoking the
+native tools; Lua's inner Ash actions still perform their own authorization.

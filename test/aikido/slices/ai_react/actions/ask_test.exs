@@ -1,6 +1,5 @@
 defmodule Aikido.Slices.AiReact.AskTest do
   use ExUnit.Case, async: true
-  alias Aikido.AI.TestActions.TestAdd
   alias Aikido.Slices.AiReact.Directives.LLMCall
   alias ReqLLM.Context
 
@@ -11,7 +10,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
           query: "What is 1 + 1?",
           request_id: "req_test_1",
           model: "anthropic:claude-haiku-4-5-20251001",
-          tools: [TestAdd],
+          tools: [:test_add],
           system_prompt: "You are precise.",
           max_iterations: 4,
           llm_opts: [max_tokens: 64]
@@ -55,7 +54,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
     assert new_slice.iteration == 0
     assert new_slice.max_iterations == 4
     assert new_slice.model == "anthropic:claude-haiku-4-5-20251001"
-    assert new_slice.tools == [TestAdd]
+    assert new_slice.tools == [:test_add]
     assert new_slice.llm_opts == [max_tokens: 64]
     assert new_slice.result == nil
     assert new_slice.error == nil
@@ -69,7 +68,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
 
     assert %LLMCall{
              model: "anthropic:claude-haiku-4-5-20251001",
-             tools: [TestAdd],
+             tools: [:test_add],
              request_id: "req_test_1",
              llm_opts: [max_tokens: 64]
            } = directive

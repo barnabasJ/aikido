@@ -1,0 +1,21 @@
+defmodule Aikido.AI.TestToolDomain do
+  use Ash.Domain, otp_app: :aikido, validate_config_inclusion?: false, extensions: [AshAi]
+
+  resources do
+    resource Aikido.AI.TestTools.Wait
+    resource Aikido.AI.TestTools.Identity
+    resource Aikido.AI.TestActions.TestAdd
+    resource Aikido.AI.TestActions.TestMultiply
+    resource Aikido.AI.TestActions.TestEcho
+    resource Aikido.AI.TestActions.TestFails
+  end
+
+  tools do
+    tool :test_wait, Aikido.AI.TestTools.Wait, :wait
+    tool :test_identity, Aikido.AI.TestTools.Identity, :identity
+    tool :test_add, Aikido.AI.TestActions.TestAdd, :test_add
+    tool :test_multiply, Aikido.AI.TestActions.TestMultiply, :test_multiply
+    tool :test_echo, Aikido.AI.TestActions.TestEcho, :test_echo
+    tool :test_fails, Aikido.AI.TestActions.TestFails, :test_fails
+  end
+end

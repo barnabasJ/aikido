@@ -126,22 +126,14 @@ defmodule Aikido.TeamDeliveryTest do
   test "queued worker jobs preserve each caller scope", _ctx do
     team = Domain.delivery_start!(%{})
     Domain.delivery_ensure_member!(team, %{member: :worker})
-    owner = self()
 
-    descriptor =
-      ReqLLM.Tool.new!(
-        name: "identity",
-        description: "Identity",
-        parameter_schema: %{type: "object", properties: %{}},
-        callback: fn _ -> {:error, :stub} end
-      )
-
-    callback = fn _, context ->
-      send(owner, {:tool_scope, context.actor.id, context.tenant})
-      {:ok, "identity recorded"}
-    end
-
-    payload = %{text: "identify", tools: [{descriptor, callback}], llm_opts: [observer: self()]}
+    payload = %{
+      text: "identify",
+      tools: [:test_identity],
+      tool_options: [otp_app: :aikido],
+      tool_context: %{context: %{observer: self()}},
+      llm_opts: [observer: self()]
+    }
 
     Domain.delivery_assign_task!(team, %{member: :worker, task_id: "alice", payload: payload},
       actor: %{id: "alice"},
@@ -157,7 +149,7 @@ defmodule Aikido.TeamDeliveryTest do
 
     tool_turn = %Aikido.Slices.AiReact.Turn{
       type: :tool_calls,
-      tool_calls: [%{id: "identity", name: "identity", arguments: %{}}]
+      tool_calls: [%{id: "identity", name: "test_identity", arguments: %{}}]
     }
 
     final = %Aikido.Slices.AiReact.Turn{type: :final_answer, text: "done"}
@@ -167,8 +159,12 @@ defmodule Aikido.TeamDeliveryTest do
     send(finish_first, {:answer, final})
     assert_receive {:team_model, second, _}, 2_000
     send(second, {:answer, tool_turn})
-    assert_receive {:tool_scope, "bob", "b"}, 2_000
-    assert_receive {:team_model, finish_second, _}, 2_000
+    assert_receive {:team_model, finish_second, messages}, 2_000
+
+    assert_receive {:tool_scope, "bob", "b"},
+                   2_000,
+                   inspect(Enum.flat_map(messages, & &1.content) |> Enum.map(& &1.text))
+
     send(finish_second, {:answer, final})
   end
 

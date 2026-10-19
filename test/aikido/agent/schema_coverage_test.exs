@@ -145,9 +145,17 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
 
   test "tool conversion uses Ash casting without accepting numeric suffixes" do
     tool =
-      Aikido.Slices.AiReact.ToolAdapter.ash_tool(
-        {AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults, :check_schema}
-      )
+      %AshAi.Tool{
+        name: :check_schema,
+        resource: AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults,
+        action:
+          Ash.Resource.Info.action(
+            AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults,
+            :check_schema
+          ),
+        arguments: [],
+        load: []
+      }
 
     assert {:error, error} =
              AshAi.Tools.execute(
@@ -161,9 +169,17 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
 
   test "JSON tool schemas retain Ash constraints and enum choices" do
     tool =
-      Aikido.Slices.AiReact.ToolAdapter.ash_tool(
-        {AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults, :check_schema}
-      )
+      %AshAi.Tool{
+        name: :check_schema,
+        resource: AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults,
+        action:
+          Ash.Resource.Info.action(
+            AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults,
+            :check_schema
+          ),
+        arguments: [],
+        load: []
+      }
 
     json = AshAi.Tools.parameter_schema(tool, strict: false)["properties"]["input"]
     assert json["required"] == ["name"]

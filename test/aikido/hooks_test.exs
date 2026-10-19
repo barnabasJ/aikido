@@ -288,7 +288,7 @@ defmodule Aikido.HooksTest do
              Aikido.AI.ask_sync(pid, "hello",
                model: "tools",
                client: Aikido.HooksTest.Client,
-               tools: [Aikido.AI.TestActions.TestAdd],
+               tools: [:test_add],
                hooks: hooks,
                timeout: 5_000
              )

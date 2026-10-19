@@ -43,8 +43,9 @@ end
 
 defmodule AikidoTest.ScopedTool do
   use Ash.Resource,
-    data_layer: :embedded,
+    data_layer: Ash.DataLayer.Simple,
     validate_domain_inclusion?: false,
+    domain: AikidoTest.ScopedDomain,
     authorizers: [Ash.Policy.Authorizer]
 
   policies do
@@ -81,7 +82,15 @@ defmodule AikidoTest.ScopedAssistant do
 end
 
 defmodule AikidoTest.ScopedDomain do
-  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Ash.Domain]
+  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Ash.Domain, AshAi]
+
+  resources do
+    resource AikidoTest.ScopedTool
+  end
+
+  tools do
+    tool :identity, AikidoTest.ScopedTool, :identity
+  end
 
   agents do
     agent :scoped, AikidoTest.ScopedAgent
@@ -120,7 +129,8 @@ defmodule Aikido.AshScopeTest do
       AikidoTest.ScopedDomain.assistant_start!(%{
         model: "offline",
         client: AikidoTest.ScopedClient,
-        tools: [{AikidoTest.ScopedTool, :identity}],
+        tools: [:identity],
+        tool_options: [actions: [{AikidoTest.ScopedTool, [:identity]}]],
         llm_opts: [observer: self()]
       })
 
@@ -131,7 +141,13 @@ defmodule Aikido.AshScopeTest do
     )
 
     assert_receive {:model, model, _}, 2_000
-    [tool] = Aikido.Slices.AiReact.ToolAdapter.from_actions([{AikidoTest.ScopedTool, :identity}])
+
+    {[tool], _registry} =
+      AshAi.build_tools_and_registry(
+        actions: [{AikidoTest.ScopedTool, [:identity]}],
+        actor: %{id: "alice"},
+        tenant: "org-a"
+      )
 
     turn = %Aikido.Slices.AiReact.Turn{
       type: :tool_calls,

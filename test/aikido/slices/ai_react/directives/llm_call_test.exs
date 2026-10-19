@@ -8,7 +8,6 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
 
   import Aikido.AI.Test.ResponseFixtures
 
-  alias Aikido.AI.TestActions.TestAdd
   alias Aikido.Slices.AiReact.Directives.LLMCall
   alias Aikido.Slices.AiReact.Turn
   alias ReqLLM.Context
@@ -20,7 +19,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
     %LLMCall{
       model: Keyword.get(opts, :model, "anthropic:claude-haiku-4-5-20251001"),
       context: Keyword.get(opts, :context, Context.new([Context.user("hi")])),
-      tools: Keyword.get(opts, :tools, [TestAdd]),
+      tools: Keyword.get(opts, :tools, [:test_add]),
       request_id: Keyword.get(opts, :request_id, "req_1"),
       llm_opts: Keyword.get(opts, :llm_opts, max_tokens: 64)
     }

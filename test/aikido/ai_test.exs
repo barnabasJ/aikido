@@ -12,33 +12,11 @@ defmodule Aikido.AITest.MathAgent do
 
   react do
     model "anthropic:claude-haiku-4-5-20251001"
-    tools [Aikido.AI.TestActions.TestAdd]
+    tools [:test_add]
     system_prompt "You are precise."
     max_iterations 4
     max_tokens 256
     temperature 0.0
-  end
-end
-
-defmodule Aikido.AITest.TestFailingTool.Implementation do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(input, _opts, _context) do
-    {:error, "explosion"}
-  end
-end
-
-defmodule Aikido.AITest.TestFailingTool do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :test_failing, :map do
-      argument :reason, :string, default: "nope"
-      description "A tool that always returns {:error, _} — exercises the tool-error path."
-      run {Aikido.AITest.TestFailingTool.Implementation, action: :run}
-    end
   end
 end
 
@@ -56,7 +34,7 @@ defmodule Aikido.AITest.FailingAgent do
 
   react do
     model "anthropic:claude-haiku-4-5-20251001"
-    tools [Aikido.AITest.TestFailingTool]
+    tools [:test_fails]
     system_prompt "x"
     max_iterations 4
   end
@@ -76,7 +54,7 @@ defmodule Aikido.AITest.TightAgent do
 
   react do
     model "anthropic:claude-haiku-4-5-20251001"
-    tools [Aikido.AI.TestActions.TestAdd]
+    tools [:test_add]
     system_prompt "x"
     max_iterations 1
   end
@@ -95,7 +73,7 @@ defmodule Aikido.AITest.NoModelAgent do
   end
 
   react do
-    tools [Aikido.AI.TestActions.TestAdd]
+    tools [:test_add]
     max_iterations 2
   end
 end
@@ -242,7 +220,7 @@ defmodule Aikido.AITest do
 
     test("tool errors are returned as JSON in tool.completed (not as :failed)", ctx) do
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
-        {:ok, tool_call_response([{"test_failing", %{"input" => %{"reason" => "boom"}}}])}
+        {:ok, tool_call_response([{"test_fails", %{"input" => %{"reason" => "boom"}}}])}
       end)
 
       expect(ReqLLM.Generation, :generate_text, fn _model, messages, _opts ->

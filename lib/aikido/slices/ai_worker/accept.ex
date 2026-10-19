@@ -35,6 +35,8 @@ defmodule Aikido.Slices.AiWorker.Accept do
         :model,
         :client,
         :tools,
+        :tool_context,
+        :tool_options,
         :system_prompt,
         :llm_opts,
         :max_iterations,

@@ -20,7 +20,8 @@ defmodule Aikido.Ash.Transformers.AI do
   defp build(dsl) do
     fields = [
       options: [Aikido.AI.Options, %{}, false],
-      tools: [{:array, Aikido.Types.Tool}, [], false],
+      tools: [{:array, :atom}, [], false],
+      tool_options: [Aikido.Types.Native, [], false],
       hooks: [{:array, Aikido.Hooks.Hook}, [], false],
       tool_context: [:map, %{}, false],
       model: [:term, nil, true],
@@ -45,9 +46,14 @@ defmodule Aikido.Ash.Transformers.AI do
 
              options =
                case name do
-                 :max_iterations -> Keyword.put(options, :constraints, min: 1)
-                 :llm_opts -> Keyword.put(options, :constraints, kind: :keyword_list)
-                 _ -> options
+                 :max_iterations ->
+                   Keyword.put(options, :constraints, min: 1)
+
+                 name when name in [:llm_opts, :tool_options] ->
+                   Keyword.put(options, :constraints, kind: :keyword_list)
+
+                 _ ->
+                   options
                end
 
              case Builder.add_new_attribute(dsl, name, type, options) do

@@ -43,7 +43,7 @@ defmodule Aikido.Slices.AiReactE2ETest.EchoAgent do
       base_url: "http://localhost:1234/v1"
     }
 
-    tools [Aikido.AI.TestActions.TestEcho]
+    tools [:test_echo]
     max_iterations 5
     max_tokens 256
     llm_opts api_key: "lm-studio"
@@ -69,7 +69,7 @@ defmodule Aikido.Slices.AiReactE2ETest.AddAgent do
       base_url: "http://localhost:1234/v1"
     }
 
-    tools [Aikido.AI.TestActions.TestAdd]
+    tools [:test_add]
     max_iterations 5
     max_tokens 256
     llm_opts api_key: "lm-studio"

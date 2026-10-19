@@ -12,7 +12,7 @@ defmodule Aikido.Dsl.ExtensionReactTest.SupportAgent do
 
   react do
     model "anthropic:claude-haiku-4-5-20251001"
-    tools [Aikido.AI.TestActions.TestAdd]
+    tools [:test_add]
     system_prompt "You are a support agent."
     max_iterations 5
   end
@@ -32,7 +32,7 @@ defmodule Aikido.Dsl.ExtensionReactTest.RenamedReactAgent do
 
   react do
     model "anthropic:claude-haiku-4-5-20251001"
-    tools [Aikido.AI.TestActions.TestAdd]
+    tools [:test_add]
   end
 end
 
@@ -67,7 +67,7 @@ defmodule Aikido.Dsl.ExtensionReactTest do
 
       %{config: config} = Enum.find(instances, &(&1.module == Aikido.Slices.AiReact))
       assert config[:model] == "anthropic:claude-haiku-4-5-20251001"
-      assert config[:tools] == [Aikido.AI.TestActions.TestAdd]
+      assert config[:tools] == [:test_add]
       assert config[:system_prompt] == "You are a support agent."
       assert config[:max_iterations] == 5
     end

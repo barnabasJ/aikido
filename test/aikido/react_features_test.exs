@@ -170,30 +170,20 @@ defmodule Aikido.ReactFeaturesTest do
   end
 
   test "a timed-out tool returns conversational error data and its task is stopped", ctx do
-    owner = self()
-
-    tool =
-      ReqLLM.Tool.new!(
-        name: "wait",
-        description: "Wait",
-        parameter_schema: %{type: "object", properties: %{}},
-        callback: fn _ ->
-          send(owner, {:tool_running, self()})
-
-          receive do
-            :continue -> {:ok, "unexpected"}
-          end
-        end
+    opts =
+      options(
+        tools: [:test_wait],
+        tool_context: %{context: %{observer: self()}},
+        options: %{tool_timeout_ms: 200}
       )
 
-    opts = options(tools: [tool], options: %{tool_timeout_ms: 200})
     pid = start_server(ctx, Agent)
     task = Task.async(fn -> Aikido.AI.ask_sync(pid, "use tool", opts) end)
     assert_receive {:model, worker, _}, 2_000
 
     turn = %Aikido.Slices.AiReact.Turn{
       type: :tool_calls,
-      tool_calls: [%{id: "one", name: "wait", arguments: %{}}]
+      tool_calls: [%{id: "one", name: "test_wait", arguments: %{}}]
     }
 
     send(worker, {:answer, {:ok, turn}})

@@ -5,8 +5,10 @@ defmodule Aikido.Ash.AI do
   Add to an `Ash.Resource` extended by `Aikido.Ash.Agent`, optionally alongside
   `Aikido.Ash.Team`. Both expose `ask(query, request_id)` and `cancel(request_id)`
   generic actions. Model configuration and the runtime tool list are attributes
-  supplied at create time. Tools can be built dynamically as `ReqLLM.Tool` objects
-  with callbacks; no compile-time tool declaration is required.
+  supplied at create time. Pass Ash AI tool names in `tools`; `tool_options`
+  accepts native Ash AI configuration such as `otp_app` or `actions`. The default
+  source is the resource/domain OTP application. Aikido builds native tool
+  descriptions and execution registries inside I/O tasks, never in state actions.
 
   Supply `hooks` at start or set defaults in `ai`. Lua sync hooks gate lifecycle
   steps; async observers can inject context through signals. See
@@ -25,6 +27,7 @@ defmodule Aikido.Ash.AI do
     schema: [
       model: [type: :any],
       options: [type: :map, default: %{}],
+      tool_options: [type: :keyword_list, default: []],
       client: [type: :module, default: ReqLLM.Generation],
       system_prompt: [type: :string],
       llm_opts: [type: :keyword_list, default: []],

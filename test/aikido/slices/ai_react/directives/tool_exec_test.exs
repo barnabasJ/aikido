@@ -1,7 +1,6 @@
 defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
   use AikidoTest.Case, async: true
 
-  alias Aikido.AI.TestActions.{TestAdd, TestFails}
   alias Aikido.Slices.AiReact.Directives.ToolExec
   @receive_timeout 5_000
 
@@ -15,7 +14,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     %ToolExec{
       tool_call: call,
-      tool_modules: Keyword.get(opts, :tool_modules, [TestAdd, TestFails]),
+      tools: Keyword.get(opts, :tools, [:test_add, :test_fails]),
       request_id: Keyword.get(opts, :request_id, "req_1")
     }
   end
@@ -81,7 +80,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
     assert Jason.decode!(signal.data.content) == %{"result" => 3}
   end
 
-  test "returns the tool's {:error, _} as JSON inside tool.completed (not failed)",
+  test "returns native Ash AI error content inside tool.completed (not failed)",
        %{aikido: aikido} do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
@@ -102,8 +101,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     assert_receive {:cast, signal}, @receive_timeout
     assert signal.type == "ai.react.tool.completed"
-    assert %{"error" => error} = Jason.decode!(signal.data.content)
-    assert error =~ "nope"
+    assert signal.data.content =~ "nope"
   end
 
   test "completion signals carry native Ash scope and only shared application context",

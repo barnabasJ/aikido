@@ -77,6 +77,7 @@ spark_locals_without_parens = [
   temperature: 1,
   timezone: 1,
   tool_context: 1,
+  tool_options: 1,
   tools: 1,
   topology: 1,
   type: 1,
