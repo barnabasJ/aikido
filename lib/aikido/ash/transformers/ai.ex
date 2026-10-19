@@ -19,11 +19,13 @@ defmodule Aikido.Ash.Transformers.AI do
 
   defp build(dsl) do
     fields = [
+      options: [Aikido.AI.Options, %{}, false],
       tools: [{:array, Aikido.Types.Tool}, [], false],
       hooks: [{:array, Aikido.Hooks.Hook}, [], false],
       tool_context: [:map, %{}, false],
       model: [:term, nil, true],
       client: [:atom, ReqLLM.Generation, false],
+      llm_opts: [Aikido.Types.Native, [], false],
       system_prompt: [:string, nil, true],
       max_iterations: [:integer, 10, false]
     ]
@@ -42,9 +44,11 @@ defmodule Aikido.Ash.Transformers.AI do
              ]
 
              options =
-               if name == :max_iterations,
-                 do: Keyword.put(options, :constraints, min: 1),
-                 else: options
+               case name do
+                 :max_iterations -> Keyword.put(options, :constraints, min: 1)
+                 :llm_opts -> Keyword.put(options, :constraints, kind: :keyword_list)
+                 _ -> options
+               end
 
              case Builder.add_new_attribute(dsl, name, type, options) do
                {:ok, dsl} -> {:cont, {:ok, dsl}}

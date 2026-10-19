@@ -36,11 +36,56 @@ defmodule AikidoTest.ScopedAgent do
   end
 end
 
+defmodule AikidoTest.ScopedTool.Implementation do
+  use Ash.Resource.Actions.Implementation
+  def run(_input, _opts, context), do: {:ok, %{actor: context.actor.id, tenant: context.tenant}}
+end
+
+defmodule AikidoTest.ScopedTool do
+  use Ash.Resource,
+    data_layer: :embedded,
+    validate_domain_inclusion?: false,
+    authorizers: [Ash.Policy.Authorizer]
+
+  policies do
+    policy always() do
+      authorize_if actor_present()
+    end
+  end
+
+  actions do
+    action :identity, :map do
+      run AikidoTest.ScopedTool.Implementation
+    end
+  end
+end
+
+defmodule AikidoTest.ScopedClient do
+  def generate_text(_, messages, opts) do
+    send(opts[:observer], {:model, self(), messages})
+
+    receive do
+      {:answer, value} -> value
+    end
+  end
+end
+
+defmodule AikidoTest.ScopedAssistant do
+  use Ash.Resource,
+    domain: AikidoTest.ScopedDomain,
+    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+
+  agent do
+    name "scoped_assistant"
+  end
+end
+
 defmodule AikidoTest.ScopedDomain do
-  use Ash.Domain, extensions: [Aikido.Ash.Domain]
+  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Ash.Domain]
 
   agents do
     agent :scoped, AikidoTest.ScopedAgent
+    agent :assistant, AikidoTest.ScopedAssistant
   end
 end
 
@@ -68,5 +113,36 @@ defmodule Aikido.AshScopeTest do
 
     assert %{observed: %{actor: nil, tenant: "org-b", request_tag: nil}} =
              AikidoTest.ScopedDomain.scoped_inspect!(ref)
+  end
+
+  test "native AI commands preserve scope across model and authorized Ash tool execution" do
+    ref =
+      AikidoTest.ScopedDomain.assistant_start!(%{
+        model: "offline",
+        client: AikidoTest.ScopedClient,
+        tools: [{AikidoTest.ScopedTool, :identity}],
+        llm_opts: [observer: self()]
+      })
+
+    AikidoTest.ScopedDomain.assistant_ask!(ref, %{query: "identify", request_id: "scoped-run"},
+      actor: %{id: "alice"},
+      tenant: "org-a",
+      authorize?: false
+    )
+
+    assert_receive {:model, model, _}, 2_000
+    [tool] = Aikido.Slices.AiReact.ToolAdapter.from_actions([{AikidoTest.ScopedTool, :identity}])
+
+    turn = %Aikido.Slices.AiReact.Turn{
+      type: :tool_calls,
+      tool_calls: [%{id: "identity", name: tool.name, arguments: %{}}]
+    }
+
+    send(model, {:answer, {:ok, turn}})
+    assert_receive {:model, next, messages}, 2_000
+    result = Enum.find(messages, &(&1.role == :tool))
+    text = Enum.map_join(result.content, & &1.text)
+    assert Jason.decode!(text) == %{"actor" => "alice", "tenant" => "org-a"}
+    send(next, {:answer, {:ok, %Aikido.Slices.AiReact.Turn{type: :final_answer, text: "done"}}})
   end
 end

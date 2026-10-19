@@ -40,6 +40,18 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
         send(target, {:cast, signal})
         forward(target)
 
+      {:"$gen_call", from, {:subscribe, _, _, _, _, _}} ->
+        GenServer.reply(from, {:ok, make_ref()})
+        forward(target)
+
+      {:"$gen_call", from, {:read_state_with_selector, selector}} ->
+        GenServer.reply(
+          from,
+          selector.(%{agent: %{state: %{ai: %{request_id: "req_1", status: :running}}}})
+        )
+
+        forward(target)
+
       {:run, fun, from} ->
         send(from, {:run_done, fun.()})
         forward(target)
@@ -71,7 +83,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
 
     :ok =
       run_in(agent, fn ->
-        Aikido.Directive.exec(directive(), :input_signal, fake_state(aikido))
+        Aikido.Directive.exec(directive(), Jido.Signal.new!("input", %{}), fake_state(aikido))
       end)
 
     assert_receive {:reqllm_called, 1, [_]}, 1_000
@@ -93,7 +105,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
 
     :ok =
       run_in(agent, fn ->
-        Aikido.Directive.exec(directive(), :input_signal, fake_state(aikido))
+        Aikido.Directive.exec(directive(), Jido.Signal.new!("input", %{}), fake_state(aikido))
       end)
 
     assert_receive {:cast, signal}, 1_000

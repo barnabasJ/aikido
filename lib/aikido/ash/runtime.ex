@@ -283,7 +283,6 @@ defmodule Aikido.Ash.Runtime do
     |> Ash.Resource.Info.attributes()
     |> Map.new(fn attr ->
       value = Map.get(record, attr.name)
-      value = if is_struct(value), do: Map.from_struct(value), else: value
       {attr.name, value}
     end)
     |> Map.delete(:id)
@@ -294,11 +293,13 @@ defmodule Aikido.Ash.Runtime do
         if function_exported?(resource, :__aikido_ai__, 0) do
           configuration =
             Map.take(own_state, [
+              :options,
               :tools,
               :tool_context,
               :hooks,
               :model,
               :client,
+              :llm_opts,
               :system_prompt,
               :max_iterations
             ])

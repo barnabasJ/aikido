@@ -138,10 +138,28 @@ defmodule Aikido.AI do
     end
   end
 
+  @doc "Cancel the active run; its model and tool tasks observe the terminal transition."
+  def cancel(pid, request_id \\ nil) do
+    Aikido.AgentServer.cast(pid, Jido.Signal.new!("ai.react.cancel", %{request_id: request_id}))
+  end
+
+  @doc "Queue a user message for the next model request, or the next run when idle."
+  def queue_message(pid, text, opts \\ []) do
+    signal = Jido.Signal.new!("ai.react.message", %{text: text})
+    signal = Aikido.SignalCtx.put_ctx(signal, caller_scope(opts))
+
+    Aikido.AgentServer.call(pid, signal, fn _ ->
+      {:ok, :queued}
+    end)
+  end
+
   defp mint_request_id, do: "req_" <> Aikido.Util.generate_id()
 
   defp build_ask_signal(query, request_id, opts) do
     data = %{
+      metadata: Keyword.get(opts, :metadata, %{}),
+      options: Keyword.get(opts, :options),
+      tool_context: Keyword.get(opts, :tool_context),
       query: query,
       request_id: request_id,
       model: Keyword.get(opts, :model),
@@ -154,6 +172,18 @@ defmodule Aikido.AI do
     }
 
     Jido.Signal.new!("ai.react.ask", data)
+    |> Aikido.SignalCtx.put_ctx(caller_scope(opts))
+  end
+
+  defp caller_scope(opts) do
+    if Keyword.has_key?(opts, :scope),
+      do:
+        opts
+        |> Keyword.fetch!(:scope)
+        |> Ash.Scope.to_opts()
+        |> Map.new()
+        |> Map.drop([:authorize?]),
+      else: Map.new(Keyword.take(opts, [:actor, :tenant]))
   end
 
   defp launch(pid, signal, request_id) do

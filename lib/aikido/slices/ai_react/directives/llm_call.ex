@@ -22,6 +22,8 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   use Aikido.Directive
 
   typed_struct do
+    field :options, :term, default: %{}
+    field :iteration, :integer, default: 1
     field :model, :term, allow_nil?: false
     field :client, :module, allow_nil?: false, default: ReqLLM.Generation
     field :context, :term, allow_nil?: false
@@ -44,45 +46,95 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
 
     {:ok, _pid} =
       Task.Supervisor.start_child(task_sup, fn ->
-        run_and_dispatch(directive, agent_pid, source, Aikido.SignalCtx.ctx(input_signal))
+        run_and_dispatch(
+          directive,
+          agent_pid,
+          source,
+          Aikido.SignalCtx.ctx(input_signal),
+          task_sup
+        )
       end)
 
     :ok
   end
 
-  defp run_and_dispatch(%LLMCall{} = d, agent_pid, source, scope) do
-    reqllm_tools = ToolAdapter.from_actions(d.tools)
+  defp run_and_dispatch(%LLMCall{} = d, agent_pid, source, scope, supervisor) do
+    options = Aikido.AI.Options.resolve(d.options)
+    llm_opts = Keyword.put(d.llm_opts, :tools, ToolAdapter.from_actions(d.tools))
     messages = Context.to_list(d.context)
-    llm_opts = Keyword.put(d.llm_opts, :tools, reqllm_tools)
 
-    client = d.client
+    result =
+      Aikido.AI.Execution.run(
+        agent_pid,
+        d.request_id,
+        supervisor,
+        fn notify, attempt ->
+          if options.streaming do
+            Aikido.AI.Streaming.call(
+              d.client,
+              d.model,
+              messages,
+              llm_opts,
+              fn text, thinking ->
+                signal =
+                  Signal.new!(
+                    "ai.react.stream",
+                    %{
+                      request_id: d.request_id,
+                      iteration: d.iteration,
+                      attempt: attempt,
+                      text: text,
+                      thinking: thinking
+                    },
+                    source: source
+                  )
+                  |> Aikido.SignalCtx.put_ctx(scope)
 
-    case client.generate_text(d.model, messages, llm_opts) do
-      {:ok, response} ->
-        turn = Turn.from_response(response)
+                AgentServer.cast(agent_pid, signal)
+              end,
+              notify,
+              options.stream_batch_bytes,
+              options.stream_batch_ms
+            )
+          else
+            d.client.generate_text(d.model, messages, llm_opts)
+          end
+        end,
+        timeout: options.model_timeout_ms,
+        progress_timeout:
+          if(options.streaming, do: options.progress_timeout_ms, else: options.model_timeout_ms),
+        retries: options.model_max_retries,
+        backoff: options.retry_backoff_ms
+      )
 
-        signal =
-          Signal.new!("ai.react.llm.completed", %{turn: turn, request_id: d.request_id},
+    signal =
+      case result do
+        {:ok, response} ->
+          Signal.new!(
+            "ai.react.llm.completed",
+            %{
+              turn: Turn.from_response(response),
+              request_id: d.request_id,
+              iteration: d.iteration
+            },
             source: source
           )
 
-        _ = AgentServer.cast(agent_pid, Aikido.SignalCtx.put_ctx(signal, scope))
+        {:error, reason} ->
+          Signal.new!("ai.react.failed", %{reason: reason, request_id: d.request_id},
+            source: source
+          )
+      end
 
-      {:error, reason} ->
-        cast_failure(agent_pid, source, d.request_id, reason, scope)
-    end
+    AgentServer.cast(agent_pid, Aikido.SignalCtx.put_ctx(signal, scope))
   rescue
-    # Anything raised in the Task body — bad tool definition, transport
-    # exception, decoder bug — must still surface as a terminal signal.
-    # If we let the Task die quietly the slice stays :running forever
-    # and `Aikido.AI.await/2` only ever returns `{:error, :timeout}`.
-    exception -> cast_failure(agent_pid, source, d.request_id, exception, scope)
-  end
-
-  defp cast_failure(agent_pid, source, request_id, reason, scope) do
-    signal =
-      Signal.new!("ai.react.failed", %{reason: reason, request_id: request_id}, source: source)
-
-    _ = AgentServer.cast(agent_pid, Aikido.SignalCtx.put_ctx(signal, scope))
+    exception ->
+      AgentServer.cast(
+        agent_pid,
+        Signal.new!("ai.react.failed", %{reason: exception, request_id: d.request_id},
+          source: source
+        )
+        |> Aikido.SignalCtx.put_ctx(scope)
+      )
   end
 end

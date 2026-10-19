@@ -16,6 +16,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   use Aikido.Directive
 
   typed_struct do
+    field :options, :term, default: %{}
     field :tool_call, :map, allow_nil?: false
     field :tool_modules, {:array, :term}, allow_nil?: false, default: []
     field :tool_context, :map, allow_nil?: false, default: %{}
@@ -40,6 +41,8 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
     context =
       Map.merge(Map.merge(directive.tool_context, inherited), %{
         agent_id: state.id,
+        request_id: directive.request_id,
+        tool_call_id: directive.tool_call.id,
         agent_resource:
           if(function_exported?(agent_module, :__aikido_resource__, 0),
             do: agent_module.__aikido_resource__()
@@ -51,14 +54,31 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
 
     {:ok, _pid} =
       Task.Supervisor.start_child(task_sup, fn ->
-        run_and_dispatch(directive, agent_pid, source, context)
+        run_and_dispatch(directive, agent_pid, source, context, task_sup)
       end)
 
     :ok
   end
 
-  defp run_and_dispatch(%ToolExec{} = d, agent_pid, source, context) do
-    content = run_tool(d.tool_call, d.tool_modules, context)
+  defp run_and_dispatch(%ToolExec{} = d, agent_pid, source, context, supervisor) do
+    options = Aikido.AI.Options.resolve(d.options)
+
+    result =
+      Aikido.AI.Execution.run(
+        agent_pid,
+        d.request_id,
+        supervisor,
+        fn _notify, _attempt -> run_tool(d.tool_call, d.tool_modules, context) end,
+        timeout: options.tool_timeout_ms,
+        retries: options.tool_max_retries,
+        backoff: options.retry_backoff_ms
+      )
+
+    content =
+      case result do
+        {:ok, content} -> content
+        {:error, reason} -> Jason.encode!(%{error: format_error(reason)})
+      end
 
     data = %{
       tool_call_id: d.tool_call.id,
@@ -87,22 +107,22 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
 
     case ToolAdapter.lookup_action(name, modules) do
       {:ok, module} -> safe_invoke(module, args, name, context)
-      {:error, :not_found} -> Jason.encode!(%{error: "tool not found: #{name}"})
+      {:error, :not_found} -> {:error, "tool not found: #{name}"}
     end
   end
 
   defp safe_invoke(tool, args, name, context) do
     case invoke(tool, args, context) do
-      {:ok, result} -> encode_result(result)
-      {:ok, result, _extra} -> encode_result(result)
-      {:error, reason} -> Jason.encode!(%{error: format_error(reason)})
+      {:ok, result} -> {:ok, encode_result(result)}
+      {:ok, result, _extra} -> {:ok, encode_result(result)}
+      {:error, reason} -> {:error, reason}
     end
   rescue
     exception ->
-      Jason.encode!(%{error: "#{name} crashed: #{Exception.message(exception)}"})
+      {:error, "#{name} crashed: #{Exception.message(exception)}"}
   catch
     kind, reason ->
-      Jason.encode!(%{error: "#{name} #{kind}: #{inspect(reason)}"})
+      {:error, "#{name} #{kind}: #{inspect(reason)}"}
   end
 
   defp encode_result(value) when is_binary(value), do: value

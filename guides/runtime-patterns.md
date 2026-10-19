@@ -160,10 +160,87 @@ and Lua continuations are ephemeral and do not survive process restarts.
 Both first activation and later durable snapshots apply slice `externalize/1`
 and agent `checkpoint/2`; loading applies `restore/2` and `reinstate/1`. Startup
 state is not saved a second time in process options. Persist credentials and
-identities only through application-owned codecs. Runtime-only middleware and
-dispatch options are reconstructed from the agent module after restart.
+identities only through application-owned codecs. Explicit middleware and dispatch
+configuration is retained for restoration; keep credentials out of that configuration
+and resolve them through application providers instead.
 
 Native Ash commands carry the caller's actor, tenant and application context
 through signal processing and follow-up effects. They do not turn an outer
 action's authorization bypass into a bypass for downstream tools. A later
 command supplies its own scope; command scope is not durable agent identity.
+Queued messages and deliveries must match the active run's actor and tenant;
+a different scope is rejected with `:scope_mismatch`. Worker queues retain each
+task's original scope in memory and discard those queued executions on restoration.
+
+### Conversations and bounded ReAct execution
+
+The ReAct slice retains its conversation between requests. `message(text)`
+queues input while a model/tool turn is active. A final answer with queued
+messages starts the next turn before completing the request. `deliver(text,
+request_id)` starts a run when idle and queues input when busy; teams use this
+same interface to wake an orchestrator. `handoff(messages)` replaces an idle
+conversation with a validated ReqLLM context, such as an externally prepared
+summary. It rejects replacement during an active or todo-waiting run.
+
+Pass `options` at agent startup, in `ai`, or per `ask`:
+
+```elixir
+options %{
+  streaming: true,
+  model_timeout_ms: 120_000,
+  progress_timeout_ms: 60_000,
+  tool_timeout_ms: 120_000,
+  model_max_retries: 2,
+  tool_max_retries: 0,
+  context_max_tokens: 16_000,
+  protect_recent_tokens: 4_000
+}
+```
+
+Options are a native `Aikido.AI.Options` contract. A per-request options value
+replaces the configured options. Retry defaults are zero. Tool retries must be
+explicitly enabled and are appropriate only when repeating the tool is safe.
+All attempts and backoff share one overall deadline. Cancellation and owner
+termination stop active model/tool attempts; streaming cancellation also closes
+the ReqLLM stream. A custom client can wrap provider-specific concurrency limits.
+Applications still own cancellation and deadlines inside their Lua request callback.
+
+Streaming clients implement `stream_text/3` and return `ReqLLM.StreamResponse`.
+The native response builder assembles tool calls, reasoning and usage. Aikido
+batches text/thinking updates by bytes or elapsed time (`stream_batch_bytes`,
+`stream_batch_ms`). Subscribe to `ai.react.stream` for partial state. The durable
+runtime does not synchronously checkpoint each partial stream update; the
+completed turn commits canonical history. `usage` contains cumulative numeric
+usage for the current run, including its tool/model cycles.
+
+Compaction is disabled when `context_max_tokens` is nil. The pure pipeline
+ported from Makewright estimates token use, prunes older tool output and slides
+complete message groups. System instructions and the newest group survive;
+therefore a single oversized newest group can exceed the requested budget.
+Token counts are estimates, not provider-enforced limits. Supply pure
+`compaction_steps` callbacks to customize the pipeline. Model-based summary
+work belongs in a client/effect, followed by an explicit `handoff` when idle.
+
+Restoring an interrupted run retains its conversation but marks the run failed
+with `:interrupted`. Missing tool replies are closed with interruption results
+before another request, preserving valid tool-call pairing. Running provider
+calls, Lua VMs and tool side effects are not replayed automatically.
+
+### Optional todos
+
+Mount `slice :todos, Aikido.Slices.Todo` to expose `todo_add`, `todo_activate`,
+`todo_complete`, `todo_block` and `todo_remove` on the domain interface. Each
+item has a caller-supplied stable ID, text, blocking flag, metadata, status and
+completion result. Repeated completion does not replace existing evidence.
+`timeout_ms` can block an overdue item. Restored timed items become blocked
+with `:interrupted`, since process-local timers cannot establish a new deadline.
+
+Set `options.completion: :todos` to hold the model's final answer in `:waiting`
+until all blocking items complete. A blocked item fails the run. `todo_path`
+selects the mount (default `:todos`). This gate is optional; ordinary agents
+complete on the model's final answer. Application tools decide what evidence
+suffices to complete an item. Workflow IDs and database updates remain owned by
+the application; Aikido carries arbitrary `metadata` without interpreting it.
+
+Open `/examples/conversation` to try streaming, retained history and todo-gated
+completion without a provider key.

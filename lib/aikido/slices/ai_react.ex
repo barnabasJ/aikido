@@ -88,6 +88,23 @@ defmodule Aikido.Slices.AiReact do
     description "ReAct reasoning slice attached via `slices:` on a Aikido.Agent."
 
     schema do
+      attribute :run_scope, :map, default: %{}
+      attribute :run_metadata, :map, public?: true, default: %{}
+      attribute :options, Aikido.AI.Options, public?: true, default: %{}, allow_nil?: false
+      attribute :queued_messages, {:array, :string}, public?: true, default: [], allow_nil?: false
+
+      attribute :streaming_text, :string,
+        public?: true,
+        default: "",
+        constraints: [allow_empty?: true, trim?: false]
+
+      attribute :streaming_thinking, :string,
+        public?: true,
+        default: "",
+        constraints: [allow_empty?: true, trim?: false]
+
+      attribute :stream_attempt, :integer, default: 0
+      attribute :usage, :map, public?: true, default: %{}
       attribute :status, :atom, public?: true, allow_nil?: false, default: :idle
       attribute :request_id, :term, public?: true, allow_nil?: true, default: nil
       attribute :context, :term, public?: true, allow_nil?: true, default: nil
@@ -122,6 +139,7 @@ defmodule Aikido.Slices.AiReact do
     end
 
     config_schema do
+      attribute :options, Aikido.AI.Options, public?: true, default: %{}, allow_nil?: false
       attribute :hooks, {:array, Aikido.Hooks.Hook}, public?: true, allow_nil?: false, default: []
       attribute :model, :term, public?: true, allow_nil?: true
       attribute :client, :atom, public?: true, allow_nil?: false, default: ReqLLM.Generation
@@ -136,6 +154,11 @@ defmodule Aikido.Slices.AiReact do
 
     config_transform {__MODULE__, :__fold_llm_opts__, []}
     route "ai.react.ask", :ask
+    route "ai.react.message", :message
+    route "ai.react.deliver", :deliver
+    route "ai.react.handoff", :handoff
+    route "aikido.todo.changed", :todo_changed
+    route "ai.react.stream", :stream
     route "ai.react.llm.completed", :llm_turn
     route "ai.react.tool.completed", :tool_result
     route "ai.react.failed", :failed
@@ -148,6 +171,7 @@ defmodule Aikido.Slices.AiReact do
     name: :react,
     describe: "ReAct reasoning slice attached via `slices:` on a Aikido.Agent.",
     schema: [
+      options: [type: :map, default: %{}],
       model: [type: :any, doc: "Model spec accepted by `ReqLLM.Generation.generate_text/3`."],
       client: [
         type: :module,
@@ -243,6 +267,9 @@ defmodule Aikido.Slices.AiReact do
   actions do
     action :ask, Aikido.ActionResult do
       argument :state, :term
+      argument :options, Aikido.AI.Options
+      argument :tool_context, :map
+      argument :metadata, :map, default: %{}
       argument :query, :string, allow_nil?: false
       argument :request_id, :string, allow_nil?: false
       argument :model, :term
@@ -254,6 +281,43 @@ defmodule Aikido.Slices.AiReact do
       argument :hooks, {:array, Aikido.Hooks.Hook}
       description "Open a ReAct run on a Aikido.Slices.AiReact-equipped agent."
       run {Aikido.Slices.AiReact.Implementation, action: :ask}
+    end
+
+    action :message, Aikido.ActionResult do
+      argument :state, :term
+      argument :text, :string, allow_nil?: false
+      run {Aikido.Slices.AiReact.Implementation, action: :message}
+    end
+
+    action :handoff, Aikido.ActionResult do
+      argument :state, :term
+      argument :messages, {:array, :term}, allow_nil?: false
+      run {Aikido.Slices.AiReact.Implementation, action: :handoff}
+    end
+
+    action :deliver, Aikido.ActionResult do
+      argument :state, :term
+      argument :metadata, :map, default: %{}
+      argument :text, :string, allow_nil?: false
+      argument :request_id, :string, allow_nil?: false
+      run {Aikido.Slices.AiReact.Implementation, action: :deliver}
+    end
+
+    action :todo_changed, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      run {Aikido.Slices.AiReact.Implementation, action: :todo_changed}
+    end
+
+    action :stream, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :request_id, :string, allow_nil?: false
+      argument :iteration, :integer, allow_nil?: false
+      argument :attempt, :integer, default: 0
+      argument :text, :string, default: "", constraints: [allow_empty?: true, trim?: false]
+      argument :thinking, :string, default: "", constraints: [allow_empty?: true, trim?: false]
+      run {Aikido.Slices.AiReact.Implementation, action: :stream}
     end
 
     action :cancel, Aikido.ActionResult do
@@ -274,6 +338,7 @@ defmodule Aikido.Slices.AiReact do
     action :llm_turn, Aikido.ActionResult do
       public? false
       argument :state, :term
+      argument :iteration, :integer
       argument :turn, :term, allow_nil?: false
       argument :request_id, :string, allow_nil?: false
       description "Process a completed LLM turn and decide the next ReAct step."
@@ -311,5 +376,35 @@ defmodule Aikido.Slices.AiReact do
       argument :name, :string
       run {Aikido.Slices.AiReact.Implementation, action: :hook_context}
     end
+  end
+
+  @doc false
+  def externalize(state),
+    do:
+      Map.merge(state, %{
+        hooks_pending: %{},
+        hook_terminal: nil,
+        run_scope: %{},
+        streaming_text: "",
+        streaming_thinking: ""
+      })
+
+  @doc false
+  def reinstate(state) do
+    state =
+      if state.status in [:running, :waiting],
+        do: Map.merge(state, %{status: :failed, error: :interrupted}),
+        else: state
+
+    Map.merge(state, %{
+      context: if(state.context, do: Aikido.AI.ContextCompactor.close_tool_calls(state.context)),
+      hooks_pending: %{},
+      hook_terminal: nil,
+      run_scope: %{},
+      pending_tool_calls: [],
+      tool_results_received: [],
+      streaming_text: "",
+      streaming_thinking: ""
+    })
   end
 end

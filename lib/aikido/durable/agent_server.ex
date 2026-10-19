@@ -21,7 +21,12 @@ defmodule Aikido.Durable.AgentServer do
   def dump_state(%{options: options} = initial) do
     module = Keyword.fetch!(options, :agent_module)
     Code.ensure_loaded!(module)
-    agent = module.new(id: Keyword.fetch!(options, :id), state: options[:initial_state] || %{})
+
+    agent =
+      if function_exported?(module, :new, 1),
+        do: module.new(id: Keyword.fetch!(options, :id), state: options[:initial_state] || %{}),
+        else: module.new()
+
     agent = Persister.transform_agent(agent, module, :externalize)
 
     encode(%{
@@ -35,8 +40,9 @@ defmodule Aikido.Durable.AgentServer do
   end
 
   # Domain values have exactly one persistence path: the agent/slice codecs.
-  # Process-local middleware, callbacks and startup state are reconstructed by
-  # the host, never saved beside the codecs' output as a second copy.
+  # Runtime configuration is retained, but startup domain state is never saved
+  # beside the codecs' output as a second copy. Applications must keep secrets
+  # in runtime providers rather than in persisted middleware configuration.
   defp boot_options(options) do
     Keyword.take(options, [
       :agent_module,
@@ -49,7 +55,9 @@ defmodule Aikido.Durable.AgentServer do
       :pool_key,
       :on_parent_death,
       :skip_schedules,
-      :debug
+      :debug,
+      :middleware,
+      :default_dispatch
     ])
   end
 
@@ -102,6 +110,11 @@ defmodule Aikido.Durable.AgentServer do
     do: wrap(AgentServer.handle_call(request, from, state.runtime), state)
 
   @impl true
+  def handle_cast({:signal, %Jido.Signal{type: "ai.react.stream"}} = request, state) do
+    # Streaming text is transient; the completed turn commits canonical history.
+    wrap(AgentServer.handle_cast(request, state.runtime), state, false)
+  end
+
   def handle_cast(request, state),
     do: wrap(AgentServer.handle_cast(request, state.runtime), state)
 
@@ -121,6 +134,9 @@ defmodule Aikido.Durable.AgentServer do
 
   @impl true
   def terminate(reason, state), do: AgentServer.terminate(reason, state.runtime)
+
+  defp wrap({:noreply, runtime}, state, false), do: {:noreply, %{state | runtime: runtime}}
+  defp wrap(result, state, false), do: wrap(result, state)
 
   defp wrap({:reply, reply, runtime}, state),
     do: {:reply, reply, %{state | runtime: runtime}, sync: true}

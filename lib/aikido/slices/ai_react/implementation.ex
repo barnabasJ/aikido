@@ -9,6 +9,68 @@ defmodule Aikido.Slices.AiReact.Implementation do
   def run(input, [action: :hook_context], _context),
     do: Aikido.Hooks.context(input.arguments.state, Map.delete(input.arguments, :state))
 
+  def run(input, [action: action], context) when action in [:message, :deliver] do
+    state = input.arguments.state
+    scope = caller_scope(input)
+
+    if state.status in [:running, :waiting] &&
+         Map.merge(%{actor: nil, tenant: nil}, Map.get(state, :run_scope, %{})) != scope do
+      {:error, :scope_mismatch}
+    else
+      run_message(input, action, context)
+    end
+  end
+
+  def run(input, [action: :handoff], _context) do
+    state = input.arguments.state
+
+    if state.status in [:running, :waiting] do
+      {:error, :busy}
+    else
+      with {:ok, context} <- ReqLLM.Context.normalize(input.arguments.messages) do
+        Aikido.ActionResult.new(state: Map.put(state, :context, context))
+      end
+    end
+  end
+
+  def run(input, [action: :todo_changed], _context) do
+    state = input.arguments.state
+
+    if state.status == :waiting do
+      state = apply_todo_gate(state, input.context.aikido.agent.state)
+
+      Aikido.Hooks.transition(Aikido.ActionResult.new(state: state), :after_model, %{
+        todo_completion: true
+      })
+    else
+      Aikido.ActionResult.new(state: state)
+    end
+  end
+
+  def run(input, [action: :stream], _context) do
+    data = input.arguments
+    state = data.state
+
+    if state.status == :running && state.request_id == data.request_id &&
+         state.iteration + 1 == data.iteration &&
+         data.attempt >= Map.get(state, :stream_attempt, 0) do
+      reset? = data.attempt > Map.get(state, :stream_attempt, 0)
+
+      state =
+        Map.merge(state, %{
+          stream_attempt: data.attempt,
+          streaming_text:
+            if(reset?, do: "", else: Map.get(state, :streaming_text, "")) <> data.text,
+          streaming_thinking:
+            if(reset?, do: "", else: Map.get(state, :streaming_thinking, "")) <> data.thinking
+        })
+
+      Aikido.ActionResult.new(state: state)
+    else
+      Aikido.ActionResult.new(state: state)
+    end
+  end
+
   def run(%{arguments: %{state: %{hook_terminal: terminal}}} = input, [action: action], _context)
       when not is_nil(terminal) and action in [:llm_turn, :tool_result, :failed] do
     Aikido.ActionResult.new(state: input.arguments.state)
@@ -16,6 +78,24 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
   def run(input, [action: action] = opts, context) do
     result = decide(input, opts, context)
+    result = if action == :ask, do: bind_scope(result, input), else: result
+
+    result =
+      case result do
+        {:ok, %{state: %{status: :completed} = state} = result} ->
+          {:ok,
+           %{
+             result
+             | state:
+                 apply_todo_gate(
+                   state,
+                   (input.context.aikido[:agent] && input.context.aikido.agent.state) || %{}
+                 )
+           }}
+
+        other ->
+          other
+      end
 
     case result do
       {:ok, %{state: state}} when state != input.arguments.state ->
@@ -28,7 +108,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
             :cancel -> :run_cancelled
           end
 
-        payload = Map.take(input.arguments, [:query, :tool_call_id, :name, :content, :reason])
+        payload =
+          Map.take(input.arguments, [:query, :tool_call_id, :name, :content, :reason, :metadata])
 
         payload =
           if action == :llm_turn,
@@ -41,6 +122,78 @@ defmodule Aikido.Slices.AiReact.Implementation do
         result
     end
   end
+
+  defp run_message(input, :message, _context) do
+    state = input.arguments.state
+
+    if state.status == :waiting do
+      case ask_open_run(
+             %{
+               query: input.arguments.text,
+               request_id: state.request_id,
+               metadata: Map.get(state, :run_metadata, %{})
+             },
+             state
+           ) do
+        {:ok, result} ->
+          Aikido.Hooks.transition(bind_scope({:ok, result}, input), :run_started, %{
+            query: input.arguments.text
+          })
+
+        error ->
+          error
+      end
+    else
+      state =
+        Map.update(
+          state,
+          :queued_messages,
+          [input.arguments.text],
+          &(&1 ++ [input.arguments.text])
+        )
+
+      Aikido.ActionResult.new(state: state)
+    end
+  end
+
+  defp run_message(input, :deliver, _context) do
+    if input.arguments.state.status == :running do
+      state =
+        input.arguments.state
+        |> Map.update(:queued_messages, [input.arguments.text], &(&1 ++ [input.arguments.text]))
+        |> Map.update(:run_metadata, %{}, fn metadata ->
+          delivery = Map.take(input.arguments, [:request_id, :metadata])
+          Map.update(metadata, :deliveries, [delivery], &(&1 ++ [delivery]))
+        end)
+
+      Aikido.ActionResult.new(state: state)
+    else
+      case ask_open_run(
+             %{
+               query: input.arguments.text,
+               request_id: input.arguments.request_id,
+               metadata: input.arguments.metadata
+             },
+             input.arguments.state
+           ) do
+        {:ok, result} ->
+          Aikido.Hooks.transition(bind_scope({:ok, result}, input), :run_started, %{
+            query: input.arguments.text
+          })
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp bind_scope({:ok, result}, input),
+    do: {:ok, %{result | state: Map.put(result.state, :run_scope, caller_scope(input))}}
+
+  defp bind_scope(error, _input), do: error
+
+  defp caller_scope(input),
+    do: Map.merge(%{actor: nil, tenant: nil}, Map.take(input.context.aikido, [:actor, :tenant]))
 
   defp decide(input, [action: :ask], _context) do
     data = Map.delete(input.arguments, :state)
@@ -58,7 +211,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
     slice = input.arguments.state
     requested = Map.get(signal.data, :request_id)
 
-    if slice.status == :running && (is_nil(requested) || requested == slice.request_id) do
+    if slice.status in [:running, :waiting] &&
+         (is_nil(requested) || requested == slice.request_id) do
       Aikido.ActionResult.new(
         state:
           slice
@@ -102,9 +256,28 @@ defmodule Aikido.Slices.AiReact.Implementation do
     slice = input.arguments.state
 
     cond do
-      llm_turn_stale?(slice, request_id) -> Aikido.ActionResult.new(state: slice, directives: [])
-      slice.status != :running -> Aikido.ActionResult.new(state: slice, directives: [])
-      true -> llm_turn_handle_turn(turn, slice)
+      llm_turn_stale?(slice, request_id) ||
+          (input.arguments[:iteration] && input.arguments.iteration != slice.iteration + 1) ->
+        Aikido.ActionResult.new(state: slice, directives: [])
+
+      slice.status != :running ->
+        Aikido.ActionResult.new(state: slice, directives: [])
+
+      true ->
+        usage =
+          Map.merge(Map.get(slice, :usage, %{}), turn.usage || %{}, fn _key, old, new ->
+            if is_number(old) && is_number(new), do: old + new, else: new
+          end)
+
+        llm_turn_handle_turn(
+          turn,
+          Map.merge(slice, %{
+            usage: usage,
+            streaming_text: turn.text || "",
+            streaming_thinking: turn.thinking_content || "",
+            stream_attempt: 0
+          })
+        )
     end
   end
 
@@ -148,22 +321,64 @@ defmodule Aikido.Slices.AiReact.Implementation do
     else
       ask_build_run(
         Map.put(data, :hooks, data[:hooks] || ask_slice_field(slice, :hooks) || []),
+        slice,
         system_prompt,
         model,
         tools,
         max_iter,
         llm_opts,
         client,
-        ask_slice_field(slice, :tool_context) || %{}
+        Map.merge(ask_slice_field(slice, :tool_context) || %{}, data[:tool_context] || %{})
       )
     end
   end
 
-  defp ask_build_run(data, system_prompt, model, tools, max_iter, llm_opts, client, tool_context) do
-    context = ask_build_initial_context(data.query, system_prompt)
+  defp ask_build_run(
+         data,
+         slice,
+         system_prompt,
+         model,
+         tools,
+         max_iter,
+         llm_opts,
+         client,
+         tool_context
+       ) do
+    context =
+      case Map.get(slice || %{}, :context) do
+        %ReqLLM.Context{} = context ->
+          context = Aikido.AI.ContextCompactor.close_tool_calls(context)
+          messages = Enum.reject(context.messages, &(&1.role == :system))
+          system = if system_prompt, do: [ReqLLM.Context.system(system_prompt)], else: []
+          %{context | messages: system ++ messages}
+
+        _ ->
+          ReqLLM.Context.new([])
+      end
+
+    context =
+      if context.messages == [] && system_prompt,
+        do: ReqLLM.Context.append(context, ReqLLM.Context.system(system_prompt)),
+        else: context
+
+    context =
+      Enum.reduce(Map.get(slice || %{}, :queued_messages, []) ++ [data.query], context, fn text,
+                                                                                           context ->
+        ReqLLM.Context.append(context, ReqLLM.Context.user(text))
+      end)
+
+    options = Aikido.AI.Options.resolve(data[:options] || Map.get(slice || %{}, :options))
+    context = Aikido.AI.ContextCompactor.compact(context, options)
 
     new_slice = %{
       status: :running,
+      options: options,
+      run_metadata: data[:metadata] || %{},
+      queued_messages: [],
+      streaming_text: "",
+      streaming_thinking: "",
+      stream_attempt: 0,
+      usage: %{},
       request_id: data.request_id,
       context: context,
       iteration: 0,
@@ -188,6 +403,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
     }
 
     directive = %Aikido.Slices.AiReact.Directives.LLMCall{
+      options: options,
+      iteration: 1,
       client: client,
       model: model,
       context: context,
@@ -196,7 +413,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       llm_opts: llm_opts
     }
 
-    Aikido.ActionResult.new(state: new_slice, directives: [directive])
+    Aikido.ActionResult.new(state: Map.merge(slice || %{}, new_slice), directives: [directive])
   end
 
   defp ask_running?(%{status: :running}) do
@@ -213,14 +430,6 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
   defp ask_slice_field(slice, key) when is_map(slice) do
     Map.get(slice, key)
-  end
-
-  defp ask_build_initial_context(query, nil) do
-    ReqLLM.Context.new([ReqLLM.Context.user(query)])
-  end
-
-  defp ask_build_initial_context(query, system) when is_binary(system) do
-    ReqLLM.Context.new([ReqLLM.Context.system(system), ReqLLM.Context.user(query)])
   end
 
   defp failed_stale?(%{request_id: current}, id) do
@@ -242,7 +451,41 @@ defmodule Aikido.Slices.AiReact.Implementation do
         result: text
     }
 
-    Aikido.ActionResult.new(state: new_slice, directives: [])
+    queued = Map.get(slice, :queued_messages, [])
+
+    if queued != [] && new_slice.iteration < slice.max_iterations do
+      context =
+        Enum.reduce(queued, new_context, fn text, context ->
+          ReqLLM.Context.append(context, ReqLLM.Context.user(text))
+        end)
+
+      context = Aikido.AI.ContextCompactor.compact(context, Map.get(slice, :options))
+
+      new_slice =
+        Map.merge(new_slice, %{
+          status: :running,
+          result: nil,
+          context: context,
+          queued_messages: [],
+          streaming_text: "",
+          streaming_thinking: ""
+        })
+
+      effect = %Aikido.Slices.AiReact.Directives.LLMCall{
+        client: Map.get(slice, :client, ReqLLM.Generation),
+        model: slice.model,
+        context: context,
+        tools: slice.tools,
+        request_id: slice.request_id,
+        llm_opts: slice.llm_opts,
+        options: Map.get(slice, :options, %{}),
+        iteration: new_slice.iteration + 1
+      }
+
+      Aikido.ActionResult.new(state: new_slice, directives: [effect])
+    else
+      Aikido.ActionResult.new(state: new_slice, directives: [])
+    end
   end
 
   defp llm_turn_handle_turn(
@@ -288,6 +531,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     directives =
       Enum.map(msg_calls, fn call ->
         %Aikido.Slices.AiReact.Directives.ToolExec{
+          options: Map.get(slice, :options, %{}),
           tool_call: call,
           tool_modules: slice.tools,
           tool_context: Map.get(slice, :tool_context, %{}),
@@ -330,6 +574,14 @@ defmodule Aikido.Slices.AiReact.Implementation do
         current_signature
       )
 
+    warned_context =
+      Enum.reduce(Map.get(slice, :queued_messages, []), warned_context, fn text, context ->
+        ReqLLM.Context.append(context, ReqLLM.Context.user(text))
+      end)
+
+    warned_context = Aikido.AI.ContextCompactor.compact(warned_context, Map.get(slice, :options))
+    slice = Map.put(slice, :queued_messages, [])
+
     new_slice = %{
       slice
       | context: warned_context,
@@ -339,6 +591,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
     }
 
     directive = %Aikido.Slices.AiReact.Directives.LLMCall{
+      options: Map.get(slice, :options, %{}),
+      iteration: slice.iteration + 1,
       client: Map.get(slice, :client, ReqLLM.Generation),
       model: slice.model,
       context: warned_context,
@@ -358,5 +612,35 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
   defp tool_result_maybe_append_cycle_warning(context, _previous, _current) do
     {context, :no_warning}
+  end
+
+  defp apply_todo_gate(state, agent_state) do
+    options = Aikido.AI.Options.resolve(Map.get(state, :options))
+
+    if options.completion == :todos do
+      case Map.get(agent_state, options.todo_path) do
+        %{items: items} ->
+          blocking = Enum.filter(items, & &1.blocking?)
+
+          cond do
+            blocked = Enum.find(blocking, &(&1.status == :blocked)) ->
+              Map.merge(state, %{
+                status: :failed,
+                error: {:todo_blocked, blocked.id, blocked.reason}
+              })
+
+            Enum.any?(blocking, &(&1.status != :completed)) ->
+              Map.put(state, :status, :waiting)
+
+            true ->
+              Map.put(state, :status, :completed)
+          end
+
+        _ ->
+          Map.merge(state, %{status: :failed, error: :todo_slice_not_mounted})
+      end
+    else
+      state
+    end
   end
 end

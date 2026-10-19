@@ -7,4 +7,7 @@ defmodule Aikido.AI.Client do
   """
   @callback generate_text(term(), [map()], keyword()) ::
               {:ok, ReqLLM.Response.t() | Aikido.Slices.AiReact.Turn.t()} | {:error, term()}
+  @callback stream_text(term(), list(), keyword()) ::
+              {:ok, ReqLLM.StreamResponse.t()} | {:error, term()}
+  @optional_callbacks stream_text: 3
 end

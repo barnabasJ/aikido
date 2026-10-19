@@ -24,8 +24,10 @@ defmodule Aikido.Ash.AI do
     name: :ai,
     schema: [
       model: [type: :any],
+      options: [type: :map, default: %{}],
       client: [type: :module, default: ReqLLM.Generation],
       system_prompt: [type: :string],
+      llm_opts: [type: :keyword_list, default: []],
       hooks: [type: {:list, :map}, default: []],
       max_iterations: [type: :pos_integer, default: 10]
     ]

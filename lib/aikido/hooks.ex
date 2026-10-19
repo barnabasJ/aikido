@@ -31,6 +31,11 @@ defmodule Aikido.Hooks do
           do: queue ++ [{:event, :run_completed, %{result: state.result}}],
           else: queue
 
+      queue =
+        if state.status == :failed && event not in [:run_failed, :run_cancelled],
+          do: queue ++ [{:event, :run_failed, %{reason: state.error}}],
+          else: queue
+
       advance(state, queue, state.status, [])
     end
   end
@@ -103,7 +108,12 @@ defmodule Aikido.Hooks do
     hooks = Enum.filter(state.hooks, &(&1.event == event))
 
     event =
-      Map.merge(payload, %{type: event, request_id: state.request_id, iteration: state.iteration})
+      Map.merge(payload, %{
+        type: event,
+        request_id: state.request_id,
+        iteration: state.iteration,
+        metadata: Map.get(state, :run_metadata, %{})
+      })
 
     queue = Enum.map(hooks, &{:hook, &1, event}) ++ rest
     advance(state, queue, status, directives)
@@ -137,6 +147,7 @@ defmodule Aikido.Hooks do
         )
       end)
 
+    context = Aikido.AI.ContextCompactor.compact(context, Map.get(state, :options))
     state = state |> Map.put(:context, context) |> Map.put(:hook_context, [])
     advance(state, rest, status, directives ++ [%{effect | context: context}])
   end
