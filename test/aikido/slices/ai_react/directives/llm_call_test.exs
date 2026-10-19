@@ -116,4 +116,33 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
     assert signal.type == "ai.react.failed"
     assert signal.data == %{reason: :rate_limited, request_id: "req_1"}
   end
+
+  test "handoff calls disable streaming and report a separately correlated document", %{
+    aikido: aikido
+  } do
+    expect(ReqLLM.Generation, :generate_text, fn _, _, opts ->
+      assert opts[:tools] == []
+      {:ok, final_answer_response("Next action: continue.")}
+    end)
+
+    agent = spawn_agent_stub(self())
+
+    handoff = %{
+      directive()
+      | mode: :handoff,
+        handoff_id: 7,
+        tools: [],
+        options: %{streaming: true}
+    }
+
+    assert :ok =
+             run_in(agent, fn ->
+               Aikido.Directive.exec(handoff, Jido.Signal.new!("input", %{}), fake_state(aikido))
+             end)
+
+    assert_receive {:cast, signal}, 1_000
+    assert signal.type == "ai.react.context_handoff.completed"
+    assert signal.data.request_id == "req_1"
+    assert signal.data.handoff_id == 7
+  end
 end

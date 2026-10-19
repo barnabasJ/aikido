@@ -99,7 +99,7 @@ defmodule AgentExamples.Catalog do
       description:
         "Stream an answer, retain conversation history, and optionally wait for todos.",
       detail:
-        "Start offline, add a todo, and send a prompt. The answer streams but completion waits for the todo. Complete or block the item to resolve the run. Send another prompt to see retained history, or queue a message while the model is working. Context compaction keeps complete tool groups and system instructions. Application metadata remains plain data.",
+        "Start offline, add a todo, and send a prompt. The answer streams but completion waits for the todo. Complete or block the item to resolve the run. Send another prompt to see retained history, or queue a message while the model is working. Near the context limit, the model writes a handoff document and continues with fresh context. Application metadata remains plain data.",
       flow: [
         "History + queued messages",
         "Batched text / thinking",

@@ -90,6 +90,10 @@ defmodule Aikido.Slices.AiReact do
     description "ReAct reasoning slice attached via `slices:` on a Aikido.Agent."
 
     schema do
+      attribute :handoff_pending, :integer
+      attribute :handoff_count, :integer, public?: true, default: 0, allow_nil?: false
+      attribute :last_handoff, :map, public?: true
+      attribute :last_input_tokens, :integer
       attribute :prepared_tools, :term
       attribute :tool_preparation, {:array, :term}, default: [], allow_nil?: false
       attribute :run_scope, :map, default: %{}
@@ -169,6 +173,8 @@ defmodule Aikido.Slices.AiReact do
     end
 
     config_transform {__MODULE__, :__fold_llm_opts__, []}
+    route "ai.react.context_handoff.completed", :handoff_completed
+    route "ai.react.context_handoff.failed", :handoff_failed
     route "ai.react.tools.ready", :tools_ready
     route "ai.react.ask", :ask
     route "ai.react.message", :message
@@ -285,6 +291,25 @@ defmodule Aikido.Slices.AiReact do
   @behaviour Aikido.Persist.Transform
 
   actions do
+    action :handoff_completed, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :request_id, :string, allow_nil?: false
+      argument :handoff_id, :integer, allow_nil?: false
+      argument :turn, :term, allow_nil?: false
+      argument :iteration, :integer
+      run {Aikido.Slices.AiReact.Implementation, action: :handoff_completed}
+    end
+
+    action :handoff_failed, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :request_id, :string, allow_nil?: false
+      argument :handoff_id, :integer, allow_nil?: false
+      argument :reason, :term, allow_nil?: false
+      run {Aikido.Slices.AiReact.Implementation, action: :handoff_failed}
+    end
+
     action :tools_ready, Aikido.ActionResult do
       public? false
       argument :state, :term
@@ -412,6 +437,7 @@ defmodule Aikido.Slices.AiReact do
   def externalize(state),
     do:
       Map.merge(state, %{
+        handoff_pending: nil,
         prepared_tools: nil,
         tool_preparation: [],
         hooks_pending: %{},
@@ -430,9 +456,10 @@ defmodule Aikido.Slices.AiReact do
         else: state
 
     Map.merge(state, %{
+      handoff_pending: nil,
       prepared_tools: nil,
       tool_preparation: [],
-      context: if(state.context, do: Aikido.AI.ContextCompactor.close_tool_calls(state.context)),
+      context: if(state.context, do: Aikido.AI.Context.close_tool_calls(state.context)),
       hooks_pending: %{},
       hook_terminal: nil,
       run_scope: %{},

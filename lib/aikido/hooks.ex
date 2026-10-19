@@ -156,7 +156,6 @@ defmodule Aikido.Hooks do
         )
       end)
 
-    context = Aikido.AI.ContextCompactor.compact(context, Map.get(state, :options))
     state = state |> Map.put(:context, context) |> Map.put(:hook_context, [])
     {state, %{effect | context: context}}
   end

@@ -11,7 +11,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
         unchanged
 
       result ->
-        prepare_tools(result)
+        result = prepare_tools(result)
+        Aikido.AI.Handoff.plan(result)
     end
   end
 
@@ -25,6 +26,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
            result
            | state:
                Map.merge(state, %{
+                 handoff_pending: nil,
                  prepared_tools: nil,
                  tool_preparation: []
                })
@@ -33,6 +35,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       prepared = Map.get(state, :prepared_tools) ->
         directives =
           Enum.map(result.directives, fn
+            %LLMCall{mode: :handoff} = effect -> %{effect | tools: []}
             %LLMCall{} = effect -> %{effect | tools: elem(prepared, 0)}
             %ToolExec{} = effect -> %{effect | registry: elem(prepared, 1)}
             effect -> effect
@@ -71,6 +74,12 @@ defmodule Aikido.Slices.AiReact.Implementation do
   end
 
   defp prepare_tools(error), do: error
+
+  defp handle(input, [action: :handoff_completed], _context),
+    do: Aikido.AI.Handoff.complete(input.arguments.state, Map.delete(input.arguments, :state))
+
+  defp handle(input, [action: :handoff_failed], _context),
+    do: Aikido.AI.Handoff.fail(input.arguments.state, Map.delete(input.arguments, :state))
 
   defp handle(input, [action: :tools_ready], _context) do
     state = input.arguments.state
@@ -154,7 +163,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
     data = input.arguments
     state = data.state
 
-    if state.status == :running && state.request_id == data.request_id &&
+    if state.status == :running && is_nil(Map.get(state, :handoff_pending)) &&
+         state.request_id == data.request_id &&
          state.iteration + 1 == data.iteration &&
          data.attempt >= Map.get(state, :stream_attempt, 0) do
       reset? = data.attempt > Map.get(state, :stream_attempt, 0)
@@ -342,7 +352,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       failed_stale?(slice, id) ->
         Aikido.ActionResult.new(state: slice, directives: [])
 
-      slice.status not in [:setup, :running] ->
+      slice.status not in [:setup, :running] || not is_nil(Map.get(slice, :handoff_pending)) ->
         Aikido.ActionResult.new(state: slice, directives: [])
 
       true ->
@@ -363,7 +373,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     slice = input.arguments.state
 
     cond do
-      llm_turn_stale?(slice, request_id) ||
+      not is_nil(Map.get(slice, :handoff_pending)) || llm_turn_stale?(slice, request_id) ||
           (input.arguments[:iteration] && input.arguments.iteration != slice.iteration + 1) ->
         Aikido.ActionResult.new(state: slice, directives: [])
 
@@ -380,6 +390,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
           turn,
           Map.merge(slice, %{
             usage: usage,
+            last_input_tokens: Aikido.AI.Handoff.input_tokens(turn.usage),
             streaming_text: turn.text || "",
             streaming_thinking: turn.thinking_content || "",
             stream_attempt: 0
@@ -396,7 +407,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       tool_result_stale?(slice, data.request_id) ->
         Aikido.ActionResult.new(state: slice, directives: [])
 
-      slice.status != :running ->
+      slice.status != :running || not is_nil(Map.get(slice, :handoff_pending)) ->
         Aikido.ActionResult.new(state: slice, directives: [])
 
       not Enum.any?(slice.pending_tool_calls, &(&1.id == data.tool_call_id)) ||
@@ -454,7 +465,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     context =
       case Map.get(slice || %{}, :context) do
         %ReqLLM.Context{} = context ->
-          context = Aikido.AI.ContextCompactor.close_tool_calls(context)
+          context = Aikido.AI.Context.close_tool_calls(context)
           messages = Enum.reject(context.messages, &(&1.role == :system))
           system = if system_prompt, do: [ReqLLM.Context.system(system_prompt)], else: []
           %{context | messages: system ++ messages}
@@ -475,11 +486,14 @@ defmodule Aikido.Slices.AiReact.Implementation do
       end)
 
     options = Aikido.AI.Options.resolve(data[:options] || Map.get(slice || %{}, :options))
-    context = Aikido.AI.ContextCompactor.compact(context, options)
 
     new_slice = %{
       status: :setup,
       prepared_tools: nil,
+      handoff_pending: nil,
+      handoff_count: 0,
+      last_handoff: nil,
+      last_input_tokens: nil,
       tool_preparation: [],
       options: options,
       run_metadata: data[:metadata] || %{},
@@ -567,8 +581,6 @@ defmodule Aikido.Slices.AiReact.Implementation do
         Enum.reduce(queued, new_context, fn text, context ->
           ReqLLM.Context.append(context, ReqLLM.Context.user(text))
         end)
-
-      context = Aikido.AI.ContextCompactor.compact(context, Map.get(slice, :options))
 
       new_slice =
         Map.merge(new_slice, %{
@@ -686,7 +698,6 @@ defmodule Aikido.Slices.AiReact.Implementation do
         ReqLLM.Context.append(context, ReqLLM.Context.user(text))
       end)
 
-    warned_context = Aikido.AI.ContextCompactor.compact(warned_context, Map.get(slice, :options))
     slice = Map.put(slice, :queued_messages, [])
 
     new_slice = %{

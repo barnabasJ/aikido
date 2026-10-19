@@ -102,7 +102,7 @@ defmodule AgentExamples.Source do
     AgentExamples.AI.ScriptedClient,
     AgentExamples.AI.StreamingClient,
     Aikido.AI.Options,
-    Aikido.AI.ContextCompactor,
+    Aikido.AI.Handoff,
     Aikido.Ash.AI,
     Aikido.Slices.AiReact,
     Aikido.Slices.AiWorker

@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Replace automatic lossy context trimming with Makewright-style model-written
+  handoffs at clean ReAct boundaries. Preserve system instructions, queued
+  messages, run scope, todos and prepared tools across takeover. Keep original
+  context on failed handoffs; remove pruning/sliding options and pipeline.
+
 - Add an explicit ReAct `:setup` state before model execution. Queue messages
   and deliveries into the first model request, support setup cancellation and
   bounded preparation, and treat restored setup runs as interrupted.
@@ -27,7 +32,7 @@
   through command signals and follow-up effects without persisting caller scope.
 
 - Retain ReAct history, queue messages, stream text/thinking and record usage.
-  Add bounded cancellable model/tool execution, opt-in retries, context compaction,
+  Add bounded cancellable model/tool execution, opt-in retries, context handoff,
   idle handoff, and explicit interrupted-run recovery.
 - Add the optional Todo slice and todo-gated completion, plus an offline LiveView
   example for conversations, streaming and todo evidence.

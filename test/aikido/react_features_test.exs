@@ -289,7 +289,7 @@ defmodule Aikido.ReactFeaturesTest do
     assert {:ok, "done"} = Task.await(task)
   end
 
-  test "compaction retains system instructions and tool calls stay paired" do
+  test "interruption repair retains system instructions and pairs tool calls" do
     context =
       ReqLLM.Context.new([
         ReqLLM.Context.system("keep these instructions"),
@@ -297,16 +297,10 @@ defmodule Aikido.ReactFeaturesTest do
         ReqLLM.Context.assistant("call", tool_calls: [%{id: "one", name: "tool", arguments: %{}}])
       ])
 
-    repaired = Aikido.AI.ContextCompactor.close_tool_calls(context)
+    repaired = Aikido.AI.Context.close_tool_calls(context)
     assert List.last(repaired.messages).role == :tool
 
-    compacted =
-      Aikido.AI.ContextCompactor.compact(repaired, %{
-        context_max_tokens: 400,
-        protect_recent_tokens: 0
-      })
-
-    assert hd(compacted.messages).role == :system
-    assert Enum.map(Enum.take(compacted.messages, -2), & &1.role) == [:assistant, :tool]
+    assert hd(repaired.messages).role == :system
+    assert Enum.map(Enum.take(repaired.messages, -2), & &1.role) == [:assistant, :tool]
   end
 end

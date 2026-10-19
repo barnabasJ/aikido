@@ -1,6 +1,8 @@
 defmodule AgentExamples.AI.StreamingClient do
   @moduledoc "Offline streaming using native ReqLLM chunks and responses; no provider key is needed."
 
+  defdelegate generate_text(model, messages, opts), to: AgentExamples.AI.ScriptedClient
+
   def stream_text(_model, messages, _opts) do
     user_messages = Enum.filter(messages, &(&1.role == :user))
     latest = user_messages |> List.last() |> Map.fetch!(:content) |> Enum.map_join(& &1.text)

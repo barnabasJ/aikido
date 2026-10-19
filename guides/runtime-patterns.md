@@ -193,7 +193,7 @@ options %{
   model_max_retries: 2,
   tool_max_retries: 0,
   context_max_tokens: 16_000,
-  protect_recent_tokens: 4_000
+  handoff_buffer_tokens: 4_000
 }
 ```
 
@@ -213,13 +213,27 @@ runtime does not synchronously checkpoint each partial stream update; the
 completed turn commits canonical history. `usage` contains cumulative numeric
 usage for the current run, including its tool/model cycles.
 
-Compaction is disabled when `context_max_tokens` is nil. The pure pipeline
-ported from Makewright estimates token use, prunes older tool output and slides
-complete message groups. System instructions and the newest group survive;
-therefore a single oversized newest group can exceed the requested budget.
-Token counts are estimates, not provider-enforced limits. Supply pure
-`compaction_steps` callbacks to customize the pipeline. Model-based summary
-work belongs in a client/effect, followed by an explicit `handoff` when idle.
+Context handoff is disabled when `context_max_tokens` is nil (or `handoff` is
+false). Near `context_max_tokens - handoff_buffer_tokens`, at the next clean
+model boundary, the agent asks the model for a handoff document using its full
+current context. That request has no tools and does not stream. The document
+must preserve the mission, procedure, decisions, completed work, remaining work
+and exact next action. Override the instructions with `handoff_prompt`.
+
+On success, an action replaces model context with the existing system messages
+and one takeover message containing the document, appends messages queued during
+the handoff, and continues the same run with its prepared tools and todo state.
+`handoff_count` and `last_handoff` expose the swap. No tool batch is interrupted.
+The threshold uses the larger of the latest provider input count and the local
+estimate; cumulative run usage is not mistaken for current context size. Choose
+a buffer large enough for the instructions and document and smaller than the
+context ceiling. Estimates are not provider-enforced limits.
+
+A failed, empty, truncated or oversized handoff fails the run with
+`{:context_handoff_failed, reason}` and preserves its original context. There is
+no automatic trimming fallback. Cancellation also stops an active handoff.
+The separate public `handoff` action replaces history while idle; automatic
+context handoff operates within an active run through its own result actions.
 
 Restoring an interrupted run retains its conversation but marks the run failed
 with `:interrupted`. Missing tool replies are closed with interruption results

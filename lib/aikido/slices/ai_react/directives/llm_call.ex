@@ -22,6 +22,12 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   use Aikido.Directive
 
   typed_struct do
+    field :mode, :atom,
+      default: :normal,
+      allow_nil?: false,
+      constraints: [one_of: [:normal, :handoff, :resume]]
+
+    field :handoff_id, :integer
     field :options, :term, default: %{}
     field :iteration, :integer, default: 1
     field :model, :term, allow_nil?: false
@@ -63,6 +69,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     options = Aikido.AI.Options.resolve(d.options)
 
     llm_opts = Keyword.put(d.llm_opts, :tools, d.tools)
+    llm_opts = if d.mode == :handoff, do: Keyword.delete(llm_opts, :tool_choice), else: llm_opts
     messages = Context.to_list(d.context)
 
     result =
@@ -71,7 +78,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
         d.request_id,
         supervisor,
         fn notify, attempt ->
-          if options.streaming do
+          if options.streaming && d.mode != :handoff do
             Aikido.AI.Streaming.call(
               d.client,
               d.model,
@@ -104,7 +111,10 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
         end,
         timeout: options.model_timeout_ms,
         progress_timeout:
-          if(options.streaming, do: options.progress_timeout_ms, else: options.model_timeout_ms),
+          if(options.streaming && d.mode != :handoff,
+            do: options.progress_timeout_ms,
+            else: options.model_timeout_ms
+          ),
         retries: options.model_max_retries,
         backoff: options.retry_backoff_ms
       )
@@ -112,18 +122,29 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     signal =
       case result do
         {:ok, response} ->
+          data =
+            handoff_data(
+              %{
+                turn: Turn.from_response(response),
+                request_id: d.request_id,
+                iteration: d.iteration
+              },
+              d
+            )
+
           Signal.new!(
-            "ai.react.llm.completed",
-            %{
-              turn: Turn.from_response(response),
-              request_id: d.request_id,
-              iteration: d.iteration
-            },
+            if(d.mode == :handoff,
+              do: "ai.react.context_handoff.completed",
+              else: "ai.react.llm.completed"
+            ),
+            data,
             source: source
           )
 
         {:error, reason} ->
-          Signal.new!("ai.react.failed", %{reason: reason, request_id: d.request_id},
+          Signal.new!(
+            failure_type(d),
+            handoff_data(%{reason: reason, request_id: d.request_id}, d),
             source: source
           )
       end
@@ -133,10 +154,17 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     exception ->
       AgentServer.cast(
         agent_pid,
-        Signal.new!("ai.react.failed", %{reason: exception, request_id: d.request_id},
+        Signal.new!(
+          failure_type(d),
+          handoff_data(%{reason: exception, request_id: d.request_id}, d),
           source: source
         )
         |> Aikido.SignalCtx.put_ctx(scope)
       )
   end
+
+  defp failure_type(%{mode: :handoff}), do: "ai.react.context_handoff.failed"
+  defp failure_type(_), do: "ai.react.failed"
+  defp handoff_data(data, %{mode: :handoff, handoff_id: id}), do: Map.put(data, :handoff_id, id)
+  defp handoff_data(data, _), do: data
 end

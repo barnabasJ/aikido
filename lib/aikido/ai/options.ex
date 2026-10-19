@@ -62,17 +62,15 @@ defmodule Aikido.AI.Options do
 
     attribute :context_max_tokens, :integer, public?: true, constraints: [min: 1]
 
-    attribute :protect_recent_tokens, :integer,
-      default: 4_000,
-      allow_nil?: false,
+    attribute :handoff, :boolean, public?: true, default: true, allow_nil?: false
+
+    attribute :handoff_buffer_tokens, :integer,
       public?: true,
+      default: 24_000,
+      allow_nil?: false,
       constraints: [min: 0]
 
-    attribute :compaction_steps, {:array, :function},
-      default: [],
-      allow_nil?: false,
-      public?: true,
-      constraints: [items: [arity: 2]]
+    attribute :handoff_prompt, :string, public?: true
   end
 
   @doc false

@@ -1,5 +1,5 @@
 defmodule AgentExamples.ConversationAssistant do
-  @moduledoc "Conversation history, streaming, compaction and optional todo completion in one agent."
+  @moduledoc "Conversation history, streaming, model-written handoff and optional todo completion in one agent."
   use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
 
   agent do
@@ -14,7 +14,7 @@ defmodule AgentExamples.ConversationAssistant do
       streaming: true,
       completion: :todos,
       context_max_tokens: 4_000,
-      protect_recent_tokens: 1_000
+      handoff_buffer_tokens: 1_000
     }
   end
 end

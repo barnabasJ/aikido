@@ -25,6 +25,13 @@ defmodule AgentExamples.AI.ScriptedClient do
     tools = Keyword.fetch!(options, :tools) |> Enum.map(& &1.name)
 
     cond do
+      tools == [] && String.starts_with?(query, "This conversation is about to be replaced") ->
+        {:ok,
+         %Turn{
+           text:
+             "Offline handoff demonstration. Follow the system instructions and continue the conversation with the supplied tools. Next action: process the latest user instruction and report the result."
+         }}
+
       String.starts_with?(query, "orchestrate:") &&
           ("spawn_worker" in tools || "run_lua" in tools) ->
         orchestrate(results, query, "run_lua" in tools)
