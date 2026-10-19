@@ -61,6 +61,10 @@
 
 ### Added
 
+- Add bounded Lua lifecycle hooks to ReAct agents and teams. Ordered synchronous
+  gates return typed decisions; asynchronous observers can send signals and
+  inject context into later model requests. Add an offline LiveView hooks example.
+
 - Add `Aikido.AgentServer.call_until/5` for subscribe-before-dispatch command
   completion, including timeout, process monitoring, and subscription cleanup.
 

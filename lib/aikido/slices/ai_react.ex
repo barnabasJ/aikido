@@ -113,9 +113,16 @@ defmodule Aikido.Slices.AiReact do
       attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
       attribute :system_prompt, :term, public?: true, allow_nil?: true, default: nil
       attribute :llm_opts, :term, public?: true, allow_nil?: false, default: []
+      attribute :hooks, {:array, Aikido.Hooks.Hook}, public?: true, allow_nil?: false, default: []
+      attribute :hooks_pending, :map, public?: true, allow_nil?: false, default: %{}
+      attribute :hook_sequence, :integer, public?: true, allow_nil?: false, default: 0
+      attribute :hook_context, {:array, :map}, public?: true, allow_nil?: false, default: []
+      attribute :hook_errors, {:array, :map}, public?: true, allow_nil?: false, default: []
+      attribute :hook_terminal, :atom, public?: true
     end
 
     config_schema do
+      attribute :hooks, {:array, Aikido.Hooks.Hook}, public?: true, allow_nil?: false, default: []
       attribute :model, :term, public?: true, allow_nil?: true
       attribute :client, :atom, public?: true, allow_nil?: false, default: ReqLLM.Generation
       attribute :tools, {:array, :term}, public?: true, allow_nil?: false, default: []
@@ -133,6 +140,8 @@ defmodule Aikido.Slices.AiReact do
     route "ai.react.tool.completed", :tool_result
     route "ai.react.failed", :failed
     route "ai.react.cancel", :cancel
+    route "ai.react.hook.completed", :hook_completed
+    route "ai.react.hook.context", :hook_context
   end
 
   @react_section %Spark.Dsl.Section{
@@ -146,6 +155,7 @@ defmodule Aikido.Slices.AiReact do
         doc: "Module implementing the model-call boundary."
       ],
       tool_context: [type: :map, default: %{}],
+      hooks: [type: {:list, :map}, default: []],
       tools: [
         type: {:list, :any},
         default: [],
@@ -241,6 +251,7 @@ defmodule Aikido.Slices.AiReact do
       argument :system_prompt, :string
       argument :max_iterations, :integer, constraints: [min: 1]
       argument :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list]
+      argument :hooks, {:array, Aikido.Hooks.Hook}
       description "Open a ReAct run on a Aikido.Slices.AiReact-equipped agent."
       run {Aikido.Slices.AiReact.Implementation, action: :ask}
     end
@@ -278,6 +289,27 @@ defmodule Aikido.Slices.AiReact do
       argument :request_id, :string, allow_nil?: false
       description "Process one tool result and fan-in to the next LLM turn."
       run {Aikido.Slices.AiReact.Implementation, action: :tool_result}
+    end
+
+    action :hook_completed, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :request_id, :string, allow_nil?: false
+      argument :token, :integer, allow_nil?: false
+      argument :name, :string, allow_nil?: false
+      argument :mode, :atom, allow_nil?: false, constraints: [one_of: [:sync, :async]]
+      argument :result, :term
+      argument :reason, :term
+      run {Aikido.Slices.AiReact.Implementation, action: :hook_completed}
+    end
+
+    action :hook_context, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :request_id, :string, allow_nil?: false
+      argument :text, :string, allow_nil?: false
+      argument :name, :string
+      run {Aikido.Slices.AiReact.Implementation, action: :hook_context}
     end
   end
 end

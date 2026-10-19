@@ -137,6 +137,10 @@ defmodule Aikido.MixProject do
       # Aikido Deps
       {:ash, "~> 3.36"},
       {:ash_ai, "~> 1.3"},
+      {:lua, "~> 1.0.2"},
+      {:ash_lua,
+       git: "https://github.com/ash-project/ash_lua.git",
+       ref: "5388cbbcd176e3f879a713d948733d9f0e281cf6"},
       {:simple_sat, "~> 0.1"},
       {:deep_merge, "~> 1.0"},
       {:jason, "~> 1.4"},

@@ -8,6 +8,10 @@ defmodule Aikido.Ash.AI do
   supplied at create time. Tools can be built dynamically as `ReqLLM.Tool` objects
   with callbacks; no compile-time tool declaration is required.
 
+  Supply `hooks` at start or set defaults in `ai`. Lua sync hooks gate lifecycle
+  steps; async observers can inject context through signals. See
+  `Aikido.Hooks.Hook` and the runtime-patterns guide.
+
       ai do
         model "zai:glm-4.7"
       end
@@ -22,6 +26,7 @@ defmodule Aikido.Ash.AI do
       model: [type: :any],
       client: [type: :module, default: ReqLLM.Generation],
       system_prompt: [type: :string],
+      hooks: [type: {:list, :map}, default: []],
       max_iterations: [type: :pos_integer, default: 10]
     ]
   }

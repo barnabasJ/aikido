@@ -283,6 +283,7 @@ defmodule Aikido.Ash.Runtime do
             Map.take(own_state, [
               :tools,
               :tool_context,
+              :hooks,
               :model,
               :client,
               :system_prompt,

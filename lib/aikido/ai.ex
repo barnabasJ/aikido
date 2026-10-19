@@ -85,6 +85,7 @@ defmodule Aikido.AI do
           system_prompt: String.t() | nil,
           max_iterations: pos_integer() | nil,
           llm_opts: keyword(),
+          hooks: [map()],
           timeout: timeout()
         ]
 
@@ -148,7 +149,8 @@ defmodule Aikido.AI do
       tools: Keyword.get(opts, :tools),
       system_prompt: Keyword.get(opts, :system_prompt),
       max_iterations: Keyword.get(opts, :max_iterations),
-      llm_opts: Keyword.get(opts, :llm_opts)
+      llm_opts: Keyword.get(opts, :llm_opts),
+      hooks: Keyword.get(opts, :hooks)
     }
 
     Jido.Signal.new!("ai.react.ask", data)

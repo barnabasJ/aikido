@@ -20,6 +20,7 @@ defmodule Aikido.Ash.Transformers.AI do
   defp build(dsl) do
     fields = [
       tools: [{:array, Aikido.Types.Tool}, [], false],
+      hooks: [{:array, Aikido.Hooks.Hook}, [], false],
       tool_context: [:map, %{}, false],
       model: [:term, nil, true],
       client: [:atom, ReqLLM.Generation, false],

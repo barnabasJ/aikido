@@ -1,8 +1,48 @@
 defmodule Aikido.Slices.AiReact.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
+
   @impl true
-  def run(input, [action: :ask], _context) do
+  def run(input, [action: :hook_completed], _context),
+    do: Aikido.Hooks.completed(input.arguments.state, Map.delete(input.arguments, :state))
+
+  def run(input, [action: :hook_context], _context),
+    do: Aikido.Hooks.context(input.arguments.state, Map.delete(input.arguments, :state))
+
+  def run(%{arguments: %{state: %{hook_terminal: terminal}}} = input, [action: action], _context)
+      when not is_nil(terminal) and action in [:llm_turn, :tool_result, :failed] do
+    Aikido.ActionResult.new(state: input.arguments.state)
+  end
+
+  def run(input, [action: action] = opts, context) do
+    result = decide(input, opts, context)
+
+    case result do
+      {:ok, %{state: state}} when state != input.arguments.state ->
+        event =
+          case action do
+            :ask -> :run_started
+            :llm_turn -> :after_model
+            :tool_result -> :after_tool
+            :failed -> :run_failed
+            :cancel -> :run_cancelled
+          end
+
+        payload = Map.take(input.arguments, [:query, :tool_call_id, :name, :content, :reason])
+
+        payload =
+          if action == :llm_turn,
+            do: Map.put(payload, :turn, Map.from_struct(input.arguments.turn)),
+            else: payload
+
+        Aikido.Hooks.transition(result, event, payload)
+
+      _ ->
+        result
+    end
+  end
+
+  defp decide(input, [action: :ask], _context) do
     data = Map.delete(input.arguments, :state)
     slice = input.arguments.state
 
@@ -13,15 +53,18 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  @impl true
-  def run(input, [action: :cancel], _context) do
+  defp decide(input, [action: :cancel], _context) do
     signal = input.context.aikido.signal
     slice = input.arguments.state
     requested = Map.get(signal.data, :request_id)
 
     if slice.status == :running && (is_nil(requested) || requested == slice.request_id) do
       Aikido.ActionResult.new(
-        state: %{slice | status: :failed, error: :cancelled},
+        state:
+          slice
+          |> Map.put(:status, :failed)
+          |> Map.put(:error, :cancelled)
+          |> Map.put(:hooks_pending, %{}),
         directives: []
       )
     else
@@ -29,8 +72,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  @impl true
-  def run(input, [action: :failed], _context) do
+  defp decide(input, [action: :failed], _context) do
     reason = input.arguments[:reason]
     id = input.arguments[:request_id]
     slice = input.arguments.state
@@ -43,12 +85,18 @@ defmodule Aikido.Slices.AiReact.Implementation do
         Aikido.ActionResult.new(state: slice, directives: [])
 
       true ->
-        Aikido.ActionResult.new(state: %{slice | status: :failed, error: reason}, directives: [])
+        Aikido.ActionResult.new(
+          state:
+            slice
+            |> Map.put(:status, :failed)
+            |> Map.put(:error, reason)
+            |> Map.put(:hooks_pending, %{}),
+          directives: []
+        )
     end
   end
 
-  @impl true
-  def run(input, [action: :llm_turn], _context) do
+  defp decide(input, [action: :llm_turn], _context) do
     turn = input.arguments[:turn]
     request_id = input.arguments[:request_id]
     slice = input.arguments.state
@@ -60,8 +108,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  @impl true
-  def run(input, [action: :tool_result], _context) do
+  defp decide(input, [action: :tool_result], _context) do
     data = Map.delete(input.arguments, :state)
     slice = input.arguments.state
 
@@ -70,6 +117,10 @@ defmodule Aikido.Slices.AiReact.Implementation do
         Aikido.ActionResult.new(state: slice, directives: [])
 
       slice.status != :running ->
+        Aikido.ActionResult.new(state: slice, directives: [])
+
+      not Enum.any?(slice.pending_tool_calls, &(&1.id == data.tool_call_id)) ||
+          Enum.any?(slice.tool_results_received, &(&1.tool_call_id == data.tool_call_id)) ->
         Aikido.ActionResult.new(state: slice, directives: [])
 
       true ->
@@ -96,7 +147,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       {:error, :no_model}
     else
       ask_build_run(
-        data,
+        Map.put(data, :hooks, data[:hooks] || ask_slice_field(slice, :hooks) || []),
         system_prompt,
         model,
         tools,
@@ -123,6 +174,12 @@ defmodule Aikido.Slices.AiReact.Implementation do
       tool_results_received: [],
       previous_tool_signature: nil,
       model: model,
+      hooks: data[:hooks] || [],
+      hooks_pending: %{},
+      hook_sequence: 0,
+      hook_context: [],
+      hook_errors: [],
+      hook_terminal: nil,
       client: client,
       tools: tools,
       tool_context: tool_context,
