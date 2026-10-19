@@ -73,7 +73,7 @@ defmodule Aikido.AI do
       of polling state; subscribes pre-cast to close the registration
       race.
     * ADR 0022 §5 — single active run per agent; concurrent `ask/3`
-      while `:running` returns the action's `{:error, :busy}` chain
+      while `:setup` or `:running` returns the action's `{:error, :busy}` chain
       error verbatim through `Aikido.AgentServer.call/4`.
   """
 

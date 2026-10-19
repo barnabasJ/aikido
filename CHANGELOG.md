@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Add an explicit ReAct `:setup` state before model execution. Queue messages
+  and deliveries into the first model request, support setup cancellation and
+  bounded preparation, and treat restored setup runs as interrupted.
+
 - Prepare native Ash AI tools once per ReAct run and reuse their descriptions
   and registry across model turns, parallel calls and retries. Exclude generated
   callbacks from snapshots and rebuild them for new runs after restoration.

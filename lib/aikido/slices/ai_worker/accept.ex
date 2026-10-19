@@ -17,7 +17,7 @@ defmodule Aikido.Slices.AiWorker.Accept do
       duplicate? ->
         Aikido.ActionResult.new(state: state)
 
-      state.pending || context.agent.state.ai.status in [:running, :waiting] ->
+      state.pending || context.agent.state.ai.status in [:setup, :running, :waiting] ->
         Aikido.ActionResult.new(state: Map.update(state, :queue, [data], &(&1 ++ [data])))
 
       true ->

@@ -60,7 +60,7 @@ defmodule Aikido.Hooks do
 
         Aikido.ActionResult.new(state: state)
 
-      state.status != :running || not Map.has_key?(pending, data.token) ->
+      state.status not in [:setup, :running] || not Map.has_key?(pending, data.token) ->
         Aikido.ActionResult.new(state: state)
 
       true ->
@@ -84,7 +84,7 @@ defmodule Aikido.Hooks do
   @doc false
   def context(state, data) do
     state =
-      if state.request_id == data.request_id && state.status == :running,
+      if state.request_id == data.request_id && state.status in [:setup, :running],
         do: enqueue_context(state, data[:name] || "async", data.text),
         else: state
 
@@ -132,13 +132,22 @@ defmodule Aikido.Hooks do
       state =
         state
         |> Map.put(:hooks_pending, Map.put(pending, token, %{queue: rest, status: status}))
-        |> Map.put(:status, :running)
+        |> Map.put(:status, if(status == :setup, do: :setup, else: :running))
 
       Aikido.ActionResult.new(state: state, directives: directives ++ [effect])
     end
   end
 
   defp advance(state, [{:effect, %LLMCall{} = effect} | rest], status, directives) do
+    {state, effect} = prepare_model(state, effect)
+    advance(state, rest, status, directives ++ [effect])
+  end
+
+  defp advance(state, [{:effect, effect} | rest], status, directives),
+    do: advance(state, rest, status, directives ++ [effect])
+
+  @doc false
+  def prepare_model(state, effect) do
     context =
       Enum.reduce(Map.get(state, :hook_context, []), state.context, fn entry, context ->
         ReqLLM.Context.append(
@@ -149,11 +158,8 @@ defmodule Aikido.Hooks do
 
     context = Aikido.AI.ContextCompactor.compact(context, Map.get(state, :options))
     state = state |> Map.put(:context, context) |> Map.put(:hook_context, [])
-    advance(state, rest, status, directives ++ [%{effect | context: context}])
+    {state, %{effect | context: context}}
   end
-
-  defp advance(state, [{:effect, effect} | rest], status, directives),
-    do: advance(state, rest, status, directives ++ [effect])
 
   defp enqueue_context(state, name, text),
     do:

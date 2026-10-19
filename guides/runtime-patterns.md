@@ -267,6 +267,14 @@ registry directly. There is no per-tool Aikido tuple or callback wrapper.
 Native tool action errors reach the model unchanged as Ash AI's formatted content;
 execution deadlines and crashes are handled by the bounded I/O task.
 
+A run starts in `:setup`. Startup hooks and tool preparation must finish before
+it enters `:running` and sends its first model request. Another start or handoff
+is rejected during setup. Messages and deliveries from the same actor/tenant
+are queued and included in that first request. Cancellation stops an active
+preparation task; failures settle the run without calling the model. Late results
+cannot revive a cancelled or replaced run. Tool preparation uses the configured
+`model_timeout_ms` budget.
+
 Aikido builds descriptions and the callback registry once per ReAct run, before
 its first model or tool effect. Later turns and parallel tool calls reuse them;
 callbacks still receive the current invocation context. Finishing or cancelling

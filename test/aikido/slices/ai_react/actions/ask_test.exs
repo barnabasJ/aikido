@@ -39,7 +39,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
     }
   end
 
-  test "transitions an idle slice to :running, seeds the context, and emits LLMCall" do
+  test "transitions an idle slice to :setup and prepares tools before the model call" do
     {:ok, new_slice, [directive]} =
       AikidoTest.NativeAction.run(
         {Aikido.Slices.AiReact, :ask},
@@ -49,7 +49,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
         %{}
       )
 
-    assert new_slice.status == :running
+    assert new_slice.status == :setup
     assert new_slice.request_id == "req_test_1"
     assert new_slice.iteration == 0
     assert new_slice.max_iterations == 4
@@ -116,7 +116,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
         %{}
       )
 
-    assert new_slice.status == :running
+    assert new_slice.status == :setup
     assert new_slice.result == nil
     assert new_slice.error == nil
     assert new_slice.previous_tool_signature == nil
@@ -138,7 +138,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
   end
 
   test "accepts the ask when the slice is nil (uninitialized)" do
-    {:ok, %{status: :running}, [%PrepareTools{}]} =
+    {:ok, %{status: :setup}, [%PrepareTools{}]} =
       AikidoTest.NativeAction.run(
         {Aikido.Slices.AiReact, :ask},
         ask_signal(),

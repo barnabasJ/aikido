@@ -19,7 +19,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     state = result.state
 
     cond do
-      state.status not in [:running, :waiting] ->
+      state.status not in [:setup, :running, :waiting] ->
         {:ok,
          %{
            result
@@ -52,6 +52,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
         if pending != [] && Map.get(result.state, :tool_preparation, []) == [] do
           effect = %PrepareTools{
+            options: Map.get(state, :options, %{}),
             tools: state.tools,
             tool_options: state.tool_options,
             request_id: state.request_id
@@ -74,12 +75,28 @@ defmodule Aikido.Slices.AiReact.Implementation do
   defp handle(input, [action: :tools_ready], _context) do
     state = input.arguments.state
 
-    if state.request_id == input.arguments.request_id && state.status == :running &&
+    if state.request_id == input.arguments.request_id && state.status == :setup &&
          Map.get(state, :tool_preparation, []) != [] do
-      directives = state.tool_preparation
+      context =
+        Enum.reduce(state.queued_messages, state.context, fn text, context ->
+          ReqLLM.Context.append(context, ReqLLM.Context.user(text))
+        end)
+
+      state = Map.merge(state, %{context: context, queued_messages: []})
+
+      {directives, state} =
+        Enum.map_reduce(state.tool_preparation, state, fn
+          %LLMCall{} = effect, state ->
+            {state, effect} = Aikido.Hooks.prepare_model(state, effect)
+            {effect, state}
+
+          effect, state ->
+            {effect, state}
+        end)
 
       state =
         state
+        |> Map.put(:status, :running)
         |> Map.put(:prepared_tools, input.arguments.prepared_tools)
         |> Map.put(:tool_preparation, [])
 
@@ -99,7 +116,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     state = input.arguments.state
     scope = caller_scope(input)
 
-    if state.status in [:running, :waiting] &&
+    if state.status in [:setup, :running, :waiting] &&
          Map.merge(%{actor: nil, tenant: nil}, Map.get(state, :run_scope, %{})) != scope do
       {:error, :scope_mismatch}
     else
@@ -110,7 +127,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
   defp handle(input, [action: :handoff], _context) do
     state = input.arguments.state
 
-    if state.status in [:running, :waiting] do
+    if state.status in [:setup, :running, :waiting] do
       {:error, :busy}
     else
       with {:ok, context} <- ReqLLM.Context.normalize(input.arguments.messages) do
@@ -247,7 +264,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
   end
 
   defp run_message(input, :deliver, _context) do
-    if input.arguments.state.status == :running do
+    if input.arguments.state.status in [:setup, :running] do
       state =
         input.arguments.state
         |> Map.update(:queued_messages, [input.arguments.text], &(&1 ++ [input.arguments.text]))
@@ -301,7 +318,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     slice = input.arguments.state
     requested = Map.get(signal.data, :request_id)
 
-    if slice.status in [:running, :waiting] &&
+    if slice.status in [:setup, :running, :waiting] &&
          (is_nil(requested) || requested == slice.request_id) do
       Aikido.ActionResult.new(
         state:
@@ -325,7 +342,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       failed_stale?(slice, id) ->
         Aikido.ActionResult.new(state: slice, directives: [])
 
-      slice.status != :running ->
+      slice.status not in [:setup, :running] ->
         Aikido.ActionResult.new(state: slice, directives: [])
 
       true ->
@@ -461,7 +478,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     context = Aikido.AI.ContextCompactor.compact(context, options)
 
     new_slice = %{
-      status: :running,
+      status: :setup,
       prepared_tools: nil,
       tool_preparation: [],
       options: options,
@@ -508,7 +525,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     Aikido.ActionResult.new(state: Map.merge(slice || %{}, new_slice), directives: [directive])
   end
 
-  defp ask_running?(%{status: :running}) do
+  defp ask_running?(%{status: status}) when status in [:setup, :running] do
     true
   end
 

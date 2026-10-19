@@ -6,8 +6,11 @@ defmodule Aikido.AI.Execution do
   def run(owner, request_id, supervisor, work, opts) do
     selector = fn runtime ->
       if Enum.any?(runtime.agent.state, fn
-           {_, %{request_id: ^request_id, status: :running}} -> true
-           _ -> false
+           {_, %{request_id: ^request_id, status: status}} when status in [:setup, :running] ->
+             true
+
+           _ ->
+             false
          end), do: :skip, else: {:error, :cancelled}
     end
 

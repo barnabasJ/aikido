@@ -96,7 +96,7 @@ defmodule Aikido.HookRequestsTest do
     task = Task.async(fn -> Aikido.AI.ask_sync(pid, "hello", options) end)
     assert_receive {:question, waiter, %{type: "pick.color"}, %{request_id: run_id}}, 2_000
     assert is_binary(run_id)
-    assert {:ok, :running} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.status})
+    assert {:ok, :setup} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.status})
     send(waiter, {:answer, %{value: "blue"}})
     assert {:ok, answer} = Task.await(task, 5_000)
     assert answer =~ "Lua received blue"

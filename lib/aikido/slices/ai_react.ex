@@ -30,17 +30,18 @@ defmodule Aikido.Slices.AiReact do
 
   ## State machine
 
-      :idle ──ask──▶ :running ─┬─final answer──▶ :completed
-                               ├─tool calls + iter < max ─▶ :running (next iter)
-                               ├─tool calls + iter ≥ max ─▶ :completed (truncated)
-                               └─LLM error ──▶ :failed
+      :idle ──ask──▶ :setup ──tools ready──▶ :running
+                       │                       ├─tool calls──▶ :running (next turn)
+                       │                       ├─final answer / limit──▶ :completed
+                       │                       ├─unfinished blocking todos──▶ :waiting
+                       └─error / cancel──▶ :failed ◀──error / cancel──┘
 
-  Concurrent `ai.react.ask` while `:running` is rejected with
+  Concurrent `ai.react.ask` while `:setup` or `:running` is rejected with
   `{:error, :busy}` (ADR 0022 §5).
 
   ## Slice fields
 
-    * `:status` — `:idle | :running | :completed | :failed`.
+    * `:status` — `:idle | :setup | :running | :waiting | :completed | :failed`.
     * `:request_id` — opaque correlation id minted by `Aikido.AI.ask/3`.
       Every response signal carries it; mismatched signals are dropped as
       stale.
@@ -424,7 +425,7 @@ defmodule Aikido.Slices.AiReact do
   @impl true
   def reinstate(state) do
     state =
-      if state.status in [:running, :waiting],
+      if state.status in [:setup, :running, :waiting],
         do: Map.merge(state, %{status: :failed, error: :interrupted}),
         else: state
 

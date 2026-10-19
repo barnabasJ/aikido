@@ -96,7 +96,7 @@ defmodule Aikido.PreparedToolsTest do
 
   test "late preparation results cannot restart a cancelled or replaced run" do
     state = %{
-      status: :running,
+      status: :setup,
       request_id: "new",
       tool_preparation: [:waiting],
       prepared_tools: nil
