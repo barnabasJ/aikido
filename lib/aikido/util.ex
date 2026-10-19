@@ -20,7 +20,6 @@ defmodule Aikido.Util do
 
   alias Jido.Signal.ID, as: SignalID
 
-  require OK
   require Logger
 
   @name_regex ~r/^[a-zA-Z][a-zA-Z0-9_]*$/
@@ -32,15 +31,7 @@ defmodule Aikido.Util do
   def generate_id, do: SignalID.generate!()
 
   @doc """
-  Converts a string to a binary.
-  """
-  @spec string_to_binary!(String.t()) :: binary()
-  def string_to_binary!(string) when is_binary(string) do
-    string
-  end
-
-  @doc """
-  Validates the name of a Action.
+  Validates a slice name.
 
   The name must contain only letters, numbers, and underscores.
 
@@ -55,10 +46,10 @@ defmodule Aikido.Util do
 
   ## Examples
 
-      iex> Aikido.Action.validate_name("valid_name_123")
+      iex> Aikido.Util.validate_name("valid_name_123")
       {:ok, "valid_name_123"}
 
-      iex> Aikido.Action.validate_name("invalid-name")
+      iex> Aikido.Util.validate_name("invalid-name")
       {:error, "The name must contain only letters, numbers, and underscores."}
 
   """
@@ -68,7 +59,7 @@ defmodule Aikido.Util do
 
   def validate_name(name, []) when is_binary(name) do
     if Regex.match?(@name_regex, name) do
-      OK.success(name)
+      {:ok, name}
     else
       {:error,
        Aikido.Error.validation_error(
@@ -96,284 +87,6 @@ defmodule Aikido.Util do
 
   def validate_name(_, _opts) do
     {:error, Aikido.Error.validation_error("Invalid name format.", field: :name)}
-  end
-
-  @doc """
-  Validates that all modules in a list implement the Aikido.Action behavior.
-  Used as a custom validator for Spark.Options.
-
-  This function ensures that all provided modules are valid Aikido.Action implementations
-  by checking that they:
-  1. Are valid Elixir modules that can be loaded
-  2. Are Spark hosts identified as `Aikido.Action` (i.e. did `use Aikido.Action`)
-
-  ## Parameters
-
-  - `actions`: A list of module atoms or a single module atom to validate
-
-  ## Returns
-
-  - `{:ok, actions}` if all modules are valid Aikido.Action implementations
-  - `{:error, reason}` if any module is invalid
-
-  ## Examples
-
-      iex> defmodule ValidAction do
-      ...>   use Aikido.Action
-      ...>
-      ...>   action do
-      ...>     name "valid_action"
-      ...>   end
-      ...> end
-      ...> Aikido.Util.validate_actions([ValidAction])
-      {:ok, [ValidAction]}
-
-      iex> Aikido.Util.validate_actions([InvalidModule])
-      {:error, "All actions must implement the Aikido.Action behavior"}
-
-      # Single module validation
-      iex> Aikido.Util.validate_actions(ValidAction)
-      {:ok, [ValidAction]}
-  """
-  @spec validate_actions(list(module()) | module(), keyword()) ::
-          :ok | {:ok, list(module()) | module()} | {:error, Aikido.Error.ValidationError.t()}
-  def validate_actions(actions, opts \\ [])
-
-  def validate_actions(actions, []) when is_list(actions) do
-    if Enum.all?(actions, &implements_action?/1) do
-      {:ok, actions}
-    else
-      {:error,
-       Aikido.Error.validation_error("All actions must implement the Aikido.Action behavior",
-         kind: :action,
-         subject: actions
-       )}
-    end
-  end
-
-  def validate_actions(actions, _opts) when is_list(actions) do
-    if Enum.all?(actions, &implements_action?/1) do
-      :ok
-    else
-      {:error,
-       Aikido.Error.validation_error("All actions must implement the Aikido.Action behavior",
-         kind: :action,
-         subject: actions
-       )}
-    end
-  end
-
-  def validate_actions(action, []) when is_atom(action) do
-    if implements_action?(action) do
-      {:ok, action}
-    else
-      {:error,
-       Aikido.Error.validation_error("All actions must implement the Aikido.Action behavior",
-         kind: :action,
-         subject: action
-       )}
-    end
-  end
-
-  def validate_actions(action, _opts) when is_atom(action) do
-    if implements_action?(action) do
-      :ok
-    else
-      {:error,
-       Aikido.Error.validation_error("All actions must implement the Aikido.Action behavior",
-         kind: :action,
-         subject: action
-       )}
-    end
-  end
-
-  defp implements_action?(module) when is_atom(module) do
-    match?({:module, _}, Code.ensure_compiled(module)) and
-      Aikido.ActionRef.valid?(module)
-  end
-
-  @doc """
-  Validates that a module is a valid Elixir module that can be loaded.
-  Used as a custom validator for Spark.Options.
-
-  ## Parameters
-
-  - `module`: A module atom to validate
-
-  ## Returns
-
-  - `{:ok, module}` if the module is valid
-  - `{:error, reason}` if the module is invalid
-
-  ## Examples
-
-      iex> Aikido.Util.validate_module(Enum)
-      {:ok, Enum}
-
-      iex> Aikido.Util.validate_module(:invalid_module)
-      {:error, "Module :invalid_module does not exist or cannot be loaded"}
-  """
-  @spec validate_module(any()) :: {:ok, module()} | {:error, Aikido.Error.ValidationError.t()}
-  def validate_module(module) when is_atom(module) do
-    if Code.ensure_loaded?(module) do
-      {:ok, module}
-    else
-      {:error,
-       Aikido.Error.validation_error("Module does not exist or cannot be loaded",
-         kind: :config,
-         subject: module,
-         details: %{module: inspect(module)}
-       )}
-    end
-  end
-
-  def validate_module(_) do
-    {:error,
-     Aikido.Error.validation_error("Module must be an atom", kind: :config, field: :module)}
-  end
-
-  @doc """
-  Validates that a module is a valid Elixir module that can be compiled.
-  Used as a custom validator for Spark.Options that handles compilation order.
-
-  Uses Code.ensure_compiled/1 which blocks until the module finishes compilation
-  or returns an error, making it safe for parallel compilation scenarios.
-
-  ## Parameters
-
-  - `module` - The module atom to validate
-
-  ## Returns
-
-  - `{:ok, module}` if the module can be compiled
-  - `{:error, reason}` if the module is invalid or cannot be compiled
-
-  ## Examples
-
-      iex> Aikido.Util.validate_module_compiled(Enum)
-      {:ok, Enum}
-
-      iex> Aikido.Util.validate_module_compiled(:invalid_module)
-      {:error, "Module :invalid_module does not exist or could not be compiled"}
-  """
-  @spec validate_module_compiled(any()) ::
-          {:ok, module()} | {:error, Aikido.Error.ValidationError.t()}
-  def validate_module_compiled(module) when is_atom(module) do
-    case Code.ensure_compiled(module) do
-      {:module, _} ->
-        {:ok, module}
-
-      {:error, _reason} ->
-        {:error,
-         Aikido.Error.validation_error("Module does not exist or could not be compiled",
-           kind: :config,
-           subject: module,
-           details: %{module: inspect(module)}
-         )}
-    end
-  end
-
-  def validate_module_compiled(_) do
-    {:error,
-     Aikido.Error.validation_error("Module must be an atom", kind: :config, field: :module)}
-  end
-
-  @doc false
-  @spec pluck(Enumerable.t(), atom()) :: list()
-  def pluck(enumerable, field) do
-    Enum.map(enumerable, &Map.get(&1, field))
-  end
-
-  @type server :: pid() | atom() | binary() | {name :: atom() | binary(), registry :: module()}
-
-  @doc """
-  Creates a via tuple for process registration with a registry.
-
-  ## Parameters
-
-  - name: The name to register (atom, string, or {name, registry} tuple)
-  - opts: Options list
-    - :registry - The registry module to use (required when not using tuple form)
-
-  ## Returns
-
-  A via tuple for use with process registration
-
-  ## Examples
-
-      iex> Aikido.Util.via_tuple({:my_process, MyApp.Aikido.Registry})
-      {:via, Registry, {MyApp.Aikido.Registry, "my_process"}}
-
-      iex> Aikido.Util.via_tuple(:my_process, registry: MyApp.Aikido.Registry)
-      {:via, Registry, {MyApp.Aikido.Registry, "my_process"}}
-  """
-  @spec via_tuple(server(), keyword()) :: {:via, Registry, {module(), String.t()}}
-  def via_tuple(name_or_tuple, opts \\ [])
-
-  def via_tuple({name, registry}, _opts) when is_atom(registry) do
-    name = if is_atom(name), do: Atom.to_string(name), else: name
-    {:via, Registry, {registry, name}}
-  end
-
-  def via_tuple(name, opts) do
-    registry =
-      Keyword.get(opts, :registry) ||
-        raise ArgumentError, ":registry option is required"
-
-    name = if is_atom(name), do: Atom.to_string(name), else: name
-    {:via, Registry, {registry, name}}
-  end
-
-  @doc """
-  Finds a process by name, pid, or {name, registry} tuple.
-
-  ## Parameters
-
-  - server: The process identifier (pid, name, or {name, registry} tuple)
-  - opts: Options list
-    - :registry - The registry module to use (required when not using tuple form)
-
-  ## Returns
-
-  - `{:ok, pid}` if process is found
-  - `{:error, :not_found}` if process is not found
-
-  ## Examples
-
-      iex> Aikido.Util.whereis(pid)
-      {:ok, #PID<0.123.0>}
-
-      iex> Aikido.Util.whereis({:my_process, MyApp.Aikido.Registry})
-      {:ok, #PID<0.125.0>}
-
-      iex> Aikido.Util.whereis(:my_process, registry: MyApp.Aikido.Registry)
-      {:ok, #PID<0.124.0>}
-  """
-  @spec whereis(server(), keyword()) :: {:ok, pid()} | {:error, :not_found}
-  def whereis(server, opts \\ [])
-
-  def whereis(pid, _opts) when is_pid(pid), do: {:ok, pid}
-
-  def whereis({name, registry}, _opts) when is_atom(registry) do
-    name = if is_atom(name), do: Atom.to_string(name), else: name
-
-    case Registry.lookup(registry, name) do
-      [{pid, _}] -> {:ok, pid}
-      [] -> {:error, :not_found}
-    end
-  end
-
-  def whereis(name, opts) do
-    registry =
-      Keyword.get(opts, :registry) ||
-        raise ArgumentError, ":registry option is required"
-
-    name = if is_atom(name), do: Atom.to_string(name), else: name
-
-    case Registry.lookup(registry, name) do
-      [{pid, _}] -> {:ok, pid}
-      [] -> {:error, :not_found}
-    end
   end
 
   @valid_levels Logger.levels()
