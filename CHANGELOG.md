@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Update Ash AI to 1.3 in the library and example app, making upstream tool
+  search, tool-call approval, and revised chat storage APIs available.
+
 - Remove component discovery, startup scanning, public catalog delegates, and
   their tests. Remove legacy action metadata and the unused compensation engine.
 - Consolidate runtime errors in `Aikido.Error`; preserve native Ash errors and

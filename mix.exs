@@ -136,7 +136,7 @@ defmodule Aikido.MixProject do
 
       # Aikido Deps
       {:ash, "~> 3.36"},
-      {:ash_ai, "~> 1.1"},
+      {:ash_ai, "~> 1.3"},
       {:simple_sat, "~> 0.1"},
       {:deep_merge, "~> 1.0"},
       {:jason, "~> 1.4"},

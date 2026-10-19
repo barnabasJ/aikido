@@ -14,7 +14,7 @@ defmodule AgentExamples.MixProject do
         {:phoenix_html, "~> 4.3"},
         {:bandit, "~> 1.6"},
         {:lazy_html, ">= 0.1.0", only: :test},
-        {:ash_ai, "~> 1.1.0"},
+        {:ash_ai, "~> 1.3"},
         {:ash_lua,
          git: "https://github.com/ash-project/ash_lua.git",
          ref: "5388cbbcd176e3f879a713d948733d9f0e281cf6"},
