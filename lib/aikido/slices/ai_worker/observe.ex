@@ -6,8 +6,10 @@ defmodule Aikido.Slices.AiWorker.Observe do
     state = input.arguments.state
     context = input.context.aikido
 
-    if state.pending do
-      observe = Jido.Signal.new!("harness.ai.observe", %{task_id: state.pending.task_id})
+    if (state.pending || Map.get(state, :queue, []) != []) &&
+         input.context.aikido.signal.type != "ai.react.stream" do
+      observe =
+        Jido.Signal.new!("harness.ai.observe", %{task_id: state.pending && state.pending.task_id})
 
       Aikido.ActionResult.new(
         state: state,

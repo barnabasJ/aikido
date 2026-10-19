@@ -8,17 +8,17 @@ defmodule Aikido.Ash.Team.Engine do
     case signal.type do
       "aikido.ash.team.started" -> started(signal.data, state, context, config)
       "aikido.ash.team.stopped" -> stopped(signal.data, state, context, config)
-      "aikido.ash.team.failed" -> failed(signal.data, state)
-      "aikido.ash.team.exited" -> exited(signal.data, state)
-      "aikido.ash.team.timeout" -> timeout(signal.data, state)
+      "aikido.ash.team.failed" -> failed(signal.data, state, context)
+      "aikido.ash.team.exited" -> exited(signal.data, state, context, config)
+      "aikido.ash.team.timeout" -> timeout(signal.data, state, context)
       "aikido.agent.child.started" -> {:ok, state, []}
       "aikido.agent.child.exit" -> {:ok, state, []}
       "aikido.ash.team.send" -> send_message(signal.data, state)
       "aikido.ash.team.broadcast" -> broadcast(signal.data, state)
-      "aikido.ash.team.assign_task" -> assign_task(signal, state, context)
-      "aikido.ash.team.task.completed" -> task_result(signal.data, state, :completed)
-      "aikido.ash.team.task.failed" -> task_result(signal.data, state, :failed)
-      "aikido.ash.team.task.timeout" -> task_timeout(signal.data, state)
+      "aikido.ash.team.assign_task" -> request_task(signal, state, context, config)
+      "aikido.ash.team.task.completed" -> task_result(signal.data, state, :completed, context)
+      "aikido.ash.team.task.failed" -> task_result(signal.data, state, :failed, context)
+      "aikido.ash.team.task.timeout" -> task_timeout(signal.data, state, context)
       "aikido.ash.team.operation.completed" -> {:ok, state, []}
       "aikido.ash.team.cleanup" -> {:ok, state, []}
       _ -> command(signal, state, context, config)
@@ -195,7 +195,20 @@ defmodule Aikido.Ash.Team.Engine do
     completed =
       Signal.new!("aikido.ash.team.operation.completed", %{operation_id: state.operation.id})
 
-    {:ok, state, [Directives.emit_to_pid(completed, context.agent_pid)]}
+    pending = Map.get(state, :pending_tasks, %{})
+
+    dispatch =
+      Enum.map(pending, fn {id, data} ->
+        Directives.emit(Signal.new!("aikido.ash.team.assign_task", Map.put(data, :task_id, id)))
+      end)
+
+    recovered =
+      Enum.flat_map(Map.get(state, :recovered_tasks, []), fn id ->
+        notify(state.tasks[id], state, context)
+      end)
+
+    state = Map.put(state, :recovered_tasks, [])
+    {:ok, state, [Directives.emit_to_pid(completed, context.agent_pid)] ++ dispatch ++ recovered}
   end
 
   defp advance(%{operation: %{remaining: [{kind, name} | rest]}} = state, context, config) do
@@ -313,16 +326,39 @@ defmodule Aikido.Ash.Team.Engine do
     end
   end
 
-  defp failed(%{operation_id: id, reason: reason}, state) do
-    if state.operation.id == id && state.operation.status == :running,
-      do: {:ok, %{state | operation: %{state.operation | status: :failed, error: reason}}, []},
-      else: {:ok, state, []}
+  defp failed(%{operation_id: id, reason: reason}, state, context) do
+    if state.operation.id == id && state.operation.status == :running do
+      tasks =
+        Map.new(Map.get(state, :pending_tasks, %{}), fn {id, data} ->
+          {id,
+           %{
+             id: id,
+             member: data.member,
+             status: :failed,
+             result: reason,
+             attempt: nil,
+             notify: data[:notify],
+             metadata: data[:metadata] || %{}
+           }}
+        end)
+
+      state =
+        Map.merge(state, %{
+          operation: %{state.operation | status: :failed, error: reason},
+          pending_tasks: %{},
+          tasks: Map.merge(state.tasks, tasks)
+        })
+
+      {:ok, state, Enum.flat_map(Map.values(tasks), &notify(&1, state, context))}
+    else
+      {:ok, state, []}
+    end
   end
 
-  defp timeout(%{operation_id: id}, state),
-    do: failed(%{operation_id: id, reason: :timeout}, state)
+  defp timeout(%{operation_id: id}, state, context),
+    do: failed(%{operation_id: id, reason: :timeout}, state, context)
 
-  defp exited(%{member: name, pid: pid} = data, state) do
+  defp exited(%{member: name, pid: pid} = data, state, context, _config) do
     if Map.get(state.members, name) == pid do
       tasks =
         Map.new(state.tasks, fn {id, task} ->
@@ -333,15 +369,29 @@ defmodule Aikido.Ash.Team.Engine do
            )}
         end)
 
-      {:ok,
-       %{
-         state
-         | members: Map.delete(state.members, name),
-           incarnations: Map.delete(state.incarnations, name),
-           failures:
-             Map.put(state.failures, name, Map.get(data, :result, Map.get(data, :reason))),
-           tasks: tasks
-       }, []}
+      previous = state
+
+      state = %{
+        state
+        | members: Map.delete(state.members, name),
+          incarnations: Map.delete(state.incarnations, name),
+          failures: Map.put(state.failures, name, Map.get(data, :result, Map.get(data, :reason))),
+          tasks: tasks
+      }
+
+      notifications =
+        for {id, task} <- tasks,
+            task.status == :failed && previous.tasks[id].status == :dispatched,
+            effect <- notify(task, state, context),
+            do: effect
+
+      reconcile =
+        if Map.has_key?(state.topology.nodes, name) && !Map.has_key?(state.paused, name) &&
+             state.operation.status != :running,
+           do: [Directives.emit(Signal.new!("aikido.ash.team.ensure_member", %{member: name}))],
+           else: []
+
+      {:ok, state, notifications ++ reconcile}
     else
       {:ok, state, []}
     end
@@ -370,6 +420,36 @@ defmodule Aikido.Ash.Team.Engine do
     end
   end
 
+  defp request_task(signal, state, context, config) do
+    id = signal.data[:task_id] || signal.id
+
+    cond do
+      Map.has_key?(state.tasks, id) ->
+        {:error, {:task_exists, id}}
+
+      Map.has_key?(state.members, signal.data.member) ->
+        state = Map.update(state, :pending_tasks, %{}, &Map.delete(&1, id))
+        assign_task(signal, state, context)
+
+      Map.has_key?(Map.get(state, :pending_tasks, %{}), id) ->
+        {:error, :operation_in_progress}
+
+      Map.has_key?(state.topology.nodes, signal.data.member) ->
+        state =
+          Map.update(state, :pending_tasks, %{id => signal.data}, &Map.put(&1, id, signal.data))
+
+        command(
+          %{signal | type: "aikido.ash.team.ensure_member", data: %{member: signal.data.member}},
+          state,
+          context,
+          config
+        )
+
+      true ->
+        {:error, {:unknown_member, signal.data.member}}
+    end
+  end
+
   defp assign_task(signal, state, context) do
     data = signal.data
     id = Map.get(data, :task_id) || signal.id
@@ -380,6 +460,7 @@ defmodule Aikido.Ash.Team.Engine do
            Signal.new(
              Map.get(data, :type, "harness.task"),
              Map.merge(Map.get(data, :payload, %{}), %{
+               metadata: data[:metadata] || %{},
                task_id: id,
                member: data.member,
                reply_to: context.agent_pid,
@@ -392,11 +473,13 @@ defmodule Aikido.Ash.Team.Engine do
         member: data.member,
         status: :dispatched,
         result: nil,
+        notify: data[:notify],
+        metadata: data[:metadata] || %{},
         attempt: state.incarnations[data.member]
       }
 
       effects = [Directives.emit_to_pid(outgoing, pid)]
-      timeout = Map.get(data, :timeout_ms)
+      timeout = Map.get(data, :timeout_ms, 30_000)
 
       effects =
         if is_integer(timeout) && timeout > 0,
@@ -417,29 +500,69 @@ defmodule Aikido.Ash.Team.Engine do
     end
   end
 
-  defp task_result(data, state, status) do
+  defp task_result(data, state, status, context) do
     case Map.get(state.tasks, data.task_id) do
       %{status: :dispatched, attempt: attempt, member: member} = task
       when attempt == data.attempt and member == data.member ->
-        {:ok,
-         put_in(state.tasks[data.task_id], %{
-           task
-           | status: status,
-             result: Map.get(data, :result, Map.get(data, :reason))
-         }), []}
+        task = %{task | status: status, result: Map.get(data, :result, Map.get(data, :reason))}
+        state = put_in(state.tasks[data.task_id], task)
+        {:ok, state, notify(task, state, context)}
 
       _ ->
         {:ok, state, []}
     end
   end
 
-  defp task_timeout(data, state) do
+  defp task_timeout(data, state, context) do
     case Map.get(state.tasks, data.task_id) do
       %{status: :dispatched, attempt: attempt} = task when attempt == data.attempt ->
-        {:ok, put_in(state.tasks[data.task_id], %{task | status: :failed, result: :timeout}), []}
+        task = %{task | status: :failed, result: :timeout}
+        state = put_in(state.tasks[data.task_id], task)
+
+        cancel =
+          case state.members[task.member] do
+            nil ->
+              []
+
+            pid ->
+              [
+                Directives.emit_to_pid(
+                  Signal.new!("harness.cancel_task", %{task_id: task.id}),
+                  pid
+                )
+              ]
+          end
+
+        {:ok, state, cancel ++ notify(task, state, context)}
 
       _ ->
         {:ok, state, []}
+    end
+  end
+
+  defp notify(task, state, context) do
+    pid =
+      case Map.get(task, :notify) do
+        :self -> context.agent_pid
+        nil -> nil
+        member -> state.members[member]
+      end
+
+    if pid do
+      text =
+        "Task #{task.id} from #{task.member} #{task.status}: " <>
+          inspect(task.result, limit: 100, printable_limit: 4_000)
+
+      signal =
+        Signal.new!("ai.react.deliver", %{
+          text: text,
+          request_id: "task-result/" <> task.id,
+          metadata: %{task: Map.take(task, [:id, :member, :status, :result, :metadata])}
+        })
+
+      [Directives.emit_to_pid(signal, pid)]
+    else
+      []
     end
   end
 

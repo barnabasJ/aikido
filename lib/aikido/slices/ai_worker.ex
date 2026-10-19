@@ -17,12 +17,15 @@ defmodule Aikido.Slices.AiWorker do
     name "ai_worker"
 
     schema do
+      attribute :queue, {:array, :map}, public?: true, default: []
       attribute :pending, :term, public?: true, default: nil
       attribute :completed, :integer, public?: true, default: 0
     end
 
     route "harness.task", :accept
+    route "harness.cancel_task", :cancel_task
     route "ai.react.**", :observe
+    route "aikido.todo.changed", :observe
     route "harness.ai.observe", :settle
   end
 
@@ -34,6 +37,7 @@ defmodule Aikido.Slices.AiWorker do
       argument :member, :term, allow_nil?: false
       argument :attempt, :string, allow_nil?: false
       argument :reply_to, :term, allow_nil?: false
+      argument :metadata, :map, default: %{}
       argument :text, :string, allow_nil?: false
       argument :model, :term
       argument :client, :atom
@@ -42,6 +46,13 @@ defmodule Aikido.Slices.AiWorker do
       argument :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list]
       argument :max_iterations, :integer, constraints: [min: 1]
       run Aikido.Slices.AiWorker.Accept
+    end
+
+    action :cancel_task, Aikido.ActionResult do
+      public? false
+      argument :state, :term
+      argument :task_id, :string, allow_nil?: false
+      run Aikido.Slices.AiWorker.Cancel
     end
 
     action :observe, Aikido.ActionResult do
@@ -56,4 +67,9 @@ defmodule Aikido.Slices.AiWorker do
       run Aikido.Slices.AiWorker.Settle
     end
   end
+
+  @doc false
+  def externalize(state), do: Map.merge(state, %{pending: nil, queue: []})
+  @doc false
+  def reinstate(state), do: Map.merge(state, %{pending: nil, queue: []})
 end

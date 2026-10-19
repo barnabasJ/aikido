@@ -31,12 +31,26 @@ defmodule Aikido.Slices.AiWorker.Settle do
           Map.merge(Map.take(pending, [:task_id, :member, :attempt]), %{result: result})
         )
 
-      Aikido.ActionResult.new(
-        state: %{state | pending: nil, completed: state.completed + 1},
-        directives: [Aikido.Directives.emit_to_pid(reply, pending.reply_to)]
-      )
+      next(%{state | pending: nil, completed: state.completed + 1}, context, [
+        Aikido.Directives.emit_to_pid(reply, pending.reply_to)
+      ])
     else
-      Aikido.ActionResult.new(state: state, directives: [])
+      if is_nil(pending) && ai.status in [:completed, :failed, :idle],
+        do: next(state, context, []),
+        else: Aikido.ActionResult.new(state: state)
+    end
+  end
+
+  defp next(state, context, effects) do
+    case Map.get(state, :queue, []) do
+      [data | rest] ->
+        {:ok, result} =
+          Aikido.Slices.AiWorker.Accept.start_task(%{state | queue: rest}, data, context)
+
+        Aikido.ActionResult.new(state: result.state, directives: effects ++ result.directives)
+
+      [] ->
+        Aikido.ActionResult.new(state: state, directives: effects)
     end
   end
 end

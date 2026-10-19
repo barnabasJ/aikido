@@ -153,7 +153,9 @@ defmodule Aikido.Ash.Transformers.Team do
       arg(:task_id, :string),
       arg(:type, :string, default: "harness.task"),
       arg(:payload, :map, default: %{}),
-      arg(:timeout_ms, :integer, constraints: [min: 1])
+      arg(:timeout_ms, :integer, default: 30_000, constraints: [min: 1]),
+      arg(:notify, :term),
+      arg(:metadata, :map, default: %{})
     ]
 
   defp arg(name, type, opts \\ []),

@@ -15,6 +15,8 @@ defmodule Aikido.Ash.Team.State do
     attribute :incarnations, :map, public?: true, allow_nil?: false, default: %{}
     attribute :paused, :map, public?: true, allow_nil?: false, default: %{}
     attribute :failures, :map, public?: true, allow_nil?: false, default: %{}
+    attribute :pending_tasks, :map, public?: true, default: %{}
+    attribute :recovered_tasks, {:array, :string}, default: []
     attribute :tasks, :map, public?: true, allow_nil?: false, default: %{}
 
     attribute :operation, :map,
@@ -203,5 +205,37 @@ defmodule Aikido.Ash.Team.State do
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
+  end
+
+  @doc false
+  def externalize(state), do: state
+  @doc false
+  def reinstate(state) do
+    tasks =
+      Map.merge(
+        state.tasks,
+        Map.new(Map.get(state, :pending_tasks, %{}), fn {id, data} ->
+          {id,
+           %{
+             id: id,
+             member: data.member,
+             status: :dispatched,
+             result: nil,
+             attempt: nil,
+             notify: data[:notify],
+             metadata: data[:metadata] || %{}
+           }}
+        end)
+      )
+
+    interrupted = for {id, task} <- tasks, task.status == :dispatched, do: id
+
+    tasks =
+      Map.new(tasks, fn {id, task} ->
+        {id,
+         if(id in interrupted, do: %{task | status: :failed, result: :interrupted}, else: task)}
+      end)
+
+    Map.merge(state, %{tasks: tasks, pending_tasks: %{}, recovered_tasks: interrupted})
   end
 end
