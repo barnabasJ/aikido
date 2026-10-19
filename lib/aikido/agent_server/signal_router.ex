@@ -29,7 +29,7 @@ defmodule Aikido.AgentServer.SignalRouter do
   """
 
   alias Aikido.AgentServer.State
-  alias Jido.Signal.Router, as: SignalRouter
+  alias Jido.Signal.Router
 
   @agent_default_priority 0
   @slice_default_priority -10
@@ -43,7 +43,7 @@ defmodule Aikido.AgentServer.SignalRouter do
 
   Returns an empty router if no routes are found or if building fails.
   """
-  @spec build(State.t()) :: SignalRouter.Router.t()
+  @spec build(State.t()) :: Router.Router.t()
   def build(%State{} = state) do
     routes =
       []
@@ -51,9 +51,9 @@ defmodule Aikido.AgentServer.SignalRouter do
       |> add_slice_routes(state)
       |> add_builtin_routes()
 
-    case SignalRouter.new(routes) do
+    case Router.new(routes) do
       {:ok, router} -> router
-      {:error, _} -> SignalRouter.new!([])
+      {:error, _} -> Router.new!([])
     end
   end
 

@@ -201,7 +201,7 @@ defmodule Aikido.AgentServer do
 
   alias Aikido.Config.Defaults
   alias Jido.Signal
-  alias Jido.Signal.Router, as: AikidoRouter
+  alias Jido.Signal.Router
   alias Aikido.Telemetry.Formatter
   alias Aikido.Tracing.Context, as: TraceContext
   alias Aikido.Tracing.Trace
@@ -1148,7 +1148,7 @@ defmodule Aikido.AgentServer do
       )
       when is_binary(pattern) and is_function(selector, 1) and is_pid(caller_pid) and
              is_boolean(once?) do
-    case AikidoRouter.Validator.validate_path(pattern) do
+    case Router.Validator.validate_path(pattern) do
       {:ok, _} ->
         sub_ref = make_ref()
         monitor_ref = Process.monitor(caller_pid)
@@ -1824,7 +1824,7 @@ defmodule Aikido.AgentServer do
 
   defp fire_subscribers(%State{} = state, %Signal{type: type} = signal) do
     Enum.reduce(state.signal_subscribers, state, fn {sub_ref, entry}, acc_state ->
-      if AikidoRouter.matches?(type, entry.pattern_compiled) do
+      if Router.matches?(type, entry.pattern_compiled) do
         fire_matching_subscriber(acc_state, sub_ref, entry, signal)
       else
         acc_state
@@ -1896,7 +1896,7 @@ defmodule Aikido.AgentServer do
   # ---------------------------------------------------------------------------
 
   defp route_to_actions(router, signal) do
-    case AikidoRouter.route(router, signal) do
+    case Router.route(router, signal) do
       {:ok, targets} when targets != [] ->
         actions = Enum.map(targets, &target_to_action(&1, signal))
         {:ok, actions}
