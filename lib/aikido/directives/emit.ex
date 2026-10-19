@@ -52,6 +52,8 @@ defmodule Aikido.Directives.Emit do
   def exec(%{signal: signal, dispatch: dispatch}, input_signal, state) do
     cfg = dispatch || state.default_dispatch
 
+    signal = Aikido.SignalCtx.inherit(signal, input_signal)
+
     traced_signal =
       case TraceContext.propagate_to(signal, input_signal.id) do
         {:ok, s} -> s

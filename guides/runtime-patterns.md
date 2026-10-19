@@ -154,3 +154,16 @@ asks only about the `stamp` tool; other tools may run before that gate. The
 example callback's deadline is two minutes, and the card also offers cancellation.
 Set external caller timeouts long enough for the interaction. Pending requests
 and Lua continuations are ephemeral and do not survive process restarts.
+
+### Snapshot and command scope boundaries
+
+Both first activation and later durable snapshots apply slice `externalize/1`
+and agent `checkpoint/2`; loading applies `restore/2` and `reinstate/1`. Startup
+state is not saved a second time in process options. Persist credentials and
+identities only through application-owned codecs. Runtime-only middleware and
+dispatch options are reconstructed from the agent module after restart.
+
+Native Ash commands carry the caller's actor, tenant and application context
+through signal processing and follow-up effects. They do not turn an outer
+action's authorization bypass into a bypass for downstream tools. A later
+command supplies its own scope; command scope is not durable agent identity.

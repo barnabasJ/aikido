@@ -3,10 +3,10 @@ defmodule Aikido.Ash.Action do
   use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(input, _opts, _context) do
+  def run(input, _opts, context) do
     case input.action.name do
       :start ->
-        Aikido.Ash.Runtime.start(input.resource, input)
+        Aikido.Ash.Runtime.start(input.resource, input, context)
 
       :stop ->
         Aikido.Ash.Runtime.stop(input.resource, input.arguments.agent)
@@ -28,7 +28,7 @@ defmodule Aikido.Ash.Action do
         Aikido.Ash.Runtime.list(input.resource, input.arguments)
 
       _ ->
-        Aikido.Ash.Runtime.signal(input.resource, input)
+        Aikido.Ash.Runtime.signal(input.resource, input, context)
     end
   end
 end

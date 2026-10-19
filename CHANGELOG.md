@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Apply agent and slice codecs to initial and runtime durable snapshots; retain
+  only boot identifiers outside their output. Carry Ash actor/tenant context
+  through command signals and follow-up effects without persisting caller scope.
+
 - Update Ash AI to 1.3 in the library and example app, making upstream tool
   search, tool-call approval, and revised chat storage APIs available.
 

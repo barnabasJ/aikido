@@ -68,7 +68,15 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
     }
 
     signal = Signal.new!("ai.react.tool.completed", data, source: source)
-    _ = AgentServer.cast(agent_pid, signal)
+
+    _ =
+      AgentServer.cast(
+        agent_pid,
+        Aikido.SignalCtx.put_ctx(
+          signal,
+          Map.take(context, [:actor, :tenant, :authorize?, :tracer, :context])
+        )
+      )
   end
 
   defp run_tool(%{name: name, arguments: args}, modules, context) do

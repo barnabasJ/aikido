@@ -27,6 +27,7 @@ defmodule AikidoTest.DurableTest.CodecAgent do
 
     schema do
       attribute :value, :integer, default: 5
+      attribute :credential, :string
     end
   end
 
@@ -182,6 +183,38 @@ defmodule AikidoTest.DurableTest do
 
     assert {:ok, %{domain: %{value: 5}, codec: %{value: 3}}} =
              Aikido.AgentServer.state(restored, &{:ok, &1.agent.state})
+  end
+
+  test "initial and live snapshots both apply codecs to the only copy of startup state", %{
+    pool: pool
+  } do
+    module = AikidoTest.DurableTest.CodecAgent
+
+    options = [
+      agent_module: module,
+      id: "safe",
+      initial_state: %{domain: %{value: 7, credential: "private-marker"}}
+    ]
+
+    dumped = Aikido.Durable.AgentServer.dump_state(%{options: options, permanent: true})
+    saved = dumped["payload"] |> Base.decode64!() |> :erlang.binary_to_term([:safe])
+    refute inspect(saved) =~ "private-marker"
+    refute Keyword.has_key?(saved.options, :initial_state)
+    assert {:checkpoint, %{custom_state: %{domain: %{encoded: "7"}}}} = saved.agent
+
+    {:ok, pid} =
+      Aikido.Durable.ensure_started(pool, "safe",
+        agent: module,
+        initial_state: %{domain: %{value: 7, credential: "private-marker"}}
+      )
+
+    dumped = Aikido.Durable.AgentServer.dump_state(:sys.get_state(pid).user_state)
+    saved = dumped["payload"] |> Base.decode64!() |> :erlang.binary_to_term([:safe])
+    refute inspect(saved) =~ "private-marker"
+    refute Keyword.has_key?(saved.options, :initial_state)
+    assert :ok = Aikido.Durable.stop(pool, "safe")
+    {:ok, restored} = Aikido.Durable.ensure_started(pool, "safe", agent: module)
+    assert {:ok, 7} = Aikido.AgentServer.state(restored, &{:ok, &1.agent.state.domain.value})
   end
 
   test("the default Aikido lifecycle uses DurableServer", %{directory: directory}) do

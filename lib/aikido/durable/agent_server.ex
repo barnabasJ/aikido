@@ -10,7 +10,7 @@ defmodule Aikido.Durable.AgentServer do
     agent = Persister.transform_agent(agent, runtime.agent_module, :externalize)
 
     encode(%{
-      options: Keyword.delete(state.options, :parent),
+      options: boot_options(state.options),
       parent: parent_binding(runtime.parent),
       permanent: state.permanent,
       agent: serialize_agent(agent, runtime.agent_module),
@@ -18,7 +18,40 @@ defmodule Aikido.Durable.AgentServer do
     })
   end
 
-  def dump_state(initial), do: encode(initial)
+  def dump_state(%{options: options} = initial) do
+    module = Keyword.fetch!(options, :agent_module)
+    Code.ensure_loaded!(module)
+    agent = module.new(id: Keyword.fetch!(options, :id), state: options[:initial_state] || %{})
+    agent = Persister.transform_agent(agent, module, :externalize)
+
+    encode(%{
+      options: boot_options(options),
+      parent: parent_binding(options[:parent]),
+      permanent: initial.permanent,
+      agent: serialize_agent(agent, module),
+      initial?: true,
+      cron_specs: %{}
+    })
+  end
+
+  # Domain values have exactly one persistence path: the agent/slice codecs.
+  # Process-local middleware, callbacks and startup state are reconstructed by
+  # the host, never saved beside the codecs' output as a second copy.
+  defp boot_options(options) do
+    Keyword.take(options, [
+      :agent_module,
+      :id,
+      :aikido,
+      :partition,
+      :registry,
+      :register_global,
+      :pool,
+      :pool_key,
+      :on_parent_death,
+      :skip_schedules,
+      :debug
+    ])
+  end
 
   @impl true
   def load_state(version, %{"payload" => payload}) when version in [nil, 1],
@@ -45,14 +78,18 @@ defmodule Aikido.Durable.AgentServer do
 
     case AgentServer.init(options) do
       {:ok, runtime, {:continue, continue}} ->
-        send(self(), {:aikido_durable_continue, continue, Map.has_key?(saved, :agent)})
+        send(
+          self(),
+          {:aikido_durable_continue, continue,
+           Map.has_key?(saved, :agent) && !Map.get(saved, :initial?, false)}
+        )
 
         {:ok, %{runtime: runtime, options: saved.options, permanent: saved.permanent},
          permanent: saved.permanent,
          meta: %{
            key: runtime.lifecycle.pool_key,
            partition: runtime.partition,
-           restored?: Map.has_key?(saved, :agent)
+           restored?: Map.has_key?(saved, :agent) && !Map.get(saved, :initial?, false)
          }}
 
       {:stop, reason} ->

@@ -1590,7 +1590,7 @@ defmodule Aikido.AgentServer do
       __signal_router__: state.signal_router
     }
 
-    Map.merge(base, signal_ctx)
+    Map.merge(signal_ctx, base)
   end
 
   @doc false

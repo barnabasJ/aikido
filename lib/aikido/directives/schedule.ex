@@ -38,6 +38,8 @@ defmodule Aikido.Directives.Schedule do
           )
       end
 
+    signal = Aikido.SignalCtx.inherit(signal, input_signal)
+
     traced_signal =
       case TraceContext.propagate_to(signal, input_signal.id) do
         {:ok, s} -> s

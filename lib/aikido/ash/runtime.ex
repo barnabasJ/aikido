@@ -4,9 +4,9 @@ defmodule Aikido.Ash.Runtime do
 
   def option(resource, key), do: Spark.Dsl.Extension.get_opt(resource, [:agent], key)
 
-  def start(resource, input) do
+  def start(resource, input, context \\ %{}) do
     with {:ok, topology} <- startup_topology(resource, input.arguments[:topology]) do
-      start_process(resource, input, topology)
+      start_process(resource, input, topology, context)
     end
   end
 
@@ -24,7 +24,7 @@ defmodule Aikido.Ash.Runtime do
     end
   end
 
-  defp start_process(resource, input, topology) do
+  defp start_process(resource, input, topology, context) do
     attributes =
       Map.new(Ash.Resource.Info.attributes(resource), fn attr ->
         {attr.name, Map.get_lazy(input.arguments, attr.name, fn -> default(attr.default) end)}
@@ -52,7 +52,13 @@ defmodule Aikido.Ash.Runtime do
 
         result =
           if function_exported?(resource, :__aikido_team_config__, 0) && !restored?,
-            do: Aikido.Ash.Team.start(resource, pid, topology.nodes),
+            do:
+              Aikido.Ash.Team.start(
+                resource,
+                pid,
+                topology.nodes,
+                command_context(input, context)
+              ),
             else: {:ok, :ready}
 
         case result do
@@ -71,7 +77,7 @@ defmodule Aikido.Ash.Runtime do
   defp default({module, function, args}), do: apply(module, function, args)
   defp default(value), do: value
 
-  def signal(resource, input) do
+  def signal(resource, input, context \\ %{}) do
     definition =
       resource
       |> Spark.Dsl.Extension.get_entities([:agent])
@@ -89,11 +95,18 @@ defmodule Aikido.Ash.Runtime do
     safe(fn ->
       with {:ok, {id, pid}} <- resolve(resource, input.arguments.agent),
            {:ok, signal} <- Jido.Signal.new(definition.type, payload, source: "/ash"),
+           signal = Aikido.SignalCtx.put_ctx(signal, command_context(input, context)),
            {:ok, _} <- dispatch(resource, pid, signal) do
         {:ok,
          Map.merge(reference(resource, id, pid), %{signal_id: signal.id, status: :processed})}
       end
     end)
+  end
+
+  defp command_context(input, context) do
+    input.context
+    |> Map.drop([:private, :aikido_runtime_options, :aikido, :authorize?])
+    |> Map.merge(Map.take(context, [:actor, :tenant, :tracer]))
   end
 
   defp dispatch(resource, pid, signal) do

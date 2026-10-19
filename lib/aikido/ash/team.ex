@@ -83,8 +83,10 @@ defmodule Aikido.Ash.Team do
   use Spark.Dsl.Extension, sections: [@team], transformers: [Aikido.Ash.Transformers.Team]
 
   @doc false
-  def start(resource, pid, topology) do
-    signal = Jido.Signal.new!("aikido.ash.team.start", %{topology: topology})
+  def start(resource, pid, topology, context \\ %{}) do
+    signal =
+      Jido.Signal.new!("aikido.ash.team.start", %{topology: topology})
+      |> Aikido.SignalCtx.put_ctx(context)
 
     call(resource, pid, signal)
   end

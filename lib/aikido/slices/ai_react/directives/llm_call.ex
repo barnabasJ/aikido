@@ -37,20 +37,20 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   alias ReqLLM.Context
 
   @impl true
-  def exec(%LLMCall{} = directive, _input_signal, state) do
+  def exec(%LLMCall{} = directive, input_signal, state) do
     agent_pid = self()
     task_sup = Aikido.task_supervisor_name(state.aikido)
     source = "/agent/#{state.id}"
 
     {:ok, _pid} =
       Task.Supervisor.start_child(task_sup, fn ->
-        run_and_dispatch(directive, agent_pid, source)
+        run_and_dispatch(directive, agent_pid, source, Aikido.SignalCtx.ctx(input_signal))
       end)
 
     :ok
   end
 
-  defp run_and_dispatch(%LLMCall{} = d, agent_pid, source) do
+  defp run_and_dispatch(%LLMCall{} = d, agent_pid, source, scope) do
     reqllm_tools = ToolAdapter.from_actions(d.tools)
     messages = Context.to_list(d.context)
     llm_opts = Keyword.put(d.llm_opts, :tools, reqllm_tools)
@@ -66,23 +66,23 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
             source: source
           )
 
-        _ = AgentServer.cast(agent_pid, signal)
+        _ = AgentServer.cast(agent_pid, Aikido.SignalCtx.put_ctx(signal, scope))
 
       {:error, reason} ->
-        cast_failure(agent_pid, source, d.request_id, reason)
+        cast_failure(agent_pid, source, d.request_id, reason, scope)
     end
   rescue
     # Anything raised in the Task body — bad tool definition, transport
     # exception, decoder bug — must still surface as a terminal signal.
     # If we let the Task die quietly the slice stays :running forever
     # and `Aikido.AI.await/2` only ever returns `{:error, :timeout}`.
-    exception -> cast_failure(agent_pid, source, d.request_id, exception)
+    exception -> cast_failure(agent_pid, source, d.request_id, exception, scope)
   end
 
-  defp cast_failure(agent_pid, source, request_id, reason) do
+  defp cast_failure(agent_pid, source, request_id, reason, scope) do
     signal =
       Signal.new!("ai.react.failed", %{reason: reason, request_id: request_id}, source: source)
 
-    _ = AgentServer.cast(agent_pid, signal)
+    _ = AgentServer.cast(agent_pid, Aikido.SignalCtx.put_ctx(signal, scope))
   end
 end

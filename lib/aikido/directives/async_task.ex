@@ -233,6 +233,8 @@ defmodule Aikido.Directives.AsyncTask do
 
   @spec trace(signal :: Signal.t(), input_signal :: Signal.t()) :: Signal.t()
   defp trace(%Signal{} = signal, %Signal{} = input_signal) do
+    signal = Aikido.SignalCtx.inherit(signal, input_signal)
+
     case TraceContext.propagate_to(signal, input_signal.id) do
       {:ok, traced} -> traced
       {:error, _reason} -> signal
