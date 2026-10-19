@@ -15,6 +15,9 @@ defmodule AgentExamples.Source do
              "lib/aikido/slices/ai_worker/**/*.ex",
              "lib/aikido/slices/ai_react/**/*.ex",
              "lib/aikido/hooks.ex",
+             "lib/aikido/ai/*.ex",
+             "lib/aikido/slices/todo.ex",
+             "lib/aikido/slices/todo/*.ex",
              "lib/aikido/hooks/*.ex",
              "lib/aikido/ash/ai.ex",
              "lib/aikido/ash/team/engine.ex"
@@ -52,7 +55,11 @@ defmodule AgentExamples.Source do
                          String.contains?(file, "agent_examples/slices/") ->
                            :slice
 
-                         module in [Aikido.Slices.AiReact, Aikido.Slices.AiWorker] ->
+                         module in [
+                           Aikido.Slices.AiReact,
+                           Aikido.Slices.AiWorker,
+                           Aikido.Slices.Todo
+                         ] ->
                            :slice
 
                          String.contains?(file, "/actions/") ||
@@ -93,6 +100,9 @@ defmodule AgentExamples.Source do
     AgentExamples.AI.Tools.Implementation,
     AgentExamples.AI.LuaSurface,
     AgentExamples.AI.ScriptedClient,
+    AgentExamples.AI.StreamingClient,
+    Aikido.AI.Options,
+    Aikido.AI.ContextCompactor,
     Aikido.Ash.AI,
     Aikido.Slices.AiReact,
     Aikido.Slices.AiWorker
@@ -127,6 +137,9 @@ defmodule AgentExamples.Source do
   end
 
   defp modules("hook-requests"), do: [AgentExamples.Playground]
+
+  defp modules("conversation"),
+    do: [Aikido.Slices.Todo, Aikido.Slices.Todo.Item, Aikido.Slices.Todo.Implementation]
 
   defp modules("counter"), do: []
   defp modules("checklist"), do: []

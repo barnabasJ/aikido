@@ -91,6 +91,23 @@ defmodule AgentExamples.Catalog do
       flow: ["Sync briefing", "Model & tool gates", "Async context signal", "Next model call"]
     },
     %{
+      slug: "conversation",
+      title: "Conversation and work tracking",
+      eyebrow: "Streaming · persistent conversation",
+      resource: AgentExamples.ConversationAssistant,
+      kind: :ai,
+      description:
+        "Stream an answer, retain conversation history, and optionally wait for todos.",
+      detail:
+        "Start offline, add a todo, and send a prompt. The answer streams but completion waits for the todo. Complete or block the item to resolve the run. Send another prompt to see retained history, or queue a message while the model is working. Context compaction keeps complete tool groups and system instructions. Application metadata remains plain data.",
+      flow: [
+        "History + queued messages",
+        "Batched text / thinking",
+        "Optional todo gate",
+        "Completion or explicit failure"
+      ]
+    },
+    %{
       slug: "hook-requests",
       title: "Lua request / response",
       eyebrow: "Experimental · human in the loop",

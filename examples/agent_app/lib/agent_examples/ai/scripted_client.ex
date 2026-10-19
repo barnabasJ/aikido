@@ -11,6 +11,15 @@ defmodule AgentExamples.AI.ScriptedClient do
 
   @impl true
   def generate_text(_model, messages, options) do
+    current =
+      messages
+      |> Enum.with_index()
+      |> Enum.reverse()
+      |> Enum.find(fn {message, _} ->
+        message.role == :user && !String.starts_with?(text(message), "[Hook context:")
+      end)
+
+    messages = Enum.drop(messages, if(current, do: elem(current, 1), else: 0))
     query = messages |> Enum.find(&(&1.role == :user)) |> text()
     results = Enum.filter(messages, &(&1.role == :tool))
     tools = Keyword.fetch!(options, :tools) |> Enum.map(& &1.name)

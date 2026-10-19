@@ -62,6 +62,16 @@ defmodule AgentExamples.Playground do
           {:reply, :ok, state}
         end
 
+      %{status: :running} = run when slug == "conversation" ->
+        case Aikido.Ash.command(run.record, %{text: query}, action: :message) do
+          {:ok, _} ->
+            {:reply, :ok,
+             put_run(state, key, %{run | messages: run.messages ++ [%{role: :user, text: query}]})}
+
+          {:error, error} ->
+            {:reply, {:error, error_text(error)}, state}
+        end
+
       _ ->
         {:reply, {:error, "Start an idle example before sending a prompt."}, state}
     end
@@ -377,7 +387,14 @@ defmodule AgentExamples.Playground do
             {:error, "Live mode needs ZAI_API_KEY on the server and a model such as zai:glm-5.3."}
         end
       else
-        {:ok, AI.offline(Map.put(overrides, :tools, tools))}
+        attributes = AI.offline(Map.put(overrides, :tools, tools))
+
+        attributes =
+          if example.slug == "conversation",
+            do: Map.put(attributes, :client, AI.StreamingClient),
+            else: attributes
+
+        {:ok, attributes}
       end
     else
       {:ok, %{}}
@@ -426,8 +443,18 @@ defmodule AgentExamples.Playground do
        own: Map.take(own, [:count, :items, :completed, :title, :status, :result, :error]),
        journal: Map.get(Map.get(state.agent.state, :journal) || %{}, :entries, []),
        ai:
-         Map.take(ai, [:status, :iteration, :result, :error, :hook_errors])
+         Map.take(ai, [
+           :status,
+           :iteration,
+           :result,
+           :error,
+           :hook_errors,
+           :streaming_text,
+           :streaming_thinking,
+           :usage
+         ])
          |> Map.put(:hook_messages, hook_messages(ai)),
+       todos: Map.get(Map.get(state.agent.state, :todos, %{}), :items, []),
        members: Enum.sort_by(members, & &1.name),
        tasks: tasks
      }}

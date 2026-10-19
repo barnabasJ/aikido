@@ -7,8 +7,16 @@
 ### Changed
 
 - Apply agent and slice codecs to initial and runtime durable snapshots; retain
-  only boot identifiers outside their output. Carry Ash actor/tenant context
+  boot identifiers and explicit runtime configuration outside their output. Carry Ash actor/tenant context
   through command signals and follow-up effects without persisting caller scope.
+
+- Retain ReAct history, queue messages, stream text/thinking and record usage.
+  Add bounded cancellable model/tool execution, opt-in retries, context compaction,
+  idle handoff, and explicit interrupted-run recovery.
+- Add the optional Todo slice and todo-gated completion, plus an offline LiveView
+  example for conversations, streaming and todo evidence.
+- Activate lazy workers on delegation, queue worker tasks, deliver results to an
+  orchestrator, and handle task deadlines, member loss and interrupted work.
 
 - Update Ash AI to 1.3 in the library and example app, making upstream tool
   search, tool-call approval, and revised chat storage APIs available.

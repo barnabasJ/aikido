@@ -195,7 +195,8 @@ defmodule AgentExamples.AITest do
         )
       )
 
-    assert {:ok, "callback: hello"} = AI.ask(assistant, "hello")
+    assert {:ok, "callback: hello"} =
+             AI.ask(assistant, "hello", ash: [actor: %{id: "caller"}, tenant: "workspace"])
 
     assert_receive {:tool_context, %{id: "caller"}, "workspace",
                     %{"input" => %{"text" => "hello"}}}

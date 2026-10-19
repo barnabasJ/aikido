@@ -154,6 +154,22 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert render(view) =~ "The example tool gate denied this run."
   end
 
+  test "the conversation example streams, waits for todos and retains prior turns", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/conversation")
+    owner = start(view, "conversation", %{mode: "offline"})
+    view |> form("#todo-form", %{text: "Verify the answer"}) |> render_submit()
+    view |> form("#prompt-form", %{query: "Remember this"}) |> render_submit()
+    await(owner, "conversation", &(&1.snapshot.ai.status == :waiting), 10_000)
+    assert has_element?(view, "#stream-output", "I remember 1 user messages")
+    view |> element("#todos button[phx-click=todo_complete]") |> render_click()
+    await(owner, "conversation", &(&1.status == :completed))
+    assert has_element?(view, "#messages", "Remember this")
+    view |> form("#prompt-form", %{query: "What came before?"}) |> render_submit()
+    await(owner, "conversation", &(&1.status == :completed), 10_000)
+    assert has_element?(view, "#messages", "I remember 2 user messages")
+    assert has_element?(view, "#definition-Aikido-Slices-Todo[open]")
+  end
+
   test "a Lua request can be answered from LiveView and the same script continues", %{conn: conn} do
     {:ok, view, html} = live(conn, "/examples/hook-requests")
     assert html =~ "aikido.request"

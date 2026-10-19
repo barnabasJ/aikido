@@ -62,7 +62,9 @@ defmodule Aikido.TodoTest do
         "ai.react.**",
         fn runtime ->
           if runtime.agent.state.ai.status == :waiting, do: {:ok, :waiting}, else: :skip
-        end, once: true)
+        end,
+        once: true
+      )
 
     opts = [
       model: "offline",

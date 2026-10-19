@@ -30,6 +30,7 @@ defmodule AgentExamples.Agents do
   end
 
   agents do
+    agent :conversation, AgentExamples.ConversationAssistant
     agent :assistant, AgentExamples.Assistant
     agent :hooked_assistant, AgentExamples.HookedAssistant
     agent :interactive_assistant, AgentExamples.InteractiveAssistant

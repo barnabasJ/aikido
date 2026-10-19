@@ -26,7 +26,11 @@ defmodule AgentExamples.AI do
     with {:ok, reference} <- Aikido.AgentServer.subscribe(pid, "**", observe, once: true) do
       try do
         with {:ok, _} <-
-               Aikido.Ash.command(record, %{query: query, request_id: request_id}, action: :ask) do
+               Aikido.Ash.command(
+                 record,
+                 %{query: query, request_id: request_id},
+                 Keyword.put(Keyword.get(opts, :ash, []), :action, :ask)
+               ) do
           receive do
             {:aikido_subscription, ^reference, %{result: result}} -> result
           after

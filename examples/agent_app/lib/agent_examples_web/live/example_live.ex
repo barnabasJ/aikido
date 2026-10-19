@@ -75,6 +75,18 @@ defmodule AgentExamplesWeb.ExampleLive do
     end
   end
 
+  def handle_event("todo_add", %{"text" => text}, socket),
+    do: command(socket, :todo_add, %{id: Ash.UUIDv7.generate(), text: text})
+
+  def handle_event("todo_complete", %{"id" => id}, socket),
+    do: command(socket, :todo_complete, %{id: id, result: "Verified in the playground"})
+
+  def handle_event("todo_block", %{"id" => id}, socket),
+    do: command(socket, :todo_block, %{id: id, reason: "Blocked in the playground"})
+
+  def handle_event("todo_remove", %{"id" => id}, socket),
+    do: command(socket, :todo_remove, %{id: id})
+
   def handle_event("cancel_run", _, socket), do: command(socket, :cancel, %{})
 
   def handle_event("add", %{"amount" => amount}, socket),
@@ -294,15 +306,51 @@ defmodule AgentExamplesWeb.ExampleLive do
             <div :if={busy?(@run)} class="working" role="status">
               <span class="live-dot"></span> Working through model turns and tools…
             </div>
+            <section
+              :if={
+                active?(@run) && busy?(@run) && Map.get(@run.snapshot.ai, :streaming_text, "") != ""
+              }
+              id="stream-output"
+              aria-live="polite"
+            >
+              <h3>
+                {if @run.snapshot.ai.status == :waiting,
+                  do: "Answer waiting for todos",
+                  else: "Streaming answer"}
+              </h3>
+              <pre>{Map.get(@run.snapshot.ai, :streaming_text, "")}</pre>
+              <details>
+                <summary>Thinking</summary><pre>{Map.get(@run.snapshot.ai, :streaming_thinking, "")}</pre>
+              </details>
+            </section>
             <form id="prompt-form" phx-submit="ask" class="prompt-form">
               <label for="query">Your task</label><textarea
                 id="query"
                 name="query"
                 rows="3"
-                disabled={!active?(@run) || busy?(@run)}
+                disabled={!active?(@run) || (busy?(@run) && @example.slug != "conversation")}
               >{@prompt}</textarea>
-              <button class="button primary" disabled={!active?(@run) || busy?(@run)}>Send task →</button>
+              <button
+                class="button primary"
+                disabled={!active?(@run) || (busy?(@run) && @example.slug != "conversation")}
+              >{if busy?(@run) && @example.slug == "conversation",
+                do: "Queue message",
+                else: "Send task →"}</button>
             </form>
+          </section>
+          <section :if={@example.slug == "conversation" && active?(@run)} class="panel" id="todos">
+            <h2>Optional todos</h2>
+            <p>Completion waits for blocking items. Record evidence, block an item, or remove it.</p>
+            <form id="todo-form" phx-submit="todo_add" class="inline-form">
+              <input name="text" placeholder="Work to verify" required />
+              <button class="button secondary">Add todo</button>
+            </form>
+            <article :for={item <- @run.snapshot.todos} id={"todo-#{item.id}"}>
+              <span>{item.text} · {item.status}</span>
+              <button class="button secondary" phx-click="todo_complete" phx-value-id={item.id}>Complete</button>
+              <button class="button secondary" phx-click="todo_block" phx-value-id={item.id}>Block</button>
+              <button class="button secondary" phx-click="todo_remove" phx-value-id={item.id}>Remove</button>
+            </article>
           </section>
           <section :if={@example.kind == :counter} class="panel" id="counter-panel">
             <div class="counter-visual">
