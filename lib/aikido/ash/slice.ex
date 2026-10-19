@@ -6,6 +6,8 @@ defmodule Aikido.Ash.Slice do
   resource, returning `Aikido.ActionResult`. Routed actions receive `state`
   (the current slice value) and typed payload arguments. The agent pipeline
   applies that returned state and executes the directives after the action.
+  Slice actions are pure and must never perform side effects; return directives
+  for all I/O, message delivery, process creation and scheduling.
 
   Mounting the slice automatically exposes its routed public actions on the
   agent's domain interface, using the Ash action names and payload contracts.

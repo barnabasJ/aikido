@@ -6,8 +6,10 @@ The repository's `AGENTS.md` defines its architecture and implementation standar
 
 ## State and effects
 
-Keep agent decisions pure. Actions return the next domain state and directives;
-directives perform I/O without changing domain or runtime state. Return external
+Actions are pure: they return the next domain state and directives and never
+perform side effects. All side effects belong in directives, including message
+delivery, network and database I/O, process creation and timers. Directives
+perform I/O without changing domain or runtime state. Return external
 results as signals. Use Ash types for contracts and Spark.Options for configuration.
 Preserve tagged tuple and structured error contracts at public boundaries.
 

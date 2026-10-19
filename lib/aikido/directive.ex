@@ -21,6 +21,10 @@ defmodule Aikido.Directive do
         end
       end
 
+  Side effects belong only in directives; actions are pure and return their
+  next state and directive descriptors without executing any effects.
+  Directives must not mutate domain or runtime state.
+
   Execution performs I/O only. Return `:ok` to continue or `{:stop, reason}` to
   stop the agent. State changes belong in actions; asynchronous results return
   as signals. Never wait for an agent reply inside a directive callback.

@@ -34,8 +34,12 @@ defmodule Aikido do
       {agent, directives} = MyAgent.cmd(agent, MyAction)
 
   - **Agents** — Immutable structs updated via commands
-  - **Actions** — Functions that transform agent state (may perform side effects)
-  - **Directives** — Descriptions of external effects (signals, processes, etc.)
+  - **Actions** — Pure functions that return the next agent state and directives; never perform side effects
+  - **Directives** — Descriptions of side effects, executed by the runtime without mutating state
+
+  Side effects belong only in directives. Actions must not send messages, perform
+  network or database I/O, spawn processes, or schedule timers. Return directives
+  for that work; their results return as signals processed by actions.
 
   ## For Tests
 

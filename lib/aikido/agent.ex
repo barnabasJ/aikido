@@ -20,6 +20,8 @@ defmodule Aikido.Agent do
   the batch, the input agent is returned unchanged, and no directives execute.
 
   Key invariants:
+  - Actions are pure: return the next state and directives; never perform side effects.
+  - Side effects belong only in directives, executed by the runtime after `cmd/2`.
   - On success the returned `agent` is **always complete** — no "apply
     directives" step needed.
   - On error the input agent is returned via the caller's error branch;

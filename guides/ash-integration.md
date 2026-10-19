@@ -14,7 +14,10 @@ config :ash, default_string_length_count: :codepoints
 ```
 
 The existing `Aikido.AgentServer` runs the processes. State changes still come
-exclusively from action return values, and directives perform runtime effects.
+exclusively from action return values. Agent and slice actions are pure and must
+never perform side effects. Return directives for all I/O, including message
+delivery, database writes, model requests and process creation; the runtime
+executes them after applying the action result.
 The resource DSL generates the internal agent modules; consumers call the domain.
 
 ## An agent resource

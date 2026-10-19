@@ -20,8 +20,8 @@ defmodule Aikido.Agent.SliceUpdate do
          []}
       end
 
-  Actions mutate state through their return value; directives are pure
-  side effects.
+  Actions are pure: state changes flow only through their return values.
+  All side effects belong in directives, which must not mutate state.
   """
 
   @enforce_keys [:slices]

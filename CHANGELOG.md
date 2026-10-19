@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Clarify throughout the architecture documentation that agent and slice actions
+  are pure: all side effects belong in directives.
+
 - Cache ReAct token estimates in slice state and increment them as messages are
   appended. Refresh estimates on history replacement, handoff and restore, and
   clear provider counts belonging to the replaced context.

@@ -11,8 +11,9 @@ to DurableServer. InstanceManager and the pod API have been removed.
 
 `Aikido.Agent` remains the pure action/signal engine. `Aikido.AgentServer` is the
 runtime callback implementation hosted by DurableServer. Configure
-`persistence :temporary` to delete snapshots on stop. Actions own state transitions;
-directives perform I/O and return results through signals.
+`persistence :temporary` to delete snapshots on stop. Actions are pure: they
+return state transitions and directives without performing side effects. All
+side effects belong in directives; results return through signals.
 
 `SpawnAgent` starts durable child agents and snapshots their current logical parent. Teams add desired topology,
 dependencies, ownership, lazy activation, dynamic worker templates, and task

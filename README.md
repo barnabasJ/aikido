@@ -113,7 +113,10 @@ not automatically persist live agent state or make process effects transactional
 
 ## State and effects
 
-Actions are the sole channel for domain state changes. Directives perform I/O
+Actions are pure: they return the next state and directives and never perform
+side effects. Their return values are the sole channel for domain state changes.
+All side effects belong in directives: message delivery, network and database I/O,
+process creation and timers. Directives perform I/O
 and mutate no domain or runtime state. Their results return as signals, which
 enter another action. Middleware may stage an agent for I/O; runtime bookkeeping
 belongs to runtime callbacks. Use Ash types for data contracts and Spark for DSL

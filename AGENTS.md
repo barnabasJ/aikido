@@ -4,13 +4,14 @@
 Build reliable agent systems by separating pure decision logic from runtime side-effect execution.
 
 ## The Bright Line
-- **Actions mutate state.** The action's return value is the **sole channel** for `agent.state` (domain) writes.
+- **Actions are pure.** They return the next state and directives and must never perform side effects. The action's return value is the **sole channel** for `agent.state` (domain) writes.
 - **Directives are pure I/O.** They emit signals, spawn processes, schedule messages — and **mutate no state**: not domain (`agent.state`), not runtime (`%AgentServer.State{}`), nothing. Their results, if any, come back as signals that re-enter the pipeline.
 - **Type-system enforced.** `Aikido.AgentServer.DirectiveExec.exec/3` returns `:ok | {:stop, term()}` — there is no state slot in the return shape, so a directive author cannot accidentally write one.
 
 Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/effect separation rules in this file are canonical.
 
 ## Action/Directive Design Rules
+- Side effects belong only in directives. Actions must not send messages, perform network or database I/O, spawn processes, or schedule timers; return directives for that work.
 - Actions are the only place that decides and applies agent state transitions. If another process needs state changed, send it a signal and let that process route the signal to an action.
 - Directives should be as short as possible: one runtime effect, then return. Do not put multi-step workflows inside `DirectiveExec`.
 - Directives must not call `Aikido.AgentServer.call/4`, wait for replies, inspect agent state to decide business logic, or mutate process state. Synchronous calls from directive execution can deadlock when the target is the current agent or is waiting on the current mailbox turn.
