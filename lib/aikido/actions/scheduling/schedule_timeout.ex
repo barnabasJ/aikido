@@ -6,7 +6,10 @@ defmodule Aikido.Actions.Scheduling.ScheduleTimeout do
     timeout = input.arguments[:timeout_ms]
     id = input.arguments[:timeout_id]
     type = input.arguments[:signal_type]
-    signal = Jido.Signal.new!(type, %{timeout_id: id}, source: "/timeout")
+
+    signal =
+      struct!(Jido.Signal, id: nil, type: type, data: %{timeout_id: id}, source: "/timeout")
+
     directive = Aikido.Directives.schedule(timeout, signal)
 
     Aikido.ActionResult.new(

@@ -52,6 +52,29 @@ defmodule Aikido.Directive do
     end
   end
 
+  @doc """
+  Complete a signal envelope during directive execution.
+
+  Actions can return `struct!(Jido.Signal, id: nil, type: type, data: data, source: source)`
+  without generating IDs or reading the clock. Emit, Schedule and Cron supply
+  that runtime metadata here. Fully constructed signals retain their identity.
+  This function performs runtime work and must not be called from an action.
+  """
+  def materialize_signal(%Jido.Signal{id: id, time: time} = signal)
+      when is_binary(id) and is_binary(time), do: signal
+
+  def materialize_signal(%Jido.Signal{} = signal) do
+    signal
+    |> Map.from_struct()
+    |> materialize_signal()
+  end
+
+  def materialize_signal(signal) when is_map(signal) do
+    signal
+    |> Map.reject(fn {key, value} -> key in [:id, :time, :source] && is_nil(value) end)
+    |> Jido.Signal.new!()
+  end
+
   @doc "Execute a directive through its module's behaviour callback."
   @spec exec(struct(), Jido.Signal.t(), Aikido.AgentServer.State.t()) ::
           :ok | {:stop, term()}

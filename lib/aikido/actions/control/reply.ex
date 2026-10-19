@@ -9,7 +9,7 @@ defmodule Aikido.Actions.Control.Reply do
 
     case extract_reply_to(input) do
       {:ok, pid} ->
-        out = Jido.Signal.new!(type, payload, source: "/reply")
+        out = struct!(Jido.Signal, id: nil, type: type, data: payload, source: "/reply")
         directive = Aikido.Directives.emit_to_pid(out, pid)
         Aikido.ActionResult.new(state: %{replied_to: pid}, directives: [directive])
 

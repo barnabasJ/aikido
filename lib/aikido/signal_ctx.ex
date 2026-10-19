@@ -84,6 +84,16 @@ defmodule Aikido.SignalCtx do
     put_ctx(target, Map.merge(src, dst))
   end
 
+  @doc "Return the input signal's timestamp in milliseconds, or zero without an envelope."
+  def timestamp(%Signal{time: time}) when is_binary(time) do
+    case DateTime.from_iso8601(time) do
+      {:ok, datetime, _offset} -> DateTime.to_unix(datetime, :millisecond)
+      _ -> 0
+    end
+  end
+
+  def timestamp(_), do: 0
+
   defp extensions(%Signal{extensions: nil}), do: %{}
   defp extensions(%Signal{extensions: ext}) when is_map(ext), do: ext
 

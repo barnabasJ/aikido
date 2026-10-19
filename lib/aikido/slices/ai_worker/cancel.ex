@@ -8,7 +8,13 @@ defmodule Aikido.Slices.AiWorker.Cancel do
     state = Map.put(state, :queue, Enum.reject(Map.get(state, :queue, []), &(&1.task_id == id)))
 
     if state.pending && state.pending.task_id == id do
-      signal = Jido.Signal.new!("ai.react.cancel", %{request_id: id})
+      signal =
+        struct!(Jido.Signal,
+          id: nil,
+          type: "ai.react.cancel",
+          data: %{request_id: id},
+          source: "/aikido"
+        )
 
       Aikido.ActionResult.new(
         state: %{state | pending: nil},

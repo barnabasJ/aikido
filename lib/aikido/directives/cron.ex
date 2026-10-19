@@ -100,6 +100,12 @@ defmodule Aikido.Directives.Cron do
         _input_signal,
         state
       ) do
+    message =
+      case message do
+        %Jido.Signal{} -> Aikido.Directive.materialize_signal(message)
+        other -> other
+      end
+
     case Aikido.Directives.Cron.register_io(state, cron_expr, message, logical_id, tz) do
       {:ok, io_result} ->
         signal =

@@ -15,7 +15,12 @@ defmodule Aikido.Slices.Todo.Implementation do
         },
         directives: [
           Aikido.Directives.emit(
-            Jido.Signal.new!("aikido.todo.changed", %{id: id, removed: true})
+            struct!(Jido.Signal,
+              id: nil,
+              type: "aikido.todo.changed",
+              data: %{id: id, removed: true},
+              source: "/aikido"
+            )
           )
         ]
       )
@@ -87,7 +92,15 @@ defmodule Aikido.Slices.Todo.Implementation do
               Enum.map(state.items, fn item -> if item.id == data.id, do: next, else: item end)
 
         state = %{state | items: items, revision: revision}
-        changed = Jido.Signal.new!("aikido.todo.changed", %{id: data.id, item: next})
+
+        changed =
+          struct!(Jido.Signal,
+            id: nil,
+            type: "aikido.todo.changed",
+            data: %{id: data.id, item: next},
+            source: "/aikido"
+          )
+
         effects = [Aikido.Directives.emit(changed)]
 
         effects =
@@ -96,7 +109,12 @@ defmodule Aikido.Slices.Todo.Implementation do
               [
                 Aikido.Directives.schedule(
                   data.timeout_ms,
-                  Jido.Signal.new!("aikido.todo.expire", %{id: data.id, revision: revision})
+                  struct!(Jido.Signal,
+                    id: nil,
+                    type: "aikido.todo.expire",
+                    data: %{id: data.id, revision: revision},
+                    source: "/aikido"
+                  )
                 )
               ]
           else

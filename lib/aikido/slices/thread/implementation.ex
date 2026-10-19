@@ -5,10 +5,10 @@ defmodule Aikido.Slices.Thread.Implementation do
   def run(input, [action: :append], _context) do
     %Ash.Union{value: entry} = input.arguments.entry
     slice = input.arguments.state
-    thread = append_ensure_thread(slice)
+    thread = append_ensure_thread(slice, input)
 
     Aikido.ActionResult.new(
-      state: Aikido.Slices.Thread.append(thread, entry),
+      state: Aikido.Slices.Thread.append(thread, entry, entry_options(input, thread)),
       directives: []
     )
   end
@@ -19,10 +19,13 @@ defmodule Aikido.Slices.Thread.Implementation do
 
     case slice do
       %Aikido.Slices.Thread{} = thread ->
-        Aikido.ActionResult.new(state: Aikido.Slices.Thread.clear(thread), directives: [])
+        Aikido.ActionResult.new(
+          state: Aikido.Slices.Thread.clear(thread, options(input)),
+          directives: []
+        )
 
       _ ->
-        Aikido.ActionResult.new(state: Aikido.Slices.Thread.new(), directives: [])
+        Aikido.ActionResult.new(state: Aikido.Slices.Thread.new(options(input)), directives: [])
     end
   end
 
@@ -37,17 +40,35 @@ defmodule Aikido.Slices.Thread.Implementation do
 
       _ ->
         Aikido.ActionResult.new(
-          state: Aikido.Slices.Thread.new(Map.to_list(data)),
+          state:
+            Aikido.Slices.Thread.new(
+              Keyword.merge(
+                options(input),
+                Enum.reject(Map.to_list(data), fn {_, value} -> is_nil(value) end)
+              )
+            ),
           directives: []
         )
     end
   end
 
-  defp append_ensure_thread(%Aikido.Slices.Thread{} = thread) do
+  defp append_ensure_thread(%Aikido.Slices.Thread{} = thread, _input) do
     thread
   end
 
-  defp append_ensure_thread(_) do
-    Aikido.Slices.Thread.new()
+  defp append_ensure_thread(_, input) do
+    Aikido.Slices.Thread.new(options(input))
+  end
+
+  defp options(input) do
+    runtime = input.context[:aikido] || %{}
+    signal = runtime[:signal]
+    seed = {signal && signal.id, runtime[:agent_id], runtime[:slice_path], input.arguments}
+    id = :crypto.hash(:sha256, :erlang.term_to_binary(seed)) |> Base.url_encode64(padding: false)
+    [now: Aikido.SignalCtx.timestamp(signal), id: "thread_" <> id]
+  end
+
+  defp entry_options(input, thread) do
+    Keyword.put(options(input), :id_generator, fn seq -> "#{thread.id}:#{thread.rev}:#{seq}" end)
   end
 end

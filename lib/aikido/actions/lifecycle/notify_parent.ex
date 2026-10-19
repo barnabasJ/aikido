@@ -7,7 +7,7 @@ defmodule Aikido.Actions.Lifecycle.NotifyParent do
     payload = input.arguments[:payload]
     source = input.arguments[:source]
     ctx = input.context.aikido
-    signal = Jido.Signal.new!(type, payload, source: source)
+    signal = struct!(Jido.Signal, id: nil, type: type, data: payload, source: source)
 
     directive =
       case Map.get(ctx, :parent) do

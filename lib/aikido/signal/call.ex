@@ -135,7 +135,9 @@ defmodule Aikido.Signal.Call do
 
   def reply(%Signal{id: req_id, jido_dispatch: dispatch}, reply_type, data)
       when is_binary(reply_type) and is_map(data) do
-    {:ok, reply_signal} = Signal.new(reply_type, data, subject: req_id)
+    reply_signal =
+      struct!(Signal, id: nil, type: reply_type, data: data, source: "/aikido", subject: req_id)
+
     %Emit{signal: reply_signal, dispatch: dispatch}
   end
 

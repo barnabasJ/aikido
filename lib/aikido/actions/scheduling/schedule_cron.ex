@@ -8,7 +8,7 @@ defmodule Aikido.Actions.Scheduling.ScheduleCron do
     type = input.arguments[:signal_type]
     payload = input.arguments[:payload]
     tz = input.arguments[:timezone]
-    signal = Jido.Signal.new!(type, payload, source: "/cron")
+    signal = struct!(Jido.Signal, id: nil, type: type, data: payload, source: "/cron")
 
     opts =
       if job_id do

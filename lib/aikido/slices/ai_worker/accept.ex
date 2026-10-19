@@ -45,7 +45,7 @@ defmodule Aikido.Slices.AiWorker.Accept do
       |> Map.merge(%{query: data.text, request_id: data.task_id})
 
     ask =
-      Jido.Signal.new!("ai.react.ask", payload)
+      struct!(Jido.Signal, id: nil, type: "ai.react.ask", data: payload, source: "/aikido")
       |> Aikido.SignalCtx.put_ctx(Map.get(data, :signal_context, %{}))
 
     Aikido.ActionResult.new(

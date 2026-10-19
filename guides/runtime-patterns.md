@@ -15,6 +15,15 @@ runtime callback implementation hosted by DurableServer. Configure
 return state transitions and directives without performing side effects. All
 side effects belong in directives; results return through signals.
 
+Signal emission descriptors may use
+`struct!(Jido.Signal, id: nil, type: "work.ready", data: %{}, source: "/worker")`.
+Emit, Schedule and Cron complete missing envelope IDs and timestamps during
+execution. Constructing the directive performs no I/O. Identity, memory and
+thread actions use the input signal's timestamp and deterministic state/entry
+IDs rather than reading the clock or generating random IDs. Direct calls without
+an input signal use timestamp zero; standalone slice constructors retain their
+convenience defaults outside the reducer pipeline.
+
 `SpawnAgent` starts durable child agents and snapshots their current logical parent. Teams add desired topology,
 dependencies, ownership, lazy activation, dynamic worker templates, and task
 receipts. A team resource can itself be a member or a worker template.

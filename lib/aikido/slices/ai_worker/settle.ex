@@ -26,9 +26,11 @@ defmodule Aikido.Slices.AiWorker.Settle do
         end
 
       reply =
-        Jido.Signal.new!(
-          type,
-          Map.merge(Map.take(pending, [:task_id, :member, :attempt]), %{result: result})
+        struct!(Jido.Signal,
+          id: nil,
+          type: type,
+          data: Map.merge(Map.take(pending, [:task_id, :member, :attempt]), %{result: result}),
+          source: "/aikido"
         )
 
       next(%{state | pending: nil, completed: state.completed + 1}, context, [

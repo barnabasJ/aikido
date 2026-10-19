@@ -12,7 +12,8 @@ defmodule Aikido.Slices.Identity.Implementation do
 
       _ ->
         Aikido.ActionResult.new(
-          state: Aikido.Slices.Identity.new(Map.to_list(data)),
+          state:
+            Aikido.Slices.Identity.new(Keyword.merge(Map.to_list(data), now: timestamp(input))),
           directives: []
         )
     end
@@ -22,8 +23,14 @@ defmodule Aikido.Slices.Identity.Implementation do
   def run(input, [action: :evolve], _context) do
     params = Map.delete(input.arguments, :state)
     slice = input.arguments.state
-    identity = slice || Aikido.Slices.Identity.new()
-    evolved = Aikido.Slices.Identity.evolve(identity, Map.to_list(params))
+    identity = slice || Aikido.Slices.Identity.new(now: timestamp(input))
+
+    evolved =
+      Aikido.Slices.Identity.evolve(
+        identity,
+        Keyword.merge(Map.to_list(params), now: timestamp(input))
+      )
+
     Aikido.ActionResult.new(state: evolved, directives: [])
   end
 
@@ -31,19 +38,22 @@ defmodule Aikido.Slices.Identity.Implementation do
   def run(input, [action: :update_profile], _context) do
     profile = input.arguments[:profile]
     slice = input.arguments.state
-    identity = update_profile_ensure_identity(slice)
+    identity = update_profile_ensure_identity(slice, input)
 
     Aikido.ActionResult.new(
-      state: Aikido.Slices.Identity.update_profile(identity, profile),
+      state: Aikido.Slices.Identity.update_profile(identity, profile, now: timestamp(input)),
       directives: []
     )
   end
 
-  defp update_profile_ensure_identity(%Aikido.Slices.Identity{} = identity) do
+  defp update_profile_ensure_identity(%Aikido.Slices.Identity{} = identity, _input) do
     identity
   end
 
-  defp update_profile_ensure_identity(_) do
-    Aikido.Slices.Identity.new()
+  defp update_profile_ensure_identity(_, input) do
+    Aikido.Slices.Identity.new(now: timestamp(input))
   end
+
+  defp timestamp(input),
+    do: Aikido.SignalCtx.timestamp(get_in(input.context, [:aikido, :signal]))
 end

@@ -6,10 +6,10 @@ defmodule Aikido.Slices.Memory.Implementation do
     name = input.arguments[:space]
     item = input.arguments[:item]
     slice = input.arguments.state
-    memory = append_to_space_ensure_memory(slice)
+    memory = ensure_memory(slice, input)
 
     Aikido.ActionResult.new(
-      state: Aikido.Slices.Memory.append_to_space(memory, name, item),
+      state: Aikido.Slices.Memory.append_to_space(memory, name, item, options(input)),
       directives: []
     )
   end
@@ -19,10 +19,10 @@ defmodule Aikido.Slices.Memory.Implementation do
     name = input.arguments[:space]
     key = input.arguments[:key]
     slice = input.arguments.state
-    memory = delete_from_space_ensure_memory(slice)
+    memory = ensure_memory(slice, input)
 
     Aikido.ActionResult.new(
-      state: Aikido.Slices.Memory.delete_from_space(memory, name, key),
+      state: Aikido.Slices.Memory.delete_from_space(memory, name, key, options(input)),
       directives: []
     )
   end
@@ -31,10 +31,10 @@ defmodule Aikido.Slices.Memory.Implementation do
   def run(input, [action: :delete_space], _context) do
     name = input.arguments[:space]
     slice = input.arguments.state
-    memory = delete_space_ensure_memory(slice)
+    memory = ensure_memory(slice, input)
 
     Aikido.ActionResult.new(
-      state: Aikido.Slices.Memory.delete_space(memory, name),
+      state: Aikido.Slices.Memory.delete_space(memory, name, options(input)),
       directives: []
     )
   end
@@ -50,7 +50,13 @@ defmodule Aikido.Slices.Memory.Implementation do
 
       _ ->
         Aikido.ActionResult.new(
-          state: Aikido.Slices.Memory.new(Map.to_list(data)),
+          state:
+            Aikido.Slices.Memory.new(
+              Keyword.merge(
+                options(input),
+                Enum.reject(Map.to_list(data), fn {_, value} -> is_nil(value) end)
+              )
+            ),
           directives: []
         )
     end
@@ -67,10 +73,10 @@ defmodule Aikido.Slices.Memory.Implementation do
       end
 
     slice = input.arguments.state
-    memory = ensure_space_ensure_memory(slice)
+    memory = ensure_memory(slice, input)
 
     Aikido.ActionResult.new(
-      state: Aikido.Slices.Memory.ensure_space(memory, name, default),
+      state: Aikido.Slices.Memory.ensure_space(memory, name, default, options(input)),
       directives: []
     )
   end
@@ -81,10 +87,10 @@ defmodule Aikido.Slices.Memory.Implementation do
     key = input.arguments[:key]
     value = input.arguments[:value]
     slice = input.arguments.state
-    memory = put_in_space_ensure_memory(slice)
+    memory = ensure_memory(slice, input)
 
     Aikido.ActionResult.new(
-      state: Aikido.Slices.Memory.put_in_space(memory, name, key, value),
+      state: Aikido.Slices.Memory.put_in_space(memory, name, key, value, options(input)),
       directives: []
     )
   end
@@ -94,10 +100,10 @@ defmodule Aikido.Slices.Memory.Implementation do
     name = input.arguments[:space]
     (%Aikido.Slices.Memory.Space{} = space) = input.arguments[:value]
     slice = input.arguments.state
-    memory = put_space_ensure_memory(slice)
+    memory = ensure_memory(slice, input)
 
     Aikido.ActionResult.new(
-      state: Aikido.Slices.Memory.put_space(memory, name, space),
+      state: Aikido.Slices.Memory.put_space(memory, name, space, options(input)),
       directives: []
     )
   end
@@ -107,67 +113,28 @@ defmodule Aikido.Slices.Memory.Implementation do
     name = input.arguments[:space]
     (%Aikido.Slices.Memory.Space{} = new_space) = input.arguments[:value]
     slice = input.arguments.state
-    memory = update_space_ensure_memory(slice)
+    memory = ensure_memory(slice, input)
 
     Aikido.ActionResult.new(
-      state: Aikido.Slices.Memory.update_space(memory, name, fn _existing -> new_space end),
+      state:
+        Aikido.Slices.Memory.update_space(
+          memory,
+          name,
+          fn _existing -> new_space end,
+          options(input)
+        ),
       directives: []
     )
   end
 
-  defp append_to_space_ensure_memory(%Aikido.Slices.Memory{} = memory) do
-    memory
-  end
+  defp ensure_memory(%Aikido.Slices.Memory{} = memory, _input), do: memory
+  defp ensure_memory(_, input), do: Aikido.Slices.Memory.new(options(input))
 
-  defp append_to_space_ensure_memory(_) do
-    Aikido.Slices.Memory.new()
-  end
-
-  defp delete_from_space_ensure_memory(%Aikido.Slices.Memory{} = memory) do
-    memory
-  end
-
-  defp delete_from_space_ensure_memory(_) do
-    Aikido.Slices.Memory.new()
-  end
-
-  defp delete_space_ensure_memory(%Aikido.Slices.Memory{} = memory) do
-    memory
-  end
-
-  defp delete_space_ensure_memory(_) do
-    Aikido.Slices.Memory.new()
-  end
-
-  defp ensure_space_ensure_memory(%Aikido.Slices.Memory{} = memory) do
-    memory
-  end
-
-  defp ensure_space_ensure_memory(_) do
-    Aikido.Slices.Memory.new()
-  end
-
-  defp put_in_space_ensure_memory(%Aikido.Slices.Memory{} = memory) do
-    memory
-  end
-
-  defp put_in_space_ensure_memory(_) do
-    Aikido.Slices.Memory.new()
-  end
-
-  defp put_space_ensure_memory(%Aikido.Slices.Memory{} = memory) do
-    memory
-  end
-
-  defp put_space_ensure_memory(_) do
-    Aikido.Slices.Memory.new()
-  end
-
-  defp update_space_ensure_memory(%Aikido.Slices.Memory{} = memory) do
-    memory
-  end
-
-  defp update_space_ensure_memory(_) do
-    Aikido.Slices.Memory.new()
+  defp options(input) do
+    runtime = input.context[:aikido] || %{}
+    signal = runtime[:signal]
+    seed = {signal && signal.id, runtime[:agent_id], runtime[:slice_path], input.arguments}
+    id = :crypto.hash(:sha256, :erlang.term_to_binary(seed)) |> Base.url_encode64(padding: false)
+    [now: Aikido.SignalCtx.timestamp(signal), id: "mem_" <> id]
   end
 end

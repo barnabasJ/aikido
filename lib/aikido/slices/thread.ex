@@ -188,11 +188,12 @@ defmodule Aikido.Slices.Thread do
 
   @doc "Append entries to thread (returns new thread)"
   @spec append(t(), Entry.t() | map() | [Entry.t() | map()]) :: t()
-  def append(%{__struct__: __MODULE__} = thread, entries) do
+  @spec append(t(), Entry.t() | map() | [Entry.t() | map()], keyword()) :: t()
+  def append(%{__struct__: __MODULE__} = thread, entries, opts \\ []) do
     entries = List.wrap(entries)
-    now = System.system_time(:millisecond)
+    now = Keyword.get_lazy(opts, :now, fn -> System.system_time(:millisecond) end)
     base_seq = length(thread.entries)
-    prepared_entries = EntryNormalizer.normalize_many(entries, base_seq, now)
+    prepared_entries = EntryNormalizer.normalize_many(entries, base_seq, now, opts)
 
     %{
       thread
@@ -208,8 +209,9 @@ defmodule Aikido.Slices.Thread do
   `metadata`) and bumping the revision.
   """
   @spec clear(t()) :: t()
-  def clear(%{__struct__: __MODULE__} = thread) do
-    now = System.system_time(:millisecond)
+  @spec clear(t(), keyword()) :: t()
+  def clear(%{__struct__: __MODULE__} = thread, opts \\ []) do
+    now = Keyword.get_lazy(opts, :now, fn -> System.system_time(:millisecond) end)
 
     %{
       thread

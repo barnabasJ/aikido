@@ -11,7 +11,10 @@ defmodule Aikido.Actions.Control.Forward do
     final_type = resolve_type(type, original)
     final_payload = resolve_payload(payload, original)
     final_source = resolve_source(source, original)
-    out_signal = Jido.Signal.new!(final_type, final_payload, source: final_source)
+
+    out_signal =
+      struct!(Jido.Signal, id: nil, type: final_type, data: final_payload, source: final_source)
+
     directive = Aikido.Directives.emit_to_pid(out_signal, pid)
     Aikido.ActionResult.new(state: %{forwarded_to: pid}, directives: [directive])
   end

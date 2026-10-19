@@ -9,7 +9,7 @@ defmodule Aikido.Slices.Thread.EntryNormalizer do
   alias Aikido.Slices.Thread.Entry
 
   @type entry_input :: Entry.t() | map()
-  @type opts :: [id_generator: (-> String.t())]
+  @type opts :: [id_generator: (-> String.t()) | (non_neg_integer() -> String.t())]
 
   @doc """
   Normalize a single entry input into `%Aikido.Slices.Thread.Entry{}`.
@@ -21,7 +21,7 @@ defmodule Aikido.Slices.Thread.EntryNormalizer do
     id_generator = Keyword.get(opts, :id_generator, &generate_entry_id/0)
 
     %Entry{
-      id: entry.id || id_generator.(),
+      id: entry.id || generate_id(id_generator, seq),
       seq: seq,
       at: entry.at || now,
       kind: entry.kind || :note,
@@ -34,7 +34,7 @@ defmodule Aikido.Slices.Thread.EntryNormalizer do
     id_generator = Keyword.get(opts, :id_generator, &generate_entry_id/0)
 
     %Entry{
-      id: fetch_entry_attr(attrs, :id, id_generator),
+      id: fetch_entry_attr(attrs, :id, fn -> generate_id(id_generator, seq) end),
       seq: seq,
       at: fetch_entry_attr(attrs, :at, fn -> now end),
       kind: fetch_entry_attr(attrs, :kind, fn -> :note end),
@@ -61,6 +61,9 @@ defmodule Aikido.Slices.Thread.EntryNormalizer do
       value -> value
     end
   end
+
+  defp generate_id(generator, seq) when is_function(generator, 1), do: generator.(seq)
+  defp generate_id(generator, _seq), do: generator.()
 
   defp generate_entry_id do
     "entry_" <> Aikido.Util.generate_id()
