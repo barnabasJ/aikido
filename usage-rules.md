@@ -26,7 +26,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 
 ## QA Patterns
 - Start with pure `cmd/2` tests, then add AgentServer integration tests.
-- Use `AikidoTest.Case` + `AikidoTest.Eventually` for async runtime assertions.
+- Use `AikidoTest.Case`, subscription helpers and process monitors for async runtime assertions.
 - Run `mix q` (`mix quality`) and coverage checks before release.
 
 ## Avoid

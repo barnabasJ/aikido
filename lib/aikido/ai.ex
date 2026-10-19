@@ -69,8 +69,7 @@ defmodule Aikido.AI do
 
   ## Coordination guarantees
 
-    * `ask_sync/3` waits for a subscription notification instead of polling
-      state. It subscribes before launching to avoid missing completion.
+    * `ask_sync/3` waits for a subscription notification. It subscribes before launching to avoid missing completion.
     * Only one run may be active per agent; concurrent `ask/3`
       while `:setup` or `:running` returns the action's `{:error, :busy}` chain
       error verbatim through `Aikido.AgentServer.call/4`.

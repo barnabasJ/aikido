@@ -139,7 +139,7 @@ Start with [the domain](lib/agent_examples/agents.ex), then
 [Work](lib/agent_examples/actions/work.ex) shows the complete asynchronous
 signal chain; its uppercase task is a local stand-in for one blocking tool call.
 [Demo](lib/agent_examples/demo.ex) subscribes before sending work so it can
-observe completion without polling or sleeps. The tests cover these behaviors.
+observe completion through subscriptions. The tests cover these behaviors.
 
 Actions return the next state. Directives perform I/O and return promptly.
 Results return as signals; a receiving action decides the next transition.

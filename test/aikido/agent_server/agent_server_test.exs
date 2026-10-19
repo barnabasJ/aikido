@@ -272,21 +272,7 @@ defmodule AikidoTest.AgentServerTest do
           aikido: aikido
         )
 
-      ref = Process.monitor(pid)
-      Process.exit(pid, :kill)
-      assert_receive {:DOWN, ^ref, :process, ^pid, :killed}, 500
-
-      eventually(
-        fn ->
-          case Aikido.AgentServer.whereis(Aikido.registry_name(aikido), id) do
-            new_pid when is_pid(new_pid) -> new_pid != pid and Process.alive?(new_pid)
-            _ -> false
-          end
-        end,
-        timeout: 10_000
-      )
-
-      restarted_pid = Aikido.AgentServer.whereis(Aikido.registry_name(aikido), id)
+      restarted_pid = AikidoTest.LifecycleWait.restart(pid)
       assert is_pid(restarted_pid)
       refute restarted_pid == pid
       Aikido.stop_agent(aikido, restarted_pid)
@@ -1324,7 +1310,7 @@ defmodule AikidoTest.AgentServerTest do
         )
 
       GenServer.cast(pid, :unknown_message)
-      eventually(fn -> Process.alive?(pid) end)
+      assert {:ok, :responsive} = Aikido.AgentServer.state(pid, fn _ -> {:ok, :responsive} end)
       GenServer.stop(pid)
     end
 
@@ -1336,7 +1322,7 @@ defmodule AikidoTest.AgentServerTest do
         )
 
       send(pid, :random_message)
-      eventually(fn -> Process.alive?(pid) end)
+      assert {:ok, :responsive} = Aikido.AgentServer.state(pid, fn _ -> {:ok, :responsive} end)
       GenServer.stop(pid)
     end
   end

@@ -29,10 +29,8 @@ defmodule AikidoTest.DebugIntegrationTest do
       signal = signal("aikido.test.debug", %{value: 42})
       Aikido.AgentServer.cast(pid, signal)
 
-      eventually(fn ->
-        {:ok, events} = Aikido.AgentServer.recent_events(pid)
-        assert is_list(events)
-      end)
+      {:ok, events} = Aikido.AgentServer.recent_events(pid)
+      assert is_list(events)
     end
 
     test("disabling debug stops recording", %{aikido: aikido}) do
@@ -101,10 +99,8 @@ defmodule AikidoTest.DebugIntegrationTest do
       assert metadata[:aikido_instance] == aikido
       assert metadata[:aikido_partition] == :blue
 
-      eventually(fn ->
-        {:ok, events} = Aikido.AgentServer.recent_events(pid)
-        Enum.any?(events, &(&1.aikido_partition == :blue))
-      end)
+      {:ok, events} = Aikido.AgentServer.recent_events(pid)
+      assert Enum.any?(events, &(&1.aikido_partition == :blue))
 
       :telemetry.detach(handler_id)
     end

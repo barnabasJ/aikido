@@ -55,7 +55,6 @@ end
 
 defmodule AikidoTest.DurableTest do
   use ExUnit.Case, async: false
-  import AikidoTest.Eventually
 
   setup do
     directory =
@@ -125,18 +124,7 @@ defmodule AikidoTest.DurableTest do
                &{:ok, &1.agent.state.domain.counter}
              )
 
-    Process.exit(first, :kill)
-
-    second =
-      eventually(
-        fn ->
-          case Aikido.Durable.lookup(pool, "crash") do
-            {:ok, pid} when pid != first -> pid
-            _ -> false
-          end
-        end,
-        timeout: 10000
-      )
+    second = AikidoTest.LifecycleWait.restart(first)
 
     assert {:ok, 9} = Aikido.AgentServer.state(second, &{:ok, &1.agent.state.domain.counter})
   end
@@ -257,18 +245,7 @@ defmodule AikidoTest.DurableTest do
       )
 
     first = Aikido.whereis(instance, team.id)
-    Process.exit(first, :kill)
-
-    second =
-      eventually(
-        fn ->
-          case Aikido.whereis(instance, team.id) do
-            pid when is_pid(pid) and pid != first -> pid
-            _ -> false
-          end
-        end,
-        timeout: 10000
-      )
+    second = AikidoTest.LifecycleWait.restart(first)
 
     member =
       AikidoTest.AgentWait.await_state_value(

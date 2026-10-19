@@ -767,7 +767,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       child_pid = await_child_pid(parent_pid, :child_to_stop)
       stop_directive = %Aikido.Directives.StopChild{tag: :child_to_stop, reason: :normal}
       Aikido.AgentServer.cast(parent_pid, signal_carrying_directive(stop_directive))
-      refute_eventually(Process.alive?(child_pid))
+      AikidoTest.LifecycleWait.await_down(child_pid)
     end
 
     test("returns ok when child tag not found", %{state: state, input_signal: input_signal}) do

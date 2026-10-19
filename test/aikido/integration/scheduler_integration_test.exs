@@ -106,17 +106,22 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       wait_for_tick_count(pid, 1, timeout: 5000)
       server_ref = Process.monitor(pid)
 
+      :persistent_term.put({AikidoTest.Support.FailingTimeZoneDatabase, :observer}, self())
+
+      on_exit(fn ->
+        :persistent_term.erase({AikidoTest.Support.FailingTimeZoneDatabase, :observer})
+      end)
+
       Application.put_env(
         :aikido,
         :time_zone_database,
         AikidoTest.Support.FailingTimeZoneDatabase
       )
 
-      eventually(fn -> Process.alive?(pid) end, timeout: 2000)
+      assert Process.alive?(pid)
 
-      eventually(fn -> Process.alive?(job_pid) and :sys.get_state(job_pid).retrying? end,
-        timeout: 5000
-      )
+      assert_receive {:time_zone_resolution_failed, ^job_pid}, 5000
+      assert :sys.get_state(job_pid).retrying?
 
       {:ok, %{heartbeat_pid: heartbeat_pid, baseline: baseline}} =
         Aikido.AgentServer.state(pid, fn s ->
@@ -128,11 +133,8 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       assert Process.alive?(job_pid)
       Application.put_env(:aikido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
 
-      eventually(fn -> Process.alive?(job_pid) and not :sys.get_state(job_pid).retrying? end,
-        timeout: 5000
-      )
-
       wait_for_tick_count(pid, baseline + 1, timeout: 8000)
+      refute :sys.get_state(job_pid).retrying?
       refute_received {:DOWN, ^server_ref, :process, ^pid, _reason}
     end
 
@@ -255,7 +257,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       job_id = scheduled_job_id()
       job_pid = wait_for_job(pid, job_id, timeout: 5000)
       assert Process.alive?(job_pid)
-      eventually(fn -> tick_count(pid) >= 1 end, timeout: 5000)
+      wait_for_tick_count(pid, 1, timeout: 5000)
 
       {:ok, snapshot} =
         Aikido.AgentServer.state(pid, fn s ->
@@ -303,9 +305,13 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       job_pid = wait_for_job(pid, job_id, timeout: 5000)
       assert Process.alive?(job_pid)
 
-      eventually(
-        fn ->
-          tick_count(pid) >= 1 and Enum.any?(ticks(pid), &(&1[:source] == :slice_schedule))
+      AikidoTest.AgentWait.await_state_value(
+        pid,
+        fn state ->
+          domain = state.agent.state.domain
+
+          if domain.tick_count >= 1 and Enum.any?(domain.ticks, &(&1[:source] == :slice_schedule)),
+            do: true
         end,
         timeout: 5000
       )

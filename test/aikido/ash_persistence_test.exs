@@ -40,7 +40,6 @@ end
 
 defmodule AikidoTest.AshPersistenceTest do
   use ExUnit.Case, async: false
-  import AikidoTest.Eventually
 
   alias AikidoTest.AshPersistence.{Domain, Permanent, Temporary}
 
@@ -126,18 +125,7 @@ defmodule AikidoTest.AshPersistenceTest do
 
   test "temporary agents retain crash recovery until explicitly stopped" do
     ref = Domain.temporary_start!(%{id: "recoverable", value: 7})
-    Process.exit(ref.pid, :kill)
-
-    recovered =
-      eventually(
-        fn ->
-          case Aikido.whereis(AikidoTest.AshPersistence.Instance, ref.id) do
-            pid when is_pid(pid) and pid != ref.pid -> pid
-            _ -> false
-          end
-        end,
-        timeout: 5_000
-      )
+    recovered = AikidoTest.LifecycleWait.restart(ref.pid)
 
     assert %{value: 7} = Domain.temporary_inspect!(recovered)
   end

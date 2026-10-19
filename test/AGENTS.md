@@ -15,13 +15,14 @@ Provide stable, reusable testing patterns for pure agents, AgentServer runtime b
 
 ## Support Modules
 - `AikidoTest.Case`: isolated Aikido instance per test (`aikido`, `aikido_pid` context)
-- `AikidoTest.Eventually`: polling helpers/macros for non-state waits (`eventually`, `assert_eventually`, `refute_eventually`); for agent state changes use `Aikido.AgentServer.subscribe/4` or one of the `await_*` helpers
+- `AikidoTest.AgentWait`: subscription-based state assertions
+- `AikidoTest.LifecycleWait`: process monitors and supervised recovery events
 - `AikidoTest.Support.TestTracer`: lightweight span capture for runtime assertions
 - `AikidoTest.TestAgents` and `AikidoTest.TestActions`: canonical fixtures for behavior-level tests
 
 ## Standards
 - Prefer behavior assertions over implementation/log assertions
-- Avoid `Process.sleep/1`; use eventual assertions and monitored process lifecycle checks
+- Avoid `Process.sleep/1`; use subscriptions and monitored process lifecycle checks
 - Keep tests focused and deterministic (single behavior per test where practical)
 - Use unique IDs/helpers to avoid test cross-talk
 

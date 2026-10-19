@@ -36,7 +36,7 @@ defmodule AikidoTest.AgentServer.StopChildTest do
 
     assert {:ok, ^child_pid} = Aikido.AgentServer.adopt_child(parent_pid, child_pid, :worker)
     assert :ok = Aikido.AgentServer.stop_child(parent_pid, :worker)
-    eventually(fn -> not Process.alive?(child_pid) end)
+    AikidoTest.LifecycleWait.await_down(child_pid)
 
     await_state_value(parent_pid, fn s ->
       if map_size(s.children) == 0 do
@@ -62,7 +62,7 @@ defmodule AikidoTest.AgentServer.StopChildTest do
 
     assert {:ok, ^child_pid} = Aikido.AgentServer.adopt_child(parent_pid, child_pid, "worker")
     assert :ok = Aikido.AgentServer.stop_child(parent_pid, "worker")
-    eventually(fn -> not Process.alive?(child_pid) end)
+    AikidoTest.LifecycleWait.await_down(child_pid)
 
     await_state_value(parent_pid, fn s ->
       if map_size(s.children) == 0 do

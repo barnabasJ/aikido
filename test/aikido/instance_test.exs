@@ -53,7 +53,6 @@ end
 
 defmodule AikidoTest.InstanceTest do
   use ExUnit.Case, async: false
-  import AikidoTest.Eventually
 
   defp compile_inline_redis_instance(prefix) do
     module =
@@ -346,9 +345,7 @@ end
       assert :ok = Aikido.stop_agent(AikidoTest.InstanceTest.TestInstance, "stop-test")
       assert_receive {:DOWN, ^ref, :process, ^pid, _}, 1000
 
-      eventually(fn ->
-        Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "stop-test") == nil
-      end)
+      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "stop-test") == nil
     end
 
     test "shared stop_agent/2 stops an agent by pid" do
@@ -417,10 +414,8 @@ end
                  partition: :alpha
                )
 
-      eventually(fn ->
-        Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "shared-id", partition: :alpha) ==
-          nil
-      end)
+      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "shared-id", partition: :alpha) ==
+               nil
 
       assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "shared-id") ==
                unpartitioned_pid

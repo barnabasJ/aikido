@@ -39,7 +39,6 @@ defmodule AikidoTest.Case do
   using do
     quote do
       import AikidoTest.Case
-      import AikidoTest.Eventually
       import AikidoTest.AgentWait
 
       @doc """

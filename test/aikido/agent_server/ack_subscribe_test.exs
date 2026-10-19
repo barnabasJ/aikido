@@ -167,7 +167,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
       assert {:ok, 0} = Aikido.AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)})
     end
 
-    test("skip waits for a later signal without polling state", %{aikido: aikido}) do
+    test("skip waits for a later signal through its subscription", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.TestAgent)
       :ok = Aikido.AgentServer.await_ready(pid)
       caller = self()
@@ -209,9 +209,8 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
       assert {:error, %Ash.Error.Unknown{}} =
                Aikido.AgentServer.call_until(pid, signal("fail"), "**", fn _ -> :skip end)
 
-      assert_eventually(fn ->
-        Aikido.AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)}) == {:ok, 0}
-      end)
+      assert {:ok, 0} =
+               Aikido.AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)})
     end
 
     test("timeout releases subscriptions and isolates late replies", %{aikido: aikido}) do
@@ -227,9 +226,8 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
                  timeout: 20
                )
 
-      assert_eventually(fn ->
-        Aikido.AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)}) == {:ok, 0}
-      end)
+      assert {:ok, 0} =
+               Aikido.AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)})
 
       assert {:ok, 2} =
                Aikido.AgentServer.call(pid, signal("write", %{value: 2}), fn runtime ->

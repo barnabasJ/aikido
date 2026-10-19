@@ -46,7 +46,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 
 ## Testing and QA
 - Prefer pure agent tests first, then AgentServer/runtime integration tests
-- Use helpers from `test/AGENTS.md` (`AikidoTest.Case`, `AikidoTest.Eventually`) for async assertions
+- Use helpers from `test/AGENTS.md` (`AikidoTest.Case`, `AikidoTest.AgentWait`, `AikidoTest.LifecycleWait`) for async assertions
 - Avoid `Process.sleep/1` in tests; assert eventual state/event behavior
 
 ## Release Hygiene

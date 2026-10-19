@@ -2,22 +2,15 @@ defmodule AikidoTest.AgentWait do
   @moduledoc """
   Subscribe-based wait helpers for agent state changes.
 
-  Tests must not poll agent state. Use these helpers for
-  any wait whose stop condition is a predicate over the agent's state.
+  Use these helpers when the wait condition is a predicate over agent state.
 
   Each helper:
 
-  1. **Fast-paths a `state/3` query** — if the predicate already holds,
-     return immediately.
-  2. **Registers a `subscribe/4`** to a signal pattern (default `"**"`,
-     i.e. fire on every signal) with `once: true` and a selector that
-     returns `{:ok, value}` when the predicate matches and `:skip`
-     otherwise.
-  3. **Re-checks via `state/3`** after the subscription is registered to
-     close the registration race (some signal could land between the
-     first check and `subscribe/4`).
-  4. **Blocks on `assert_receive`-style** receipt of the subscription
-     fire message, raising on timeout.
+  1. Registers a one-shot subscription before checking the current state.
+  2. Reads the state once, returning immediately if the condition holds.
+  3. Otherwise waits for the subscription notification. The selector returns
+     `:skip` until a matching signal produces the required state.
+  4. Removes the subscription when the wait finishes or times out.
 
   Selectors run in the agent process after the outermost middleware
   unwinds, so the predicate sees the fully processed state.
@@ -67,43 +60,38 @@ defmodule AikidoTest.AgentWait do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
     pattern = Keyword.get(opts, :pattern, @default_pattern)
 
-    state_selector = fn s -> {:ok, value_fn.(s)} end
-
-    subscribe_selector = fn s ->
-      case value_fn.(s) do
+    selector = fn state ->
+      case value_fn.(state) do
         nil -> :skip
         value -> {:ok, value}
       end
     end
 
-    case AgentServer.state(pid, state_selector) do
-      {:ok, value} when not is_nil(value) ->
-        value
+    {:ok, ref} = AgentServer.subscribe(pid, pattern, selector, once: true)
 
-      _ ->
-        wait_via_subscription(pid, pattern, state_selector, subscribe_selector, timeout)
-    end
-  end
+    try do
+      case AgentServer.state(pid, &{:ok, value_fn.(&1)}) do
+        {:ok, value} when not is_nil(value) ->
+          value
 
-  defp wait_via_subscription(pid, pattern, state_selector, subscribe_selector, timeout) do
-    {:ok, ref} = AgentServer.subscribe(pid, pattern, subscribe_selector, once: true)
+        _ ->
+          receive do
+            {:aikido_subscription, ^ref, %{result: {:ok, value}}} -> value
+          after
+            timeout ->
+              raise ExUnit.AssertionError,
+                message:
+                  "await_state_value/3 predicate not satisfied within #{timeout}ms (pattern=#{inspect(pattern)})"
+          end
+      end
+    after
+      AgentServer.unsubscribe(pid, ref)
 
-    case AgentServer.state(pid, state_selector) do
-      {:ok, value} when not is_nil(value) ->
-        AgentServer.unsubscribe(pid, ref)
-        value
-
-      _ ->
-        receive do
-          {:aikido_subscription, ^ref, %{result: {:ok, value}}} -> value
-        after
-          timeout ->
-            AgentServer.unsubscribe(pid, ref)
-
-            raise ExUnit.AssertionError,
-              message:
-                "await_state_value/3 predicate not satisfied within #{timeout}ms (pattern=#{inspect(pattern)})"
-        end
+      receive do
+        {:aikido_subscription, ^ref, _result} -> :ok
+      after
+        0 -> :ok
+      end
     end
   end
 end

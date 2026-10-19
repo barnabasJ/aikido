@@ -41,8 +41,8 @@ mix test
 ```
 
 Prefer pure action tests before runtime integration tests. Use subscriptions,
-monitors, and the shared wait helpers for asynchronous assertions. Avoid sleeps
-and repeated agent-state polling. Add coverage for behavior changes and failures.
+monitors, and the shared wait helpers for asynchronous assertions. Add coverage
+for behavior changes and failures.
 
 ## Benchmarks
 

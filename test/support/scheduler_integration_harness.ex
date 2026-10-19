@@ -241,7 +241,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
   Wait for the agent's domain `tick_count` to reach `count`.
 
   Uses subscriptions: each `cron.tick` triggers a pipeline
-  whose post-state the subscription evaluates. No polling.
+  whose post-state the subscription evaluates.
   """
   def wait_for_tick_count(pid, count, opts \\ []) do
     AikidoTest.AgentWait.await_state_value(

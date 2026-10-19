@@ -375,7 +375,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = Aikido.AgentServer.cast(pid, register_signal)
-      eventually(fn -> Process.alive?(pid) end)
+      assert Process.alive?(pid)
 
       {:ok, %{cron_jobs: cron_jobs, cron_specs: cron_specs}} =
         Aikido.AgentServer.state(pid, fn s ->
@@ -406,7 +406,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = Aikido.AgentServer.cast(pid, register_signal)
-      eventually(fn -> Process.alive?(pid) end)
+      assert Process.alive?(pid)
 
       {:ok, %{cron_jobs: cron_jobs, cron_specs: cron_specs}} =
         Aikido.AgentServer.state(pid, fn s ->
@@ -571,7 +571,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         end
       end)
 
-      eventually(fn -> not Process.alive?(job_pid) end)
+      AikidoTest.LifecycleWait.await_down(job_pid)
       GenServer.stop(pid)
     end
 
@@ -666,7 +666,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       assert is_pid(job_pid)
       assert Process.alive?(job_pid)
       GenServer.stop(pid)
-      eventually(fn -> not Process.alive?(job_pid) end)
+      AikidoTest.LifecycleWait.await_down(job_pid)
     end
 
     test("multiple cron jobs are all cleaned up on termination", %{aikido: aikido}) do
@@ -707,7 +707,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       GenServer.stop(pid)
 
       for job_pid <- job_pids do
-        eventually(fn -> not Process.alive?(job_pid) end)
+        AikidoTest.LifecycleWait.await_down(job_pid)
       end
     end
   end

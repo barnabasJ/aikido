@@ -165,7 +165,7 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
       job_id = scheduled_job_id()
       job_pid1 = wait_for_job(pid1, job_id, timeout: 5000)
       assert Process.alive?(job_pid1)
-      eventually(fn -> tick_count(pid1) >= 1 end, timeout: 5000)
+      wait_for_tick_count(pid1, 1, timeout: 5000)
       {:ok, cron_specs1} = Aikido.AgentServer.state(pid1, fn s -> {:ok, s.cron_specs} end)
       assert cron_specs1 == %{}
       stop_and_wait(pid1)
@@ -215,7 +215,14 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
           {:ok, pid} = start_persisted_agent(manager, instance_key)
           good_job_pid = wait_for_job(pid, :good, timeout: 5000)
           assert Process.alive?(good_job_pid)
-          eventually(fn -> Enum.any?(ticks(pid), &(&1[:kind] == :good_replay)) end, timeout: 5000)
+
+          AikidoTest.AgentWait.await_state_value(
+            pid,
+            fn state ->
+              if Enum.any?(state.agent.state.domain.ticks, &(&1[:kind] == :good_replay)), do: true
+            end,
+            timeout: 5000
+          )
 
           {:ok, %{cron_jobs: cron_jobs, cron_specs: cron_specs}} =
             Aikido.AgentServer.state(pid, fn s ->
@@ -231,19 +238,11 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
 
       assert log =~ "dropped malformed persisted cron spec"
 
-      eventually(
-        fn ->
-          case Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table) do
-            {:ok, updated_checkpoint} ->
-              persisted_specs = Map.get(updated_checkpoint.state || %{}, scheduler_key, %{})
-              Map.has_key?(persisted_specs, :good) and not Map.has_key?(persisted_specs, :broken)
+      assert {:ok, updated_checkpoint} =
+               Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table)
 
-            _ ->
-              false
-          end
-        end,
-        timeout: 3000
-      )
+      persisted_specs = Map.get(updated_checkpoint.state || %{}, scheduler_key, %{})
+      assert Map.has_key?(persisted_specs, :good) and not Map.has_key?(persisted_specs, :broken)
     end
 
     test(
@@ -293,19 +292,11 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
 
       assert log =~ "dropped malformed persisted cron spec"
 
-      eventually(
-        fn ->
-          case Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table) do
-            {:ok, updated_checkpoint} ->
-              scheduler_state = Map.get(updated_checkpoint.state || %{}, scheduler_key, %{})
-              scheduler_state == %{}
+      assert {:ok, updated_checkpoint} =
+               Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table)
 
-            _ ->
-              false
-          end
-        end,
-        timeout: 3000
-      )
+      scheduler_state = Map.get(updated_checkpoint.state || %{}, scheduler_key, %{})
+      assert scheduler_state == %{}
     end
 
     test(
@@ -370,19 +361,11 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
 
       assert log =~ "failed to register cron job :skipped"
 
-      eventually(
-        fn ->
-          case Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table) do
-            {:ok, updated_checkpoint} ->
-              persisted_specs = Map.get(updated_checkpoint.state || %{}, scheduler_key, %{})
-              persisted_specs == %{}
+      assert {:ok, updated_checkpoint} =
+               Aikido.Storage.ETS.get_checkpoint(checkpoint_key, table: table)
 
-            _ ->
-              false
-          end
-        end,
-        timeout: 3000
-      )
+      persisted_specs = Map.get(updated_checkpoint.state || %{}, scheduler_key, %{})
+      assert persisted_specs == %{}
     end
 
     test("bad durable replay does not block slice schedules on thaw", context) do
@@ -423,9 +406,14 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
           slice_pid = wait_for_job(pid, slice_job_id(), timeout: 5000)
           assert Process.alive?(slice_pid)
 
-          eventually(
-            fn ->
-              tick_count(pid) >= 1 and Enum.any?(ticks(pid), &(&1[:source] == :slice_schedule))
+          AikidoTest.AgentWait.await_state_value(
+            pid,
+            fn state ->
+              domain = state.agent.state.domain
+
+              if domain.tick_count >= 1 and
+                   Enum.any?(domain.ticks, &(&1[:source] == :slice_schedule)),
+                 do: true
             end,
             timeout: 5000
           )
@@ -524,15 +512,10 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
       assert :ok = register_cron(register_pid, "* * * * * * *", job_id: :write_through_register)
       wait_for_job(register_pid, :write_through_register, timeout: 5000)
 
-      eventually(
-        fn ->
-          case Aikido.Storage.ETS.get_checkpoint(register_checkpoint_key, table: table) do
-            {:ok, checkpoint} -> checkpoint.state == [] and checkpoint.marker == :register_marker
-            _ -> false
-          end
-        end,
-        timeout: 3000
-      )
+      assert {:ok, checkpoint} =
+               Aikido.Storage.ETS.get_checkpoint(register_checkpoint_key, table: table)
+
+      assert checkpoint.state == [] and checkpoint.marker == :register_marker
 
       cancel_key = "corrupt-write-through-cancel"
 
@@ -563,15 +546,14 @@ defmodule AikidoTest.Integration.SchedulerDurabilityIntegrationTest do
 
       assert :ok = cancel_cron(cancel_pid, :write_through_cancel)
 
-      eventually(
-        fn ->
-          case Aikido.Storage.ETS.get_checkpoint(cancel_checkpoint_key, table: table) do
-            {:ok, checkpoint} -> checkpoint.state == [] and checkpoint.marker == :cancel_marker
-            _ -> false
-          end
-        end,
-        timeout: 3000
-      )
+      AikidoTest.AgentWait.await_state_value(cancel_pid, fn state ->
+        if not Map.has_key?(state.cron_jobs, :write_through_cancel), do: true
+      end)
+
+      assert {:ok, checkpoint} =
+               Aikido.Storage.ETS.get_checkpoint(cancel_checkpoint_key, table: table)
+
+      assert checkpoint.state == [] and checkpoint.marker == :cancel_marker
     end
   end
 end

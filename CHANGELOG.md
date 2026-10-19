@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Replace repeated-check test helpers with subscriptions, process monitors and
+  lifecycle events, including AgentServer readiness telemetry. Document completion
+  waits through `AgentServer.call_until/5`.
+
 - Rewrite task-number references and migration commentary in source documentation
   and test descriptions to describe current behavior.
 

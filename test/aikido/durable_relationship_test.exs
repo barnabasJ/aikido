@@ -1,6 +1,5 @@
 defmodule AikidoTest.DurableRelationshipTest do
   use ExUnit.Case, async: false
-  import AikidoTest.Eventually
   import AikidoTest.AgentWait
 
   alias Aikido.AgentServer
@@ -110,18 +109,7 @@ defmodule AikidoTest.DurableRelationshipTest do
     assert :ok = Aikido.Directive.exec(directive, signal, runtime)
     assert {:ok, child} = AgentServer.await_child(parent, :worker)
     assert {:ok, ^child} = Aikido.Durable.lookup(pool, "child")
-    Process.exit(child, :kill)
-
-    restored =
-      eventually(
-        fn ->
-          case Aikido.whereis(instance, "child") do
-            pid when is_pid(pid) and pid != child -> pid
-            _ -> false
-          end
-        end,
-        timeout: 10_000
-      )
+    restored = AikidoTest.LifecycleWait.restart(child)
 
     assert {:ok, %{id: "parent", pid: ^parent}} = AgentServer.state(restored, &{:ok, &1.parent})
     assert {:ok, %{parent_id: "parent"}} = Aikido.parent_binding(instance, "child")

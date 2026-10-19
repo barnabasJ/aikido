@@ -83,21 +83,29 @@ defmodule Aikido.AgentServer do
 
   Agents signal completion via **state**, not process death:
 
-      # In an action, set the terminal status on the agent's slice:
-      slice = put_in(slice, [:status], :completed)
-      slice = put_in(slice, [:last_answer], answer)
-      {:ok, slice}
+      # In an action, return the terminal status as part of slice state:
+      slice = %{slice | status: :completed, last_answer: answer}
+      Aikido.ActionResult.new(state: slice, directives: [])
 
-      # External code polls for completion via a selector:
-      {:ok, status} =
-        AgentServer.state(server, fn s ->
-          domain = Aikido.Dsl.Agent.Info.path(s.agent_module)
-          case get_in(s.agent.state, [domain, :status]) do
-            :completed -> {:ok, {:completed, get_in(s.agent.state, [domain, :last_answer])}}
-            :failed -> {:ok, {:failed, get_in(s.agent.state, [domain, :error])}}
-            _ -> {:ok, :still_running}
-          end
-        end)
+      # Subscribe before sending the command, then await its terminal state:
+      selector = fn runtime ->
+        path = Aikido.Dsl.Agent.Info.path(runtime.agent_module)
+        slice = Map.fetch!(runtime.agent.state, path)
+
+        case slice.status do
+          :completed -> {:ok, slice.last_answer}
+          :failed -> {:error, slice.error}
+          _ -> :skip
+        end
+      end
+
+      {:ok, answer} =
+        Aikido.AgentServer.call_until(server, signal, "**", selector, timeout: 30_000)
+
+  `call_until/5` registers a one-shot subscription before dispatching `signal`.
+  The selector runs after matching signals are processed; `:skip` keeps the
+  subscription waiting. There are no repeated state queries. For concurrent
+  requests, also match the request identifier in the selector.
 
   This follows Elm/Redux semantics where completion is a state concern.
   The process stays alive until explicitly stopped or supervised.
@@ -528,6 +536,10 @@ defmodule Aikido.AgentServer do
   reconcile + slice start has completed before sending signals or
   reading agent state. If the agent is already past `:idle` (ready
   fired before the call), replies immediately.
+
+  Readiness also emits `[:aikido, :agent_server, :ready]` telemetry with the
+  agent ID, module, instance and partition. Observers can register before
+  starting or restarting an agent to discover its new process.
 
   ## Options
 
@@ -1073,6 +1085,18 @@ defmodule Aikido.AgentServer do
     notify_parent_of_startup(state)
     state = emit_through_chain(state, lifecycle_ready_signal(state))
     state = State.set_status(state, :idle)
+
+    emit_telemetry(
+      [:aikido, :agent_server, :ready],
+      %{system_time: System.system_time()},
+      %{
+        agent_id: state.id,
+        agent_module: state.agent_module,
+        aikido_instance: state.aikido,
+        aikido_partition: state.partition
+      }
+    )
+
     state = notify_ready_waiters(state)
     {:noreply, state}
   end
@@ -1220,7 +1244,7 @@ defmodule Aikido.AgentServer do
         })
 
       # Synthesize a `aikido.agent.child.adopted` after the state mutation
-      # so subscribers can observe the post-adoption state without polling.
+      # so subscribers can observe the post-adoption state through subscriptions.
       # `notify_parent_of_startup`
       # on the child side will also cast `aikido.agent.child.started` back
       # to us asynchronously — that signal observes the same registration
@@ -1359,7 +1383,7 @@ defmodule Aikido.AgentServer do
 
                 # Synthesize a lifecycle signal and run it through the
                 # agent's own pipeline so `subscribe/4` subscribers see
-                # the post-restart state without polling.
+                # the post-restart state through subscriptions.
                 new_pid = Map.fetch!(new_state.cron_jobs, logical_id)
                 signal = cron_restarted_signal(new_state, logical_id, new_pid)
                 new_state = dispatch_synthetic_signal(signal, new_state)
@@ -2693,7 +2717,7 @@ defmodule Aikido.AgentServer do
 This is a HARD STOP: pending directives and async work will be lost, and on_after_cmd/3 will NOT run.
 
 For normal completion, set state.status to :completed/:failed instead and avoid returning {:stop, ...}.
-External code should poll AgentServer.state/3 with a status selector, not rely on process death.
+External code should subscribe before dispatch, using AgentServer.call_until/5 to await terminal state.
 
 {:stop, ...} should only be used for abnormal/framework-level termination.
 "

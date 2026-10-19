@@ -7,7 +7,6 @@ end
 defmodule AikidoTest.SchedulerTest do
   use ExUnit.Case, async: false
   import ExUnit.CaptureLog
-  import AikidoTest.Eventually
 
   setup do
     original_database = Calendar.get_time_zone_database()
@@ -162,7 +161,7 @@ defmodule AikidoTest.SchedulerTest do
       {:ok, pid} = Aikido.Scheduler.run_every(fn -> :ok end, "* * * * *")
       assert Process.alive?(pid)
       assert :ok = Aikido.Scheduler.cancel(pid)
-      eventually(fn -> not Process.alive?(pid) end)
+      AikidoTest.LifecycleWait.await_down(pid)
     end
 
     test "cancels a blocked callback worker and stops future ticks" do
@@ -180,8 +179,8 @@ defmodule AikidoTest.SchedulerTest do
       assert_receive {:worker_started, worker_pid}, 2000
       assert is_pid(worker_pid)
       assert :ok = Aikido.Scheduler.cancel(pid)
-      eventually(fn -> not Process.alive?(pid) end)
-      eventually(fn -> not Process.alive?(worker_pid) end)
+      AikidoTest.LifecycleWait.await_down(pid)
+      AikidoTest.LifecycleWait.await_down(worker_pid)
       refute_receive {:worker_started, _another_worker}, 1500
     end
 
@@ -224,13 +223,15 @@ defmodule AikidoTest.SchedulerTest do
     test "returns false after cancellation" do
       {:ok, pid} = Aikido.Scheduler.run_every(fn -> :ok end, "* * * * *")
       Aikido.Scheduler.cancel(pid)
-      eventually(fn -> Aikido.Scheduler.alive?(pid) == false end)
+      AikidoTest.LifecycleWait.await_down(pid)
+      refute Aikido.Scheduler.alive?(pid)
     end
 
     test "returns false for a dead pid" do
       {:ok, pid} = Aikido.Scheduler.run_every(fn -> :ok end, "* * * * *")
       Aikido.Scheduler.cancel(pid)
-      eventually(fn -> Aikido.Scheduler.alive?(pid) == false end)
+      AikidoTest.LifecycleWait.await_down(pid)
+      refute Aikido.Scheduler.alive?(pid)
     end
   end
 
@@ -308,7 +309,8 @@ defmodule AikidoTest.SchedulerTest do
           AikidoTest.Support.FailingTimeZoneDatabase
         )
 
-        eventually(fn -> Process.alive?(owner) and Process.alive?(job_pid) end, timeout: 2000)
+        assert Process.alive?(owner)
+        assert Process.alive?(job_pid)
         :persistent_term.put(tick_gate, true)
         Application.put_env(:aikido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
         assert_receive {:recovered_tick, ^owner_tag, worker_pid}, 3000

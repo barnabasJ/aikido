@@ -46,7 +46,6 @@ end
 
 defmodule AikidoTest.AgentPoolTest do
   use ExUnit.Case, async: true
-  import AikidoTest.Eventually
   @moduletag :capture_log
 
   defp unique_aikido_name do
@@ -189,14 +188,10 @@ defmodule AikidoTest.AgentPoolTest do
       assert :ok = Aikido.Agent.WorkerPool.cast(aikido_name, :test_pool, signal)
       get_signal = Jido.Signal.new!("get_count", %{}, source: "/test")
 
-      eventually(fn ->
-        {:ok, agent} =
-          Aikido.Agent.WorkerPool.call(aikido_name, :test_pool, get_signal, fn s ->
-            {:ok, s.agent}
-          end)
+      {:ok, agent} =
+        Aikido.Agent.WorkerPool.call(aikido_name, :test_pool, get_signal, &{:ok, &1.agent})
 
-        agent.state.domain.counter >= 1
-      end)
+      assert agent.state.domain.counter >= 1
 
       Supervisor.stop(aikido_pid)
     end
