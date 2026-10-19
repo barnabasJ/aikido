@@ -3,7 +3,9 @@ defmodule AikidoTest.AgentServer.TracePropagationTest.EmitAction.Implementation 
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    signal = Jido.Signal.new!("test.emitted", %{value: 42}, source: "/test")
+    signal =
+      struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{value: 42}, source: "/test")
+
     Aikido.ActionResult.new(state: %{}, directives: [%Aikido.Directives.Emit{signal: signal}])
   end
 end

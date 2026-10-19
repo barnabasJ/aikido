@@ -29,7 +29,14 @@ defmodule AikidoTest.AgentServerCoverageTest.ManyDirectivesAction.Implementation
 
     directives =
       for i <- 1..count do
-        signal = Jido.Signal.new!("test.emitted.#{i}", %{index: i}, source: "/test")
+        signal =
+          struct!(Jido.Signal,
+            id: nil,
+            type: "test.emitted.#{i}",
+            data: %{index: i},
+            source: "/test"
+          )
+
         %Aikido.Directives.Emit{signal: signal}
       end
 
@@ -125,7 +132,7 @@ defmodule AikidoTest.AgentServerCoverageTest.DelayCompleteAction.Implementation 
         :error -> input.context.aikido.signal.data[:delay_ms]
       end
 
-    Process.sleep(delay)
+    AikidoTest.TestActions.SlowAction.work(delay)
 
     Aikido.ActionResult.new(
       state: %{status: :completed, last_answer: "delayed done!"},

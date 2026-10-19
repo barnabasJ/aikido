@@ -42,7 +42,10 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction.Impleme
     slice = input.arguments.state
     cron_expr = Map.get(params, :cron)
     job_id = Map.get(params, :job_id)
-    tick_signal = Jido.Signal.new!("cron.tick", %{}, source: "/test/cron")
+
+    tick_signal =
+      struct!(Jido.Signal, id: nil, type: "cron.tick", data: %{}, source: "/test/cron")
+
     directive = Aikido.Directives.cron(cron_expr, tick_signal, job_id: job_id)
     Aikido.ActionResult.new(state: slice, directives: [directive])
   end

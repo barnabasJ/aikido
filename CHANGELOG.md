@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Move emitted signal ID/time generation into directive execution. Make identity,
+  memory and thread reducers derive timestamps and IDs from their inputs, and
+  remove sleeping and mutable counters from reducer test fixtures. Add replay
+  and effect-boundary regression coverage.
+
 - Clarify throughout the architecture documentation that agent and slice actions
   are pure: all side effects belong in directives.
 

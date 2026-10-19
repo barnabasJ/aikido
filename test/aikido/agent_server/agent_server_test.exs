@@ -3,7 +3,9 @@ defmodule AikidoTest.AgentServerTest.EmitTestAction.Implementation do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    signal = Jido.Signal.new!("test.emitted", %{from: "agent"}, source: "/test")
+    signal =
+      struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test")
+
     Aikido.ActionResult.new(state: %{}, directives: [%Aikido.Directives.Emit{signal: signal}])
   end
 end
@@ -25,7 +27,8 @@ defmodule AikidoTest.AgentServerTest.ScheduleTestAction.Implementation do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    scheduled_signal = Jido.Signal.new!("scheduled.ping", %{}, source: "/test")
+    scheduled_signal =
+      struct!(Jido.Signal, id: nil, type: "scheduled.ping", data: %{}, source: "/test")
 
     Aikido.ActionResult.new(
       state: %{},
@@ -357,7 +360,7 @@ defmodule AikidoTest.AgentServerTest do
           use Ash.Resource.Actions.Implementation
           @impl true
           def run(input, _opts, _context) do
-            Process.sleep(80)
+            AikidoTest.TestActions.SlowAction.work(80)
             Aikido.ActionResult.new(state: %{slow_done: true}, directives: [])
           end
         end
@@ -430,7 +433,7 @@ defmodule AikidoTest.AgentServerTest do
           @impl true
           def run(input, _opts, _context) do
             slice = input.arguments.state
-            Process.sleep(120)
+            AikidoTest.TestActions.SlowAction.work(120)
             Aikido.ActionResult.new(state: Map.put(slice, :slow_done, true), directives: [])
           end
         end
@@ -914,7 +917,9 @@ defmodule AikidoTest.AgentServerTest do
           @impl true
           def run(input, _opts, _context) do
             slice = input.arguments.state
-            scheduled = Jido.Signal.new!("scheduled.ping", %{}, source: "/test")
+
+            scheduled =
+              struct!(Jido.Signal, id: nil, type: "scheduled.ping", data: %{}, source: "/test")
 
             Aikido.ActionResult.new(
               state: slice,
@@ -1018,7 +1023,7 @@ defmodule AikidoTest.AgentServerTest do
 
             directives =
               for i <- 1..3 do
-                sig = Jido.Signal.new!("tick", %{n: i}, source: "/test")
+                sig = struct!(Jido.Signal, id: nil, type: "tick", data: %{n: i}, source: "/test")
                 %Aikido.Directives.Schedule{delay_ms: i * 20, message: sig}
               end
 
@@ -1427,7 +1432,7 @@ defmodule AikidoTest.AgentServerTest do
           use Ash.Resource.Actions.Implementation
           @impl true
           def run(input, _opts, _context) do
-            Process.sleep(20)
+            AikidoTest.TestActions.SlowAction.work(20)
             Aikido.ActionResult.new(state: %{processed: true}, directives: [])
           end
         end

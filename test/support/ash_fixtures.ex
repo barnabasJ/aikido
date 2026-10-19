@@ -241,12 +241,17 @@ defmodule AikidoTest.AshFixtures.TaskAction.Implementation do
     result = String.upcase(data.text)
 
     reply =
-      Jido.Signal.new!("aikido.ash.team.task.completed", %{
-        task_id: data.task_id,
-        member: data.member,
-        attempt: data.attempt,
-        result: result
-      })
+      struct!(Jido.Signal,
+        id: nil,
+        source: "/test",
+        type: "aikido.ash.team.task.completed",
+        data: %{
+          task_id: data.task_id,
+          member: data.member,
+          attempt: data.attempt,
+          result: result
+        }
+      )
 
     Aikido.ActionResult.new(
       state: %{state | result: result},

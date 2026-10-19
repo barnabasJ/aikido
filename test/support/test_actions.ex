@@ -345,13 +345,13 @@ defmodule AikidoTest.TestActions.SlowAction.Implementation do
         :error -> input.context.aikido.signal.data[:delay_ms]
       end
 
-    Process.sleep(delay)
+    AikidoTest.TestActions.SlowAction.work(delay)
     Aikido.ActionResult.new(state: %{processed: true, delay: delay}, directives: [])
   end
 end
 
 defmodule AikidoTest.TestActions.SlowAction do
-  @moduledoc "Action that sleeps for a configurable delay"
+  @moduledoc "Pure CPU-bound action used to exercise execution timeouts."
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
   actions do
@@ -361,6 +361,11 @@ defmodule AikidoTest.TestActions.SlowAction do
       run {AikidoTest.TestActions.SlowAction.Implementation, action: :run}
     end
   end
+
+  # Deliberately expensive pure work: timeout tests must not model I/O in reducers.
+  def work(units), do: work_steps(max(units, 1) * 100_000, 0)
+  defp work_steps(0, sum), do: sum
+  defp work_steps(left, sum), do: work_steps(left - 1, sum + left)
 end
 
 defmodule AikidoTest.TestActions.FailingAction.Implementation do

@@ -42,7 +42,10 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Impl
     cron_expr = Map.get(params, :cron)
     job_id = Map.get(params, :job_id)
     timezone = Map.get(params, :timezone)
-    message = Map.get(params, :message, Jido.Signal.new!(%{type: "cron.tick", source: "/test"}))
+
+    message =
+      Map.get(params, :message, struct!(Jido.Signal, id: nil, type: "cron.tick", source: "/test"))
+
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
     Aikido.ActionResult.new(state: slice, directives: [directive])
   end
@@ -182,7 +185,12 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
   end
 
   def register_cron(pid, cron_expr, opts \\ []) do
-    message = Keyword.get(opts, :message, Jido.Signal.new!(%{type: "cron.tick", source: "/test"}))
+    message =
+      Keyword.get(
+        opts,
+        :message,
+        struct!(Jido.Signal, id: nil, type: "cron.tick", source: "/test")
+      )
 
     signal =
       Jido.Signal.new!(%{
