@@ -106,6 +106,37 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
     assert error =~ "nope"
   end
 
+  test "completion signals carry native Ash scope and only shared application context",
+       %{aikido: aikido} do
+    agent = spawn_agent_stub(self())
+
+    input =
+      Jido.Signal.new!("input", %{})
+      |> Aikido.SignalCtx.put_ctx(%{
+        actor: %{id: "alice"},
+        tenant: "org-a",
+        authorize?: true,
+        tracer: AikidoTest.Support.TestTracer,
+        context: %{shared: %{locale: "de"}, local_only: "stay here"},
+        runtime_only: "stay here"
+      })
+
+    assert :ok =
+             run_in(agent, fn ->
+               Aikido.Directive.exec(directive(), input, fake_state(aikido))
+             end)
+
+    assert_receive {:cast, signal}, @receive_timeout
+
+    assert Aikido.SignalCtx.ctx(signal) == %{
+             actor: %{id: "alice"},
+             tenant: "org-a",
+             authorize?: true,
+             tracer: AikidoTest.Support.TestTracer,
+             context: %{shared: %{locale: "de"}}
+           }
+  end
+
   test "encodes a 'tool not found' error when no module matches", %{aikido: aikido} do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)

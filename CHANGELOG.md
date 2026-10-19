@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Use native Ash scope extraction for tool-result signals, including Ash's shared
+  context propagation rules.
+
 - Apply agent and slice codecs to initial and runtime durable snapshots; retain
   boot identifiers and explicit runtime configuration outside their output. Carry Ash actor/tenant context
   through command signals and follow-up effects without persisting caller scope.

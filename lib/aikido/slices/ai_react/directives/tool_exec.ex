@@ -94,7 +94,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         agent_pid,
         Aikido.SignalCtx.put_ctx(
           signal,
-          Map.take(context, [:actor, :tenant, :authorize?, :tracer, :context])
+          Map.new(Ash.Scope.to_opts(context))
         )
       )
   end
