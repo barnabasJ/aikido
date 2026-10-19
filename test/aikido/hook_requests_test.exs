@@ -65,6 +65,16 @@ defmodule Aikido.HookRequestsTest do
   end
 
   test "the application can wait in its callback while the agent stays responsive", ctx do
+    # Compile the Lua request path before the timed mailbox assertions. In the
+    # full suite, concurrent fixture compilation can delay BEAM module loading.
+    assert {:ok, _} =
+             Aikido.Hooks.Execute.evaluate(
+               hook(fn _, _ -> {:ok, %{value: "blue"}} end),
+               %{type: :before_model},
+               self(),
+               "warmup"
+             )
+
     pid = start_server(ctx, Aikido.HookRequestsTest.Agent)
     observer = self()
 
