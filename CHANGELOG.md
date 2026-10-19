@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Cache ReAct token estimates in slice state and increment them as messages are
+  appended. Refresh estimates on history replacement, handoff and restore, and
+  clear provider counts belonging to the replaced context.
+
 - Replace automatic lossy context trimming with Makewright-style model-written
   handoffs at clean ReAct boundaries. Preserve system instructions, queued
   messages, run scope, todos and prepared tools across takeover. Keep original

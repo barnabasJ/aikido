@@ -224,8 +224,14 @@ On success, an action replaces model context with the existing system messages
 and one takeover message containing the document, appends messages queued during
 the handoff, and continues the same run with its prepared tools and todo state.
 `handoff_count` and `last_handoff` expose the swap. No tool batch is interrupted.
-The threshold uses the larger of the latest provider input count and the local
-estimate; cumulative run usage is not mistaken for current context size. Choose
+The slice stores its local count in `estimated_tokens` and updates it for each
+message appended to model context, including tool results and hook context.
+Handoff checks read that cached count instead of rescanning history. Context
+replacement (including handoff) and restoration refresh it once; provider counts
+from the previous context are cleared. Queued text is counted when folded into
+model context, not while it remains in the queue. The threshold uses the larger
+of the latest provider input count and the cached estimate; cumulative run usage
+is not mistaken for current context size. Choose
 a buffer large enough for the instructions and document and smaller than the
 context ceiling. Estimates are not provider-enforced limits.
 

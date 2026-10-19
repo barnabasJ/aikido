@@ -28,6 +28,33 @@ defmodule Aikido.AI.Context do
     message_tokens + @base_overhead_tokens
   end
 
+  @doc "Replace model context and refresh its cached estimate; prior provider counts no longer apply."
+  def replace_context(state, context) do
+    Map.merge(state, %{
+      context: context,
+      estimated_tokens: if(context, do: estimate_tokens(context), else: 0),
+      last_input_tokens: nil
+    })
+  end
+
+  @doc "Append one message and count only that message against the cached estimate."
+  def append_message(state, %Message{} = message) do
+    tokens =
+      case Map.get(state, :estimated_tokens) do
+        tokens when is_integer(tokens) and tokens >= @base_overhead_tokens -> tokens
+        _ -> estimate_tokens(state.context)
+      end
+
+    Map.merge(state, %{
+      context: Context.append(state.context, message),
+      estimated_tokens: tokens + estimate_message_tokens(message)
+    })
+  end
+
+  @doc "Append messages in order, updating the estimate for each new message."
+  def append_messages(state, messages),
+    do: Enum.reduce(messages, state, fn message, state -> append_message(state, message) end)
+
   @doc """
   Estimate token count for a single message.
   """

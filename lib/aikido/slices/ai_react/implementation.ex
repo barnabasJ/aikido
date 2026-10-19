@@ -2,6 +2,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
 
+  alias Aikido.AI.Context, as: Conversation
   alias Aikido.Slices.AiReact.Directives.{LLMCall, PrepareTools, ToolExec}
 
   @impl true
@@ -86,12 +87,13 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
     if state.request_id == input.arguments.request_id && state.status == :setup &&
          Map.get(state, :tool_preparation, []) != [] do
-      context =
-        Enum.reduce(state.queued_messages, state.context, fn text, context ->
-          ReqLLM.Context.append(context, ReqLLM.Context.user(text))
-        end)
+      state =
+        Conversation.append_messages(
+          state,
+          Enum.map(state.queued_messages, &ReqLLM.Context.user/1)
+        )
 
-      state = Map.merge(state, %{context: context, queued_messages: []})
+      state = Map.put(state, :queued_messages, [])
 
       {directives, state} =
         Enum.map_reduce(state.tool_preparation, state, fn
@@ -140,7 +142,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       {:error, :busy}
     else
       with {:ok, context} <- ReqLLM.Context.normalize(input.arguments.messages) do
-        Aikido.ActionResult.new(state: Map.put(state, :context, context))
+        Aikido.ActionResult.new(state: Conversation.replace_context(state, context))
       end
     end
   end
@@ -465,25 +467,32 @@ defmodule Aikido.Slices.AiReact.Implementation do
     context =
       case Map.get(slice || %{}, :context) do
         %ReqLLM.Context{} = context ->
-          context = Aikido.AI.Context.close_tool_calls(context)
+          context = Conversation.close_tool_calls(context)
           messages = Enum.reject(context.messages, &(&1.role == :system))
           system = if system_prompt, do: [ReqLLM.Context.system(system_prompt)], else: []
           %{context | messages: system ++ messages}
 
         _ ->
-          ReqLLM.Context.new([])
+          ReqLLM.Context.new(
+            if(system_prompt, do: [ReqLLM.Context.system(system_prompt)], else: [])
+          )
       end
 
-    context =
-      if context.messages == [] && system_prompt,
-        do: ReqLLM.Context.append(context, ReqLLM.Context.system(system_prompt)),
-        else: context
+    base = slice || %{}
+    cached = Map.get(base, :estimated_tokens)
 
-    context =
-      Enum.reduce(Map.get(slice || %{}, :queued_messages, []) ++ [data.query], context, fn text,
-                                                                                           context ->
-        ReqLLM.Context.append(context, ReqLLM.Context.user(text))
-      end)
+    base =
+      if Map.get(base, :context) == context && is_integer(cached) && cached > 0,
+        do: base,
+        else: Conversation.replace_context(base, context)
+
+    base =
+      Conversation.append_messages(
+        base,
+        Enum.map(Map.get(base, :queued_messages, []) ++ [data.query], &ReqLLM.Context.user/1)
+      )
+
+    context = base.context
 
     options = Aikido.AI.Options.resolve(data[:options] || Map.get(slice || %{}, :options))
 
@@ -504,6 +513,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       usage: %{},
       request_id: data.request_id,
       context: context,
+      estimated_tokens: base.estimated_tokens,
       iteration: 0,
       max_iterations: max_iter,
       result: nil,
@@ -564,7 +574,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
   end
 
   defp llm_turn_handle_turn(%Aikido.Slices.AiReact.Turn{type: :final_answer, text: text}, slice) do
-    new_context = ReqLLM.Context.append(slice.context, ReqLLM.Context.assistant(text || ""))
+    slice = Conversation.append_message(slice, ReqLLM.Context.assistant(text || ""))
+    new_context = slice.context
 
     new_slice = %{
       slice
@@ -577,10 +588,10 @@ defmodule Aikido.Slices.AiReact.Implementation do
     queued = Map.get(slice, :queued_messages, [])
 
     if queued != [] && new_slice.iteration < slice.max_iterations do
-      context =
-        Enum.reduce(queued, new_context, fn text, context ->
-          ReqLLM.Context.append(context, ReqLLM.Context.user(text))
-        end)
+      new_slice =
+        Conversation.append_messages(new_slice, Enum.map(queued, &ReqLLM.Context.user/1))
+
+      context = new_slice.context
 
       new_slice =
         Map.merge(new_slice, %{
@@ -618,7 +629,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
       Enum.map(tool_calls, fn tc -> %{id: tc.id, name: tc.name, arguments: tc.arguments} end)
 
     assistant_msg = ReqLLM.Context.assistant(text || "", tool_calls: msg_calls)
-    new_context = ReqLLM.Context.append(slice.context, assistant_msg)
+    slice = Conversation.append_message(slice, assistant_msg)
+    new_context = slice.context
 
     if iteration >= slice.max_iterations do
       llm_turn_truncate(slice, new_context, iteration)
@@ -667,14 +679,15 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
   defp tool_result_append_and_maybe_dispatch(data, slice) do
     msg = ReqLLM.Context.tool_result(data.tool_call_id, data.name, data.content)
-    new_context = ReqLLM.Context.append(slice.context, msg)
+    slice = Conversation.append_message(slice, msg)
+    new_context = slice.context
 
     received =
       slice.tool_results_received ++
         [%{tool_call_id: data.tool_call_id, name: data.name, content: data.content}]
 
     if length(received) == length(slice.pending_tool_calls) do
-      tool_result_finalize_batch(slice, new_context)
+      tool_result_finalize_batch(slice)
     else
       Aikido.ActionResult.new(
         state: %{slice | context: new_context, tool_results_received: received},
@@ -683,21 +696,23 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  defp tool_result_finalize_batch(slice, new_context) do
+  defp tool_result_finalize_batch(slice) do
     current_signature = Aikido.Slices.AiReact.tool_call_signature(slice.pending_tool_calls)
 
-    {warned_context, _} =
+    {slice, _} =
       tool_result_maybe_append_cycle_warning(
-        new_context,
+        slice,
         slice.previous_tool_signature,
         current_signature
       )
 
-    warned_context =
-      Enum.reduce(Map.get(slice, :queued_messages, []), warned_context, fn text, context ->
-        ReqLLM.Context.append(context, ReqLLM.Context.user(text))
-      end)
+    slice =
+      Conversation.append_messages(
+        slice,
+        Enum.map(Map.get(slice, :queued_messages, []), &ReqLLM.Context.user/1)
+      )
 
+    warned_context = slice.context
     slice = Map.put(slice, :queued_messages, [])
 
     new_slice = %{
@@ -721,14 +736,16 @@ defmodule Aikido.Slices.AiReact.Implementation do
     Aikido.ActionResult.new(state: new_slice, directives: [directive])
   end
 
-  defp tool_result_maybe_append_cycle_warning(context, previous_signature, current_signature)
+  defp tool_result_maybe_append_cycle_warning(state, previous_signature, current_signature)
        when is_binary(previous_signature) and previous_signature == current_signature do
-    {ReqLLM.Context.append(context, ReqLLM.Context.user(Aikido.Slices.AiReact.cycle_warning())),
-     :warned}
+    {Conversation.append_message(
+       state,
+       ReqLLM.Context.user(Aikido.Slices.AiReact.cycle_warning())
+     ), :warned}
   end
 
-  defp tool_result_maybe_append_cycle_warning(context, _previous, _current) do
-    {context, :no_warning}
+  defp tool_result_maybe_append_cycle_warning(state, _previous, _current) do
+    {state, :no_warning}
   end
 
   defp apply_todo_gate(state, agent_state) do

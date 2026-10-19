@@ -148,16 +148,16 @@ defmodule Aikido.Hooks do
 
   @doc false
   def prepare_model(state, effect) do
-    context =
-      Enum.reduce(Map.get(state, :hook_context, []), state.context, fn entry, context ->
-        ReqLLM.Context.append(
-          context,
+    state =
+      Enum.reduce(Map.get(state, :hook_context, []), state, fn entry, state ->
+        Aikido.AI.Context.append_message(
+          state,
           ReqLLM.Context.user("[Hook context: #{entry.name}]\n#{entry.text}")
         )
       end)
 
-    state = state |> Map.put(:context, context) |> Map.put(:hook_context, [])
-    {state, %{effect | context: context}}
+    state = Map.put(state, :hook_context, [])
+    {state, %{effect | context: state.context}}
   end
 
   defp enqueue_context(state, name, text),

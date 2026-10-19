@@ -93,6 +93,13 @@ defmodule Aikido.Slices.AiReact do
       attribute :handoff_pending, :integer
       attribute :handoff_count, :integer, public?: true, default: 0, allow_nil?: false
       attribute :last_handoff, :map, public?: true
+
+      attribute :estimated_tokens, :integer,
+        public?: true,
+        default: 0,
+        allow_nil?: false,
+        constraints: [min: 0]
+
       attribute :last_input_tokens, :integer
       attribute :prepared_tools, :term
       attribute :tool_preparation, {:array, :term}, default: [], allow_nil?: false
@@ -455,11 +462,13 @@ defmodule Aikido.Slices.AiReact do
         do: Map.merge(state, %{status: :failed, error: :interrupted}),
         else: state
 
+    context = if(state.context, do: Aikido.AI.Context.close_tool_calls(state.context))
+    state = Aikido.AI.Context.replace_context(state, context)
+
     Map.merge(state, %{
       handoff_pending: nil,
       prepared_tools: nil,
       tool_preparation: [],
-      context: if(state.context, do: Aikido.AI.Context.close_tool_calls(state.context)),
       hooks_pending: %{},
       hook_terminal: nil,
       run_scope: %{},

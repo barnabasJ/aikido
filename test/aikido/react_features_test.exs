@@ -89,6 +89,8 @@ defmodule Aikido.ReactFeaturesTest do
     assert length(messages) == 5
     send(third, {:answer, {:ok, Responses.final_answer_response("three")}})
     assert {:ok, "three"} = Task.await(next)
+    assert {:ok, ai} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai})
+    assert ai.estimated_tokens == Aikido.AI.Context.estimate_tokens(ai.context)
   end
 
   setup do
@@ -227,7 +229,9 @@ defmodule Aikido.ReactFeaturesTest do
       )
     end
 
-    assert {:ok, _} = handoff.([ReqLLM.Context.user("previous summary")])
+    assert {:ok, replaced} = handoff.([ReqLLM.Context.user("previous summary")])
+    assert replaced.estimated_tokens == Aikido.AI.Context.estimate_tokens(replaced.context)
+    assert replaced.last_input_tokens == nil
     task = Task.async(fn -> Aikido.AI.ask_sync(pid, "continue", ctx.options) end)
     assert_receive {:model, worker, messages}, 2_000
     assert length(messages) == 2
@@ -277,11 +281,15 @@ defmodule Aikido.ReactFeaturesTest do
       ai
       |> Map.put(:context, context)
       |> Map.put(:run_scope, %{actor: %{id: "alice"}})
+      |> Map.put(:estimated_tokens, 999_999)
+      |> Map.put(:last_input_tokens, 888_888)
       |> Aikido.Slices.AiReact.externalize()
       |> Aikido.Slices.AiReact.reinstate()
 
     assert restored.status == :failed
     assert restored.error == :interrupted
+    assert restored.estimated_tokens == Aikido.AI.Context.estimate_tokens(restored.context)
+    assert restored.last_input_tokens == nil
     assert restored.run_scope == %{}
     assert restored.hooks_pending == %{}
     assert List.last(restored.context.messages).role == :tool

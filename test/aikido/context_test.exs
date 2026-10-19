@@ -7,6 +7,63 @@ defmodule Aikido.AI.ContextTest do
   alias ReqLLM.Message.ContentPart
   alias ReqLLM.ToolCall
 
+  test "incremental estimates match a full count through user, assistant and tool messages" do
+    state =
+      Conversation.replace_context(%{}, Context.new([Context.system("Keep the procedure.")]))
+
+    calls = [%{id: "one", name: "lookup", arguments: %{query: "a search"}}]
+
+    messages = [
+      Context.user("Start here."),
+      Context.assistant("I will look it up.", tool_calls: calls),
+      Context.tool_result("one", "lookup", "Some evidence."),
+      Context.user("Also consider this follow-up."),
+      Context.assistant("The conclusion.")
+    ]
+
+    Enum.reduce(messages, state, fn message, state ->
+      updated = Conversation.append_message(state, message)
+      assert updated.estimated_tokens == Conversation.estimate_tokens(updated.context)
+
+      assert updated.estimated_tokens ==
+               state.estimated_tokens + Conversation.estimate_message_tokens(message)
+
+      updated
+    end)
+  end
+
+  test "appending trusts the cached estimate and counts only the new message" do
+    state = %{context: Context.new([Context.user("earlier")]), estimated_tokens: 10_000}
+    message = Context.user("new message")
+    updated = Conversation.append_message(state, message)
+    assert updated.estimated_tokens == 10_000 + Conversation.estimate_message_tokens(message)
+  end
+
+  test "replacement refreshes an old estimate and invalidates the old provider count" do
+    state = %{
+      context: Context.new([Context.user("old")]),
+      estimated_tokens: 999_999,
+      last_input_tokens: 888_888
+    }
+
+    context = Context.new([Context.system("new procedure"), Context.user("new task")])
+    replaced = Conversation.replace_context(state, context)
+    assert replaced.estimated_tokens == Conversation.estimate_tokens(context)
+    assert replaced.last_input_tokens == nil
+    assert Conversation.replace_context(replaced, nil).estimated_tokens == 0
+  end
+
+  test "handoff threshold reads cached counts without examining the conversation" do
+    state = %{
+      context: Context.new([Context.user("earlier")]),
+      estimated_tokens: 1_234,
+      last_input_tokens: 987
+    }
+
+    assert Aikido.AI.Handoff.current_tokens(state) == 1_234
+    assert Aikido.AI.Handoff.current_tokens(%{state | last_input_tokens: 1_500}) == 1_500
+  end
+
   # --- Helpers ---
 
   # Build a chronological ReqLLM.Context from a list of messages. If

@@ -59,7 +59,12 @@ defmodule Aikido.ContextHandoffTest do
     assert text(Enum.at(fresh, 1)) =~ document
     assert text(List.last(fresh)) == "new instruction"
     refute Enum.any?(fresh, &(text(&1) == String.trim(original)))
-    assert {:ok, %{last_handoff: %{document: ^document}, handoff_pending: nil}} = ai(pid)
+
+    assert {:ok, %{last_handoff: %{document: ^document}, handoff_pending: nil} = resumed} =
+             ai(pid)
+
+    assert resumed.estimated_tokens == Aikido.AI.Context.estimate_tokens(resumed.context)
+    assert resumed.last_input_tokens == nil
 
     send(
       successor,

@@ -90,7 +90,8 @@ defmodule Aikido.AI.Handoff do
               Context.append(context, Context.user(text))
             end)
 
-          tokens = Conversation.estimate_tokens(context)
+          replacement = Conversation.replace_context(state, context)
+          tokens = replacement.estimated_tokens
           options = Aikido.AI.Options.resolve(state.options)
 
           if tokens >= options.context_max_tokens do
@@ -102,7 +103,7 @@ defmodule Aikido.AI.Handoff do
               end)
 
             state =
-              Map.merge(state, %{
+              Map.merge(replacement, %{
                 context: context,
                 handoff_pending: nil,
                 last_handoff: %{
@@ -111,7 +112,7 @@ defmodule Aikido.AI.Handoff do
                   after_tokens: tokens,
                   id: data.handoff_id
                 },
-                last_input_tokens: tokens,
+                last_input_tokens: nil,
                 queued_messages: [],
                 streaming_text: "",
                 streaming_thinking: "",
@@ -167,7 +168,7 @@ defmodule Aikido.AI.Handoff do
 
   @doc false
   def current_tokens(state),
-    do: max(Map.get(state, :last_input_tokens) || 0, Conversation.estimate_tokens(state.context))
+    do: max(Map.get(state, :last_input_tokens) || 0, Map.get(state, :estimated_tokens, 0))
 
   @doc false
   def input_tokens(usage) when is_map(usage) do
