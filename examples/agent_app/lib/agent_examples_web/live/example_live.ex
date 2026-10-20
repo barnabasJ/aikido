@@ -92,6 +92,14 @@ defmodule AgentExamplesWeb.ExampleLive do
   def handle_event("add", %{"amount" => amount}, socket),
     do: command(socket, :add, %{amount: amount})
 
+  def handle_event("increase", %{"amount" => amount}, socket),
+    do: command(socket, :increase, %{amount: amount})
+
+  def handle_event("decrease", %{"amount" => amount}, socket),
+    do: command(socket, :decrease, %{amount: amount})
+
+  def handle_event("counter_notice", _, socket), do: command(socket, :notice, %{})
+
   def handle_event("add_item", %{"item" => item}, socket),
     do: command(socket, :add, %{item: item})
 
@@ -375,6 +383,29 @@ defmodule AgentExamplesWeb.ExampleLive do
                 disabled={!active?(@run)}
               >Add →</button>
             </form>
+            <div class="section-heading">
+              <h3>Shared typed handler</h3><span>Increase or decrease</span>
+            </div>
+            <p>Both signals reach one action. Its typed union identifies the adjustment.</p>
+            <form id="counter-increase-form" phx-submit="increase" class="inline-form">
+              <label>Increase by<input type="number" name="amount" value="2" /></label>
+              <button class="button secondary" disabled={!active?(@run)}>Increase →</button>
+            </form>
+            <form id="counter-decrease-form" phx-submit="decrease" class="inline-form">
+              <label>Decrease by<input type="number" name="amount" value="1" /></label>
+              <button class="button secondary" disabled={!active?(@run)}>Decrease →</button>
+            </form>
+            <div class="section-heading">
+              <h3>Every signal counts</h3>
+              <span id="signals-seen">{own(@run)[:signals_seen] || 0} signals observed</span>
+            </div>
+            <p>The wildcard handler also counts notices that leave the current count unchanged.</p>
+            <button
+              id="counter-notice"
+              class="button secondary"
+              phx-click="counter_notice"
+              disabled={!active?(@run)}
+            >Send a notice</button>
           </section>
           <section :if={@example.kind == :checklist} class="panel">
             <div class="section-heading">

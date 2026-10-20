@@ -5,6 +5,7 @@ defmodule AgentExamples.Source do
            [
              "examples/agent_app/lib/agent_examples/agents/*.ex",
              "examples/agent_app/lib/agent_examples/slices/*.ex",
+             "examples/agent_app/lib/agent_examples/signals/*.ex",
              "examples/agent_app/lib/agent_examples/ai/*.ex",
              "examples/agent_app/lib/agent_examples/**/implementation.ex",
              "examples/agent_app/lib/agent_examples/agents.ex",
@@ -18,6 +19,9 @@ defmodule AgentExamples.Source do
              "lib/aikido/ai/*.ex",
              "lib/aikido/slices/todo.ex",
              "lib/aikido/slices/todo/*.ex",
+             "lib/aikido/signals/ai_react/*.ex",
+             "lib/aikido/signals/ai_worker/*.ex",
+             "lib/aikido/signals/todo/*.ex",
              "lib/aikido/hooks/*.ex",
              "lib/aikido/ash/ai.ex",
              "lib/aikido/ash/team/engine.ex"
@@ -46,8 +50,13 @@ defmodule AgentExamples.Source do
 
                      category =
                        cond do
-                         String.ends_with?(name, ".Implementation") ->
+                         String.ends_with?(name, ".Implementation") ||
+                             String.ends_with?(file, "/implementation.ex") ->
                            :action
+
+                         String.contains?(file, "agent_examples/signals/") ||
+                             String.contains?(file, "lib/aikido/signals/") ->
+                           :signal
 
                          String.contains?(file, "/agents/") ->
                            :agent
@@ -119,10 +128,15 @@ defmodule AgentExamples.Source do
 
     Enum.filter(@definitions, fn entry ->
       entry.module in modules ||
+        Enum.any?(modules, &String.starts_with?(entry.name, inspect(&1) <> ".")) ||
         (AgentExamples.Catalog.ai?(example) &&
            (entry.module in @ai_names || String.starts_with?(entry.name, "Aikido.Slices.AiReact.") ||
               String.starts_with?(entry.name, "Aikido.Hooks") ||
-              String.starts_with?(entry.name, "Aikido.Slices.AiWorker.")))
+              String.starts_with?(entry.name, "Aikido.Slices.AiWorker.") ||
+              String.starts_with?(entry.name, "Aikido.Signals.AiReact.") ||
+              String.starts_with?(entry.name, "Aikido.Signals.AiWorker.") ||
+              (example.slug == "conversation" &&
+                 String.starts_with?(entry.name, "Aikido.Signals.Todo."))))
     end)
     |> Enum.sort_by(fn entry ->
       {if(entry.module == example.resource, do: 0, else: rank(entry.category)), entry.name}
@@ -167,8 +181,9 @@ defmodule AgentExamples.Source do
   defp modules(_), do: []
   defp rank(:agent), do: 1
   defp rank(:slice), do: 2
-  defp rank(:action), do: 3
-  defp rank(:directive), do: 4
-  defp rank(:domain), do: 5
-  defp rank(_), do: 6
+  defp rank(:signal), do: 3
+  defp rank(:action), do: 4
+  defp rank(:directive), do: 5
+  defp rank(:domain), do: 6
+  defp rank(_), do: 7
 end

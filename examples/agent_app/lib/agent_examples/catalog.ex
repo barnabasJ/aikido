@@ -7,10 +7,11 @@ defmodule AgentExamples.Catalog do
       eyebrow: "State & contracts",
       resource: AgentExamples.Counter,
       kind: :counter,
-      description: "Send a typed command and watch a pure action update a counter.",
+      description:
+        "Adjust a counter with typed signals and count every signal with a wildcard route.",
       detail:
-        "Ash casts the amount before a signal enters the agent. The action returns the next count; reads expose it as an ordinary resource attribute.",
-      flow: ["Typed amount", "counter.add", "Pure action", "New count"]
+        "Add uses a typed public command. Increase and decrease share one handler through a native Ash union. A wildcard handler observes all three and also counts a notice with no specific handler. Each action returns the next state, which the following action receives.",
+      flow: ["Typed signal", "Shared union handler", "Wildcard observer", "Count + signals seen"]
     },
     %{
       slug: "checklist",

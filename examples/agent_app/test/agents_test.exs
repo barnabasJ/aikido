@@ -44,6 +44,37 @@ defmodule AgentExamples.AgentsTest do
     assert list.completed == 1
   end
 
+  test "a typed union shares one handler while the wildcard counts all signals", %{prefix: prefix} do
+    counter = Agents.counter_start!(%{id: prefix <> "-counter-routes"})
+    baseline = Agents.counter_inspect!(counter).signals_seen
+
+    assert %{count: 3, signals_seen: seen} =
+             counter |> Agents.counter_add!(%{amount: "3"}) |> Agents.counter_inspect!()
+
+    assert seen == baseline + 1
+
+    for {definition, amount, expected, total} <- [
+          {AgentExamples.Counter.Signals.Increase, "4", 7, 2},
+          {AgentExamples.Counter.Signals.Decrease, "5", 2, 3}
+        ] do
+      signal = definition.new!(%{amount: amount})
+
+      assert {:ok, %{count: ^expected, signals_seen: seen}} =
+               Aikido.AgentServer.call(counter.pid, signal, &{:ok, &1.agent.state.state})
+
+      assert seen == baseline + total
+    end
+
+    notice = Aikido.Signal.new!("counter.notice", false)
+
+    assert {:ok, %{count: 2, signals_seen: seen}} =
+             Aikido.AgentServer.call(counter.pid, notice, &{:ok, &1.agent.state.state})
+
+    assert seen == baseline + 4
+    assert {:error, _} = AgentExamples.Counter.Signals.Increase.new(%{amount: "invalid"})
+    assert Agents.counter_inspect!(counter).signals_seen == seen
+  end
+
   test "an embedded slice changes independently of the agent's own state", %{prefix: prefix} do
     notebook =
       snapshot_result(Agents.notebook_start!(%{id: prefix <> "-notebook", title: "Notes"}))

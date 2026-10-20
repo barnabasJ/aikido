@@ -42,8 +42,8 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - `Aikido.Durable`: keyed activation and persistence through DurableServer; the default backend is local EKV
 
 ## Native Ash and Spark Contracts
-- Define reducer actions on their owning agent or slice resource, with typed `argument`s and `Aikido.Types.ActionResult` as the return type. Prefer separate `Ash.Resource.Actions.Implementation` modules referenced with `run MyApp.Implementation`.
-- A signal target is a required positional local action name or `{resource, action}` tuple. Mounted slices contribute their routed public actions; do not redeclare them on the agent.
+- Pass an `Ash.Resource.Actions.Implementation` module to `signal :name, SignalDefinition, Implementation` or `route SignalDefinition, Implementation`. Aikido generates native reducer actions returning `Aikido.Types.ActionResult`; state uses the owning resource's schema and payload arguments use the signal's schema. Explicit native Ash action references remain available when an application owns the action contract.
+- Signal lists generate a native Ash union payload selected by the matched signal type; wildcard routes receive generic `data` for observers. Mounted slices contribute their routed public signals; do not redeclare them on the agent. Mark internal typed routes `public?: false`.
 - Let native Ash changesets and action inputs apply types, constraints and defaults. Use Spark Info modules for DSL metadata, transformers for expansion and verifiers for validation. Avoid generated companion resources, custom validation bridges and redundant accessor functions.
 - Forward native Ash/Spark options in convenience hosts. Use an application domain when supplied; `Aikido.RuntimeDomain` is the agent convenience macro's default. Keep normal domain-inclusion validation.
 - Pass actor, tenant, application context and tracers through native Ash scope and tracing APIs. The external command and internal reducer are separate Ash authorization boundaries; downstream tools retain their own authorization.

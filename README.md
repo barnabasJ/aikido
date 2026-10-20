@@ -43,31 +43,18 @@ Set `instance MyApp.Aikido` in the agent block for agents using that runtime.
 
 ## An agent and its public interface
 
-Define native Ash actions directly on an agent or on a mounted slice. Runtime
-state is supplied internally; each action returns `Aikido.Types.ActionResult`:
+Define the payload once as a typed signal and pass its implementation module.
+Aikido generates the native Ash reducer and public command:
 
 ```elixir
-defmodule MyApp.Counter do
-  use Ash.Resource,
-    domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent]
+defmodule MyApp.Signals.Add do
+  use Aikido.Signal
 
-  agent do
-    name "counter"
+  signal do
+    type "counter.add"
 
     schema do
-      attribute :count, :integer, allow_nil?: false, default: 0, public?: true
-    end
-
-    signal :add, "counter.add", :add
-  end
-
-  actions do
-    action :add, Aikido.Types.ActionResult do
-      argument :state, :map, allow_nil?: false
-      argument :amount, :integer, allow_nil?: false
-
-      run MyApp.Increment
+      attribute :amount, :integer, allow_nil?: false
     end
   end
 end
@@ -82,6 +69,22 @@ defmodule MyApp.Increment do
   end
 end
 
+defmodule MyApp.Counter do
+  use Ash.Resource,
+    domain: MyApp.Agents,
+    extensions: [Aikido.Ash.Agent]
+
+  agent do
+    name "counter"
+
+    schema do
+      attribute :count, :integer, allow_nil?: false, default: 0, public?: true
+    end
+
+    signal :add, MyApp.Signals.Add, MyApp.Increment
+  end
+end
+
 defmodule MyApp.Agents do
   use Ash.Domain, otp_app: :my_app, extensions: [Aikido.Ash.Domain]
 
@@ -90,6 +93,12 @@ defmodule MyApp.Agents do
   end
 end
 ```
+
+The generated reducer's `state` argument uses the owning resource's schema.
+Payload arguments use the signal's Ash types, constraints and defaults. A route
+can also take several signal definitions: its implementation receives a native
+`Ash.Union` in `input.arguments.data`. Wildcard observers such as
+`route "**", MyApp.CountSignals` receive generic `data` and typed state.
 
 Register the domain in your application configuration:
 

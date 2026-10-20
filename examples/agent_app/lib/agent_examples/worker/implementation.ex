@@ -1,8 +1,8 @@
-defmodule AgentExamples.Worker.Implementation do
+defmodule AgentExamples.Worker.Work do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, [action: :work], _context) do
+  def run(input, _opts, _context) do
     state = input.arguments.state
 
     if state.status == :working do
@@ -20,16 +20,26 @@ defmodule AgentExamples.Worker.Implementation do
       )
     end
   end
+end
+
+defmodule AgentExamples.Worker.Completed do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(input, [action: :completed], _context) do
+  def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
       state: %{input.arguments.state | status: :completed, result: input.arguments.result}
     )
   end
+end
+
+defmodule AgentExamples.Worker.Failed do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(input, [action: :failed], _context) do
+  def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
       state: %{input.arguments.state | status: :failed, error: input.arguments.reason}
     )

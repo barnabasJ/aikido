@@ -55,26 +55,14 @@ children = [
 Add `Aikido.Ash.Agent` to the resource extensions:
 
 ```elixir
-defmodule MyApp.Counter do
-  use Ash.Resource,
-    domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent]
+defmodule MyApp.Signals.Add do
+  use Aikido.Signal
 
-  agent do
-    name "counter"
+  signal do
+    type "counter.add"
+
     schema do
-      attribute :count, :integer, default: 0, public?: true
-    end
-
-    signal :add, "counter.add", :increment
-  end
-
-  actions do
-    action :increment, Aikido.Types.ActionResult do
-      argument :state, :map, allow_nil?: false
-      argument :amount, :integer, allow_nil?: false
-
-      run MyApp.Increment
+      attribute :amount, :integer, allow_nil?: false
     end
   end
 end
@@ -84,14 +72,33 @@ defmodule MyApp.Increment do
 
   @impl true
   def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(state: %{count: input.arguments.state.count + input.arguments.amount})
+    state = input.arguments.state
+    Aikido.Types.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
+  end
+end
+
+defmodule MyApp.Counter do
+  use Ash.Resource,
+    domain: MyApp.Agents,
+    extensions: [Aikido.Ash.Agent]
+
+  agent do
+    name "counter"
+
+    schema do
+      attribute :count, :integer, default: 0, public?: true
+    end
+
+    signal :add, MyApp.Signals.Add, MyApp.Increment
   end
 end
 ```
 
-Keep action contracts on the resource and prefer separate implementation modules
-using `Ash.Resource.Actions.Implementation`. Ash passes the typed arguments,
-implementation options, and action context directly to `run/3`.
+The signal owns the payload contract; the resource owns the state contract.
+Aikido generates a native reducer action with those typed arguments and
+`run MyApp.Increment`. The implementation uses
+`Ash.Resource.Actions.Implementation` and returns `Aikido.Types.ActionResult`.
+There is no separate reducer action declaration to keep in sync.
 
 `schema do` uses the same attribute declarations as Ash's `attributes do` block.
 The DSL transformer moves those declarations into real resource attributes at
@@ -143,21 +150,23 @@ standard default unless the application selects another data layer. Selecting
 AshPostgres or another layer does not automatically persist live agent snapshots
 or make process effects transactional; generic actions still use the agent runtime.
 
-The target is the third positional argument: `signal :add, "counter.add", :increment`.
-A local action name targets a native action on the agent; `{MyApp.Actions, :increment}`
-targets a reusable action on another Ash resource.
-It is required on every declaration. Mounting an embedded Ash slice automatically
-exposes its routed public actions with their existing targets and argument contracts;
-do not repeat those signals on the agent. Names come from the slice action names.
-Private actions (`public? false`) and schedule-only actions remain internal.
-Public routes require concrete signal types. Conflicting inherited names fail
-compilation; an explicit agent signal can override an inherited action name.
+The required third argument is the implementation module:
+`signal :add, MyApp.Signals.Add, MyApp.Increment`. The public command and its
+native reducer are generated from the signal's schema. The reducer's state
+argument uses the owning resource's schema, including Ash field constraints.
+Reducer implementations remain pure; return directives for I/O.
 
-A `signal` declaration generates a generic action with arguments inferred from
-its native Ash target or mounted slice route. Types, constraints and defaults
-are preserved. Untyped routes accept a `data` map defaulting to `%{}`. An explicit
-`action :name, :map` may customize arguments and native preparations; omit its
-`run` implementation so the transformer installs signal delivery.
+Mounting an embedded slice exposes its routed public signals automatically;
+do not repeat them on the agent. Names come from signal definition module names
+converted to snake case. Mark internal typed routes `public?: false`.
+Wildcard routes remain internal observers. Conflicting inherited names fail
+compilation; an explicit agent signal can override an inherited command name.
+
+Explicit native Ash action references remain available for actions whose
+contracts the application owns. Their native argument contracts are preserved,
+including whole `data` defaults and nullable/scalar payloads. An explicit public
+`action :name, :map` can customize preparations and arguments; omit its `run`
+implementation so the transformer installs signal delivery.
 
 Each signal action takes `agent`: a stable string ID, a current PID, or a reference
 returned by `start`. The result is a small receipt containing `id`, `pid`,
@@ -214,8 +223,27 @@ end
 {:ok, signal} = MyApp.IncrementRequested.new(%{amount: 2})
 ```
 
-The definition casts its payload through native Ash map fields and constraints.
-Its constructors generate runtime metadata, so call them at I/O boundaries.
+Signal definitions are native Ash payload types. `Ash.Type.cast_input/3` casts
+the payload using its declared fields, constraints and defaults. The definition's
+`new/1` and `new!/1` constructors wrap that payload in an `Aikido.Signal` and
+generate runtime metadata, so call them at I/O boundaries.
+
+Routes generate native reducer actions from their implementation modules:
+
+```elixir
+route MyApp.Signals.Add, MyApp.Increment
+route [MyApp.Signals.Add, MyApp.Signals.Reset], MyApp.CounterEvents
+route "**", MyApp.CountSignals
+```
+
+A single definition supplies flat payload arguments, such as `amount`. A list
+supplies `input.arguments.data` as a native `Ash.Union`, with variants named from
+the signal modules (`:add` and `:reset` here). The matched event type selects the
+variant before native casting, so overlapping payload schemas are unambiguous.
+The implementation can pattern-match `%Ash.Union{type: :add, value: payload}`.
+A wildcard route supplies generic `data` as `:term`; this supports observers that
+count every signal without assuming a payload schema. All three forms receive
+state typed from their owning resource. Slice state retains its resource struct.
 
 Pure reducers construct signal descriptors without generating IDs or timestamps:
 
@@ -320,21 +348,12 @@ defmodule MyApp.CounterSlice do
     data_layer: :embedded,
     extensions: [Aikido.Ash.Slice]
 
-  actions do
-    action :increment, Aikido.Types.ActionResult do
-      argument :state, :map, allow_nil?: false
-      argument :amount, :integer, allow_nil?: false
-
-      run MyApp.Increment
-    end
-  end
-
   slice do
     name "counter_slice"
     schema do
       attribute :count, :integer, default: 0, public?: true
     end
-    route "counter.increment", :increment
+    route MyApp.Signals.Add, MyApp.Increment
   end
 end
 
@@ -355,14 +374,15 @@ Register `agent :composed, MyApp.ComposedAgent` in the domain. Then:
 
 ```elixir
 {:ok, agent} = MyApp.Agents.composed_start(%{})
-{:ok, agent} = MyApp.Agents.composed_increment(agent, %{amount: 2})
+{:ok, agent} = MyApp.Agents.composed_add(agent, %{amount: 2})
 agent = MyApp.Agents.composed_inspect!(agent)
 agent.counter.count # => 2
 ```
 
-Slice actions receive their current slice value as `state`. Declared arguments
-such as `amount` are cast from the signal payload and exposed directly in
-`input.arguments`; actions declaring a `data` map instead receive that map.
+Slice implementations receive their current typed slice value as `state`.
+Single-signal fields such as `amount` are cast from the payload and exposed in
+`input.arguments`. List routes receive a native union in `data`; wildcard routes
+receive raw `data`.
 They return `Aikido.Types.ActionResult.new(state: new_state, directives: directives)`;
 `directives` defaults to `[]`. The agent pipeline applies the returned state
 and executes the directives. Runtime action context is available under `input.context.aikido`.
@@ -373,7 +393,7 @@ action names and send their configured data through the same action adapter:
 
 ```elixir
 schedules do
-  schedule "*/5 * * * *", :increment, data: %{amount: 1}
+  schedule "*/5 * * * *", :add, data: %{amount: 1}
 end
 ```
 
@@ -459,7 +479,7 @@ process side effects cannot be rolled back as a database transaction.
 
 ## Native contracts and tools
 
-Actions declare native Ash `argument`s and a return type. Reducers return
+Generated actions use native Ash arguments and return types. Reducers return
 `Aikido.Types.ActionResult`; ordinary tools return their declared Ash type. Implement
 callbacks with `Ash.Resource.Actions.Implementation` modules and reference them
 with `run MyApp.Implementation` on the owning resource.

@@ -42,15 +42,22 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
     worker = Catalog.find("worker") |> AgentExamples.Source.for_example()
     definition = Enum.find(worker, &(&1.module == AgentExamples.Worker))
-    assert definition.code =~ "action :work, Aikido.Types.ActionResult"
-    assert definition.code =~ "action :completed, Aikido.Types.ActionResult"
-    assert definition.code =~ "action :failed, Aikido.Types.ActionResult"
+    assert definition.code =~ "signal :run, AgentExamples.Worker.Signals.Run"
+    assert definition.code =~ "signal :completed, AgentExamples.Worker.Signals.Completed"
+    assert definition.code =~ "signal :failed, AgentExamples.Worker.Signals.Failed"
+    refute definition.code =~ "argument :"
     assert definition.open?
 
-    implementation = Enum.find(worker, &(&1.module == AgentExamples.Worker.Implementation))
+    implementation = Enum.find(worker, &(&1.module == AgentExamples.Worker.Work))
     assert implementation.code =~ "use Ash.Resource.Actions.Implementation"
     assert implementation.code =~ "Aikido.Directives.async_task"
     refute implementation.open?
+
+    signal = Enum.find(worker, &(&1.module == AgentExamples.Worker.Signals.Run))
+    assert signal.category == :signal
+    assert signal.code =~ "use Aikido.Signal"
+    assert signal.code =~ "attribute :text, :string"
+    refute signal.open?
 
     directive =
       Catalog.find("research-team")
@@ -98,6 +105,33 @@ defmodule AgentExamplesWeb.LiveViewTest do
     notebook |> form("#notebook-form", %{text: "A slice owns this note"}) |> render_submit()
     await(owner, "notebook", &(&1.snapshot.journal == ["A slice owns this note"]))
     assert has_element?(notebook, "#journal", "A slice owns this note")
+  end
+
+  test "counter union controls and wildcard notices update the signal visual", %{conn: conn} do
+    {:ok, view, html} = live(conn, "/examples/counter")
+    assert html =~ "native Ash union"
+    assert has_element?(view, "#definition-AgentExamples-Counter-Adjust code", "%Ash.Union")
+    assert has_element?(view, "#definition-AgentExamples-Counter-CountAll code", "signals_seen")
+
+    assert has_element?(
+             view,
+             "#definition-AgentExamples-Counter-Signals-Increase:not([open])"
+           )
+
+    owner = start(view, "counter")
+    baseline = Playground.get(owner, "counter").snapshot.own.signals_seen
+    view |> form("#counter-increase-form", %{amount: "9"}) |> render_submit()
+    await(owner, "counter", &(&1.snapshot.own.count == 9))
+    view |> form("#counter-decrease-form", %{amount: "4"}) |> render_submit()
+    await(owner, "counter", &(&1.snapshot.own.count == 5))
+    view |> element("#counter-notice") |> render_click()
+    await(owner, "counter", &(&1.snapshot.own.signals_seen == baseline + 3))
+
+    assert has_element?(view, "#counter-value", "5")
+    assert has_element?(view, "#signals-seen", "#{baseline + 3} signals observed")
+    assert has_element?(view, "#events", "counter.increase")
+    assert has_element?(view, "#events", "counter.decrease")
+    assert has_element?(view, "#events", "counter.notice")
   end
 
   test "background task results arrive without blocking the LiveView", %{conn: conn} do

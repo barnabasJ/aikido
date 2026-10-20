@@ -1,5 +1,5 @@
 defmodule AgentExamples.Counter do
-  @moduledoc "Typed action arguments become signals; a pure action increments state."
+  @moduledoc "Typed signals, a shared union handler, and a wildcard signal counter."
   use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Ash.Agent]
 
   agent do
@@ -7,16 +7,14 @@ defmodule AgentExamples.Counter do
 
     schema do
       attribute :count, :integer, allow_nil?: false, default: 0, public?: true
+      attribute :signals_seen, :integer, allow_nil?: false, default: 0, public?: true
     end
 
-    signal :add, "counter.add", :add
-  end
+    signal :add, AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Implementation
 
-  actions do
-    action :add, Aikido.Types.ActionResult do
-      argument :state, :map, allow_nil?: false
-      argument :amount, :integer, allow_nil?: false
-      run AgentExamples.Counter.Implementation
-    end
+    route [AgentExamples.Counter.Signals.Increase, AgentExamples.Counter.Signals.Decrease],
+          AgentExamples.Counter.Adjust
+
+    route "**", AgentExamples.Counter.CountAll
   end
 end

@@ -6,6 +6,13 @@
 
 ### Changed
 
+- Generate native reducer actions from typed Signal definitions and required Ash
+  implementation modules. Validate state against its owning resource schema;
+  route lists through one native Ash union selected by the concrete signal type.
+  Keep wildcard observers and expose typed mounted-slice commands automatically.
+- Use Signal definition modules as native Ash payload types and demonstrate typed
+  routes, union handlers and an all-signal counter in the example application.
+
 - Preserve whole-payload native action defaults and scalar values through public
   commands and reducer execution. Forward existing signal identity, reply routing
   and caller context when relaying requests.

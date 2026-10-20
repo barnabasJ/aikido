@@ -180,9 +180,7 @@ defmodule AgentExamples.Playground do
       %{status: status} = run when status != :stopped ->
         input = normalize_member_input(action, input, run.snapshot)
 
-        case run.record.resource
-             |> Ash.ActionInput.for_action(action, Map.put(input, :agent, run.record.id))
-             |> Ash.run_action() do
+        case dispatch_command(run, action, input) do
           {:ok, _receipt} ->
             run = %{run | error: nil}
 
@@ -286,6 +284,30 @@ defmodule AgentExamples.Playground do
     do: {:noreply, finish_request(state, id, {:error, :timeout})}
 
   def handle_info(_, state), do: {:noreply, state}
+
+  defp dispatch_command(%{record: %{resource: AgentExamples.Counter}} = run, action, input)
+       when action in [:increase, :decrease] do
+    definition =
+      case action do
+        :increase -> AgentExamples.Counter.Signals.Increase
+        :decrease -> AgentExamples.Counter.Signals.Decrease
+      end
+
+    with {:ok, signal} <- definition.new(input) do
+      Aikido.AgentServer.call(run.record.pid, signal, fn _ -> {:ok, :processed} end)
+    end
+  end
+
+  defp dispatch_command(%{record: %{resource: AgentExamples.Counter}} = run, :notice, _input) do
+    signal = Aikido.Signal.new!("counter.notice", %{message: "Observed by the wildcard route"})
+    Aikido.AgentServer.call(run.record.pid, signal, fn _ -> {:ok, :processed} end)
+  end
+
+  defp dispatch_command(run, action, input) do
+    run.record.resource
+    |> Ash.ActionInput.for_action(action, Map.put(input, :agent, run.record.id))
+    |> Ash.run_action()
+  end
 
   defp create_run(_key, nil, _, state), do: {:reply, {:error, "Unknown example"}, state}
 
@@ -531,7 +553,17 @@ defmodule AgentExamples.Playground do
        resource: resource,
        team?: resource && !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)),
        children: %{},
-       own: Map.take(own, [:count, :items, :completed, :title, :status, :result, :error]),
+       own:
+         Map.take(own, [
+           :count,
+           :signals_seen,
+           :items,
+           :completed,
+           :title,
+           :status,
+           :result,
+           :error
+         ]),
        journal: Map.get(Map.get(state.agent.state, :journal) || %{}, :entries, []),
        ai:
          Map.take(ai, [

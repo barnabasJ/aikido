@@ -15,21 +15,7 @@ defmodule AgentExamples.Checklist do
         public?: true
     end
 
-    signal :add, "checklist.add", :add
-    signal :complete, "checklist.complete", :complete
-  end
-
-  actions do
-    action :add, Aikido.Types.ActionResult do
-      argument :state, :map, allow_nil?: false
-      argument :item, :string, allow_nil?: false
-      run {AgentExamples.Checklist.Implementation, action: :add}
-    end
-
-    action :complete, Aikido.Types.ActionResult do
-      argument :state, :map, allow_nil?: false
-      argument :item, :string, allow_nil?: false
-      run {AgentExamples.Checklist.Implementation, action: :complete}
-    end
+    signal :add, AgentExamples.Checklist.Signals.Add, AgentExamples.Checklist.Add
+    signal :complete, AgentExamples.Checklist.Signals.Complete, AgentExamples.Checklist.Complete
   end
 end

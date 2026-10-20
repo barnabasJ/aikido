@@ -14,15 +14,15 @@ mix phx.server
 Open [localhost:4000](http://localhost:4000). Every example has its own LiveView
 page with a description, a state/workflow visual, interactive controls, and a
 live signal inspector. Each page also includes the exact source definitions,
-with independent code accordions: agents and slices open initially, actions,
-directives, and supporting modules closed. The headers show module names and
+with independent code accordions: agents and slices open initially, typed signal
+definitions, actions, directives, and supporting modules closed. The headers show module names and
 source paths; live updates preserve your open/closed choices.
 The index links to every example page. No Node installation,
 asset build, database, or API key is needed for offline mode.
 
 | Page | Browser interaction |
 | --- | --- |
-| `/examples/counter` | Change the count and watch its gauge |
+| `/examples/counter` | Add, increase/decrease through one typed union handler, and count every signal |
 | `/examples/checklist` | Add and complete items; inspect progress |
 | `/examples/notebook` | Append notes to the embedded journal |
 | `/examples/worker` | Submit background work and receive its result |
@@ -84,7 +84,7 @@ offline or `mix ai.live` with a z.ai key.
 
 | Resource | What it demonstrates | Domain calls |
 | --- | --- | --- |
-| `AgentExamples.Counter` | Typed arguments and a pure state transition | `counter_start`, `counter_add`, `counter_list`, `counter_stop` |
+| `AgentExamples.Counter` | Typed signals, a shared union handler, and a wildcard counter | `counter_start`, `counter_add`, `counter_list`, `counter_stop` |
 | `AgentExamples.Checklist` | Multiple commands and business errors without state changes | `checklist_add`, `checklist_complete` |
 | `AgentExamples.Notebook` | Own state plus an embedded Ash journal slice | `notebook_append` |
 | `AgentExamples.Worker` | An action returns AsyncTask; a result signal routes to another action | `worker_run` |
@@ -94,6 +94,26 @@ Every generated interface also has a bang version. The resource's signal action
 arguments are Ash types, so invalid inputs fail before producing a signal.
 Agent state uses `schema do` blocks with native Ash `attribute` declarations.
 The transformer installs them as resource attributes; no separate state module is needed.
+
+Each signal defines its payload once with `use Aikido.Signal` and a `signal do`
+block containing its type, source, and schema. Agent declarations bind that
+contract directly to an Ash action implementation:
+
+```elixir
+signal :add, AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Implementation
+
+route [AgentExamples.Counter.Signals.Increase, AgentExamples.Counter.Signals.Decrease],
+      AgentExamples.Counter.Adjust
+
+route "**", AgentExamples.Counter.CountAll
+```
+
+The public `add` command receives the fields declared by its signal. The list
+route gives `Adjust` one native `Ash.Union` value whose tag identifies increase
+or decrease. The wildcard receives arbitrary signal data and increments
+`signals_seen`, including a notice with no specific handler. Generated reducers
+use the owning state schema and each signal's payload types; the example agents
+do not repeat those contracts in manual action declarations.
 
 The formatter imports Aikido's generated `locals_without_parens` rules and Ash's
 DSL rules. From the repository root, `mix spark.formatter` regenerates Aikido's

@@ -6,16 +6,8 @@ defmodule AgentExamples.Journal do
     attribute :entries, {:array, :string}, public?: true, allow_nil?: false, default: []
   end
 
-  actions do
-    action :append, Aikido.Types.ActionResult do
-      argument :state, :map, allow_nil?: false
-      argument :text, :string, allow_nil?: false
-      run AgentExamples.Journal.Implementation
-    end
-  end
-
   slice do
     name "example_journal"
-    route "journal.append", :append
+    route AgentExamples.Journal.Signals.Append, AgentExamples.Journal.Implementation
   end
 end
