@@ -87,7 +87,13 @@ defmodule Aikido.Ash.Runtime do
            resource,
            :aikido_flat_signal_inputs,
            []
-         ), do: arguments, else: Map.get(arguments, :data, arguments)
+         ) do
+        arguments
+      else
+        if Enum.any?(input.action.arguments, &(&1.name == :data)),
+          do: Map.get(arguments, :data),
+          else: arguments
+      end
 
     safe(fn ->
       with {:ok, {id, pid}} <- resolve(resource, input.arguments.agent),

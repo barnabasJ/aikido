@@ -192,16 +192,15 @@ defmodule Aikido.Ash.Transformers.Agent do
   defp add_signal(dsl, signal) do
     case Enum.find(Transformer.get_entities(dsl, [:actions]), &(&1.name == signal.name)) do
       nil ->
-        arguments = signal_arguments(dsl, signal)
+        {arguments, shape} = signal_arguments(dsl, signal)
 
-        {arguments, dsl} =
-          if arguments == [] do
-            {[build_argument!(:data, :map, default: %{}, allow_nil?: false)], dsl}
+        dsl =
+          if shape == :flat do
+            Transformer.persist(dsl, :aikido_flat_signal_inputs, [
+              signal.name | Transformer.get_persisted(dsl, :aikido_flat_signal_inputs, [])
+            ])
           else
-            {arguments,
-             Transformer.persist(dsl, :aikido_flat_signal_inputs, [
-               signal.name | Transformer.get_persisted(dsl, :aikido_flat_signal_inputs, [])
-             ])}
+            dsl
           end
 
         Builder.add_new_action(dsl, :action, signal.name,
@@ -309,15 +308,32 @@ defmodule Aikido.Ash.Transformers.Agent do
 
     case Enum.find(action.arguments, &(&1.name == :data)) do
       nil ->
-        action.arguments
-        |> Enum.reject(&(&1.name == :state))
-        |> Enum.map(&%{&1 | public?: true})
+        arguments =
+          action.arguments
+          |> Enum.reject(&(&1.name == :state))
+          |> Enum.map(&%{&1 | public?: true})
+
+        if arguments == [],
+          do: {[build_argument!(:data, :map, default: %{}, allow_nil?: false)], :whole},
+          else: {arguments, :flat}
 
       data ->
-        for {name, options} <- Keyword.get(data.constraints, :fields, []) do
-          {type, options} = Keyword.pop!(options, :type)
-          options = Keyword.take(options, Keyword.keys(Ash.Resource.Actions.Argument.schema()))
-          build_argument!(name, type, options)
+        case Keyword.get(data.constraints, :fields, []) do
+          [] ->
+            {[%{data | public?: true}], :whole}
+
+          fields ->
+            arguments =
+              for {name, options} <- fields do
+                {type, options} = Keyword.pop!(options, :type)
+
+                options =
+                  Keyword.take(options, Keyword.keys(Ash.Resource.Actions.Argument.schema()))
+
+                build_argument!(name, type, options)
+              end
+
+            {arguments, :flat}
         end
     end
   end

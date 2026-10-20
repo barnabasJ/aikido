@@ -1796,7 +1796,7 @@ defmodule Aikido.AgentServer do
         |> Map.get(reference, [Spark.Dsl.Extension.get_opt(current.agent_module, [:agent], :path)])
 
       Enum.reduce_while(paths, {:ok, current, effects}, fn path, {:ok, current, effects} ->
-        case run_action(reference, params || %{}, signal, current, path) do
+        case run_action(reference, params, signal, current, path) do
           {:ok, result} ->
             state =
               case result.state do
@@ -1831,7 +1831,7 @@ defmodule Aikido.AgentServer do
     arguments =
       if Enum.any?(definition.arguments, &(&1.name == :data)),
         do: %{data: params, state: state},
-        else: Map.put(params, :state, state)
+        else: Map.put(params || %{}, :state, state)
 
     runtime =
       Map.merge(ctx, %{
