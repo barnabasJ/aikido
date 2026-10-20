@@ -17,6 +17,10 @@ live signal inspector. Each page also includes the exact source definitions,
 with independent code accordions: agents and slices open initially, typed signal
 definitions, actions, directives, and supporting modules closed. The headers show module names and
 source paths; live updates preserve your open/closed choices.
+Each URL maps to its own LiveView module under `lib/agent_examples_web/live/`.
+`ExampleComponents` shares the layout, navigation and reusable visuals;
+`ExamplePage` shares run startup, shutdown and subscription handling. Example
+events and controls stay in their page modules.
 The index links to every example page. No Node installation,
 asset build, database, or API key is needed for offline mode.
 

@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Give each example its own LiveView page, with shared navigation, run lifecycle,
+  source panels and reusable visuals.
+
 - Use a single `route` declaration on agents and slices. Concrete routes expose
   domain commands by default; `public? false` keeps delivery internal. Use `name`
   to override the inferred command name. Wildcard observers remain internal.

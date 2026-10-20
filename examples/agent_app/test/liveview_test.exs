@@ -23,6 +23,37 @@ defmodule AgentExamplesWeb.LiveViewTest do
     end
   end
 
+  test "each example has its own LiveView and shared navigation", %{conn: conn} do
+    pages = [
+      {"counter", AgentExamplesWeb.CounterLive},
+      {"checklist", AgentExamplesWeb.ChecklistLive},
+      {"notebook", AgentExamplesWeb.NotebookLive},
+      {"worker", AgentExamplesWeb.WorkerLive},
+      {"team", AgentExamplesWeb.TeamLive},
+      {"nested-teams", AgentExamplesWeb.NestedTeamsLive},
+      {"assistant", AgentExamplesWeb.AssistantLive},
+      {"hooks", AgentExamplesWeb.HooksLive},
+      {"conversation", AgentExamplesWeb.ConversationLive},
+      {"hook-requests", AgentExamplesWeb.HookRequestsLive},
+      {"researcher", AgentExamplesWeb.ResearcherLive},
+      {"reviewer", AgentExamplesWeb.ReviewerLive},
+      {"research-team", AgentExamplesWeb.ResearchTeamLive}
+    ]
+
+    assert Enum.sort(Enum.map(pages, &elem(&1, 0))) ==
+             Enum.sort(Enum.map(Catalog.all(), & &1.slug))
+
+    for {slug, module} <- pages do
+      assert {:ok, %{module: ^module} = view, _html} = live(conn, "/examples/#{slug}")
+      assert has_element?(view, "nav[aria-label=Examples] a.active[href='/examples/#{slug}']")
+      assert has_element?(view, "#definitions")
+    end
+  end
+
+  test "an unknown example has no route", %{conn: conn} do
+    assert conn |> get("/examples/unknown") |> response(404) =~ "Not Found"
+  end
+
   test "every example shows one source panel per definition with the requested defaults", %{
     conn: conn
   } do
