@@ -1,0 +1,25 @@
+defmodule AgentExamples.AI.Tools.Actions.Delegate do
+  @moduledoc "Delegates work to another running teammate through native scoped team actions."
+  use Ash.Resource.Actions.Implementation
+  alias AgentExamples.AI.Tools.Context
+
+  @impl true
+  def run(input, _opts, context) do
+    with {:ok, team, caller, _record} <- Context.scope(input, context),
+         {:ok, member} <- resolve_member(team, input.arguments.member),
+         true <- member != caller || {:error, "Cannot delegate to yourself"},
+         {:ok, result} <-
+           AgentExamples.AI.delegate(team, member, input.arguments.text,
+             ash: Ash.Scope.to_opts(context, context: input.context)
+           ) do
+      {:ok, %{member: input.arguments.member, result: result}}
+    end
+  end
+
+  defp resolve_member(team, name) do
+    case Enum.find(Map.keys(team.team.members), &(to_string(&1) == name)) do
+      nil -> {:error, "Worker is not running"}
+      key -> {:ok, key}
+    end
+  end
+end

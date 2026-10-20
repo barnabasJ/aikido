@@ -13,18 +13,18 @@ defmodule AgentExamples.AI.Tools do
     action :stamp, :map do
       description "Attach this caller's runtime label to the supplied text."
       argument :text, :string, allow_nil?: false
-      run {AgentExamples.AI.Tools.Implementation, action: :stamp}
+      run AgentExamples.AI.Tools.Actions.Stamp
     end
 
     action :text_stats, :map do
       description "Count the words and characters in the supplied text."
       argument :text, :string, allow_nil?: false
-      run {AgentExamples.AI.Tools.Implementation, action: :text_stats}
+      run AgentExamples.AI.Tools.Actions.TextStats
     end
 
     action :team_roster, :map do
       description "List this agent's running teammates. Available only inside a team."
-      run {AgentExamples.AI.Tools.Implementation, action: :team_roster}
+      run AgentExamples.AI.Tools.Actions.TeamRoster
     end
 
     action :spawn_worker, :map do
@@ -33,7 +33,7 @@ defmodule AgentExamples.AI.Tools do
       argument :name, :string, allow_nil?: false
       argument :specialty, :string, default: "text analysis"
       argument :template, :string, default: "researcher"
-      run {AgentExamples.AI.Tools.Implementation, action: :spawn_worker}
+      run AgentExamples.AI.Tools.Actions.SpawnWorker
     end
 
     action :delegate, :map do
@@ -41,21 +41,21 @@ defmodule AgentExamples.AI.Tools do
 
       argument :member, :string, allow_nil?: false
       argument :text, :string, allow_nil?: false
-      run {AgentExamples.AI.Tools.Implementation, action: :delegate}
+      run AgentExamples.AI.Tools.Actions.Delegate
     end
 
     action :stop_worker, :map do
       description "Stop one of your owned workers or teams and its descendants. Keeps its desired topology entry."
 
       argument :member, :string, allow_nil?: false
-      run {AgentExamples.AI.Tools.Implementation, action: :stop_worker}
+      run AgentExamples.AI.Tools.Actions.StopWorker
     end
 
     action :remove_worker, :map do
       description "Remove one of your owned workers or teams and its descendants from the topology."
 
       argument :member, :string, allow_nil?: false
-      run {AgentExamples.AI.Tools.Implementation, action: :remove_worker}
+      run AgentExamples.AI.Tools.Actions.RemoveWorker
     end
   end
 end

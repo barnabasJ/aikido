@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Bind example AI tools directly to their individual native action implementations
+  and retain only shared scope and ownership helpers.
+
 - Split Identity, Memory, Thread and Todo callbacks into dedicated native action
   implementations while preserving their owning resource contracts.
 
