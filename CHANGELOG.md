@@ -6,6 +6,13 @@
 
 ### Changed
 
+- Run native create hooks and authorization during agent and embedded-slice
+  initialization, forwarding caller scope. Own-state creation is manual so an
+  agent's separate data layer receives no extra row.
+- Preserve supported term child tags when generating default identities, and
+  keep Memory space revisions increasing across fresh replacements.
+
+
 - Document each reusable native action implementation and replace static `struct!`
   calls with compile-checked struct literals. Pure reducers continue to defer
   signal ID and timestamp generation to directives.

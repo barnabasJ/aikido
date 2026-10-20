@@ -55,6 +55,7 @@ defmodule Aikido.Ash.Transformers.Agent do
       with {:ok, dsl} <-
              Builder.add_new_action(dsl, :create, :__aikido_initialize_state__,
                accept: Enum.uniq([:id | accepted]),
+               manual: Aikido.Agent.Initialize,
                public?: false
              ) do
         {:ok,
