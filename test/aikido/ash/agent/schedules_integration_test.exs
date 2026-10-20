@@ -1,4 +1,4 @@
-defmodule AikidoTest.Agent.SchedulesIntegrationTest.TickAction.Implementation do
+defmodule AikidoTest.Agent.SchedulesIntegrationTest.Actions.CountTick do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -33,7 +33,7 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent do
   actions do
     action :tick, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.Agent.SchedulesIntegrationTest.TickAction.Implementation
+      run AikidoTest.Agent.SchedulesIntegrationTest.Actions.CountTick
     end
   end
 end

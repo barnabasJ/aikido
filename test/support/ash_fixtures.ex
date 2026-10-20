@@ -1,4 +1,4 @@
-defmodule AikidoTest.AshFixtures.Increment.Implementation do
+defmodule AikidoTest.AshFixtures.Counter.Actions.Increment do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -12,7 +12,7 @@ defmodule AikidoTest.AshFixtures.Increment.Implementation do
   end
 end
 
-defmodule AikidoTest.AshFixtures.GeneratedIncrement.Implementation do
+defmodule AikidoTest.AshFixtures.GeneratedCounter.Actions.Increment do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -26,7 +26,7 @@ defmodule AikidoTest.AshFixtures.GeneratedIncrement.Implementation do
   end
 end
 
-defmodule AikidoTest.AshFixtures.DataIncrement.Implementation do
+defmodule AikidoTest.AshFixtures.GeneratedCounter.Actions.IncrementFromData do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -73,7 +73,7 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter do
         constraints: [min: 1],
         description: "Amount to add"
 
-      run AikidoTest.AshFixtures.GeneratedIncrement.Implementation
+      run AikidoTest.AshFixtures.GeneratedCounter.Actions.Increment
     end
   end
 
@@ -85,7 +85,7 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter do
         allow_nil?: false,
         constraints: [fields: [amount: [type: :integer, allow_nil?: false]]]
 
-      run AikidoTest.AshFixtures.DataIncrement.Implementation
+      run AikidoTest.AshFixtures.GeneratedCounter.Actions.IncrementFromData
     end
   end
 end
@@ -114,7 +114,7 @@ defmodule AikidoTest.AshFixtures.Counter do
     action :reduce_increment, Aikido.Types.ActionResult do
       argument :state, :term
       argument :amount, :integer, default: 1
-      run AikidoTest.AshFixtures.Increment.Implementation
+      run AikidoTest.AshFixtures.Counter.Actions.Increment
     end
   end
 end
@@ -222,7 +222,7 @@ defmodule AikidoTest.AshFixtures.Team do
   end
 end
 
-defmodule AikidoTest.AshFixtures.TaskAction.Implementation do
+defmodule AikidoTest.AshFixtures.TaskWorker.Actions.Uppercase do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -276,7 +276,7 @@ defmodule AikidoTest.AshFixtures.TaskWorker do
       argument :member, :term, allow_nil?: false
       argument :attempt, :string, allow_nil?: false
       argument :reply_to, :term, allow_nil?: false
-      run AikidoTest.AshFixtures.TaskAction.Implementation
+      run AikidoTest.AshFixtures.TaskWorker.Actions.Uppercase
     end
   end
 end

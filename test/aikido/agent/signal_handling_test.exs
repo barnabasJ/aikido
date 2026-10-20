@@ -1,4 +1,4 @@
-defmodule AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation do
+defmodule AikidoTest.Agent.SignalHandlingTest.Actions.EmitTestSignal do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -42,7 +42,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent do
   actions do
     action :emit_test, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation
+      run AikidoTest.Agent.SignalHandlingTest.Actions.EmitTestSignal
     end
   end
 end

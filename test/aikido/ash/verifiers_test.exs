@@ -42,7 +42,7 @@ defmodule AikidoTest.AshVerifiersTest do
 
           actions do
             action :invalid, :map do
-              run AikidoTest.TestActions.Noop.Implementation
+              run AikidoTest.TestActions.Actions.ClearState
             end
           end
           """,

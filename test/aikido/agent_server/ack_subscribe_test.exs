@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation do
+defmodule AikidoTest.AgentServer.AckSubscribeTest.Actions.WriteValue do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -11,7 +11,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation do
   end
 end
 
-defmodule AikidoTest.AgentServer.AckSubscribeTest.FailingAction.Implementation do
+defmodule AikidoTest.AgentServer.AckSubscribeTest.Actions.RejectWrite do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -48,12 +48,12 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.TestAgent do
     action :write, Aikido.Types.ActionResult do
       argument :state, :term
       argument :value, :integer, allow_nil?: false
-      run AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation
+      run AikidoTest.AgentServer.AckSubscribeTest.Actions.WriteValue
     end
 
     action :fail, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.AgentServer.AckSubscribeTest.FailingAction.Implementation
+      run AikidoTest.AgentServer.AckSubscribeTest.Actions.RejectWrite
     end
   end
 end

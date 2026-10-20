@@ -97,8 +97,8 @@ defmodule AikidoTest.InstanceTest do
     end
   end
 
-  describe("shared runtime API with a named instance") do
-    test "shared start_agent/3 starts an agent" do
+  describe("named-instance durable lifecycle") do
+    test "DurableServer activates an agent in the named instance" do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
 
       {:ok, agent_pid} =
@@ -194,7 +194,7 @@ defmodule AikidoTest.InstanceTest do
              ) == 2
     end
 
-    test "shared stop_agent/2 stops an agent by ID" do
+    test "DurableServer stops an agent by ID" do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
 
       {:ok, pid} =
@@ -218,7 +218,7 @@ defmodule AikidoTest.InstanceTest do
       assert AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "stop-test") == nil
     end
 
-    test "shared stop_agent/2 stops an agent by pid" do
+    test "DurableServer stops an agent by PID" do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
 
       {:ok, pid} =

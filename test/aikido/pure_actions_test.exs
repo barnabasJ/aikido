@@ -135,11 +135,16 @@ defmodule Aikido.PureActionsTest do
   end
 
   test "reducer implementations do not directly call effect APIs" do
+    example_paths =
+      "examples/agent_app/lib/agent_examples/**/*.ex"
+      |> Path.wildcard()
+      |> Enum.reject(&String.starts_with?(&1, "examples/agent_app/lib/agent_examples/ai/tools/"))
+
     paths =
       Path.wildcard("lib/aikido/actions/**/*.ex") ++
         Path.wildcard("lib/aikido/slices/**/*.ex") ++
         Path.wildcard("lib/aikido/ash/team/actions/*.ex") ++
-        Path.wildcard("examples/agent_app/lib/agent_examples/**/implementation.ex") ++
+        example_paths ++
         [
           "lib/aikido/ash/team/inputs.ex",
           "lib/aikido/ash/team/operation.ex",

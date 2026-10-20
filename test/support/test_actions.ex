@@ -1,4 +1,4 @@
-defmodule AikidoTest.TestActions.Noop.Implementation do
+defmodule AikidoTest.TestActions.Actions.ClearState do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -7,7 +7,7 @@ defmodule AikidoTest.TestActions.Noop.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.BasicAction.Implementation do
+defmodule AikidoTest.TestActions.Actions.StoreValue do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -18,7 +18,7 @@ defmodule AikidoTest.TestActions.BasicAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.OptionalInput.Implementation do
+defmodule AikidoTest.TestActions.Actions.ResolveOptionalValue do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -29,7 +29,7 @@ defmodule AikidoTest.TestActions.OptionalInput.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.Add.Implementation do
+defmodule AikidoTest.TestActions.Actions.AddValue do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -42,7 +42,7 @@ defmodule AikidoTest.TestActions.Add.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.EmitAction.Implementation do
+defmodule AikidoTest.TestActions.Actions.EmitTestSignal do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -56,7 +56,7 @@ defmodule AikidoTest.TestActions.EmitAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.MultiEffectAction.Implementation do
+defmodule AikidoTest.TestActions.Actions.EmitAndSchedule do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -70,7 +70,7 @@ defmodule AikidoTest.TestActions.MultiEffectAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.MultiSliceAction.Implementation do
+defmodule AikidoTest.TestActions.Actions.UpdateDomainAndAudit do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -84,7 +84,7 @@ defmodule AikidoTest.TestActions.MultiSliceAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.IncrementAction.Implementation do
+defmodule AikidoTest.TestActions.Actions.IncrementCounter do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -105,7 +105,7 @@ defmodule AikidoTest.TestActions.IncrementAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.DecrementAction.Implementation do
+defmodule AikidoTest.TestActions.Actions.DecrementCounter do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -126,7 +126,7 @@ defmodule AikidoTest.TestActions.DecrementAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.RecordAction.Implementation do
+defmodule AikidoTest.TestActions.Actions.RecordMessage do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -140,14 +140,14 @@ defmodule AikidoTest.TestActions.RecordAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.SlowAction.Implementation do
+defmodule AikidoTest.TestActions.Actions.ComputeSlowResult do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
     delay = input.arguments.delay_ms
 
-    AikidoTest.TestActions.SlowAction.Implementation.work(delay)
+    AikidoTest.TestActions.Actions.ComputeSlowResult.work(delay)
     Aikido.Types.ActionResult.new(state: %{processed: true, delay: delay}, directives: [])
   end
 
@@ -157,7 +157,7 @@ defmodule AikidoTest.TestActions.SlowAction.Implementation do
   defp work_steps(left, sum), do: work_steps(left - 1, sum + left)
 end
 
-defmodule AikidoTest.TestActions.FailingAction.Implementation do
+defmodule AikidoTest.TestActions.Actions.Fail do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -182,21 +182,21 @@ defmodule AikidoTest.TestActions do
   actions do
     action :noop, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.TestActions.Noop.Implementation
+      run AikidoTest.TestActions.Actions.ClearState
     end
 
     action :basic_action, Aikido.Types.ActionResult do
       argument :state, :term
       argument :value, :integer, allow_nil?: false
       description "A basic action for testing"
-      run AikidoTest.TestActions.BasicAction.Implementation
+      run AikidoTest.TestActions.Actions.StoreValue
     end
 
     action :optional_input, Aikido.Types.ActionResult do
       argument :state, :term
       argument :value, :integer
       description "Optional typed input"
-      run AikidoTest.TestActions.OptionalInput.Implementation
+      run AikidoTest.TestActions.Actions.ResolveOptionalValue
     end
 
     action :add, Aikido.Types.ActionResult do
@@ -204,55 +204,55 @@ defmodule AikidoTest.TestActions do
       argument :value, :integer, allow_nil?: false
       argument :amount, :integer, default: 1
       description "Adds amount to value"
-      run AikidoTest.TestActions.Add.Implementation
+      run AikidoTest.TestActions.Actions.AddValue
     end
 
     action :emit_action, Aikido.Types.ActionResult do
       argument :state, :term
       description "Action that returns an emit effect"
-      run AikidoTest.TestActions.EmitAction.Implementation
+      run AikidoTest.TestActions.Actions.EmitTestSignal
     end
 
     action :multi_effect_action, Aikido.Types.ActionResult do
       argument :state, :term
       description "Action that returns multiple effects"
-      run AikidoTest.TestActions.MultiEffectAction.Implementation
+      run AikidoTest.TestActions.Actions.EmitAndSchedule
     end
 
     action :multi_slice_action, Aikido.Types.ActionResult do
       argument :state, :term
       description "Action that returns a SliceUpdate writing two slices in one turn"
-      run AikidoTest.TestActions.MultiSliceAction.Implementation
+      run AikidoTest.TestActions.Actions.UpdateDomainAndAudit
     end
 
     action :increment, Aikido.Types.ActionResult do
       argument :state, :term
       argument :amount, :integer, default: 1
-      run AikidoTest.TestActions.IncrementAction.Implementation
+      run AikidoTest.TestActions.Actions.IncrementCounter
     end
 
     action :decrement, Aikido.Types.ActionResult do
       argument :state, :term
       argument :amount, :integer, default: 1
-      run AikidoTest.TestActions.DecrementAction.Implementation
+      run AikidoTest.TestActions.Actions.DecrementCounter
     end
 
     action :record, Aikido.Types.ActionResult do
       argument :state, :term
       argument :data, :map, default: %{}
-      run AikidoTest.TestActions.RecordAction.Implementation
+      run AikidoTest.TestActions.Actions.RecordMessage
     end
 
     action :slow, Aikido.Types.ActionResult do
       argument :state, :term
       argument :delay_ms, :integer, default: 100
-      run AikidoTest.TestActions.SlowAction.Implementation
+      run AikidoTest.TestActions.Actions.ComputeSlowResult
     end
 
     action :failing, Aikido.Types.ActionResult do
       argument :state, :term
       argument :reason, :string, default: "intentional failure"
-      run AikidoTest.TestActions.FailingAction.Implementation
+      run AikidoTest.TestActions.Actions.Fail
     end
   end
 end

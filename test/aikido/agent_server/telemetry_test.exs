@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementation do
+defmodule AikidoTest.AgentServer.TelemetryTest.Actions.EmitTestSignal do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -12,7 +12,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementatio
   end
 end
 
-defmodule AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implementation do
+defmodule AikidoTest.AgentServer.TelemetryTest.Actions.ScheduleTick do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -49,13 +49,13 @@ defmodule AikidoTest.AgentServer.TelemetryTest.TelemetryAgent do
   actions do
     action :emit_directive, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementation
+      run AikidoTest.AgentServer.TelemetryTest.Actions.EmitTestSignal
     end
 
     action :schedule_directive, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implementation
+      run AikidoTest.AgentServer.TelemetryTest.Actions.ScheduleTick
     end
   end
 end

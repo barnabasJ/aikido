@@ -1,4 +1,4 @@
-defmodule AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implementation do
+defmodule AikidoTest.Integration.SchedulerIntegrationTest.Actions.RecordSliceTick do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -43,7 +43,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice do
     action :slice_tick, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implementation
+      run AikidoTest.Integration.SchedulerIntegrationTest.Actions.RecordSliceTick
     end
   end
 end

@@ -482,7 +482,7 @@ defmodule AikidoTest.TypedRoutesTest do
 
   test "native implementation references are verified after owning resources compile" do
     module =
-      "AikidoTest.TypedRoutesTest.InvalidImplementation#{System.unique_integer([:positive])}"
+      "AikidoTest.TypedRoutesTest.InvalidActionTarget#{System.unique_integer([:positive])}"
 
     output =
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
@@ -490,7 +490,7 @@ defmodule AikidoTest.TypedRoutesTest do
         defmodule #{module} do
           use Aikido.Agent
           agent do
-            name "invalid_implementation"
+            name "invalid_action_target"
             signal :bad, AikidoTest.TypedRoutesTest.Increment, String
           end
         end

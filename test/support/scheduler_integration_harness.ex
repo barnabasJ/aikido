@@ -1,4 +1,4 @@
-defmodule AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementation do
+defmodule AikidoTest.Support.SchedulerIntegrationHarness.Actions.RecordTick do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -16,7 +16,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementati
   end
 end
 
-defmodule AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Implementation do
+defmodule AikidoTest.Support.SchedulerIntegrationHarness.Actions.RegisterCron do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -37,7 +37,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Impl
   end
 end
 
-defmodule AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction.Implementation do
+defmodule AikidoTest.Support.SchedulerIntegrationHarness.Actions.CancelCron do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -85,7 +85,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CronAgent do
       argument :state, :term
       argument :data, :map, default: %{}
 
-      run AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementation
+      run AikidoTest.Support.SchedulerIntegrationHarness.Actions.RecordTick
     end
 
     action :register_cron, Aikido.Types.ActionResult do
@@ -95,14 +95,14 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CronAgent do
       argument :timezone, :string
       argument :message, :term
 
-      run AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Implementation
+      run AikidoTest.Support.SchedulerIntegrationHarness.Actions.RegisterCron
     end
 
     action :cancel_cron, Aikido.Types.ActionResult do
       argument :state, :term
       argument :job_id, :term, allow_nil?: false
 
-      run AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction.Implementation
+      run AikidoTest.Support.SchedulerIntegrationHarness.Actions.CancelCron
     end
   end
 end

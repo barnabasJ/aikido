@@ -20,22 +20,22 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.CounterSlice do
   actions do
     action :bump, Aikido.Types.ActionResult do
       argument :state, :term
-      run Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation
+      run Aikido.Dsl.SlicePathResolutionTest.Actions.IncrementCount
     end
 
     action :escape, Aikido.Types.ActionResult do
       argument :state, :term
-      run Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation
+      run Aikido.Dsl.SlicePathResolutionTest.Actions.TagState
     end
 
     action :unbound, Aikido.Types.ActionResult do
       argument :state, :term
-      run Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation
+      run Aikido.Dsl.SlicePathResolutionTest.Actions.StampState
     end
   end
 end
 
-defmodule Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation do
+defmodule Aikido.Dsl.SlicePathResolutionTest.Actions.IncrementCount do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -49,7 +49,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation do
   end
 end
 
-defmodule Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation do
+defmodule Aikido.Dsl.SlicePathResolutionTest.Actions.TagState do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -63,7 +63,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation do
   end
 end
 
-defmodule Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation do
+defmodule Aikido.Dsl.SlicePathResolutionTest.Actions.StampState do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true

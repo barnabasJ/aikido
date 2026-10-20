@@ -1,4 +1,4 @@
-defmodule Aikido.AI.TestActions.TestAdd.Implementation do
+defmodule Aikido.AI.TestActions.TestAdd.Actions.AddIntegers do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -23,12 +23,12 @@ defmodule Aikido.AI.TestActions.TestAdd do
       argument :a, :integer, description: "First addend", allow_nil?: false
       argument :b, :integer, description: "Second addend", allow_nil?: false
       description "Adds two integers and returns their sum."
-      run Aikido.AI.TestActions.TestAdd.Implementation
+      run Aikido.AI.TestActions.TestAdd.Actions.AddIntegers
     end
   end
 end
 
-defmodule Aikido.AI.TestActions.TestMultiply.Implementation do
+defmodule Aikido.AI.TestActions.TestMultiply.Actions.MultiplyIntegers do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -53,12 +53,12 @@ defmodule Aikido.AI.TestActions.TestMultiply do
       argument :a, :integer, description: "First factor", allow_nil?: false
       argument :b, :integer, description: "Second factor", allow_nil?: false
       description "Multiplies two integers and returns their product."
-      run Aikido.AI.TestActions.TestMultiply.Implementation
+      run Aikido.AI.TestActions.TestMultiply.Actions.MultiplyIntegers
     end
   end
 end
 
-defmodule Aikido.AI.TestActions.TestFails.Implementation do
+defmodule Aikido.AI.TestActions.TestFails.Actions.Fail do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -80,7 +80,7 @@ defmodule Aikido.AI.TestActions.TestFails do
     action :test_fails, :map do
       argument :reason, :string, description: "Failure reason", default: "test_failure"
       description "Always returns an error — used to exercise tool-failure paths."
-      run Aikido.AI.TestActions.TestFails.Implementation
+      run Aikido.AI.TestActions.TestFails.Actions.Fail
     end
   end
 end

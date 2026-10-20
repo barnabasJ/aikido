@@ -14,7 +14,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes do
   actions do
     action :test_action, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.TestActions.Noop.Implementation
+      run AikidoTest.TestActions.Actions.ClearState
     end
   end
 end

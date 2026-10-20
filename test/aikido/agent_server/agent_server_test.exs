@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServerTest.StopTestAction.Implementation do
+defmodule AikidoTest.AgentServerTest.Actions.RequestStop do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -40,12 +40,12 @@ defmodule AikidoTest.AgentServerTest.TestAgent do
   actions do
     action :stop_test, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.AgentServerTest.StopTestAction.Implementation
+      run AikidoTest.AgentServerTest.Actions.RequestStop
     end
   end
 end
 
-defmodule AikidoTest.AgentServerTest.ScheduledAction.Implementation do
+defmodule AikidoTest.AgentServerTest.Actions.MarkScheduled do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -69,7 +69,7 @@ defmodule AikidoTest.AgentServerTest.ScheduledSlice do
   actions do
     action :scheduled_action, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.AgentServerTest.ScheduledAction.Implementation
+      run AikidoTest.AgentServerTest.Actions.MarkScheduled
     end
   end
 end
@@ -211,25 +211,13 @@ defmodule AikidoTest.AgentServerTest do
       GenServer.stop(pid)
     end
 
-    test("works with agent ID string", %{aikido: aikido}) do
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
-          id: "call-id-test"
-        )
-
-      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
-      {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-      assert agent.state.domain.counter == 1
-      GenServer.stop(pid)
-    end
-
     test("mailbox-queued messages wait for the in-flight sync call", %{aikido: aikido}) do
-      defmodule Elixir.AikidoTest.AgentServerTest.InlineSlowAction.Implementation do
+      defmodule Elixir.AikidoTest.AgentServerTest.Actions.FinishBlockingWork do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
         def run(_input, _opts, _context) do
-          AikidoTest.TestActions.SlowAction.Implementation.work(80)
+          AikidoTest.TestActions.Actions.ComputeSlowResult.work(80)
           Aikido.Types.ActionResult.new(state: %{slow_done: true}, directives: [])
         end
       end
@@ -261,7 +249,7 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :inline_slow, Aikido.Types.ActionResult do
             argument :state, :term
-            run AikidoTest.AgentServerTest.InlineSlowAction.Implementation
+            run AikidoTest.AgentServerTest.Actions.FinishBlockingWork
           end
         end
       end
@@ -296,18 +284,18 @@ defmodule AikidoTest.AgentServerTest do
     end
 
     test("buffers async signals while a sync call is running", %{aikido: aikido}) do
-      defmodule Elixir.AikidoTest.AgentServerTest.BufferedSlowAction.Implementation do
+      defmodule Elixir.AikidoTest.AgentServerTest.Actions.FinishBufferedWork do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
         def run(input, _opts, _context) do
           slice = input.arguments.state
-          AikidoTest.TestActions.SlowAction.Implementation.work(120)
+          AikidoTest.TestActions.Actions.ComputeSlowResult.work(120)
           Aikido.Types.ActionResult.new(state: Map.put(slice, :slow_done, true), directives: [])
         end
       end
 
-      defmodule Elixir.AikidoTest.AgentServerTest.BufferedIncrementAction.Implementation do
+      defmodule Elixir.AikidoTest.AgentServerTest.Actions.IncrementBufferedCounter do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
@@ -349,13 +337,13 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :buffered_slow, Aikido.Types.ActionResult do
             argument :state, :term
-            run AikidoTest.AgentServerTest.BufferedSlowAction.Implementation
+            run AikidoTest.AgentServerTest.Actions.FinishBufferedWork
           end
 
           action :buffered_increment, Aikido.Types.ActionResult do
             argument :state, :term
 
-            run AikidoTest.AgentServerTest.BufferedIncrementAction.Implementation
+            run AikidoTest.AgentServerTest.Actions.IncrementBufferedCounter
           end
         end
       end
@@ -447,7 +435,7 @@ defmodule AikidoTest.AgentServerTest do
       GenServer.stop(pid)
     end
 
-    test("works with agent ID string", %{aikido: aikido}) do
+    test("reads the supplied startup identity through its PID", %{aikido: aikido}) do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
           id: "state-id-test"
@@ -459,8 +447,8 @@ defmodule AikidoTest.AgentServerTest do
     end
   end
 
-  describe("whereis/1 and lookup") do
-    test("whereis/1 returns pid for registered agent using default registry", %{aikido: aikido}) do
+  describe("instance-scoped durable lookup") do
+    test("returns the current PID for an identity in its instance", %{aikido: aikido}) do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
           id: "whereis-test-1"
@@ -470,22 +458,8 @@ defmodule AikidoTest.AgentServerTest do
       GenServer.stop(pid)
     end
 
-    test("whereis/1 returns nil for unknown agent", %{aikido: aikido}) do
+    test("returns nil for an unknown identity in its instance", %{aikido: aikido}) do
       assert AikidoTest.Case.agent_pid(aikido, "nonexistent") == nil
-    end
-
-    test("lookup returns pid for registered agent in specific registry", %{aikido: aikido}) do
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
-          id: "whereis-test-2"
-        )
-
-      assert AikidoTest.Case.agent_pid(aikido, "whereis-test-2") == pid
-      GenServer.stop(pid)
-    end
-
-    test("lookup returns nil for unknown agent in specific registry", %{aikido: aikido}) do
-      assert AikidoTest.Case.agent_pid(aikido, "nonexistent-2") == nil
     end
 
     test("partitioned lookup resolves only within the requested partition", %{aikido: aikido}) do
@@ -526,16 +500,6 @@ defmodule AikidoTest.AgentServerTest do
 
       GenServer.stop(pid)
       refute Aikido.AgentServer.alive?(pid)
-    end
-
-    test("works with agent ID string", %{aikido: aikido}) do
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
-          id: "alive-test"
-        )
-
-      assert Aikido.AgentServer.alive?(pid)
-      GenServer.stop(pid)
     end
   end
 
@@ -579,8 +543,8 @@ defmodule AikidoTest.AgentServerTest do
     end
   end
 
-  describe("drain loop") do
-    test("processes directives in order", %{aikido: aikido}) do
+  describe("mailbox signal ordering") do
+    test("processes record signals in mailbox order", %{aikido: aikido}) do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
@@ -631,7 +595,7 @@ defmodule AikidoTest.AgentServerTest do
 
   describe("scheduled signals") do
     test("scheduled signal is processed after delay", %{aikido: aikido}) do
-      defmodule Elixir.AikidoTest.AgentServerTest.StartScheduleAction.Implementation do
+      defmodule Elixir.AikidoTest.AgentServerTest.Actions.SchedulePing do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
@@ -648,7 +612,7 @@ defmodule AikidoTest.AgentServerTest do
         end
       end
 
-      defmodule Elixir.AikidoTest.AgentServerTest.ScheduledPingAction.Implementation do
+      defmodule Elixir.AikidoTest.AgentServerTest.Actions.CountPing do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
@@ -684,12 +648,12 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :start_schedule, Aikido.Types.ActionResult do
             argument :state, :term
-            run AikidoTest.AgentServerTest.StartScheduleAction.Implementation
+            run AikidoTest.AgentServerTest.Actions.SchedulePing
           end
 
           action :scheduled_ping, Aikido.Types.ActionResult do
             argument :state, :term
-            run AikidoTest.AgentServerTest.ScheduledPingAction.Implementation
+            run AikidoTest.AgentServerTest.Actions.CountPing
           end
         end
       end
@@ -719,7 +683,7 @@ defmodule AikidoTest.AgentServerTest do
     end
 
     test("multiple scheduled signals are processed", %{aikido: aikido}) do
-      defmodule Elixir.AikidoTest.AgentServerTest.ScheduleManyAction.Implementation do
+      defmodule Elixir.AikidoTest.AgentServerTest.Actions.ScheduleTickBatch do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
@@ -736,7 +700,7 @@ defmodule AikidoTest.AgentServerTest do
         end
       end
 
-      defmodule Elixir.AikidoTest.AgentServerTest.TickAction.Implementation do
+      defmodule Elixir.AikidoTest.AgentServerTest.Actions.CountTick do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
@@ -771,13 +735,13 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :schedule_many, Aikido.Types.ActionResult do
             argument :state, :term
-            run AikidoTest.AgentServerTest.ScheduleManyAction.Implementation
+            run AikidoTest.AgentServerTest.Actions.ScheduleTickBatch
           end
 
           action :tick, Aikido.Types.ActionResult do
             argument :state, :term
             argument :n, :integer, allow_nil?: false
-            run AikidoTest.AgentServerTest.TickAction.Implementation
+            run AikidoTest.AgentServerTest.Actions.CountTick
           end
         end
       end
@@ -806,7 +770,7 @@ defmodule AikidoTest.AgentServerTest do
     end
 
     test("non-signal message is wrapped in signal", %{aikido: aikido}) do
-      defmodule Elixir.AikidoTest.AgentServerTest.ScheduleAtomAction.Implementation do
+      defmodule Elixir.AikidoTest.AgentServerTest.Actions.ScheduleScalarTimeout do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
@@ -820,7 +784,7 @@ defmodule AikidoTest.AgentServerTest do
         end
       end
 
-      defmodule Elixir.AikidoTest.AgentServerTest.AikidoScheduledAction.Implementation do
+      defmodule Elixir.AikidoTest.AgentServerTest.Actions.CaptureScheduledMessage do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
@@ -855,13 +819,13 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :schedule_atom, Aikido.Types.ActionResult do
             argument :state, :term
-            run AikidoTest.AgentServerTest.ScheduleAtomAction.Implementation
+            run AikidoTest.AgentServerTest.Actions.ScheduleScalarTimeout
           end
 
           action :aikido_scheduled, Aikido.Types.ActionResult do
             argument :state, :term
             argument :message, :term, allow_nil?: false
-            run AikidoTest.AgentServerTest.AikidoScheduledAction.Implementation
+            run AikidoTest.AgentServerTest.Actions.CaptureScheduledMessage
           end
         end
       end
@@ -912,28 +876,6 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, agent} = Aikido.AgentServer.call(via, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
       GenServer.stop(AikidoTest.Case.agent_pid(aikido, "via-resolve-test"))
-    end
-
-    test("resolves string id", %{aikido: aikido}) do
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
-          id: "string-resolve-test"
-        )
-
-      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
-      {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-      assert agent.state.domain.counter == 1
-      GenServer.stop(pid)
-    end
-
-    test("returns error for non-existent server", %{aikido: aikido}) do
-      assert AikidoTest.Case.agent_pid(aikido, "nonexistent-server") == nil
-
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
-
-      GenServer.stop(pid)
-      refute Aikido.AgentServer.alive?(pid)
     end
 
     test("returns error for invalid server reference", %{aikido: _aikido}) do
@@ -1033,12 +975,12 @@ defmodule AikidoTest.AgentServerTest do
 
   describe("inline signal processing") do
     test("mailbox-serialized processing settles every cast", %{aikido: aikido}) do
-      defmodule Elixir.AikidoTest.AgentServerTest.SlowAction2.Implementation do
+      defmodule Elixir.AikidoTest.AgentServerTest.Actions.FinishQueuedWork do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
         def run(_input, _opts, _context) do
-          AikidoTest.TestActions.SlowAction.Implementation.work(20)
+          AikidoTest.TestActions.Actions.ComputeSlowResult.work(20)
           Aikido.Types.ActionResult.new(state: %{processed: true}, directives: [])
         end
       end
@@ -1064,7 +1006,7 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :slow, Aikido.Types.ActionResult do
             argument :state, :term
-            run AikidoTest.AgentServerTest.SlowAction2.Implementation
+            run AikidoTest.AgentServerTest.Actions.FinishQueuedWork
           end
         end
       end

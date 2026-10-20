@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServer.StateAtomicityTest.SetMultipleKeysAction.Implementation do
+defmodule AikidoTest.AgentServer.StateAtomicityTest.Actions.SetMultipleKeys do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -13,7 +13,7 @@ defmodule AikidoTest.AgentServer.StateAtomicityTest.SetMultipleKeysAction.Implem
   end
 end
 
-defmodule AikidoTest.AgentServer.StateAtomicityTest.ObserveAction.Implementation do
+defmodule AikidoTest.AgentServer.StateAtomicityTest.Actions.ObserveStateKeys do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -92,13 +92,13 @@ defmodule AikidoTest.AgentServer.StateAtomicityTest.AtomicityAgent do
     action :set_multiple, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.AgentServer.StateAtomicityTest.SetMultipleKeysAction.Implementation
+      run AikidoTest.AgentServer.StateAtomicityTest.Actions.SetMultipleKeys
     end
 
     action :observe, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.AgentServer.StateAtomicityTest.ObserveAction.Implementation
+      run AikidoTest.AgentServer.StateAtomicityTest.Actions.ObserveStateKeys
     end
   end
 end

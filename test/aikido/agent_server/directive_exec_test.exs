@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction.Implementation do
+defmodule AikidoTest.AgentServer.DirectiveExecTest.Actions.ReturnDirective do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -34,12 +34,12 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.TestAgent do
       argument :state, :term
       argument :directive, :term, allow_nil?: false
 
-      run AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction.Implementation
+      run AikidoTest.AgentServer.DirectiveExecTest.Actions.ReturnDirective
     end
   end
 end
 
-defmodule AikidoTest.AgentServer.DirectiveExecTest.StopOnSignalAction.Implementation do
+defmodule AikidoTest.AgentServer.DirectiveExecTest.Actions.RequestStop do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -95,7 +95,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent do
       argument :state, :term
       argument :reason, :term, default: :normal
 
-      run AikidoTest.AgentServer.DirectiveExecTest.StopOnSignalAction.Implementation
+      run AikidoTest.AgentServer.DirectiveExecTest.Actions.RequestStop
     end
   end
 end

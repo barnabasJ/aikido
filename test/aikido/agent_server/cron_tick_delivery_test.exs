@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction.Implementation do
+defmodule AikidoTest.AgentServer.CronTickDeliveryTest.Actions.CountTick do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -17,7 +17,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction.Implementa
   end
 end
 
-defmodule AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction.Implementation do
+defmodule AikidoTest.AgentServer.CronTickDeliveryTest.Actions.RegisterCron do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -61,7 +61,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent do
     action :tick_count, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction.Implementation
+      run AikidoTest.AgentServer.CronTickDeliveryTest.Actions.CountTick
     end
 
     action :register_cron, Aikido.Types.ActionResult do
@@ -69,7 +69,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent do
       argument :cron, :string, allow_nil?: false
       argument :job_id, :term
 
-      run AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction.Implementation
+      run AikidoTest.AgentServer.CronTickDeliveryTest.Actions.RegisterCron
     end
   end
 end

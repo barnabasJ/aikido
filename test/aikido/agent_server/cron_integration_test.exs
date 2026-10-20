@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementation do
+defmodule AikidoTest.AgentServer.CronIntegrationTest.Actions.RecordCronTick do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -16,7 +16,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementat
   end
 end
 
-defmodule AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implementation do
+defmodule AikidoTest.AgentServer.CronIntegrationTest.Actions.RegisterCron do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -36,7 +36,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implemen
   end
 end
 
-defmodule AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction.Implementation do
+defmodule AikidoTest.AgentServer.CronIntegrationTest.Actions.CancelCron do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -103,7 +103,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent do
       argument :state, :term
       argument :data, :map, allow_nil?: false, default: %{}
 
-      run AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementation
+      run AikidoTest.AgentServer.CronIntegrationTest.Actions.RecordCronTick
     end
 
     action :register_cron, Aikido.Types.ActionResult do
@@ -113,14 +113,14 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent do
       argument :message, :term
       argument :timezone, :string
 
-      run AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implementation
+      run AikidoTest.AgentServer.CronIntegrationTest.Actions.RegisterCron
     end
 
     action :cancel_cron, Aikido.Types.ActionResult do
       argument :state, :term
       argument :job_id, :term, allow_nil?: false
 
-      run AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction.Implementation
+      run AikidoTest.AgentServer.CronIntegrationTest.Actions.CancelCron
     end
   end
 end

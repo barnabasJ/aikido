@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementation do
+defmodule AikidoTest.AgentServer.IdentitySignalsTest.Actions.RecordIdentitySignal do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -38,7 +38,7 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAgent do
     action :identity_watcher, Aikido.Types.ActionResult do
       argument :state, :term
       argument :data, :map, allow_nil?: false, default: %{}
-      run AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementation
+      run AikidoTest.AgentServer.IdentitySignalsTest.Actions.RecordIdentitySignal
     end
   end
 end

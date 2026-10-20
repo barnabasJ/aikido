@@ -1,4 +1,4 @@
-defmodule AikidoTest.SignalCtxTest.ContextProbe.Implementation do
+defmodule AikidoTest.SignalCtxTest.Actions.CaptureContext do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -19,7 +19,7 @@ defmodule AikidoTest.SignalCtxTest.ContextProbe do
   actions do
     action :context_probe, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.SignalCtxTest.ContextProbe.Implementation
+      run AikidoTest.SignalCtxTest.Actions.CaptureContext
     end
   end
 end

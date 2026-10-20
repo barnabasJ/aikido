@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveAction.Implementation do
+defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.Actions.ReturnDirective do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -35,7 +35,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.HarnessAgent do
       argument :state, :term
       argument :directive, :term, allow_nil?: false
 
-      run AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveAction.Implementation
+      run AikidoTest.AgentServer.DirectiveStrictSeparationTest.Actions.ReturnDirective
     end
   end
 end

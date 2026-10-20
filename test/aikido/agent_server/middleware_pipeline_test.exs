@@ -9,7 +9,7 @@ defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.TaggingMiddleware do
   end
 end
 
-defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction.Implementation do
+defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.Actions.CaptureMiddlewareTags do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -48,7 +48,7 @@ defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.MiddlewareAgent do
     action :reduce_inspect, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction.Implementation
+      run AikidoTest.AgentServer.MiddlewarePipelineTest.Actions.CaptureMiddlewareTags
     end
   end
 end

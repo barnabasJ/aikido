@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Implementation do
+defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Actions.MarkActionAndEmitFollowup do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -14,7 +14,7 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Impleme
   end
 end
 
-defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction.Implementation do
+defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Actions.MarkFollowup do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -29,7 +29,7 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyActio
   end
 end
 
-defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Implementation do
+defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Actions.ObservePriorAction do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -82,19 +82,19 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent do
     action :step1, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Implementation
+      run AikidoTest.AgentServer.SignalDirectiveOrderingTest.Actions.MarkActionAndEmitFollowup
     end
 
     action :set_followup_key, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction.Implementation
+      run AikidoTest.AgentServer.SignalDirectiveOrderingTest.Actions.MarkFollowup
     end
 
     action :step2, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Implementation
+      run AikidoTest.AgentServer.SignalDirectiveOrderingTest.Actions.ObservePriorAction
     end
   end
 end

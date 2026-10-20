@@ -1,4 +1,4 @@
-defmodule AikidoTest.Signal.CallTest.EchoAction.Implementation do
+defmodule AikidoTest.Signal.CallTest.Actions.ReplyToEcho do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -24,7 +24,7 @@ defmodule AikidoTest.Signal.CallTest.EchoAction.Implementation do
   def build_reply(_runtime), do: {:ok, %{ok: true}}
 end
 
-defmodule AikidoTest.Signal.CallTest.SilentAction.Implementation do
+defmodule AikidoTest.Signal.CallTest.Actions.IgnoreSignal do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -46,12 +46,12 @@ defmodule AikidoTest.Signal.CallTest.CallTestAgent do
   actions do
     action :echo_action, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.Signal.CallTest.EchoAction.Implementation
+      run AikidoTest.Signal.CallTest.Actions.ReplyToEcho
     end
 
     action :silent_action, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.Signal.CallTest.SilentAction.Implementation
+      run AikidoTest.Signal.CallTest.Actions.IgnoreSignal
     end
   end
 end

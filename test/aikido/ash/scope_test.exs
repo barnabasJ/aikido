@@ -39,7 +39,7 @@ defmodule AikidoTest.ScopedAgent do
   end
 end
 
-defmodule AikidoTest.ScopedTool.Implementation do
+defmodule AikidoTest.ScopedTool.Actions.ReadIdentity do
   use Ash.Resource.Actions.Implementation
   def run(_input, _opts, context), do: {:ok, %{actor: context.actor.id, tenant: context.tenant}}
 end
@@ -59,7 +59,7 @@ defmodule AikidoTest.ScopedTool do
 
   actions do
     action :identity, :map do
-      run AikidoTest.ScopedTool.Implementation
+      run AikidoTest.ScopedTool.Actions.ReadIdentity
     end
   end
 end

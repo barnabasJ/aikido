@@ -1,4 +1,4 @@
-defmodule Aikido.AI.TestTools.WaitImplementation do
+defmodule Aikido.AI.TestTools.Wait.Actions.WaitForContinue do
   use Ash.Resource.Actions.Implementation
 
   def run(input, _, _) do
@@ -18,12 +18,12 @@ defmodule Aikido.AI.TestTools.Wait do
 
   actions do
     action :wait, :string do
-      run Aikido.AI.TestTools.WaitImplementation
+      run Aikido.AI.TestTools.Wait.Actions.WaitForContinue
     end
   end
 end
 
-defmodule Aikido.AI.TestTools.IdentityImplementation do
+defmodule Aikido.AI.TestTools.Identity.Actions.ReportScope do
   use Ash.Resource.Actions.Implementation
 
   def run(input, _, context) do
@@ -40,7 +40,7 @@ defmodule Aikido.AI.TestTools.Identity do
 
   actions do
     action :identity, :string do
-      run Aikido.AI.TestTools.IdentityImplementation
+      run Aikido.AI.TestTools.Identity.Actions.ReportScope
     end
   end
 end
