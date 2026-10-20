@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Give each team lifecycle, member and task action a dedicated implementation;
+  remove the signal-type dispatcher and retain shared pure operation mechanics.
+
 - Bind every ReAct signal directly to its own documented native action
   implementation, retaining shared pure preparation, scope and completion helpers.
 

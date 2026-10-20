@@ -138,9 +138,12 @@ defmodule Aikido.PureActionsTest do
     paths =
       Path.wildcard("lib/aikido/actions/**/*.ex") ++
         Path.wildcard("lib/aikido/slices/**/*.ex") ++
+        Path.wildcard("lib/aikido/ash/team/actions/*.ex") ++
         Path.wildcard("examples/agent_app/lib/agent_examples/**/implementation.ex") ++
         [
-          "lib/aikido/ash/team/engine.ex",
+          "lib/aikido/ash/team/inputs.ex",
+          "lib/aikido/ash/team/operation.ex",
+          "lib/aikido/ash/team/tasks.ex",
           "lib/aikido/slices/ai_react/handoff.ex",
           "lib/aikido/slices/ai_react/hooks.ex"
         ]
@@ -150,7 +153,9 @@ defmodule Aikido.PureActionsTest do
           ast = path |> File.read!() |> Code.string_to_quoted!(),
           reducer?(ast) ||
             path in [
-              "lib/aikido/ash/team/engine.ex",
+              "lib/aikido/ash/team/inputs.ex",
+              "lib/aikido/ash/team/operation.ex",
+              "lib/aikido/ash/team/tasks.ex",
               "lib/aikido/slices/ai_react/handoff.ex",
               "lib/aikido/slices/ai_react/hooks.ex"
             ],
@@ -163,6 +168,10 @@ defmodule Aikido.PureActionsTest do
   defp reducer?(ast) do
     {_ast, found?} =
       Macro.prewalk(ast, false, fn
+        {:use, _, [{:__aliases__, _, [:Ash, :Resource, :Actions, :Implementation]} | _]} = node,
+        _ ->
+          {node, true}
+
         {{:., _, [{:__aliases__, _, [:Aikido, :Types, :ActionResult]}, fun]}, _, _} = node, _
         when fun in [:new, :new!] ->
           {node, true}
