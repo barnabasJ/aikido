@@ -57,35 +57,50 @@ defmodule Aikido.TodoTest do
     assert repeated.todos.items == state.todos.items
   end
 
-  test "optional todo completion holds an answer and releases it when work is complete", ctx do
-    pid = start_server(ctx, Aikido.TodoTest.Agent)
-    {:ok, _} = command(pid, "aikido.todo.add", %{id: "one", text: "verify"})
+  for action <- ["complete", "remove", "block"] do
+    test "todo #{action} settles a waiting run with external default dispatch", ctx do
+      pid = start_server(ctx, Aikido.TodoTest.Agent, default_dispatch: {:pid, target: self()})
+      {:ok, _} = command(pid, "aikido.todo.add", %{id: "one", text: "verify"})
 
-    {:ok, waiting} =
-      Aikido.AgentServer.subscribe(
-        pid,
-        "ai.react.**",
-        fn runtime ->
-          if runtime.agent.state.ai.status == :waiting, do: {:ok, :waiting}, else: :skip
-        end,
-        once: true
-      )
+      {:ok, waiting} =
+        Aikido.AgentServer.subscribe(
+          pid,
+          "ai.react.**",
+          fn runtime ->
+            if runtime.agent.state.ai.status == :waiting, do: {:ok, :waiting}, else: :skip
+          end,
+          once: true
+        )
 
-    opts = [
-      model: "offline",
-      client: Aikido.TodoTest.Client,
-      options: %{completion: :todos},
-      timeout: 5_000
-    ]
+      opts = [
+        model: "offline",
+        client: Aikido.TodoTest.Client,
+        options: %{completion: :todos},
+        timeout: 5_000
+      ]
 
-    task = Task.async(fn -> Aikido.AI.ask_sync(pid, "do work", opts) end)
-    assert_receive {:aikido_subscription, ^waiting, %{result: {:ok, :waiting}}}, 2_000
-    {:ok, _} = command(pid, "aikido.todo.complete", %{id: "one", result: "proof"})
-    assert {:ok, "finished"} = Task.await(task)
+      task = Task.async(fn -> Aikido.AI.ask_sync(pid, "do work", opts) end)
+      assert_receive {:aikido_subscription, ^waiting, %{result: {:ok, :waiting}}}, 2_000
+
+      {:ok, _} =
+        command(pid, "aikido.todo.#{unquote(action)}", %{
+          id: "one",
+          result: "proof",
+          reason: :blocked
+        })
+
+      if unquote(action) == "block" do
+        assert {:error, {:todo_blocked, "one", :blocked}} = Task.await(task)
+      else
+        assert {:ok, "finished"} = Task.await(task)
+      end
+
+      refute_received {:signal, %{type: "aikido.todo.changed"}}
+    end
   end
 
   test "a todo deadline fails a waiting run and codecs never leave a lost timer active", ctx do
-    pid = start_server(ctx, Aikido.TodoTest.Agent)
+    pid = start_server(ctx, Aikido.TodoTest.Agent, default_dispatch: {:pid, target: self()})
     {:ok, _} = command(pid, "aikido.todo.add", %{id: "one", text: "wait", timeout_ms: 100})
 
     opts = [

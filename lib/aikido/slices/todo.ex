@@ -7,6 +7,9 @@ defmodule Aikido.Slices.Todo do
   not verify application-specific claims or write application databases.
   `options.completion: :todos` on AiReact holds its final answer until every
   blocking item completes. A blocked or expired item fails that run.
+
+  Change signals are local protocol messages, independent of `default_dispatch`.
+  Observe changes with `Aikido.AgentServer.subscribe/4`.
   """
   use Ash.Resource,
     data_layer: :embedded,

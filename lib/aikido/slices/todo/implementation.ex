@@ -14,13 +14,14 @@ defmodule Aikido.Slices.Todo.Implementation do
             revision: state.revision + 1
         },
         directives: [
-          Aikido.Directives.emit(
+          Aikido.Directives.emit_to_pid(
             struct!(Jido.Signal,
               id: nil,
               type: "aikido.todo.changed",
               data: %{id: id, removed: true},
               source: "/aikido"
-            )
+            ),
+            input.context.aikido.agent_pid
           )
         ]
       )
@@ -101,7 +102,7 @@ defmodule Aikido.Slices.Todo.Implementation do
             source: "/aikido"
           )
 
-        effects = [Aikido.Directives.emit(changed)]
+        effects = [Aikido.Directives.emit_to_pid(changed, input.context.aikido.agent_pid)]
 
         effects =
           if action == :add && data[:timeout_ms] do

@@ -18,7 +18,7 @@ defmodule Aikido.Slices.AiWorker.Cancel do
 
       Aikido.Types.ActionResult.new(
         state: %{state | pending: nil},
-        directives: [Aikido.Directives.emit(signal)]
+        directives: [Aikido.Directives.emit_to_pid(signal, input.context.aikido.agent_pid)]
       )
     else
       Aikido.Types.ActionResult.new(state: state)

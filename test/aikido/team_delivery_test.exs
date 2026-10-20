@@ -253,6 +253,72 @@ defmodule Aikido.TeamDeliveryTest do
     )
   end
 
+  test "worker cancellation releases queued work with external default dispatch", ctx do
+    worker =
+      start_server(ctx, Aikido.TeamDeliveryTest.Worker, default_dispatch: {:pid, target: self()})
+
+    task_data = %{
+      member: :worker,
+      attempt: "incarnation",
+      reply_to: self(),
+      text: "wait",
+      model: "offline",
+      client: Aikido.TeamDeliveryTest.Client,
+      llm_opts: [observer: self()]
+    }
+
+    assert {:ok, _} =
+             Aikido.AgentServer.call(
+               worker,
+               signal("harness.task", Map.put(task_data, :task_id, "slow")),
+               &{:ok, &1.agent.state.work}
+             )
+
+    assert_receive {:team_model, slow, _}, 2_000
+
+    assert {:ok, %{queue: [%{task_id: "next"}]}} =
+             Aikido.AgentServer.call(
+               worker,
+               signal("harness.task", Map.put(task_data, :task_id, "next")),
+               &{:ok, &1.agent.state.work}
+             )
+
+    monitor = Process.monitor(slow)
+
+    {:ok, completed} =
+      Aikido.AgentServer.subscribe(
+        worker,
+        "**",
+        fn runtime ->
+          if runtime.agent.state.work.completed == 1,
+            do: {:ok, runtime.agent.state.ai.result},
+            else: :skip
+        end,
+        once: true
+      )
+
+    assert :ok =
+             Aikido.AgentServer.cast(worker, signal("harness.cancel_task", %{task_id: "slow"}))
+
+    assert_receive {:DOWN, ^monitor, :process, ^slow, _}, 2_000
+    assert_receive {:team_model, next, _}, 2_000
+
+    send(
+      next,
+      {:answer,
+       struct!(ReqLLM.Response,
+         id: "scripted",
+         model: "offline",
+         context: ReqLLM.Context.new(),
+         message: ReqLLM.Context.assistant("done", tool_calls: []),
+         finish_reason: :stop
+       )}
+    )
+
+    assert_receive {:aikido_subscription, ^completed, %{result: {:ok, "done"}}}, 2_000
+    refute_received {:signal, %{type: "ai.react.cancel"}}
+  end
+
   test "restoration marks interrupted tasks explicitly instead of replaying effects" do
     state = %Aikido.Ash.Team.State{
       tasks: %{

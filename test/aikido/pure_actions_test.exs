@@ -69,9 +69,13 @@ defmodule Aikido.PureActionsTest do
     result =
       replay(Todo, :todo_add, %{state: state, id: "todo", text: "work", timeout_ms: 100}, signal)
 
-    assert [%Emit{signal: %{id: nil, time: nil}}, %Schedule{message: %{id: nil, time: nil}}] =
+    assert [
+             %Emit{signal: %{id: nil, time: nil}, dispatch: {:pid, target: target}},
+             %Schedule{message: %{id: nil, time: nil}}
+           ] =
              result.directives
 
+    assert target == self()
     refute_received {:signal, _}
     refute_received {:scheduled_signal, _}
   end
@@ -191,7 +195,7 @@ defmodule Aikido.PureActionsTest do
   defp replay(resource, action, params, signal) do
     input =
       Ash.ActionInput.for_action(resource, action, params,
-        context: %{aikido: %{signal: signal, slice_path: :test}}
+        context: %{aikido: %{signal: signal, slice_path: :test, agent_pid: self()}}
       )
 
     assert {:ok, %Aikido.Types.ActionResult{} = first} = Ash.run_action(input)

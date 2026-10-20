@@ -6,7 +6,9 @@ defmodule Aikido.Slices.AiWorker do
   is accepted on `harness.task`, launches a model turn by signal, and reports
   a correlated result to the assigning team. Observation is deferred to a
   separate signal so it sees the committed AiReact transition regardless of
-  routing order. Each action writes only its own slice.
+  routing order. Each action writes only its own slice. Internal task signals
+  target the worker directly, independent of `default_dispatch`; observe their
+  processing with `Aikido.AgentServer.subscribe/4`.
   """
   use Ash.Resource,
     data_layer: :embedded,
