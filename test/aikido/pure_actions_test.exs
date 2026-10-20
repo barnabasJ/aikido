@@ -115,6 +115,25 @@ defmodule Aikido.PureActionsTest do
     assert Directive.materialize_signal(emitted) == emitted
   end
 
+  test "the purity check permits native constructors and rejects signal materialization" do
+    for function <- [:new, :new!] do
+      source = "Aikido.Signal.#{function}(%{type: \"pure\", data: %{value: 1}})"
+      assert effect_calls(Code.string_to_quoted!(source)) == []
+    end
+
+    for {source, function} <- [
+          {~s|Aikido.Signal.new("effect", %{})|, :new},
+          {~s|Aikido.Signal.new("effect", %{}, source: "/test")|, :new},
+          {~s|Aikido.Signal.new!("effect", %{})|, :new!},
+          {~s|Aikido.Signal.new!("effect", %{}, source: "/test")|, :new!},
+          {~s|Aikido.Signal.materialize(%{type: "effect"})|, :materialize}
+        ] do
+      assert [{1, Aikido.Signal, ^function}] = effect_calls(Code.string_to_quoted!(source))
+    end
+
+    assert effect_calls(quote(do: Process.send_after(self(), :effect, 1))) != []
+  end
+
   test "reducer implementations do not directly call effect APIs" do
     paths =
       Path.wildcard("lib/aikido/actions/**/*.ex") ++
@@ -158,7 +177,7 @@ defmodule Aikido.PureActionsTest do
   defp effect_calls(ast) do
     {_ast, calls} =
       Macro.prewalk(ast, [], fn
-        {{:., _, [module, function]}, metadata, _} = node, calls ->
+        {{:., _, [module, function]}, metadata, args} = node, calls when is_list(args) ->
           module =
             case module do
               {:__aliases__, _, parts} -> Module.concat(parts)
@@ -182,10 +201,11 @@ defmodule Aikido.PureActionsTest do
             ] ||
               {module, function} in [
                 {DateTime, :utc_now},
-                {Aikido.Signal, :new},
-                {Aikido.Signal, :new!},
                 {:crypto, :strong_rand_bytes}
-              ]
+              ] ||
+              (module == Aikido.Signal &&
+                 ((function in [:new, :new!] && length(args) in [2, 3]) ||
+                    (function == :materialize && length(args) == 1)))
 
           {node, if(forbidden?, do: [{metadata[:line], module, function} | calls], else: calls)}
 
