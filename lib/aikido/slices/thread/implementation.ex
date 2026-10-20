@@ -26,7 +26,7 @@ defmodule Aikido.Slices.Thread.Implementation do
 
       _ ->
         Aikido.Types.ActionResult.new(
-          state: Aikido.Slices.Thread.new(options(input)),
+          state: Aikido.Slices.Thread.new(initial_options(input)),
           directives: []
         )
     end
@@ -46,7 +46,7 @@ defmodule Aikido.Slices.Thread.Implementation do
           state:
             Aikido.Slices.Thread.new(
               Keyword.merge(
-                options(input),
+                initial_options(input),
                 Enum.reject(Map.to_list(data), fn {_, value} -> is_nil(value) end)
               )
             ),
@@ -60,15 +60,19 @@ defmodule Aikido.Slices.Thread.Implementation do
   end
 
   defp append_ensure_thread(_, input) do
-    Aikido.Slices.Thread.new(options(input))
+    Aikido.Slices.Thread.new(initial_options(input))
   end
 
   defp options(input) do
+    [now: Aikido.SignalCtx.timestamp(get_in(input.context, [:aikido, :signal]))]
+  end
+
+  defp initial_options(input) do
     runtime = input.context[:aikido] || %{}
     signal = runtime[:signal]
     seed = {signal && signal.id, runtime[:agent_id], runtime[:slice_path], input.arguments}
     id = :crypto.hash(:sha256, :erlang.term_to_binary(seed)) |> Base.url_encode64(padding: false)
-    [now: Aikido.SignalCtx.timestamp(signal), id: "thread_" <> id]
+    Keyword.put(options(input), :id, "thread_" <> id)
   end
 
   defp entry_options(input, thread) do

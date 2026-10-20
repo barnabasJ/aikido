@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Compute deterministic Memory/Thread initialization IDs only when creating missing
+  state; existing-state mutations retain identities and use signal timestamps
+  without serializing and hashing the full history.
+
 - Preserve already encoded snapshots during DurableServer's initialization-lock
   checkpoint instead of rebuilding defaults or rerunning codecs. Verify state,
   logical parent bindings and saved cron definitions across repeated dumps.

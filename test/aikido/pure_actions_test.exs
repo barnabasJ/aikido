@@ -39,6 +39,8 @@ defmodule Aikido.PureActionsTest do
             )
         end
 
+      if resource in [Memory, Thread], do: assert(result.state.id == initialized.state.id)
+      assert result.state.created_at == initialized.state.created_at
       assert result.state.updated_at == timestamp
 
       if resource == Thread do
