@@ -3,7 +3,7 @@ defmodule Aikido.Ash.Team.Runtime do
 
   # Each function is one AsyncTask unit. No function changes agent state.
   def start_member(resource, id, initial_state, parent, scope) do
-    options = Ash.Scope.to_opts(scope)
+    options = Ash.Scope.to_opts(scope, context: Map.get(scope, :context) || %{})
     context = Keyword.get(options, :context, %{})
 
     context =

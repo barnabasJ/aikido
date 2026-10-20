@@ -938,13 +938,14 @@ defmodule Aikido.AgentServer do
         raw_opts
       end
 
+    {initialization_options, opts} = Keyword.pop(opts, :initialization_options, [])
     {restored_agent, opts} = Keyword.pop(opts, :restored_agent)
     {restored_cron, opts} = Keyword.pop(opts, :restored_cron_specs, %{})
 
     with {:ok, options} <- Options.new(opts),
          agent_module = options.agent_module,
          chain = build_middleware_chain(agent_module, options),
-         agent = restored_agent || build_agent(agent_module, options),
+         agent = restored_agent || build_agent(agent_module, options, initialization_options),
          {:ok, state} <-
            State.from_options(options, agent_module, agent, middleware_chain: chain) do
       state = maybe_monitor_parent(state)
@@ -961,10 +962,10 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  defp build_agent(agent_module, %Options{id: id, initial_state: state}) do
+  defp build_agent(agent_module, %Options{id: id, initial_state: state}, initialization_options) do
     agent_module
-    |> Ash.ActionInput.for_action(:initialize, %{id: id, state: state}, authorize?: false)
-    |> Ash.run_action!(authorize?: false)
+    |> Ash.ActionInput.for_action(:initialize, %{id: id, state: state}, initialization_options)
+    |> Ash.run_action!(initialization_options)
   end
 
   defp lifecycle_starting_signal(%State{} = state) do

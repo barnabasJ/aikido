@@ -36,7 +36,12 @@ defmodule Aikido.Ash.Runtime do
                agent: resource,
                initial_state: initial_state(resource, input.arguments),
                partition: runtime_options[:partition],
-               agent_opts: runtime_options,
+               agent_opts:
+                 Keyword.put(
+                   runtime_options,
+                   :initialization_options,
+                   command_context(input, context) |> Map.to_list()
+                 ),
                permanent: Keyword.get(runtime_options, :restart?, true)
              ) do
         restored? =
@@ -96,9 +101,11 @@ defmodule Aikido.Ash.Runtime do
   end
 
   defp command_context(input, context) do
-    input.context
-    |> Map.drop([:private, :aikido_runtime_options, :aikido, :authorize?])
-    |> Map.merge(Map.take(context, [:actor, :tenant, :tracer]))
+    application_context = Map.drop(input.context, [:private, :aikido_runtime_options, :aikido])
+
+    context
+    |> Ash.Scope.to_opts(context: application_context)
+    |> Map.new()
   end
 
   defp dispatch(resource, pid, signal) do
@@ -167,7 +174,7 @@ defmodule Aikido.Ash.Runtime do
 
   defp reference(resource, id, pid), do: %{id: id, pid: pid, resource: resource}
 
-  def list(resource, arguments \\ %{}) do
+  def list(resource, arguments \\ %{}, options \\ []) do
     safe(fn ->
       Enum.reduce_while(
         Aikido.Durable.members(
@@ -192,7 +199,8 @@ defmodule Aikido.Ash.Runtime do
                  Ash.Filter.Runtime.filter_matches(
                    Ash.Resource.Info.domain(resource),
                    records,
-                   filter
+                   filter,
+                   options
                  ) do
             records =
               records

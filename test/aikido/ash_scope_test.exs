@@ -7,7 +7,7 @@ defmodule AikidoTest.ScopeReducer do
         observed: %{
           actor: context.actor,
           tenant: context.tenant,
-          request_tag: input.context.aikido[:request_tag]
+          request_tag: input.context[:request_tag]
         }
       }
     )

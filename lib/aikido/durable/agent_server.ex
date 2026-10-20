@@ -25,13 +25,16 @@ defmodule Aikido.Durable.AgentServer do
     module = Keyword.fetch!(options, :agent_module)
     Code.ensure_loaded!(module)
 
+    initialization_options = Keyword.get(options, :initialization_options, [])
+
     agent =
       module
-      |> Ash.ActionInput.for_action(:initialize, %{
-        id: Keyword.fetch!(options, :id),
-        state: options[:initial_state] || %{}
-      })
-      |> Ash.run_action!(authorize?: false)
+      |> Ash.ActionInput.for_action(
+        :initialize,
+        %{id: Keyword.fetch!(options, :id), state: options[:initial_state] || %{}},
+        initialization_options
+      )
+      |> Ash.run_action!(initialization_options)
 
     agent = Aikido.Durable.Codec.transform_agent(agent, module, :externalize)
 

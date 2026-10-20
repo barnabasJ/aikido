@@ -32,7 +32,11 @@ defmodule Aikido.Ash.Action do
         end
 
       :list ->
-        Aikido.Ash.Runtime.list(input.resource, input.arguments)
+        Aikido.Ash.Runtime.list(
+          input.resource,
+          input.arguments,
+          Ash.Scope.to_opts(context, context: input.context)
+        )
 
       _ ->
         Aikido.Ash.Runtime.signal(input.resource, input, context)

@@ -43,7 +43,7 @@ defmodule Aikido.RuntimeNativeContractTest.ScopedWorker do
   end
 
   policies do
-    policy action(:start) do
+    policy action([:start, :initialize, :__aikido_initialize_state__]) do
       authorize_if actor_present()
     end
   end
