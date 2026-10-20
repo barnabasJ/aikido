@@ -7,13 +7,14 @@ mix deps.get
 mix bench                       # all suites
 mix bench actions               # native Ash reducer execution
 mix bench context               # incremental estimates versus a full recount
+mix bench router                # prebuilt exact and wildcard route tables
 mix bench --quick               # short smoke run of every scenario
 ```
 
 Normal runs measure throughput/latency for five seconds per scenario after two
 seconds of warmup, followed by one second each for memory and reductions.
 The quick mode uses 0.1 seconds for each phase; use it to verify the suite runs,
-not to draw performance conclusions. The full suite takes roughly two minutes.
+not to draw performance conclusions. The full suite takes several minutes.
 Benchee prints environment information, statistics and comparisons to the console.
 Its [configuration reference](https://benchee.hexdocs.pm/Benchee.Configuration.html)
 describes the measurements and available settings.
@@ -27,6 +28,12 @@ this measures reducer and input-handling costs, not AgentServer delivery.
 comparing incremental token accounting with recounting the resulting history.
 Both paths include the cost of appending to ReqLLM's context list. Token estimates
 are heuristic; these benchmarks do not measure a provider tokenizer.
+
+`router` measures the owned matching core and its public tagged-result API on
+prebuilt exact, mixed-wildcard and predicate tables. Construction is excluded;
+a batch contains 100 signals. These cases measure local matching, not end-to-end
+agent throughput. Workload shape matters: wildcard traversal and sorting cost
+more than direct exact-path lookup.
 
 Benchmark jobs are compiled inside module functions rather than interpreted by
 `Code.eval_file/1`. Inputs are prepared once outside the measured functions. Each

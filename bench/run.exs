@@ -1,8 +1,13 @@
 {options, selected, invalid} = OptionParser.parse(System.argv(), strict: [quick: :boolean])
-suites = %{"actions" => Aikido.Bench.Actions, "context" => Aikido.Bench.Context}
+
+suites = %{
+  "actions" => Aikido.Bench.Actions,
+  "context" => Aikido.Bench.Context,
+  "router" => Aikido.Bench.Router
+}
 
 if invalid != [] || Enum.any?(selected, &(!Map.has_key?(suites, &1))) do
-  Mix.raise("Usage: mix bench [--quick] [actions|context ...]")
+  Mix.raise("Usage: mix bench [--quick] [actions|context|router ...]")
 end
 
 settings =
