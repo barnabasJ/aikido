@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Build hook VMs through AshLua with serializable action-surface configuration
+  and per-invocation caller scope. Demonstrate an Ash action called from a hook.
+
 - Give each example its own LiveView page, with shared navigation, run lifecycle,
   source panels and reusable visuals.
 

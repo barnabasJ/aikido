@@ -20,9 +20,11 @@ defmodule AgentExamples.HookedAssistant do
         name: "briefing",
         event: :before_model,
         mode: :sync,
+        lua_options: [otp_app: :agent_examples, labels: [:analysis]],
         script: """
         if event.iteration == 0 then
-          return {context = "Keep the answer concise and cite the tool results."}
+          local stats = assert(analysis.text_stats({input = {text = "Keep the answer concise and cite the tool results."}}))
+          return {context = "Keep the answer concise and cite the tool results. The hook briefing has " .. stats.words .. " words."}
         end
         return {decision = "continue"}
         """

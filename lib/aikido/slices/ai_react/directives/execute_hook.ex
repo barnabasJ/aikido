@@ -52,12 +52,21 @@ defmodule Aikido.Slices.AiReact.Directives.ExecuteHook do
 
   @doc false
   def evaluate(hook, event, pid, request_id, source_signal \\ nil) do
+    scope =
+      if source_signal,
+        do: source_signal |> Ash.Scope.to_opts() |> Keyword.take([:actor, :tenant, :context]),
+        else: []
+
     lua =
-      Lua.new(
+      hook.lua_options
+      |> surface_options()
+      |> Keyword.merge(scope)
+      |> Keyword.put(:lua_options,
         max_instructions: hook.max_instructions,
         max_call_depth: hook.max_call_depth,
         max_string_bytes: hook.max_string_bytes
       )
+      |> AshLua.new()
       |> Lua.set!([:event], AshLua.Encoder.encode_result(event))
       |> install_request(hook, event, request_id)
 
@@ -92,6 +101,34 @@ defmodule Aikido.Slices.AiReact.Directives.ExecuteHook do
     error -> {:error, Exception.message(error)}
   catch
     kind, reason -> {:error, "#{kind}: #{inspect(reason)}"}
+  end
+
+  defp surface_options(options) do
+    case Keyword.pop(options, :eval_resource) do
+      {nil, options} ->
+        {surface, options} = Keyword.split(options, [:otp_app, :labels, :action_entrypoints])
+
+        manifest =
+          case Keyword.fetch(surface, :otp_app) do
+            {:ok, otp_app} ->
+              {:ok, manifest} =
+                AshLua.Surface.for_otp_app(otp_app, Keyword.delete(surface, :otp_app))
+
+              manifest
+
+            :error ->
+              %Ash.Info.Manifest{}
+          end
+
+        Keyword.put(options, :manifest, manifest)
+
+      {resource, options} ->
+        {:ok, manifest} = AshLua.Surface.for_eval_resource(resource)
+
+        options
+        |> Keyword.drop([:otp_app, :labels, :action_entrypoints])
+        |> Keyword.put(:manifest, manifest)
+    end
   end
 
   defp install_signals(lua, pid, request_id, name, source_signal) do

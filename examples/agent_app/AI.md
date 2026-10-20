@@ -204,3 +204,9 @@ The live entry point creates the same team with the default `ReqLLM.Generation`
 client and a runtime model specification, then asks for worker-created helpers and
 independent review. The key stays in ReqLLM's environment lookup. This path
 requires a real account and is not part of the offline tests.
+
+The `/examples/hooks` briefing uses the same AshLua action bindings: its
+`lua_options: [otp_app: :agent_examples, labels: [:analysis]]` exposes
+`analysis.text_stats` to the hook script. Each execution builds a fresh VM with
+the caller's actor, tenant and application context. The VM and caller credentials
+are not saved as hook configuration.

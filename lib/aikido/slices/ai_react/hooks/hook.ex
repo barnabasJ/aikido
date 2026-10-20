@@ -8,6 +8,12 @@ defmodule Aikido.Slices.AiReact.Hooks.Hook do
   `aikido.send_signal(type, data)` on their originating agent. Neither mode
   can write agent state directly.
 
+  Each execution uses a fresh AshLua VM. `lua_options` selects the application's
+  action surface with `otp_app`, optional `labels` and `action_entrypoints`, or an
+  `eval_resource` configured with `AshLua.EvalActions`. Empty options expose no
+  application actions. These selectors are serializable configuration; the live
+  actor, tenant and application context come from the triggering signal.
+
   Both modes can call `aikido.request(type, payload)` and receive a response
   inside Lua. Supply an external capture such as `request: &MyApp.Hooks.request/2`.
   The callback receives `%{type: type, payload: payload}` and context containing
@@ -56,6 +62,31 @@ defmodule Aikido.Slices.AiReact.Hooks.Hook do
       description "Lua source evaluated for each matching lifecycle event."
       allow_nil? false
       public? true
+    end
+
+    attribute :lua_options, :keyword do
+      description "Serializable AshLua surface configuration; select an OTP app or an EvalActions resource. Empty options expose no Ash actions."
+      public? true
+      allow_nil? false
+      default []
+
+      constraints fields: [
+                    otp_app: [type: :atom],
+                    eval_resource: [type: :atom],
+                    labels: [type: {:array, :atom}],
+                    action_entrypoints: [
+                      type: {:array, :tuple},
+                      constraints: [
+                        items: [
+                          fields: [
+                            resource: [type: :atom, allow_nil?: false],
+                            action: [type: :atom, allow_nil?: false]
+                          ]
+                        ]
+                      ]
+                    ],
+                    forbidden_fields: [type: :atom, constraints: [one_of: [:hide, :display]]]
+                  ]
     end
 
     attribute :request, :function do

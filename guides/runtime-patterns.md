@@ -169,11 +169,36 @@ before the run's last model request; use a synchronous hook when that context
 must be present. Gates use request IDs and sequence tokens to ignore stale or
 duplicate completions, and cancellation invalidates their continuations.
 
-Each invocation gets a fresh sandboxed VM with `event` and the safe Lua standard
-library. Both modes can request a response; only async hooks receive the
-fire-and-forget signal helpers.
-They cannot access the model's tool registry or write agent state. Ash types
-validate hook configuration and decisions; Ash Lua owns value encoding.
+Each invocation builds a fresh VM through `AshLua.new`, then installs `event`
+and the hook helpers. Both modes can request a response; only async hooks receive
+the fire-and-forget signal helpers. Hook scripts call Ash actions through the
+configured AshLua surface, independently of the model's tool registry. Actions
+retain their own authorization. Scripts cannot directly write agent state.
+Ash types validate hook configuration and decisions; AshLua owns action bindings
+and value encoding.
+
+Select the surface with serializable `lua_options` on each hook:
+
+```elixir
+%{
+  name: "briefing",
+  event: :before_model,
+  mode: :sync,
+  lua_options: [otp_app: :my_app, labels: [:analysis]],
+  script: """
+  local stats = assert(analysis.text_stats({input = {text = "Briefing"}}))
+  return {context = "Briefing words: " .. stats.words}
+  """
+}
+```
+
+The domain defines `analysis.text_stats` through `AshLua.Domain`. Native `labels`
+and `action_entrypoints` filters select the exposed functions. Alternatively,
+`lua_options: [eval_resource: MyApp.LuaSurface]` reuses an `AshLua.EvalActions`
+resource's configured surface. Empty options expose no Ash actions. Caller actor,
+tenant and application context come from the current signal at execution time;
+they are not part of the saved VM configuration. A VM is never stored in agent
+state.
 Defaults are 100,000 VM instructions, a call depth of 64, and 1 MiB per string.
 Override these with `max_instructions`, `max_call_depth`, and `max_string_bytes`
 on a hook. Hook tasks are ordinary supervised tasks, not durable jobs; saved
