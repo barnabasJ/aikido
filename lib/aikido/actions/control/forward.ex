@@ -18,7 +18,13 @@ defmodule Aikido.Actions.Control.Forward do
     final_source = resolve_source(source, original)
 
     out_signal =
-      %Aikido.Signal{id: nil, type: final_type, data: final_payload, source: final_source}
+      case original do
+        %Aikido.Signal{} ->
+          %{original | type: final_type, data: final_payload, source: final_source}
+
+        _ ->
+          %Aikido.Signal{type: final_type, data: final_payload, source: final_source}
+      end
 
     directive = Aikido.Directives.emit_to_pid(out_signal, pid)
     Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [directive])
@@ -40,7 +46,7 @@ defmodule Aikido.Actions.Control.Forward do
     payload
   end
 
-  defp resolve_payload(nil, %{data: data}) when is_map(data) do
+  defp resolve_payload(nil, %{data: data}) do
     data
   end
 

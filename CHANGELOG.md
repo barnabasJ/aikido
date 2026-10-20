@@ -6,6 +6,12 @@
 
 ### Changed
 
+- Preserve whole-payload native action defaults and scalar values through public
+  commands and reducer execution. Forward existing signal identity, reply routing
+  and caller context when relaying requests.
+- Cancel active AI work while terminal hooks wait, and fail worker tasks without
+  an effective model promptly while progressing queued tasks.
+
 - Replace internal Jido Signal envelopes with native Ash/Spark `Aikido.Signal`
   contracts carrying payload, scope and tracing context together. Deliver agent
   messages directly and execute broadcasts through Ash notifiers in directives.

@@ -250,7 +250,7 @@ Both first activation and later durable snapshots apply slice `externalize/1`
 and agent `checkpoint/2`; loading applies `restore/2` and `reinstate/1`. Startup
 state is not saved a second time in process options. Keep credentials out of
 snapshots; persist application identity only through application-owned codecs.
-Explicit middleware and dispatch configuration is retained for restoration;
+Explicit middleware configuration is retained for restoration;
 keep credentials out of that configuration and resolve them through application
 providers instead.
 
