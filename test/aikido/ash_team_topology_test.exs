@@ -28,6 +28,39 @@ defmodule AikidoTest.AshTeamTopologyTest do
     assert Map.has_key?(topology.nodes, :lead)
   end
 
+  test "ownership descendants exclude members connected only by dependencies" do
+    assert {:ok, topology} =
+             Topology.build(
+               %{
+                 root: member_spec(),
+                 child: member_spec(owner: :root),
+                 grandchild: member_spec(owner: :child),
+                 dependent: member_spec(depends_on: [:child])
+               },
+               Instance
+             )
+
+    assert MapSet.new(Topology.owned_members(topology, [:root])) ==
+             MapSet.new([:root, :child, :grandchild])
+
+    assert :dependent in Topology.affected(topology, [:root])
+  end
+
+  test "ordering a selected subset ignores prerequisites outside that subset" do
+    assert {:ok, topology} =
+             Topology.build(
+               %{
+                 root: member_spec(),
+                 child: member_spec(owner: :root),
+                 last: member_spec(depends_on: [:child])
+               },
+               Instance
+             )
+
+    assert {:ok, [:child, :last]} = Topology.order(topology.nodes, [:last, :child])
+    assert {:ok, [:last]} = Topology.order(topology.nodes, [:last])
+  end
+
   test "unknown references, self references, and mixed ownership/dependency cycles fail" do
     for nodes <- [
           %{one: member_spec(owner: :missing)},

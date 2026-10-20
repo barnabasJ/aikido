@@ -132,6 +132,28 @@ defmodule AikidoTest.Slices.FSMTest do
     end
   end
 
+  test "initialization derives terminal status only when no explicit boolean is supplied" do
+    for {attributes, expected} <- [
+          {%{state: "done", terminal_states: ["done"]}, true},
+          {%{state: "done", terminal_states: ["done"], terminal?: false}, false},
+          {%{state: "ready", terminal_states: ["done"], terminal?: true}, true}
+        ] do
+      assert {:ok, record} =
+               Aikido.Slices.FSM
+               |> Ash.Changeset.for_create(:create, attributes)
+               |> Ash.Changeset.apply_attributes()
+
+      assert record.terminal? == expected
+
+      agent =
+        AikidoTest.Slices.FSMTest.ConfiguredFSMAgent.initialize!(%{
+          state: %{fsm: attributes}
+        })
+
+      assert agent.state.fsm.terminal? == expected
+    end
+  end
+
   test "history records successful native transitions in chronological order" do
     initial = AikidoTest.Slices.FSMTest.DefaultFSMAgent.initialize!().state.fsm
 

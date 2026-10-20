@@ -37,7 +37,9 @@ defmodule AgentExamples.Demo do
 
       after_signal(counter_pid, "counter.add", fn ->
         Agents.team_send!(team, %{
-          data: %{member: :counter, type: "counter.add", payload: %{amount: 5}}
+          member: :counter,
+          type: "counter.add",
+          payload: %{amount: 5}
         })
       end)
 

@@ -88,7 +88,9 @@ defmodule AgentExamples.AgentsTest do
     assert {:ok, _} =
              snapshot_result(
                Agents.team_send(team, %{
-                 data: %{member: :counter, type: "counter.add", payload: %{amount: 2}}
+                 member: :counter,
+                 type: "counter.add",
+                 payload: %{amount: 2}
                })
              )
 

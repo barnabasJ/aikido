@@ -12,11 +12,13 @@ defmodule AikidoTest.AshTeamTest do
   end
 
   test "team commands derive their public arguments from the owning reducer" do
-    public = Ash.Resource.Info.action(DynamicTeam, :add_member)
-    reducer = Ash.Resource.Info.action(Aikido.Ash.Team.State, :add_member)
+    for name <- [:add_member, :send] do
+      public = Ash.Resource.Info.action(DynamicTeam, name)
+      reducer = Ash.Resource.Info.action(Aikido.Ash.Team.State, name)
 
-    assert Enum.map(public.arguments, & &1.name) -- [:agent] ==
-             Enum.map(reducer.arguments, & &1.name) -- [:state]
+      assert Enum.map(public.arguments, & &1.name) -- [:agent] ==
+               Enum.map(reducer.arguments, & &1.name) -- [:state]
+    end
 
     input =
       Ash.ActionInput.for_action(Aikido.Ash.Team.State, :add_member, %{
@@ -38,6 +40,56 @@ defmodule AikidoTest.AshTeamTest do
                activation: :unknown
              })
              |> Ash.run_action()
+  end
+
+  test "send validates its native inputs before delivery and defaults its payload" do
+    team = Domain.team_start!(%{id: "send-contract"})
+
+    for arguments <- [
+          %{type: "counter.increment"},
+          %{member: :worker},
+          %{member: :worker, type: "counter.increment", payload: 5},
+          %{member: :worker, type: %{invalid: true}}
+        ] do
+      input = Ash.ActionInput.for_action(DynamicTeam, :send, Map.put(arguments, :agent, team))
+      refute input.valid?
+      assert {:error, %Ash.Error.Invalid{}} = Ash.run_action(input)
+    end
+
+    input =
+      Ash.ActionInput.for_action(DynamicTeam, :send, %{
+        agent: team,
+        member: :worker,
+        type: "counter.increment"
+      })
+
+    assert input.valid?
+    assert input.arguments.payload == %{}
+
+    cast =
+      Ash.ActionInput.for_action(DynamicTeam, :send, %{
+        agent: team,
+        member: :worker,
+        type: "counter.increment",
+        payload: ~s({"amount": 2})
+      })
+
+    assert cast.valid?
+    assert cast.arguments.payload == %{"amount" => 2}
+
+    worker = Domain.team_inspect!(team).team.members.worker
+
+    assert {:ok, ref} =
+             Aikido.AgentServer.subscribe(
+               worker,
+               "counter.increment",
+               &{:ok, &1.agent.state.state.count},
+               once: true
+             )
+
+    assert {:ok, _} = Domain.team_send(team, %{member: :worker, type: "counter.increment"})
+    assert_receive {:aikido_subscription, ^ref, %{result: {:ok, 3}}}
+    assert {:error, _} = Domain.team_send(team, %{member: :missing, type: "counter.increment"})
   end
 
   test "lifecycle commands return even when they complete immediately and release their subscriptions" do

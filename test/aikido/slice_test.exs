@@ -138,13 +138,13 @@ defmodule AikidoTest.SliceTest do
                Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice)
     end
 
-    test "casts supplied values and applies defaults to nil" do
+    test "casts supplied values and rejects explicitly forbidden nil" do
       assert {:ok, %{enabled: false}} =
                Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{
                  "enabled" => "false"
                })
 
-      assert {:ok, %{enabled: true}} =
+      assert {:error, %Ash.Error.Changes.InvalidAttribute{field: :enabled}} =
                Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{enabled: nil})
     end
 

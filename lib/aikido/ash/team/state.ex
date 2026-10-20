@@ -108,7 +108,9 @@ defmodule Aikido.Ash.Team.State do
     action :send, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
-      argument :data, :map, default: %{}
+      argument :member, :term, allow_nil?: false
+      argument :type, :string, allow_nil?: false
+      argument :payload, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 

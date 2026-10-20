@@ -414,7 +414,7 @@ defmodule Aikido.Ash.Team.Engine do
 
     cond do
       Map.get(state.members, name) == pid ->
-        affected = owned_members(state.topology.nodes, [name])
+        affected = Topology.owned_members(state.topology, [name])
         previous = state
 
         tasks =
@@ -469,12 +469,6 @@ defmodule Aikido.Ash.Team.Engine do
       true ->
         {:ok, state, []}
     end
-  end
-
-  defp owned_members(nodes, names) do
-    children = for {name, spec} <- nodes, spec.owner in names, do: name
-    next = Enum.uniq(names ++ children)
-    if length(next) == length(names), do: next, else: owned_members(nodes, next)
   end
 
   defp send_message(data, state) do

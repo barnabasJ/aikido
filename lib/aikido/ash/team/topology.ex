@@ -41,7 +41,7 @@ defmodule Aikido.Ash.Team.Topology do
 
   def remove(%__MODULE__{} = topology, name, cascade?) do
     with true <- Map.has_key?(topology.nodes, name) || {:error, {:unknown_member, name}} do
-      owned = closure(topology.nodes, [name], :owner)
+      owned = owned_members(topology, [name])
       affected = closure(topology.nodes, owned, :all)
 
       if !cascade? and MapSet.new(affected) != MapSet.new(owned) do
@@ -66,12 +66,15 @@ defmodule Aikido.Ash.Team.Topology do
 
   def affected(%__MODULE__{nodes: nodes}, names), do: closure(nodes, names, :all)
 
+  @doc "Returns the supplied members and their ownership descendants, excluding dependents."
+  def owned_members(%__MODULE__{nodes: nodes}, names), do: closure(nodes, names, :owner)
+
   def order(nodes, selected) do
     selected = MapSet.new(selected)
-    do_order(nodes, selected, MapSet.new(), [])
+    do_order(nodes, selected, [])
   end
 
-  defp do_order(nodes, remaining, done, result) do
+  defp do_order(nodes, remaining, result) do
     if MapSet.size(remaining) == 0 do
       {:ok, Enum.reverse(result)}
     else
@@ -80,7 +83,7 @@ defmodule Aikido.Ash.Team.Topology do
         |> Enum.filter(fn name ->
           Enum.all?(
             prerequisites(nodes[name]),
-            &(!MapSet.member?(remaining, &1) || MapSet.member?(done, &1))
+            &(!MapSet.member?(remaining, &1))
           )
         end)
         |> Enum.sort()
@@ -93,7 +96,6 @@ defmodule Aikido.Ash.Team.Topology do
           do_order(
             nodes,
             Enum.reduce(ready, remaining, &MapSet.delete(&2, &1)),
-            Enum.reduce(ready, done, &MapSet.put(&2, &1)),
             Enum.reverse(ready) ++ result
           )
       end

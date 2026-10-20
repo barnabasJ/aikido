@@ -59,8 +59,16 @@ defmodule Aikido.Slice.Config do
       fields ->
         values =
           Map.new(fields, fn field ->
-            value = Map.get(config, field.name, Map.get(config, to_string(field.name)))
-            {field.name, if(is_nil(value), do: default(field.default), else: value)}
+            value =
+              case Map.fetch(config, field.name) do
+                {:ok, value} ->
+                  value
+
+                :error ->
+                  Map.get_lazy(config, to_string(field.name), fn -> default(field.default) end)
+              end
+
+            {field.name, value}
           end)
 
         constraints =

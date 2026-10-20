@@ -36,11 +36,6 @@ defmodule AikidoTest.Thread.SliceTest do
              )
     end
 
-    test "schema is bound to the thread resource" do
-      assert Ash.Resource.Info.attribute_names(Aikido.Slices.Thread) ==
-               Ash.Resource.Info.attribute_names(Aikido.Slices.Thread)
-    end
-
     test "exposes one signal route per action" do
       route_types =
         Aikido.Slices.Thread

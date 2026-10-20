@@ -37,11 +37,6 @@ defmodule AikidoTest.Identity.SliceTest do
              )
     end
 
-    test "schema is bound to the identity resource" do
-      assert Ash.Resource.Info.attribute_names(Aikido.Slices.Identity) ==
-               Ash.Resource.Info.attribute_names(Aikido.Slices.Identity)
-    end
-
     test "exposes one signal route per action" do
       route_types =
         Aikido.Slices.Identity

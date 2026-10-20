@@ -106,7 +106,9 @@ defmodule AgentExamplesWeb.ExampleLive do
   def handle_event("team_add", _, socket),
     do:
       command(socket, :send, %{
-        data: %{member: :counter, type: "counter.add", payload: %{amount: 1}}
+        member: :counter,
+        type: "counter.add",
+        payload: %{amount: 1}
       })
 
   def handle_event("spawn_squad", _, socket) do
@@ -150,11 +152,9 @@ defmodule AgentExamplesWeb.ExampleLive do
   def handle_event("squad_add", %{"member" => member}, socket),
     do:
       command(socket, :send, %{
-        data: %{
-          member: member,
-          type: "aikido.ash.team.send",
-          payload: %{member: :counter, type: "counter.add", payload: %{amount: 1}}
-        }
+        member: member,
+        type: "aikido.ash.team.send",
+        payload: %{member: :counter, type: "counter.add", payload: %{amount: 1}}
       })
 
   def handle_async(:start_example, {:ok, {:ok, run}}, socket),

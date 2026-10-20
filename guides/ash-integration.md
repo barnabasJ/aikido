@@ -227,6 +227,12 @@ Use normal Ash `tracer:` options to follow the chain across processes; see
 
 ## Embedded slice resources
 
+Slice `config_schema` fields use Ash types and constraints. Defaults apply when a
+field is absent from the merged application configuration and mount options.
+An explicitly supplied `nil` stays nil and must satisfy the field's `allow_nil?`
+constraint; `false` remains a supplied boolean. Atom keys take precedence over
+string keys when both are present.
+
 Slices package state and the Ash actions that operate on it:
 
 ```elixir
@@ -329,7 +335,7 @@ slice tracks live member PIDs through routed child lifecycle actions.
 {:ok, team} = MyApp.Agents.review_team_start(%{id: "review-1"})
 
 {:ok, team} = MyApp.Agents.review_team_send(team, %{
-  data: %{member: :planner, type: "counter.add", payload: %{amount: 2}}
+  member: :planner, type: "counter.add", payload: %{amount: 2}
 })
 
 {:ok, %{status: :stopped}} = MyApp.Agents.review_team_stop(team)

@@ -9,8 +9,10 @@ defmodule Aikido.Slices.FSM.Initialize do
         Ash.Changeset.get_attribute(changeset, :initial_state)
 
     terminal =
-      Ash.Changeset.get_attribute(changeset, :terminal?) ||
-        state in Ash.Changeset.get_attribute(changeset, :terminal_states)
+      case Ash.Changeset.get_attribute(changeset, :terminal?) do
+        nil -> state in Ash.Changeset.get_attribute(changeset, :terminal_states)
+        terminal -> terminal
+      end
 
     changeset
     |> Ash.Changeset.change_attribute(:state, state)
