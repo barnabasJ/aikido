@@ -31,11 +31,6 @@ defmodule AikidoTest.Telemetry.ConfigTest do
       assert Aikido.Telemetry.Config.telemetry_log_level(nil) ==
                Aikido.Config.Defaults.telemetry_log_level()
     end
-
-    test "nil instance skips debug override" do
-      assert Aikido.Telemetry.Config.telemetry_log_level(nil) ==
-               Aikido.Config.Defaults.telemetry_log_level()
-    end
   end
 
   describe("slow_signal_threshold_ms/1") do

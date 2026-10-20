@@ -48,13 +48,8 @@ defmodule Aikido.NativeRuntimeScopeTest.Slice do
   end
 end
 
-defmodule Aikido.NativeRuntimeScopeTest.Capture do
-  use Ash.Resource.Actions.Implementation
-
-  @impl true
-  def run(input, _, context) do
-    runtime = input.context.aikido
-
+defmodule Aikido.NativeRuntimeScopeTest.Observation do
+  def state(input, context) do
     observed = %{
       actor_id: context.actor && context.actor.id,
       tenant: context.tenant,
@@ -62,33 +57,53 @@ defmodule Aikido.NativeRuntimeScopeTest.Capture do
       shared: input.context[:shared] && input.context.shared[:shared_marker],
       authorize?: context.authorize?,
       tracers: List.wrap(context.tracer),
-      agent_id: runtime.agent_id
+      agent_id: input.context.aikido.agent_id
     }
 
-    directives =
-      case runtime.signal.type do
-        "scope.capture" ->
-          [
-            Aikido.Directives.async_task(fn ->
-              %Aikido.Signal{
-                id: "scope-result",
-                time: "2026-01-01T00:00:00Z",
-                type: "scope.result",
-                source: "/test"
-              }
-            end)
-          ]
+    %{input.arguments.state | observed: observed}
+  end
+end
 
-        "scope.spawn" ->
-          [Aikido.Directives.spawn_agent(Aikido.NativeRuntimeScopeTest.Resource, :child)]
+defmodule Aikido.NativeRuntimeScopeTest.Capture do
+  use Ash.Resource.Actions.Implementation
 
-        _ ->
-          []
-      end
-
+  @impl true
+  def run(input, _, context) do
     Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | observed: observed},
-      directives: directives
+      state: Aikido.NativeRuntimeScopeTest.Observation.state(input, context),
+      directives: [
+        Aikido.Directives.async_task(fn ->
+          %Aikido.Signal{
+            id: "scope-result",
+            time: "2026-01-01T00:00:00Z",
+            type: "scope.result",
+            source: "/test"
+          }
+        end)
+      ]
+    )
+  end
+end
+
+defmodule Aikido.NativeRuntimeScopeTest.Spawn do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _, context) do
+    Aikido.Types.ActionResult.new(
+      state: Aikido.NativeRuntimeScopeTest.Observation.state(input, context),
+      directives: [Aikido.Directives.spawn_agent(Aikido.NativeRuntimeScopeTest.Resource, :child)]
+    )
+  end
+end
+
+defmodule Aikido.NativeRuntimeScopeTest.Observe do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _, context) do
+    Aikido.Types.ActionResult.new(
+      state: Aikido.NativeRuntimeScopeTest.Observation.state(input, context)
     )
   end
 end
@@ -134,10 +149,10 @@ defmodule Aikido.NativeRuntimeScopeTest.Resource do
     end
 
     slice :mounted, Aikido.NativeRuntimeScopeTest.Slice
-    signal :capture, "scope.capture", :reduce
-    signal :observe, "scope.observe", :reduce
-    signal :spawn, "scope.spawn", :reduce
-    route "scope.result", :reduce
+    signal :capture, "scope.capture", :capture_scope
+    signal :observe, "scope.observe", :observe_scope
+    signal :spawn, "scope.spawn", :spawn_child
+    route "scope.result", :observe_scope
   end
 
   changes do
@@ -154,9 +169,19 @@ defmodule Aikido.NativeRuntimeScopeTest.Resource do
       primary? true
     end
 
-    action :reduce, Aikido.Types.ActionResult do
+    action :capture_scope, Aikido.Types.ActionResult do
       argument :state, :term
       run Aikido.NativeRuntimeScopeTest.Capture
+    end
+
+    action :observe_scope, Aikido.Types.ActionResult do
+      argument :state, :term
+      run Aikido.NativeRuntimeScopeTest.Observe
+    end
+
+    action :spawn_child, Aikido.Types.ActionResult do
+      argument :state, :term
+      run Aikido.NativeRuntimeScopeTest.Spawn
     end
   end
 

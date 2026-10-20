@@ -602,19 +602,10 @@ defmodule AikidoTest.AgentServerTest do
       assert indices == Enum.to_list(1..10)
       GenServer.stop(pid)
     end
-
-    test("status transitions correctly", %{aikido: aikido}) do
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
-
-      {:ok, status} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.status} end)
-      assert status == :idle
-      GenServer.stop(pid)
-    end
   end
 
   describe("status transitions") do
-    test("starts as initializing then transitions to idle", %{aikido: aikido}) do
+    test("is idle after startup", %{aikido: aikido}) do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
@@ -900,16 +891,6 @@ defmodule AikidoTest.AgentServerTest do
   end
 
   describe("server resolution") do
-    test("resolves pid directly", %{aikido: aikido}) do
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
-
-      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
-      {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-      assert agent.state.domain.counter == 1
-      GenServer.stop(pid)
-    end
-
     test("resolves via tuple", %{aikido: aikido}) do
       {:ok, _pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
@@ -963,14 +944,6 @@ defmodule AikidoTest.AgentServerTest do
 
       assert {:error, :invalid_server} =
                Aikido.AgentServer.call({:invalid}, signal, fn s -> {:ok, s.agent} end)
-    end
-
-    test("alive? returns false for non-existent server", %{aikido: aikido}) do
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
-
-      GenServer.stop(pid)
-      refute Aikido.AgentServer.alive?(pid)
     end
   end
 

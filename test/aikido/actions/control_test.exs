@@ -201,26 +201,5 @@ defmodule AikidoTest.Actions.ControlTest do
 
       assert result == %{}
     end
-
-    test "leaves state unchanged when the input signal has no reply_to" do
-      input =
-        Signal.new!(%{
-          type: "query",
-          source: "/test",
-          data: %{signal_type: "response", payload: %{}}
-        })
-
-      {:ok, %Aikido.Types.ActionResult{state: result, directives: []}} =
-        then(input, fn signal ->
-          Aikido.AgentServer.RuntimeActions
-          |> Ash.ActionInput.for_action(:reply, Map.put(signal.data || %{}, :state, %{}),
-            context: %{aikido: Map.put(%{}, :signal, signal)},
-            skip_unknown_inputs: [:*]
-          )
-          |> Ash.run_action()
-        end)
-
-      assert result == %{}
-    end
   end
 end

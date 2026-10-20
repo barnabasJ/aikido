@@ -91,7 +91,6 @@ defmodule Aikido.SignalScopeTest do
 
     assert {:ok, ^literal} = Signal.new(literal)
     assert {:ok, ^literal} = Ash.Type.cast_input(Signal, literal, [])
-    assert {:ok, ^literal} = Ash.Type.cast_input(Signal, literal, [])
 
     assert Ash.Scope.to_opts(literal) == [
              actor: nil,
