@@ -25,7 +25,7 @@ defmodule Aikido.Slices.AiReact do
 
   slice do
     name "ai"
-    description "ReAct reasoning slice attached via `slices:` on a Aikido.Agent."
+    description "Embedded ReAct conversation state and native signal reducers."
 
     schema do
       attribute :handoff_pending, :integer do
