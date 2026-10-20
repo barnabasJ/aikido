@@ -51,8 +51,9 @@ Signal declarations generate the native Ash actions on the existing resource;
 the implementation modules provide their callbacks without creating resources.
 
 Place each resource beside its owned implementations and signal definitions.
-For example, `counter.ex`, `counter/implementation.ex` and `counter/signals.ex`
-keep the example counter's state, reducers and payload contracts together.
+For example, `counter.ex`, `counter/increment.ex` and
+`counter/signals/add.ex` keep the example counter's state, reducer and payload
+contract together, with each filename matching its module.
 
 Library features follow the same rule: ReAct signals, hooks, execution helpers
 and directives live under `Aikido.Slices.AiReact`; runtime protocol signals live
@@ -525,7 +526,7 @@ process side effects cannot be rolled back as a database transaction.
 Generated actions use native Ash arguments and return types. Reducers return
 `Aikido.Types.ActionResult`; ordinary tools return their declared Ash type. Implement
 callbacks with `Ash.Resource.Actions.Implementation` modules and reference them
-with `run MyApp.Implementation` on the owning resource.
+with a descriptive binding such as `run MyApp.AppendEntry` on the owning resource.
 
 Agent and slice `schema do` declarations become attributes on their existing
 Ash resources. Slice configuration declarations remain Spark entities. Resolution

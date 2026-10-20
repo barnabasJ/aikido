@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Give action modules descriptive behavior names and place example actions and
+  signal definitions in files matching their module names. Update source panels
+  and test fixtures to the same convention.
+
 - Remove the misleading misuse warning for intentional normal Stop directives.
   Distinguish asynchronous task completion from process shutdown and show the
   opening AI signal in the external subscription example. Shutdown semantics

@@ -226,7 +226,7 @@ defmodule Aikido.AgentServer do
   @typedoc """
   Selector for `call/4` and `state/3`. Receives the full
   `%AgentServer.State{}`; the slice the user cares about lives at
-  `state.agent.state` (or under the agent's declared `path/0`). Must
+  `state.agent.state`, under its configured own-state or mounted slice path. Must
   return a tagged `{:ok, _}` or `{:error, _}` tuple.
 
   Selectors run synchronously in the agent process. A raising selector is
