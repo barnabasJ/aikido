@@ -99,10 +99,9 @@ defmodule AikidoTest.DirectiveFailureTest do
           assert :ok = Aikido.AgentServer.cast(pid, input)
       end
 
+      assert {:ok, 1} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.state.count})
       assert_receive {:signal, %{type: "test.effect", data: %{label: :before, count: 1}}}
       assert_receive {:aikido_subscription, ^ref, %{result: {:ok, 1}}}
-
-      assert {:ok, 1} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.state.count})
       refute_received {:signal, %{type: "test.effect", data: %{label: :after}}}
 
       replacement = AikidoTest.LifecycleWait.restart(pid)
