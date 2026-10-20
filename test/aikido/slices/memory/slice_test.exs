@@ -86,6 +86,41 @@ defmodule AikidoTest.Memory.SliceTest do
     assert result.state.spaces.example.data == %{}
   end
 
+  test "replacing a space increments its existing revision and keeps replacement metadata" do
+    original = Aikido.Slices.Memory.new(id: "revision-test", now: 0)
+
+    final =
+      Enum.reduce(1..2, original, fn count, state ->
+        assert {:ok, result} =
+                 Aikido.Slices.Memory
+                 |> Ash.ActionInput.for_action(:update_space, %{
+                   state: state,
+                   space: :world,
+                   value: %{data: %{count: count}, metadata: %{replacement: count}}
+                 })
+                 |> Ash.run_action()
+
+        assert result.directives == []
+        assert result.state.spaces.world.rev == count
+        assert result.state.spaces.world.data == %{count: count}
+        assert result.state.spaces.world.metadata == %{replacement: count}
+        assert result.state.rev == count
+        result.state
+      end)
+
+    replacement = Aikido.Slices.Memory.Space.new!(data: %{fresh: true})
+    state = %{final | spaces: Map.put(final.spaces, :world, %{final.spaces.world | rev: 5})}
+    updated = Aikido.Slices.Memory.update_space(state, :world, fn _ -> replacement end, now: 0)
+    assert updated.spaces.world.rev == 6
+    assert updated.spaces.world.data == %{fresh: true}
+
+    assert Aikido.Slices.Memory.put_space(state, :world, replacement, now: 0).spaces.world.rev ==
+             0
+
+    assert original.spaces.world.rev == 0
+    assert original.spaces.world.data == %{}
+  end
+
   test "space arguments use Ash casting and reject invalid space values before execution" do
     for action <- [:put_space, :update_space] do
       input =
@@ -133,11 +168,14 @@ defmodule AikidoTest.Memory.SliceTest do
 
       {:ok, %{agent: agent}, []} =
         Aikido.AgentServer.apply_actions(
-          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(
-              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
-            ),
+            Aikido.SignalCtx.ctx(%Jido.Signal{
+              id: nil,
+              type: "test.action",
+              data: %{},
+              source: "/test"
+            }),
             Map.merge(%{}, %{
               agent_module: AikidoTest.Memory.SliceTest.AgentWithMemory,
               agent: agent,
@@ -155,11 +193,14 @@ defmodule AikidoTest.Memory.SliceTest do
 
       {:ok, %{agent: agent}, []} =
         Aikido.AgentServer.apply_actions(
-          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(
-              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
-            ),
+            Aikido.SignalCtx.ctx(%Jido.Signal{
+              id: nil,
+              type: "test.action",
+              data: %{},
+              source: "/test"
+            }),
             Map.merge(%{}, %{
               agent_module: AikidoTest.Memory.SliceTest.AgentWithMemory,
               agent: agent,

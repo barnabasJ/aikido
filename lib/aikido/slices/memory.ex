@@ -248,7 +248,7 @@ defmodule Aikido.Slices.Memory do
 
       current_space ->
         updated_space = fun.(current_space)
-        updated_space = %{updated_space | rev: updated_space.rev + 1}
+        updated_space = %{updated_space | rev: current_space.rev + 1}
         now = opts[:now] || System.system_time(:millisecond)
 
         %{
