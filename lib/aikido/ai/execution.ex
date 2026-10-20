@@ -4,6 +4,7 @@ defmodule Aikido.AI.Execution do
   # The inner task performs one bounded attempt. This owner handles cancellation,
   # deadlines and cleanup; it never writes agent state.
   require Ash.Tracer
+  require Logger
 
   def run(owner, request_id, supervisor, work, opts) do
     selector = fn runtime ->
@@ -141,9 +142,15 @@ defmodule Aikido.AI.Execution do
           try do
             cleanup.()
           rescue
-            _ -> :ok
+            error ->
+              Logger.warning(
+                "AI cleanup callback raised: #{Aikido.Telemetry.Formatter.safe_inspect(error)}"
+              )
           catch
-            _, _ -> :ok
+            kind, reason ->
+              Logger.warning(
+                "AI cleanup callback #{kind}: #{Aikido.Telemetry.Formatter.safe_inspect(reason)}"
+              )
           end
         end)
 
