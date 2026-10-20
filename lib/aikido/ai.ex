@@ -69,6 +69,10 @@ defmodule Aikido.AI do
       {:ok, request_id} = Aikido.AI.ask(pid, "What's the status?")
       # receive {:aikido_subscription, ^ref, ...} for every step
 
+  Native caller options (`scope`, `actor`, `tenant`, `context`, `tracer`, and
+  `authorize?`) travel with the signal. Explicit options override scope values
+  through `Ash.Scope.to_opts/2`.
+
   ## Coordination guarantees
 
     * `ask_sync/3` waits for a subscription notification. It subscribes before launching to avoid missing completion.
@@ -80,6 +84,12 @@ defmodule Aikido.AI do
   @default_await_timeout 30_000
 
   @type opts :: [
+          scope: term(),
+          actor: term(),
+          tenant: term(),
+          context: map(),
+          tracer: module() | [module()],
+          authorize?: boolean(),
           model: ReqLLM.model_input() | nil,
           tools: [atom()] | nil,
           tool_options: keyword(),
@@ -145,9 +155,19 @@ defmodule Aikido.AI do
     )
   end
 
-  @doc "Cancel the active run; its model and tool tasks observe the terminal transition."
-  def cancel(pid, request_id \\ nil) do
-    Aikido.AgentServer.cast(pid, Jido.Signal.new!("ai.react.cancel", %{request_id: request_id}))
+  @doc """
+  Cancel the active run; its model and tool tasks observe the terminal transition.
+
+  Pass native caller options as the third argument. The request ID remains
+  optional; pass nil to cancel the active run with caller options.
+  """
+  def cancel(pid, request_id \\ nil, opts \\ []) do
+    signal =
+      Jido.Signal.new!("ai.react.cancel", %{request_id: request_id})
+      |> Aikido.SignalCtx.put_ctx(caller_scope(opts))
+      |> Aikido.SignalCtx.capture_tracing()
+
+    Aikido.AgentServer.cast(pid, signal)
   end
 
   @doc "Queue a user message for the next model request, or the next run when idle."
@@ -184,14 +204,10 @@ defmodule Aikido.AI do
   end
 
   defp caller_scope(opts) do
-    if Keyword.has_key?(opts, :scope),
-      do:
-        opts
-        |> Keyword.fetch!(:scope)
-        |> Ash.Scope.to_opts()
-        |> Map.new()
-        |> Map.drop([:authorize?]),
-      else: Map.new(Keyword.take(opts, [:actor, :tenant]))
+    opts
+    |> Keyword.get(:scope, %{})
+    |> Ash.Scope.to_opts(Keyword.take(opts, [:actor, :tenant, :context, :tracer, :authorize?]))
+    |> Map.new()
   end
 
   defp launch(pid, signal, request_id) do

@@ -109,7 +109,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
     assert signal.data.content =~ "nope"
   end
 
-  test "completion signals carry native Ash scope and only shared application context",
+  test "completion signals carry native Ash scope and explicit application context",
        %{aikido: aikido} do
     start_supervised!(AikidoTest.Support.TestTracer)
     agent = spawn_agent_stub(self())
@@ -137,7 +137,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
              tenant: "org-a",
              authorize?: true,
              tracer: AikidoTest.Support.TestTracer,
-             context: %{shared: %{locale: "de"}}
+             context: %{shared: %{locale: "de"}, local_only: "stay here"}
            }
   end
 

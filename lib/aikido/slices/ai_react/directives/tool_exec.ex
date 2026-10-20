@@ -120,7 +120,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         agent_pid,
         Aikido.SignalCtx.put_ctx(
           signal,
-          Map.new(Ash.Scope.to_opts(context))
+          Map.new(Ash.Scope.to_opts(context, context: context[:context] || %{}))
         )
       )
   end
