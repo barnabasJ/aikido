@@ -40,7 +40,7 @@ defmodule AikidoTest.AshVerifiersTest do
 
           actions do
             action :invalid, :map do
-              run Aikido.Config
+              run Aikido.Slice.Config
             end
           end
           """,

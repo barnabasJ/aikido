@@ -7,6 +7,13 @@ defmodule Aikido.Slice.Config do
   2. Application environment config (`Application.get_env(otp_app, slice_module)`)
   3. Default values from the slice's config_schema (lowest priority)
   """
+  use Ash.Resource.Actions.Implementation
+
+  # The private config action casts arguments and applies defaults before this
+  # callback returns the resolved values to the mount configuration resolver.
+  @doc false
+  @impl true
+  def run(input, _opts, _context), do: {:ok, input.arguments}
 
   @doc """
   Resolves configuration for a slice module by merging app env with overrides.

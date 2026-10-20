@@ -25,7 +25,7 @@ defmodule Aikido.Dsl.Transformers.Attributes do
         Ash.Resource.Builder.build_action(:action, :__aikido_config__,
           returns: :map,
           arguments: arguments,
-          run: Aikido.Config,
+          run: Aikido.Slice.Config,
           public?: false
         )
 
