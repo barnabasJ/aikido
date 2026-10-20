@@ -51,7 +51,6 @@ defmodule Aikido.AgentServer do
     initialized through its native Ash `:initialize` action.
   - `:id` - Instance ID (auto-generated if not provided)
   - `:initial_state` - Initial state map for agent
-  - `:default_dispatch` - Default dispatch config for Emit directives (fallback: current agent pid)
   - `:middleware` - List of `module()` or `{module(), opts_map}` middleware appended at runtime
   - `:parent` - Parent reference for hierarchy
   - `:on_parent_death` - Behavior when parent dies:
@@ -200,8 +199,8 @@ defmodule Aikido.AgentServer do
   }
 
   alias Aikido.Config.Defaults
-  alias Jido.Signal
-  alias Jido.Signal.Router
+  alias Aikido.Signal
+  alias Aikido.Signal.Router
   alias Aikido.Telemetry.Formatter
   @type server :: pid() | atom() | {:via, module(), term()} | String.t()
   @cron_restart_base_ms 500
@@ -269,7 +268,7 @@ defmodule Aikido.AgentServer do
     with {:ok, pid} <- resolve_server(server) do
       GenServer.call(
         pid,
-        {:signal_with_selector, Aikido.SignalCtx.capture_tracing(signal), selector},
+        {:signal_with_selector, Aikido.Signal.capture_tracing(signal), selector},
         timeout
       )
     end
@@ -304,7 +303,7 @@ defmodule Aikido.AgentServer do
 
     tracers =
       if is_struct(command, Signal),
-        do: Aikido.SignalCtx.tracers(command),
+        do: Aikido.Signal.tracers(command),
         else:
           Enum.uniq(
             List.wrap(Keyword.get(opts, :tracer)) ++
@@ -403,7 +402,7 @@ defmodule Aikido.AgentServer do
   @spec cast(server(), Signal.t()) :: :ok | {:error, term()}
   def cast(server, %Signal{} = signal) do
     with {:ok, pid} <- resolve_server(server) do
-      GenServer.cast(pid, {:signal, Aikido.SignalCtx.capture_tracing(signal)})
+      GenServer.cast(pid, {:signal, Aikido.Signal.capture_tracing(signal)})
     end
   end
 
@@ -459,19 +458,19 @@ defmodule Aikido.AgentServer do
   subscriber. With `once: true`, the subscription is removed after the
   first non-`:skip` selector return.
 
-  Patterns are compiled by `Jido.Signal.Router` and have identical
+  Patterns are compiled by `Aikido.Signal.Router` and have identical
   semantics to `signal_routes/1` declarations: literals (`"work.start"`),
   single-segment wildcards (`"work.*"` matches any single segment after
   `"work."`), and the multi-segment wildcard (`"audit.**"`, or `"**"`
   alone to match every signal regardless of segment count).
 
-  Default dispatch is `{:pid, target: self()}`, which sends
+  Direct process delivery sends
   `{:aikido_subscription, sub_ref, %{signal_type: type, result: result}}`
   to the caller.
 
   ## Options
 
-  - `:dispatch` — dispatch config (default `{:pid, target: self()}`)
+  - `:target` — recipient PID (default `self()`)
   - `:once` — boolean, if true unsubscribe after first non-`:skip` fire (default `false`)
 
   ## Returns
@@ -483,11 +482,16 @@ defmodule Aikido.AgentServer do
           {:ok, reference()} | {:error, term()}
   def subscribe(server, pattern, selector, opts \\ [])
       when is_binary(pattern) and is_function(selector, 1) do
-    dispatch = Keyword.get(opts, :dispatch, {:pid, target: self()})
-    once? = Keyword.get(opts, :once, false)
-
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, {:subscribe, pattern, selector, dispatch, self(), once?})
+    with {:ok, options} <-
+           Spark.Options.validate(opts,
+             target: [type: :pid, default: self()],
+             once: [type: :boolean, default: false]
+           ),
+         {:ok, pid} <- resolve_server(server) do
+      GenServer.call(
+        pid,
+        {:subscribe, pattern, selector, options[:target], self(), options[:once]}
+      )
     end
   end
 
@@ -897,7 +901,8 @@ defmodule Aikido.AgentServer do
     if cancel? and is_pid(pid) and Process.alive?(pid) do
       Aikido.Directives.CronCancel.shutdown_io(
         logical_id,
-        opts[:input_signal] || Jido.Signal.new!("aikido.agent.cron.cancel", %{job_id: logical_id}),
+        opts[:input_signal] ||
+          Aikido.Signal.new!("aikido.agent.cron.cancel", %{job_id: logical_id}),
         state
       )
     end
@@ -1068,21 +1073,21 @@ defmodule Aikido.AgentServer do
   end
 
   def handle_call(
-        {:subscribe, pattern, selector, dispatch, caller_pid, once?},
+        {:subscribe, pattern, selector, target, caller_pid, once?},
         _from,
         %State{} = state
       )
       when is_binary(pattern) and is_function(selector, 1) and is_pid(caller_pid) and
              is_boolean(once?) do
-    case Router.Validator.validate_path(pattern) do
+    case Router.validate_pattern(pattern) do
       {:ok, _} ->
         sub_ref = make_ref()
         monitor_ref = Process.monitor(caller_pid)
 
         entry = %{
-          pattern_compiled: pattern,
+          pattern_compiled: Router.compile_pattern(pattern),
           selector: selector,
-          dispatch: dispatch,
+          target: target,
           monitor_ref: monitor_ref,
           once: once?
         }
@@ -1323,11 +1328,11 @@ defmodule Aikido.AgentServer do
   end
 
   defp with_signal_span(state, signal, fun) do
-    tracers = Aikido.SignalCtx.tracers(signal, state.aikido)
+    tracers = Aikido.Signal.tracers(signal, state.aikido)
     previous = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
-    incoming = Map.new(tracers, &{&1, Map.get(Aikido.SignalCtx.tracer_context(signal), &1)})
+    incoming = Map.new(tracers, &{&1, Map.get(Aikido.Signal.tracer_context(signal), &1)})
     Ash.ProcessHelpers.transfer_context(incoming)
-    signal = if tracers == [], do: signal, else: Aikido.SignalCtx.put(signal, :tracer, tracers)
+    signal = if tracers == [], do: signal, else: Aikido.Signal.put(signal, :tracer, tracers)
 
     try do
       Ash.Tracer.span {:custom, :aikido_signal}, signal.type, tracers do
@@ -1463,7 +1468,7 @@ defmodule Aikido.AgentServer do
   end
 
   defp build_signal_ctx(%Signal{} = signal, %State{} = state) do
-    signal_ctx = Aikido.SignalCtx.ctx(signal)
+    signal_ctx = Aikido.Signal.ctx(signal)
 
     base = %{
       agent: state.agent,
@@ -1642,7 +1647,7 @@ defmodule Aikido.AgentServer do
 
   defp fire_subscribers(%State{} = state, %Signal{type: type} = signal) do
     Enum.reduce(state.signal_subscribers, state, fn {sub_ref, entry}, acc_state ->
-      if Router.matches?(type, entry.pattern_compiled) do
+      if Router.matches_compiled?(type, entry.pattern_compiled) do
         fire_matching_subscriber(acc_state, sub_ref, entry, signal)
       else
         acc_state
@@ -1664,38 +1669,12 @@ defmodule Aikido.AgentServer do
   end
 
   defp dispatch_and_maybe_remove(acc_state, sub_ref, entry, signal, fire) do
-    dispatch_subscriber(entry.dispatch, sub_ref, signal, fire, acc_state)
+    send(entry.target, {:aikido_subscription, sub_ref, %{signal_type: signal.type, result: fire}})
 
     if entry.once do
       remove_subscriber(acc_state, sub_ref)
     else
       acc_state
-    end
-  end
-
-  defp dispatch_subscriber({:pid, target: target}, sub_ref, %Signal{type: type}, result, _state)
-       when is_pid(target) do
-    send(target, {:aikido_subscription, sub_ref, %{signal_type: type, result: result}})
-    :ok
-  end
-
-  defp dispatch_subscriber(dispatch, sub_ref, %Signal{type: type} = signal, result, state) do
-    payload = %{signal_type: type, result: result, sub_ref: sub_ref, source_signal: signal}
-
-    case Jido.Signal.new(%{
-           type: "aikido.subscription.fire",
-           source: signal.source,
-           data: payload
-         }) do
-      {:ok, fire_signal} ->
-        Aikido.Directives.Emit.exec(
-          %Aikido.Directives.Emit{signal: fire_signal, dispatch: dispatch},
-          signal,
-          state
-        )
-
-      {:error, _} ->
-        :ok
     end
   end
 

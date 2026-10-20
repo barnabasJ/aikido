@@ -22,7 +22,7 @@ defmodule Aikido.Directives.CronCancel do
         source: "/agent/#{state.id}"
       )
 
-    Aikido.AgentServer.cast(self(), Aikido.SignalCtx.inherit(request, input_signal))
+    Aikido.AgentServer.cast(self(), Aikido.Signal.inherit(request, input_signal))
     :ok
   end
 

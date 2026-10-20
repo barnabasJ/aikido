@@ -15,12 +15,21 @@ defmodule Aikido.AgentServer.Signal.CronCancelled do
   - `:monitor_ref` - Retired monitor reference, or `nil`
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.cron.cancelled",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: [
-      job_id: [type: :any, required: true, doc: "Logical cron job id within the agent"],
-      pid: [type: :any, doc: "PID of the cancelled cron-job process (nil if untracked)"],
-      monitor_ref: [type: :any, doc: "Monitor reference that was cleared (nil if untracked)"]
-    ]
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.cron.cancelled"
+
+    schema do
+      attribute :job_id, :term,
+        allow_nil?: false,
+        description: "Logical cron job id within the agent"
+
+      attribute :pid, :term,
+        description: "PID of the cancelled cron-job process (nil if untracked)"
+
+      attribute :monitor_ref, :term,
+        description: "Monitor reference that was cleared (nil if untracked)"
+    end
+  end
 end

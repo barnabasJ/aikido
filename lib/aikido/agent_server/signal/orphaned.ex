@@ -16,14 +16,29 @@ defmodule Aikido.AgentServer.Signal.Orphaned do
   - `:reason` - Exit reason from the former parent process
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.orphaned",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: [
-      parent_id: [type: :string, required: true, doc: "ID of the parent agent that died"],
-      parent_pid: [type: :any, required: true, doc: "PID of the parent process that died"],
-      tag: [type: :any, required: true, doc: "Tag assigned by the former parent"],
-      meta: [type: :map, default: %{}, doc: "Metadata copied from the former parent reference"],
-      reason: [type: :any, required: true, doc: "Exit reason from the parent process"]
-    ]
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.orphaned"
+
+    schema do
+      attribute :parent_id, :string,
+        allow_nil?: false,
+        description: "ID of the parent agent that died"
+
+      attribute :parent_pid, :term,
+        allow_nil?: false,
+        description: "PID of the parent process that died"
+
+      attribute :tag, :term, allow_nil?: false, description: "Tag assigned by the former parent"
+
+      attribute :meta, :map,
+        default: %{},
+        description: "Metadata copied from the former parent reference"
+
+      attribute :reason, :term,
+        allow_nil?: false,
+        description: "Exit reason from the parent process"
+    end
+  end
 end

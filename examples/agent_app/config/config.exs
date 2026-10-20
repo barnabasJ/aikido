@@ -25,6 +25,8 @@ config :spark, :formatter,
   ],
   "Ash.Domain": [extensions: [Aikido.Ash.Domain]],
   "Aikido.Directive": [],
+  "Aikido.Signal": [type: Aikido.Signal.Definition, extensions: [Aikido.Signal.Dsl]],
+  "Aikido.Signal.Definition": [],
   "Ash.TypedStruct": []
 
 config :logger, level: :warning

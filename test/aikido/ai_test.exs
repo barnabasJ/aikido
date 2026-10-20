@@ -306,7 +306,7 @@ defmodule Aikido.AITest do
       ai_before = read_ai(pid)
 
       stale =
-        Jido.Signal.new!("ai.react.tool.completed", %{
+        Aikido.Signal.new!("ai.react.tool.completed", %{
           tool_call_id: "stale",
           name: "test_add",
           content: "{}",

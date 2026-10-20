@@ -54,10 +54,10 @@ defmodule Aikido.Directives.StopChild do
 
         signal =
           "aikido.agent.stop"
-          |> Jido.Signal.new!(%{reason: normalize_stop_reason(reason)},
+          |> Aikido.Signal.new!(%{reason: normalize_stop_reason(reason)},
             source: "/agent/#{state.id}"
           )
-          |> Aikido.SignalCtx.inherit(input_signal)
+          |> Aikido.Signal.inherit(input_signal)
 
         Aikido.AgentServer.cast(pid, signal)
     end

@@ -84,7 +84,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
         )
 
       assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
-               Jido.Signal.Router.route(router, signal("agent.configured"))
+               Aikido.Signal.Router.route(router, signal("agent.configured"))
     end
 
     test "collects native route declarations and priorities" do
@@ -94,10 +94,10 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
         )
 
       assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
-               Jido.Signal.Router.route(router, signal("agent.action"))
+               Aikido.Signal.Router.route(router, signal("agent.action"))
 
       assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
-               Jido.Signal.Router.route(router, signal("agent.priority"))
+               Aikido.Signal.Router.route(router, signal("agent.priority"))
     end
 
     test "agent without routes still produces a working router" do
@@ -106,7 +106,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
           build_state(AikidoTest.AgentServer.SignalRouterTest.AgentWithoutRoutes)
         )
 
-      assert {:error, _} = Jido.Signal.Router.route(router, signal("nonexistent"))
+      assert {:error, _} = Aikido.Signal.Router.route(router, signal("nonexistent"))
     end
   end
 
@@ -118,10 +118,10 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
         )
 
       assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
-               Jido.Signal.Router.route(router, signal("slice.custom"))
+               Aikido.Signal.Router.route(router, signal("slice.custom"))
 
       assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
-               Jido.Signal.Router.route(router, signal("slice.priority"))
+               Aikido.Signal.Router.route(router, signal("slice.priority"))
     end
 
     test "non-matching signals fall through to error" do
@@ -130,7 +130,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
           build_state(AikidoTest.AgentServer.SignalRouterTest.AgentWithSlices)
         )
 
-      assert {:error, _} = Jido.Signal.Router.route(router, signal("no.match"))
+      assert {:error, _} = Aikido.Signal.Router.route(router, signal("no.match"))
     end
   end
 
@@ -142,12 +142,12 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
         )
 
       assert {:ok, [{Aikido.AgentServer.RuntimeActions, :query_children}]} =
-               Jido.Signal.Router.route(router, signal("aikido.agent.query.children"))
+               Aikido.Signal.Router.route(router, signal("aikido.agent.query.children"))
     end
   end
 
   defp signal(type) do
-    {:ok, sig} = Jido.Signal.new(%{type: type, source: "/test", data: %{}})
+    {:ok, sig} = Aikido.Signal.new(%{type: type, source: "/test", data: %{}})
     sig
   end
 end

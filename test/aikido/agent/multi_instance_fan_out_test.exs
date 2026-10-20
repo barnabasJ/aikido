@@ -180,13 +180,13 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
       agent = Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent.initialize!()
       assert agent.state.slack_support.messages == []
       assert agent.state.slack_sales.messages == []
-      {:ok, signal} = Jido.Signal.new(%{type: "slack.send", data: %{message: "hi"}})
+      {:ok, signal} = Aikido.Signal.new(%{type: "slack.send", data: %{message: "hi"}})
 
       {:ok, %{agent: agent}, _dirs} =
         Aikido.AgentServer.apply_actions(
           signal,
           Map.merge(
-            Aikido.SignalCtx.ctx(signal),
+            Aikido.Signal.ctx(signal),
             Map.merge(%{}, %{
               agent_module: Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent,
               agent: agent,
@@ -202,13 +202,13 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
 
     test "ctx.slice_path identifies the current mount per fan-out iteration" do
       agent = Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent.initialize!()
-      {:ok, signal} = Jido.Signal.new(%{type: "slack.send", data: %{message: "hi"}})
+      {:ok, signal} = Aikido.Signal.new(%{type: "slack.send", data: %{message: "hi"}})
 
       {:ok, %{agent: _agent}, directives} =
         Aikido.AgentServer.apply_actions(
           signal,
           Map.merge(
-            Aikido.SignalCtx.ctx(signal),
+            Aikido.Signal.ctx(signal),
             Map.merge(%{test_pid: self()}, %{
               agent_module: Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent,
               agent: agent,
@@ -230,7 +230,7 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
                Aikido.AgentServer.apply_actions(
                  signal,
                  Map.merge(
-                   Aikido.SignalCtx.ctx(signal),
+                   Aikido.Signal.ctx(signal),
                    Map.merge(%{test_pid: self()}, %{
                      agent_module: Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent,
                      agent: agent,
@@ -243,13 +243,13 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
 
     test "ctx.slice_config carries the right mount's resolved config" do
       agent = Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent.initialize!()
-      {:ok, signal} = Jido.Signal.new(%{type: "slack.send", data: %{message: "go"}})
+      {:ok, signal} = Aikido.Signal.new(%{type: "slack.send", data: %{message: "go"}})
 
       {:ok, %{agent: agent}, _dirs} =
         Aikido.AgentServer.apply_actions(
           signal,
           Map.merge(
-            Aikido.SignalCtx.ctx(signal),
+            Aikido.Signal.ctx(signal),
             Map.merge(%{}, %{
               agent_module: Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent,
               agent: agent,
@@ -267,13 +267,13 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
   describe("atomicity — first-mount success rolls back when a later mount errors") do
     test "the input agent's state is unchanged when any mount errors" do
       agent = Aikido.Agent.MultiInstanceFanOutTest.FailingMultiSlackAgent.initialize!()
-      {:ok, signal} = Jido.Signal.new(%{type: "slack.send", data: %{message: "hi"}})
+      {:ok, signal} = Aikido.Signal.new(%{type: "slack.send", data: %{message: "hi"}})
 
       assert {:error, _, _reason} =
                Aikido.AgentServer.apply_actions(
                  signal,
                  Map.merge(
-                   Aikido.SignalCtx.ctx(signal),
+                   Aikido.Signal.ctx(signal),
                    Map.merge(%{test_pid: self()}, %{
                      agent_module: Aikido.Agent.MultiInstanceFanOutTest.FailingMultiSlackAgent,
                      agent: agent,
@@ -294,13 +294,13 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
   describe("edge case: action shared by slice mounts AND agent's own signal_routes") do
     test "fan-out covers slice mounts AND the agent path" do
       agent = Aikido.Agent.MultiInstanceFanOutTest.HostSlackAgent.initialize!()
-      {:ok, signal} = Jido.Signal.new(%{type: "host.send", data: %{message: "broadcast"}})
+      {:ok, signal} = Aikido.Signal.new(%{type: "host.send", data: %{message: "broadcast"}})
 
       {:ok, %{agent: agent}, directives} =
         Aikido.AgentServer.apply_actions(
           signal,
           Map.merge(
-            Aikido.SignalCtx.ctx(signal),
+            Aikido.Signal.ctx(signal),
             Map.merge(%{test_pid: self()}, %{
               agent_module: Aikido.Agent.MultiInstanceFanOutTest.HostSlackAgent,
               agent: agent,

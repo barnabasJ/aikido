@@ -25,7 +25,7 @@ defmodule Aikido.Hooks.Execute do
         result =
           evaluate(directive.hook, directive.event, pid, directive.request_id, signal)
 
-        Jido.Signal.new!("ai.react.hook.completed", Map.put(payload, :result, result))
+        Aikido.Signal.new!("ai.react.hook.completed", Map.put(payload, :result, result))
       end,
       payload: payload,
       error_type: "ai.react.hook.completed"
@@ -78,13 +78,13 @@ defmodule Aikido.Hooks.Execute do
       true = is_binary(text)
 
       signal =
-        Jido.Signal.new!("ai.react.hook.context", %{
+        Aikido.Signal.new!("ai.react.hook.context", %{
           request_id: request_id,
           name: name,
           text: text
         })
 
-      signal = if source_signal, do: Aikido.SignalCtx.inherit(signal, source_signal), else: signal
+      signal = if source_signal, do: Aikido.Signal.inherit(signal, source_signal), else: signal
       :ok = Aikido.AgentServer.cast(pid, signal)
 
       {[true], state}
@@ -97,8 +97,8 @@ defmodule Aikido.Hooks.Execute do
       # tool or gate completions through this capability.
       false = String.starts_with?(type, "ai.react.")
       payload = data |> Map.delete("request_id") |> Map.put(:request_id, request_id)
-      signal = Jido.Signal.new!(type, payload)
-      signal = if source_signal, do: Aikido.SignalCtx.inherit(signal, source_signal), else: signal
+      signal = Aikido.Signal.new!(type, payload)
+      signal = if source_signal, do: Aikido.Signal.inherit(signal, source_signal), else: signal
       :ok = Aikido.AgentServer.cast(pid, signal)
       {[true], state}
     end)

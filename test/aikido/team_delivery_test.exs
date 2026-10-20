@@ -253,9 +253,9 @@ defmodule Aikido.TeamDeliveryTest do
     )
   end
 
-  test "worker cancellation releases queued work with external default dispatch", ctx do
+  test "worker cancellation releases queued work with direct internal delivery", ctx do
     worker =
-      start_server(ctx, Aikido.TeamDeliveryTest.Worker, default_dispatch: {:pid, target: self()})
+      start_server(ctx, Aikido.TeamDeliveryTest.Worker)
 
     task_data = %{
       member: :worker,

@@ -136,7 +136,7 @@ defmodule Aikido.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE", "usage-rules.md"],
+      files: ["lib", "mix.exs", "README.md", "LICENSE", "NOTICE", "usage-rules.md"],
       maintainers: ["barnabasJ"],
       licenses: ["Apache-2.0"],
       links: %{
@@ -152,7 +152,6 @@ defmodule Aikido.MixProject do
       {:durable_server, "~> 0.1.6"},
       {:ekv, "~> 0.4"},
       # External signal transport
-      {:jido_signal, "~> 2.1"},
 
       # Aikido Deps
       {:ash, "~> 3.36"},
@@ -197,7 +196,7 @@ defmodule Aikido.MixProject do
       Enum.join(
         ~w(Aikido.Dsl.Instance Aikido.Ash.Agent Aikido.Ash.Slice
            Aikido.Ash.Team Aikido.Ash.AI Aikido.Ash.Domain
-           Ash.TypedStruct.Dsl),
+           Ash.TypedStruct.Dsl Aikido.Signal.Dsl),
         ","
       )
 

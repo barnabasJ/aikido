@@ -30,7 +30,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Impl
 
     message =
       Map.get(params, :message) ||
-        %Jido.Signal{id: nil, type: "cron.tick", data: %{}, source: "/test"}
+        %Aikido.Signal{id: nil, type: "cron.tick", data: %{}, source: "/test"}
 
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
     Aikido.Types.ActionResult.new(state: slice, directives: [directive])
@@ -149,11 +149,11 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
       Keyword.get(
         opts,
         :message,
-        %Jido.Signal{id: nil, type: "cron.tick", source: "/test"}
+        %Aikido.Signal{id: nil, type: "cron.tick", source: "/test"}
       )
 
     signal =
-      Jido.Signal.new!(%{
+      Aikido.Signal.new!(%{
         type: "register_cron",
         source: "/test",
         data: %{
@@ -168,7 +168,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
   end
 
   def cancel_cron(pid, job_id) do
-    signal = Jido.Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: job_id}})
+    signal = Aikido.Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: job_id}})
     Aikido.AgentServer.cast(pid, signal)
   end
 

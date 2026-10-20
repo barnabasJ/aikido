@@ -1,7 +1,7 @@
 defmodule AikidoTest.Actions.SchedulingTest do
   use ExUnit.Case, async: true
   alias Aikido.Directives
-  alias Jido.Signal
+  alias Aikido.Signal
 
   defp sig(type, data) do
     Signal.new!(%{type: type, source: "/test", data: data})

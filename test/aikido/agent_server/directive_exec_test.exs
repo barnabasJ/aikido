@@ -115,44 +115,26 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
         agent
       )
 
-    input_signal = Jido.Signal.new!(%{type: "test.signal", source: "/test", data: %{}})
+    input_signal = Aikido.Signal.new!(%{type: "test.signal", source: "/test", data: %{}})
     %{state: state, input_signal: input_signal, agent: agent}
   end
 
   describe("Emit directive") do
-    test("falls back to dispatching to current process when no dispatch config", %{
+    test("delivers to the current process without an explicit target", %{
       state: state,
       input_signal: input_signal
     }) do
-      signal = Jido.Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
-      directive = %Aikido.Directives.Emit{signal: signal, dispatch: nil}
+      signal = Aikido.Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
+      directive = %Aikido.Directives.Emit{signal: signal, target: nil}
       assert :ok = Aikido.Directive.exec(directive, input_signal, state)
-      assert_receive {:signal, %Jido.Signal{type: "test.emitted"}}
+      assert_receive {:signal, %Aikido.Signal{type: "test.emitted"}}
     end
 
-    test("returns ok when dispatch config provided", %{state: state, input_signal: input_signal}) do
-      signal = Jido.Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
-      directive = %Aikido.Directives.Emit{signal: signal, dispatch: {:logger, level: :info}}
+    test("delivers directly to the target pid", %{state: state, input_signal: input_signal}) do
+      signal = Aikido.Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
+      directive = %Aikido.Directives.Emit{signal: signal, target: self()}
       assert :ok = Aikido.Directive.exec(directive, input_signal, state)
-    end
-
-    test("uses default_dispatch from state when directive dispatch is nil", %{
-      input_signal: input_signal,
-      agent: agent,
-      aikido: aikido
-    }) do
-      {:ok, opts} =
-        Aikido.AgentServer.Options.new(%{
-          agent_module: AikidoTest.AgentServer.DirectiveExecTest.TestAgent,
-          id: "test-agent-dispatch",
-          default_dispatch: {:logger, level: :debug},
-          aikido: aikido
-        })
-
-      {:ok, state} = Aikido.AgentServer.State.from_options(opts, agent.__struct__, agent)
-      signal = Jido.Signal.new!(%{type: "test.emitted", source: "/test", data: %{}})
-      directive = %Aikido.Directives.Emit{signal: signal, dispatch: nil}
-      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
+      assert_receive {:signal, %Aikido.Signal{type: "test.emitted"}}
     end
   end
 
@@ -190,7 +172,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
 
   describe("Schedule directive") do
     test("sends scheduled signal after delay", %{state: state, input_signal: input_signal}) do
-      signal = Jido.Signal.new!(%{type: "scheduled.ping", source: "/test", data: %{}})
+      signal = Aikido.Signal.new!(%{type: "scheduled.ping", source: "/test", data: %{}})
       directive = %Aikido.Directives.Schedule{delay_ms: 10, message: signal}
       assert :ok = Aikido.Directive.exec(directive, input_signal, state)
       assert_receive {:scheduled_signal, received_signal}, 100
@@ -269,7 +251,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
         meta: %{}
       }
 
-      input_signal = Jido.Signal.new!(%{type: "test.harness", source: "/test", data: %{}})
+      input_signal = Aikido.Signal.new!(%{type: "test.harness", source: "/test", data: %{}})
 
       {:ok, before_children} =
         Aikido.AgentServer.state(parent_pid, fn s ->
@@ -419,7 +401,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
   end
 
   defp signal_carrying_directive(directive) do
-    Jido.Signal.new!(%{type: "test.directive", source: "/test", data: %{directive: directive}})
+    Aikido.Signal.new!(%{type: "test.directive", source: "/test", data: %{directive: directive}})
   end
 
   defp await_child_pid(parent_pid, tag) do

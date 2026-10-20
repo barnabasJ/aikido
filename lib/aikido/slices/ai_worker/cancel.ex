@@ -14,7 +14,12 @@ defmodule Aikido.Slices.AiWorker.Cancel do
 
     if state.pending && state.pending.task_id == id do
       signal =
-        %Jido.Signal{id: nil, type: "ai.react.cancel", data: %{request_id: id}, source: "/aikido"}
+        %Aikido.Signal{
+          id: nil,
+          type: "ai.react.cancel",
+          data: %{request_id: id},
+          source: "/aikido"
+        }
 
       Aikido.Types.ActionResult.new(
         state: %{state | pending: nil},

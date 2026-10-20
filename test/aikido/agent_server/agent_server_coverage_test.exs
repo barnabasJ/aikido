@@ -29,7 +29,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
       nonexistent_via =
         {:via, Registry, {Module.concat(aikido, ExternalRegistry), "nonexistent-via-agent"}}
 
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
 
       assert {:error, :not_found} =
                Aikido.AgentServer.call(nonexistent_via, signal, fn s -> {:ok, s.agent} end)
@@ -57,7 +57,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
         end)
 
       via = {:via, Registry, {Module.concat(aikido, ExternalRegistry), "via-test-exists"}}
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(via, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
     end
@@ -65,7 +65,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
 
   describe("resolve_server with string ID") do
     test("string ID returns error with helpful message", %{aikido: _aikido}) do
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
 
       assert {:error, {:invalid_server, message}} =
                Aikido.AgentServer.call("some-string-id", signal, fn s -> {:ok, s.agent} end)
@@ -75,7 +75,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
     end
 
     test("string ID error on cast", %{aikido: _aikido}) do
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       assert {:error, {:invalid_server, _}} = Aikido.AgentServer.cast("some-string-id", signal)
     end
 
@@ -87,7 +87,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
 
   describe("resolve_server with atom name") do
     test("atom name that doesn't exist returns error", %{aikido: _aikido}) do
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
 
       assert {:error, :not_found} =
                Aikido.AgentServer.call(:nonexistent_atom_server, signal, fn s ->
@@ -150,7 +150,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
       assert id == "prebuilt-struct-test"
       assert counter == 50
       assert agent_module == AikidoTest.TestAgents.Counter
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, updated_agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert updated_agent.state.domain.counter == 51
       GenServer.stop(pid)
@@ -162,7 +162,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.TestAgents.Minimal)
 
-      signal = Jido.Signal.new!("nonexistent_action", %{}, source: "/test")
+      signal = Aikido.Signal.new!("nonexistent_action", %{}, source: "/test")
 
       assert {:error, %Aikido.Error.RoutingError{}} =
                Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)

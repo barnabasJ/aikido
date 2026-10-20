@@ -97,7 +97,7 @@ defmodule Aikido.Directives.SpawnAgent do
   @impl true
   def exec(%{agent: agent, tag: tag, opts: opts, meta: meta, restart?: restart?}, signal, state) do
     parent_pid = self()
-    scope = Aikido.SignalCtx.ctx(signal)
+    scope = Aikido.Signal.ctx(signal)
 
     opts =
       Map.put(

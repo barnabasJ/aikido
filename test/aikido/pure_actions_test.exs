@@ -1,13 +1,13 @@
 defmodule Aikido.PureActionsTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.{Directive, SignalCtx}
+  alias Aikido.{Directive, Signal}
   alias Aikido.Directives.{Emit, Schedule}
   alias Aikido.Slices.{Identity, Memory, Thread, Todo}
 
   test "lazy slice initialization and updates replay with the input timestamp and stable IDs" do
-    signal = Jido.Signal.new!("test", %{}, time: "2026-10-19T10:11:12Z")
-    timestamp = SignalCtx.timestamp(signal)
+    signal = Aikido.Signal.new!("test", %{}, time: "2026-10-19T10:11:12Z")
+    timestamp = Signal.timestamp(signal)
 
     for {resource, params} <- [{Identity, %{profile: %{age: 1}}}, {Memory, %{}}, {Thread, %{}}] do
       initialized = replay(resource, :ensure, %{state: nil} |> Map.merge(params), signal)
@@ -63,14 +63,14 @@ defmodule Aikido.PureActionsTest do
   end
 
   test "actions return identical emission descriptors without delivering anything" do
-    signal = Jido.Signal.new!("aikido.todo.add", %{})
+    signal = Aikido.Signal.new!("aikido.todo.add", %{})
     state = %{items: [], revision: 0}
 
     result =
       replay(Todo, :todo_add, %{state: state, id: "todo", text: "work", timeout_ms: 100}, signal)
 
     assert [
-             %Emit{signal: %{id: nil, time: nil}, dispatch: {:pid, target: target}},
+             %Emit{signal: %{id: nil, time: nil}, target: target},
              %Schedule{message: %{id: nil, time: nil}}
            ] =
              result.directives
@@ -81,24 +81,23 @@ defmodule Aikido.PureActionsTest do
   end
 
   test "Emit and Schedule supply envelope metadata only when executed" do
-    signal = Jido.Signal.new!("test.input", %{}) |> SignalCtx.put(:tenant, "tenant")
+    signal = Aikido.Signal.new!("test.input", %{}) |> Signal.put(:tenant, "tenant")
 
     envelope =
-      %Jido.Signal{id: nil, source: "/test", type: "test.output", data: %{value: 1}}
+      %Aikido.Signal{id: nil, source: "/test", type: "test.output", data: %{value: 1}}
 
     runtime =
       struct(Aikido.AgentServer.State,
         id: "test",
         agent_module: __MODULE__,
-        agent: %{},
-        default_dispatch: nil
+        agent: %{}
       )
 
     assert :ok = Directive.exec(%Emit{signal: envelope}, signal, runtime)
     assert_receive {:signal, emitted}
     assert is_binary(emitted.id)
     assert is_binary(emitted.time)
-    assert SignalCtx.get(emitted, :tenant) == "tenant"
+    assert Signal.get(emitted, :tenant) == "tenant"
 
     assert :ok = Directive.exec(%Schedule{delay_ms: 0, message: envelope}, signal, runtime)
     assert_receive {:scheduled_signal, scheduled}
@@ -106,7 +105,7 @@ defmodule Aikido.PureActionsTest do
     assert is_binary(scheduled.time)
     assert scheduled.id != emitted.id
     assert scheduled.data == emitted.data
-    assert SignalCtx.get(scheduled, :tenant) == "tenant"
+    assert Signal.get(scheduled, :tenant) == "tenant"
 
     assert Directive.materialize_signal(emitted) == emitted
   end
@@ -174,8 +173,8 @@ defmodule Aikido.PureActionsTest do
             ] ||
               {module, function} in [
                 {DateTime, :utc_now},
-                {Jido.Signal, :new},
-                {Jido.Signal, :new!},
+                {Aikido.Signal, :new},
+                {Aikido.Signal, :new!},
                 {:crypto, :strong_rand_bytes}
               ]
 

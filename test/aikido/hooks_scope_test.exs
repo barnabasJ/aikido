@@ -132,7 +132,7 @@ defmodule Aikido.HooksScopeTest do
       assert {:error, _} =
                Aikido.AgentServer.call(
                  pid,
-                 Jido.Signal.new!("hook.notice", %{}),
+                 Aikido.Signal.new!("hook.notice", %{}),
                  &{:ok, &1.agent.state.state}
                )
 

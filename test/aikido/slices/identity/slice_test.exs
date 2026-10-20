@@ -75,9 +75,9 @@ defmodule AikidoTest.Identity.SliceTest do
 
       {:ok, %{agent: agent}, []} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},
@@ -100,9 +100,9 @@ defmodule AikidoTest.Identity.SliceTest do
 
       {:ok, %{agent: agent}, []} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},

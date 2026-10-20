@@ -1,6 +1,6 @@
 defmodule Aikido.AgentServer.SignalRouter do
   @moduledoc """
-  Builds a unified Jido.Signal.Router from agent and slice routes.
+  Builds a unified Aikido.Signal.Router from agent and slice routes.
 
   This module is responsible for:
   1. Collecting routes from all sources (agent, slices)
@@ -28,7 +28,7 @@ defmodule Aikido.AgentServer.SignalRouter do
   """
 
   alias Aikido.AgentServer.State
-  alias Jido.Signal.Router
+  alias Aikido.Signal.Router
 
   @agent_default_priority 0
   @slice_default_priority -10
@@ -42,7 +42,7 @@ defmodule Aikido.AgentServer.SignalRouter do
 
   Native router validation rejects invalid routes instead of silently dropping them.
   """
-  @spec build(State.t()) :: Router.Router.t()
+  @spec build(State.t()) :: Router.t()
   def build(%State{} = state) do
     routes =
       []

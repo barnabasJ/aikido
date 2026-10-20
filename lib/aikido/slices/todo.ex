@@ -8,7 +8,7 @@ defmodule Aikido.Slices.Todo do
   `options.completion: :todos` on AiReact holds its final answer until every
   blocking item completes. A blocked or expired item fails that run.
 
-  Change signals are local protocol messages, independent of `default_dispatch`.
+  Change signals are local protocol messages, through direct process delivery.
   Observe changes with `Aikido.AgentServer.subscribe/4`.
   """
   use Ash.Resource,

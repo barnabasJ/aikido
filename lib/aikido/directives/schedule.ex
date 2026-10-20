@@ -27,7 +27,7 @@ defmodule Aikido.Directives.Schedule do
   def exec(%{delay_ms: delay, message: message}, input_signal, state) do
     signal =
       case message do
-        %Jido.Signal{} = s ->
+        %Aikido.Signal{} = s ->
           s
 
         other ->
@@ -40,7 +40,7 @@ defmodule Aikido.Directives.Schedule do
     signal =
       signal
       |> Aikido.Directive.materialize_signal()
-      |> Aikido.SignalCtx.inherit(input_signal)
+      |> Aikido.Signal.inherit(input_signal)
 
     Process.send_after(self(), {:scheduled_signal, signal}, delay)
     :ok

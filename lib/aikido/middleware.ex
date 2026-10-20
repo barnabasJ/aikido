@@ -21,9 +21,9 @@ defmodule Aikido.Middleware do
   unchanged on error, and the framework commits that input agent (with
   any prior middleware mutations) to state.
 
-  - `signal` — the triggering `Jido.Signal.t()`.
+  - `signal` — the triggering `Aikido.Signal.t()`.
   - `ctx` — per-signal runtime context (user, trace, agent-level identity).
-    Lives on `signal.extensions[:aikido_ctx]` on the wire; promoted to an
+    Lives on `signal.scope` on the wire; promoted to an
     explicit argument here.
   - `opts` — the middleware's compile-time registration options. The chain
     builder closes over each middleware's `opts` at construction time so the
@@ -62,10 +62,10 @@ defmodule Aikido.Middleware do
   @typep result :: {:ok, map(), [Aikido.Directives.t()]} | {:error, map(), term()}
 
   @callback on_signal(
-              signal :: Jido.Signal.t(),
+              signal :: Aikido.Signal.t(),
               ctx :: map(),
               opts :: map(),
-              next :: (Jido.Signal.t(), map() -> result())
+              next :: (Aikido.Signal.t(), map() -> result())
             ) :: result()
 
   @optional_callbacks on_signal: 4

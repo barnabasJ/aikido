@@ -70,7 +70,7 @@ defmodule Aikido.Slices.Thread.Implementation do
   end
 
   defp options(input) do
-    [now: Aikido.SignalCtx.timestamp(get_in(input.context, [:aikido, :signal]))]
+    [now: Aikido.Signal.timestamp(get_in(input.context, [:aikido, :signal]))]
   end
 
   defp initial_options(input) do

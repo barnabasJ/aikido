@@ -18,7 +18,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
         overrides
       )
 
-    Jido.Signal.new!("ai.react.ask", data)
+    Aikido.Signal.new!("ai.react.ask", data)
   end
 
   defp idle_slice do

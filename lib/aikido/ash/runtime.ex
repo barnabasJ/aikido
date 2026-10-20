@@ -91,8 +91,8 @@ defmodule Aikido.Ash.Runtime do
 
     safe(fn ->
       with {:ok, {id, pid}} <- resolve(resource, input.arguments.agent),
-           {:ok, signal} <- Jido.Signal.new(definition.type, payload, source: "/ash"),
-           signal = Aikido.SignalCtx.put_ctx(signal, command_context(input, context)),
+           {:ok, signal} <- Aikido.Signal.new(definition.type, payload, source: "/ash"),
+           signal = Aikido.Signal.put_ctx(signal, command_context(input, context)),
            {:ok, _} <- dispatch(resource, pid, signal) do
         {:ok,
          Map.merge(reference(resource, id, pid), %{signal_id: signal.id, status: :processed})}

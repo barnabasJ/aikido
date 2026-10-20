@@ -24,7 +24,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
   end
 
   defp signal(request_id, turn) do
-    Jido.Signal.new!("ai.react.llm.completed", %{turn: turn, request_id: request_id})
+    Aikido.Signal.new!("ai.react.llm.completed", %{turn: turn, request_id: request_id})
   end
 
   test "model history retains the canonical assistant message and provider reasoning" do

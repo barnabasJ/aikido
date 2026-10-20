@@ -40,7 +40,7 @@ defmodule AikidoTest.AgentServer.SignalTest do
     end
 
     test "new! raises on missing required fields" do
-      assert_raise RuntimeError, fn ->
+      assert_raise Ash.Error.Unknown, fn ->
         Orphaned.new!(%{parent_id: "parent-123", parent_pid: self(), tag: :worker, meta: %{}})
       end
     end
@@ -131,7 +131,7 @@ defmodule AikidoTest.AgentServer.SignalTest do
   end
 
   describe "signal compatibility" do
-    test "all signals are valid Jido.Signal structs" do
+    test "all signals are valid Aikido.Signal structs" do
       {:ok, orphaned} =
         Orphaned.new(%{
           parent_id: "p1",
@@ -144,12 +144,12 @@ defmodule AikidoTest.AgentServer.SignalTest do
       {:ok, child_exit} = ChildExit.new(%{tag: :t1, pid: self(), reason: :normal})
       {:ok, scheduled} = Scheduled.new(%{message: :msg})
 
-      assert %Jido.Signal{} = orphaned
-      assert %Jido.Signal{} = child_exit
-      assert %Jido.Signal{} = scheduled
+      assert %Aikido.Signal{} = orphaned
+      assert %Aikido.Signal{} = child_exit
+      assert %Aikido.Signal{} = scheduled
     end
 
-    test "signals have proper specversion" do
+    test "signals carry explicit native scope and tracing fields" do
       {:ok, signal} =
         Orphaned.new(%{
           parent_id: "p1",
@@ -159,7 +159,9 @@ defmodule AikidoTest.AgentServer.SignalTest do
           reason: :normal
         })
 
-      assert signal.specversion == "1.0.2"
+      assert signal.scope == %{}
+      assert signal.tracer_context == %{}
+      assert signal.reply_to == nil
     end
 
     test "signals have auto-generated ids" do

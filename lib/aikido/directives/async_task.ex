@@ -7,14 +7,14 @@ defmodule Aikido.Directives.AsyncTask do
   The executor starts a supervised task, normalizes the task's return value, and
   casts one or more signals back to the originating agent.
 
-  The work may return a fully-built `%Jido.Signal{}` when it needs complete
+  The work may return a fully-built `%Aikido.Signal{}` when it needs complete
   control over the reply envelope. Otherwise, ordinary `{:ok, value}` and
   `{:error, reason}` results are wrapped using `success_type` and `error_type`.
 
   ## Result normalization
 
-      %Jido.Signal{} -> signal is cast back as-is
-      {:ok, %Jido.Signal{}} -> signal is cast back as-is
+      %Aikido.Signal{} -> signal is cast back as-is
+      {:ok, %Aikido.Signal{}} -> signal is cast back as-is
       {:signals, signals} -> all signals are cast back
       {:ok, {:signals, signals}} -> all signals are cast back
       {:ok, result} -> success signal with payload + %{result: result}
@@ -65,7 +65,7 @@ defmodule Aikido.Directives.AsyncTask do
   alias Aikido.AgentServer
   alias Aikido.AgentServer.State
   alias Aikido.Directives.AsyncTask
-  alias Jido.Signal
+  alias Aikido.Signal
 
   require Ash.Tracer
   require Logger
@@ -90,7 +90,7 @@ defmodule Aikido.Directives.AsyncTask do
   @spec start(AsyncTask.t(), Signal.t(), State.t()) :: {:ok, pid()} | {:error, term()}
   def start(%AsyncTask{} = directive, %Signal{} = input_signal, %State{} = state) do
     agent_pid = self()
-    tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
+    tracers = Aikido.Signal.tracers(input_signal, state.aikido)
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
 
     Task.Supervisor.start_child(Aikido.task_supervisor_name(state.aikido), fn ->
@@ -234,7 +234,7 @@ defmodule Aikido.Directives.AsyncTask do
   defp dispatch_signals(signals, %Signal{} = input_signal, target, %State{} = state)
        when is_list(signals) do
     Enum.each(signals, fn signal ->
-      safe_cast(target, Aikido.SignalCtx.inherit(signal, input_signal), state)
+      safe_cast(target, Aikido.Signal.inherit(signal, input_signal), state)
     end)
 
     :ok

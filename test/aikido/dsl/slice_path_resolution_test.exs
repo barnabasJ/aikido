@@ -100,9 +100,9 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
 
       {:ok, %{agent: agent}, _dirs} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},
@@ -128,9 +128,9 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
 
       {:ok, %{agent: agent}, _dirs} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},
@@ -165,9 +165,9 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
 
       {:ok, %{agent: agent}, _dirs} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},

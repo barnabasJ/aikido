@@ -2,7 +2,7 @@ defmodule AikidoTest.DurableSchedulerTest do
   use AikidoTest.Case, async: false
   import AikidoTest.AgentWait
   alias Aikido.{AgentServer, Durable}
-  alias Jido.Signal
+  alias Aikido.Signal
   alias AikidoTest.Support.SchedulerIntegrationHarness.{CronAgent, ScheduledCronAgent}
 
   defp start_durable(aikido, agent) do

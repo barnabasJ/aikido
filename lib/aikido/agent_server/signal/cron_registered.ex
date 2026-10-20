@@ -21,18 +21,27 @@ defmodule Aikido.AgentServer.Signal.CronRegistered do
   - `:runtime_spec` - The `%CronRuntimeSpec{}` carrying scheduler details
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.cron.registered",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: [
-      job_id: [type: :any, required: true, doc: "Logical cron job id within the agent"],
-      pid: [type: :any, required: true, doc: "PID of the spawned cron-job process"],
-      monitor_ref: [type: :any, required: true, doc: "Monitor reference for the cron-job process"],
-      cron_spec: [type: :any, required: true, doc: "Validated cron spec map"],
-      runtime_spec: [
-        type: :any,
-        required: true,
-        doc: "%CronRuntimeSpec{} carrying scheduler details"
-      ]
-    ]
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.cron.registered"
+
+    schema do
+      attribute :job_id, :term,
+        allow_nil?: false,
+        description: "Logical cron job id within the agent"
+
+      attribute :pid, :term, allow_nil?: false, description: "PID of the spawned cron-job process"
+
+      attribute :monitor_ref, :term,
+        allow_nil?: false,
+        description: "Monitor reference for the cron-job process"
+
+      attribute :cron_spec, :term, allow_nil?: false, description: "Validated cron spec map"
+
+      attribute :runtime_spec, :term,
+        allow_nil?: false,
+        description: "%CronRuntimeSpec{} carrying scheduler details"
+    end
+  end
 end

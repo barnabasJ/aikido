@@ -22,7 +22,7 @@ defmodule Aikido.Slices.Todo.Implementation do
         },
         directives: [
           Aikido.Directives.emit_to_pid(
-            %Jido.Signal{
+            %Aikido.Signal{
               id: nil,
               type: "aikido.todo.changed",
               data: %{id: id, removed: true},
@@ -102,7 +102,7 @@ defmodule Aikido.Slices.Todo.Implementation do
         state = %{state | items: items, revision: revision}
 
         changed =
-          %Jido.Signal{
+          %Aikido.Signal{
             id: nil,
             type: "aikido.todo.changed",
             data: %{id: data.id, item: next},
@@ -117,7 +117,7 @@ defmodule Aikido.Slices.Todo.Implementation do
               [
                 Aikido.Directives.schedule(
                   data.timeout_ms,
-                  %Jido.Signal{
+                  %Aikido.Signal{
                     id: nil,
                     type: "aikido.todo.expire",
                     data: %{id: data.id, revision: revision},

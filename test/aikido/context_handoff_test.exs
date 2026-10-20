@@ -233,7 +233,7 @@ defmodule Aikido.ContextHandoffTest do
     assert_receive {:DOWN, ^monitor, :process, ^writer, _}, 5_000
 
     late =
-      Jido.Signal.new!("ai.react.context_handoff.completed", %{
+      Aikido.Signal.new!("ai.react.context_handoff.completed", %{
         request_id: id,
         handoff_id: handoff_id,
         turn: %ReqLLM.Response{

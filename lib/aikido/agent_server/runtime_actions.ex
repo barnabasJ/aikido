@@ -74,11 +74,6 @@ defmodule Aikido.AgentServer.RuntimeActions do
       argument :payload, :map, description: "Signal payload data", default: %{}
       argument :source, :string, description: "Signal source path", default: "/agent"
 
-      argument :delivery_mode, :atom,
-        description: "Delivery mode",
-        default: :async,
-        constraints: [one_of: [:async, :sync]]
-
       description "Emit a signal to a specific process"
       run Aikido.Actions.Lifecycle.NotifyPid
     end

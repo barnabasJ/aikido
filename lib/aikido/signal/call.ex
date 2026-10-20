@@ -13,11 +13,11 @@ defmodule Aikido.Signal.Call do
 
   `call/3` wires the two halves together:
 
-  * The caller attaches `jido_dispatch: {:pid, target: self()}` to the
+  * The caller attaches `reply_to: self()` to the
     query signal and casts it to the agent.
   * Once the agent's action runs, it uses `reply/3` (below) to build an
     `%Emit{}` directive whose signal has `subject: query.id` and whose
-    dispatch is copied from the query. The runtime delivers it as
+    target is copied from the query. The runtime delivers it as
     `{:signal, reply_signal}` to the caller's mailbox.
   * `call/3` blocks in a receive that matches on the correlation id and
     returns the reply's data.
@@ -25,7 +25,7 @@ defmodule Aikido.Signal.Call do
   ## Example
 
       # Client
-      {:ok, query} = Jido.Signal.new("my.agent.ping", %{}, source: "/x")
+      {:ok, query} = Aikido.Signal.new("my.agent.ping", %{}, source: "/x")
       {:ok, reply} = Aikido.Signal.Call.call(agent_pid, query)
 
       # Action handling "my.agent.ping"
@@ -53,7 +53,7 @@ defmodule Aikido.Signal.Call do
   alias Aikido.AgentServer
   alias Aikido.Directives.Emit
   alias Aikido.Directives.Reply
-  alias Jido.Signal
+  alias Aikido.Signal
 
   @default_timeout 5_000
 
@@ -79,11 +79,12 @@ defmodule Aikido.Signal.Call do
           {:ok, Signal.t()} | {:error, term()}
   def call(server, %Signal{} = signal, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, default_timeout())
+    signal = Aikido.Directive.materialize_signal(signal)
     correlation_id = signal.id
 
     query =
-      case signal.jido_dispatch do
-        nil -> %{signal | jido_dispatch: {:pid, target: self()}}
+      case signal.reply_to do
+        nil -> %{signal | reply_to: self()}
         _existing -> signal
       end
 
@@ -117,10 +118,10 @@ defmodule Aikido.Signal.Call do
 
   `reply_type` is the type of the reply signal; `data` is its payload.
   The reply's `subject` is set to the input signal's `id`, and the
-  reply's dispatch is copied from the input signal — which is how
+  reply's destination is copied from the input signal — which is how
   `call/3` finds it back.
 
-  Returns `nil` if the input signal lacks a reply dispatch (i.e. it was
+  Returns `nil` if the input signal lacks a reply destination (i.e. it was
   not sent by `call/3` and the caller isn't expecting an answer). That
   lets action code be flexible:
 
@@ -131,14 +132,14 @@ defmodule Aikido.Signal.Call do
   """
   @spec reply(Signal.t() | nil, String.t(), map()) :: Emit.t() | nil
   def reply(nil, _type, _data), do: nil
-  def reply(%Signal{jido_dispatch: nil}, _type, _data), do: nil
+  def reply(%Signal{reply_to: nil}, _type, _data), do: nil
 
-  def reply(%Signal{id: req_id, jido_dispatch: dispatch}, reply_type, data)
+  def reply(%Signal{id: req_id, reply_to: target}, reply_type, data)
       when is_binary(reply_type) and is_map(data) do
     reply_signal =
       %Signal{id: nil, type: reply_type, data: data, source: "/aikido", subject: req_id}
 
-    %Emit{signal: reply_signal, dispatch: dispatch}
+    %Emit{signal: reply_signal, target: target}
   end
 
   @doc """
@@ -155,7 +156,7 @@ defmodule Aikido.Signal.Call do
   On success the reply has `type: reply_type` and `data: the returned map`.
   On error the reply has `type: error_type` and `data: %{reason: reason}`.
 
-  Returns `nil` if the input signal has no `jido_dispatch` (fire-and-forget).
+  Returns `nil` if the input signal has no `reply_to` (fire-and-forget).
 
   ## Example
 
@@ -184,7 +185,7 @@ defmodule Aikido.Signal.Call do
           Reply.builder()
         ) :: Reply.t() | nil
   def reply_from_state(nil, _reply_type, _error_type, _build_mfa), do: nil
-  def reply_from_state(%Signal{jido_dispatch: nil}, _r, _e, _b), do: nil
+  def reply_from_state(%Signal{reply_to: nil}, _r, _e, _b), do: nil
 
   def reply_from_state(%Signal{} = input, reply_type, error_type, {m, f, a})
       when is_binary(reply_type) and is_binary(error_type) and is_atom(m) and is_atom(f) and

@@ -172,7 +172,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
       GenServer.stop(pid)
@@ -183,7 +183,7 @@ defmodule AikidoTest.AgentServerTest do
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       for _ <- 1..5 do
-        signal = Jido.Signal.new!("increment", %{}, source: "/test")
+        signal = Aikido.Signal.new!("increment", %{}, source: "/test")
         {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       end
 
@@ -198,7 +198,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
-      signal = Jido.Signal.new!("record", %{message: "hello"}, source: "/test")
+      signal = Aikido.Signal.new!("record", %{message: "hello"}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.messages == ["hello"]
       GenServer.stop(pid)
@@ -210,7 +210,7 @@ defmodule AikidoTest.AgentServerTest do
           id: "call-id-test"
         )
 
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
       GenServer.stop(pid)
@@ -255,7 +255,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.InlineAgent)
 
-      slow_signal = Jido.Signal.new!("slow", %{}, source: "/test")
+      slow_signal = Aikido.Signal.new!("slow", %{}, source: "/test")
       :erlang.trace(pid, true, [:receive])
 
       task =
@@ -268,7 +268,7 @@ defmodule AikidoTest.AgentServerTest do
                      1_000
 
       :erlang.trace(pid, false, [:receive])
-      Aikido.AgentServer.cast(pid, Jido.Signal.new!("increment", %{}, source: "/test"))
+      Aikido.AgentServer.cast(pid, Aikido.Signal.new!("increment", %{}, source: "/test"))
       assert {:ok, agent} = Task.await(task, 2000)
       assert agent.state.domain.slow_done == true
 
@@ -342,7 +342,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.BufferedSignalAgent)
 
-      slow_signal = Jido.Signal.new!("slow", %{}, source: "/test")
+      slow_signal = Aikido.Signal.new!("slow", %{}, source: "/test")
       :erlang.trace(pid, true, [:receive])
 
       task =
@@ -355,7 +355,7 @@ defmodule AikidoTest.AgentServerTest do
                      1_000
 
       :erlang.trace(pid, false, [:receive])
-      increment_signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      increment_signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       assert :ok = Aikido.AgentServer.cast(pid, increment_signal)
       assert {:ok, _agent} = Task.await(task, 2000)
 
@@ -377,7 +377,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       assert :ok = Aikido.AgentServer.cast(pid, signal)
 
       await_state_value(pid, fn s ->
@@ -394,7 +394,7 @@ defmodule AikidoTest.AgentServerTest do
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       for _ <- 1..5 do
-        signal = Jido.Signal.new!("increment", %{}, source: "/test")
+        signal = Aikido.Signal.new!("increment", %{}, source: "/test")
         Aikido.AgentServer.cast(pid, signal)
       end
 
@@ -524,7 +524,7 @@ defmodule AikidoTest.AgentServerTest do
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       ref = Process.monitor(pid)
-      signal = Jido.Signal.new!("stop_test", %{}, source: "/test")
+      signal = Aikido.Signal.new!("stop_test", %{}, source: "/test")
       Aikido.AgentServer.cast(pid, signal)
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1000
     end
@@ -538,7 +538,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
-      signal = Jido.Signal.new!("unknown.signal.type", %{}, source: "/test")
+      signal = Aikido.Signal.new!("unknown.signal.type", %{}, source: "/test")
 
       assert {:error, %Aikido.Error.RoutingError{}} =
                Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -552,7 +552,7 @@ defmodule AikidoTest.AgentServerTest do
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       ref = Process.monitor(pid)
-      signal = Jido.Signal.new!("aikido.agent.stop", %{reason: :shutdown}, source: "/test")
+      signal = Aikido.Signal.new!("aikido.agent.stop", %{reason: :shutdown}, source: "/test")
       assert :ok = Aikido.AgentServer.cast(pid, signal)
       assert_receive {:DOWN, ^ref, :process, ^pid, {:shutdown, :permanent}}, 1000
     end
@@ -564,7 +564,7 @@ defmodule AikidoTest.AgentServerTest do
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       for i <- 1..10 do
-        signal = Jido.Signal.new!("record", %{index: i}, source: "/test")
+        signal = Aikido.Signal.new!("record", %{index: i}, source: "/test")
         Aikido.AgentServer.cast(pid, signal)
       end
 
@@ -609,7 +609,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       {:ok, status} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.status} end)
       assert status == :idle
@@ -627,7 +627,7 @@ defmodule AikidoTest.AgentServerTest do
           slice = input.arguments.state
 
           scheduled =
-            %Jido.Signal{id: nil, type: "scheduled.ping", data: %{}, source: "/test"}
+            %Aikido.Signal{id: nil, type: "scheduled.ping", data: %{}, source: "/test"}
 
           Aikido.Types.ActionResult.new(
             state: slice,
@@ -682,7 +682,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.ScheduleTrackingAgent)
 
-      signal = Jido.Signal.new!("start_schedule", %{}, source: "/test")
+      signal = Aikido.Signal.new!("start_schedule", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
 
       {:ok, pings_initial} =
@@ -713,7 +713,7 @@ defmodule AikidoTest.AgentServerTest do
 
           directives =
             for i <- 1..3 do
-              sig = %Jido.Signal{id: nil, type: "tick", data: %{n: i}, source: "/test"}
+              sig = %Aikido.Signal{id: nil, type: "tick", data: %{n: i}, source: "/test"}
               %Aikido.Directives.Schedule{delay_ms: i * 20, message: sig}
             end
 
@@ -767,7 +767,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.MultiScheduleAgent)
 
-      signal = Jido.Signal.new!("schedule_many", %{}, source: "/test")
+      signal = Aikido.Signal.new!("schedule_many", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
 
       events =
@@ -848,7 +848,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.WrapScheduleAgent)
 
-      signal = Jido.Signal.new!("schedule_atom", %{}, source: "/test")
+      signal = Aikido.Signal.new!("schedule_atom", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
 
       received =
@@ -874,7 +874,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
       GenServer.stop(pid)
@@ -897,7 +897,7 @@ defmodule AikidoTest.AgentServerTest do
         end)
 
       via = {:via, Registry, {registry, "via-resolve-test"}}
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(via, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
       GenServer.stop(AikidoTest.Case.agent_pid(aikido, "via-resolve-test"))
@@ -909,7 +909,7 @@ defmodule AikidoTest.AgentServerTest do
           id: "string-resolve-test"
         )
 
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
       GenServer.stop(pid)
@@ -926,7 +926,7 @@ defmodule AikidoTest.AgentServerTest do
     end
 
     test("returns error for invalid server reference", %{aikido: _aikido}) do
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
 
       assert {:error, :invalid_server} =
                Aikido.AgentServer.call(123, signal, fn s -> {:ok, s.agent} end)
@@ -1068,13 +1068,13 @@ defmodule AikidoTest.AgentServerTest do
 
       signals =
         for _ <- 1..10 do
-          Jido.Signal.new!("slow", %{}, source: "/test")
+          Aikido.Signal.new!("slow", %{}, source: "/test")
         end
 
       Enum.each(signals, fn sig -> Aikido.AgentServer.cast(pid, sig) end)
 
       {:ok, _final} =
-        Aikido.AgentServer.call(pid, Jido.Signal.new!("slow", %{}, source: "/test"), fn s ->
+        Aikido.AgentServer.call(pid, Aikido.Signal.new!("slow", %{}, source: "/test"), fn s ->
           {:ok, s.agent}
         end)
 

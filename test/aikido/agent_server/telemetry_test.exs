@@ -3,7 +3,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementatio
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
-    signal = %Jido.Signal{id: nil, type: "test.emitted", data: %{}, source: "/test"}
+    signal = %Aikido.Signal{id: nil, type: "test.emitted", data: %{}, source: "/test"}
 
     Aikido.Types.ActionResult.new(
       state: %{},
@@ -97,7 +97,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
           id: "telemetry-signal-test"
         )
 
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
 
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], measurements,
@@ -124,7 +124,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
           id: "telemetry-directive-count"
         )
 
-      signal = Jido.Signal.new!("emit_directive", %{}, source: "/test")
+      signal = Aikido.Signal.new!("emit_directive", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, _}
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], _, metadata}
@@ -144,7 +144,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
         )
 
       drain_directive_events()
-      signal = Jido.Signal.new!("emit_directive", %{}, source: "/test")
+      signal = Aikido.Signal.new!("emit_directive", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, _}
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], _, _}
@@ -185,7 +185,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
           id: "telemetry-type-test"
         )
 
-      signal = Jido.Signal.new!("schedule_directive", %{}, source: "/test")
+      signal = Aikido.Signal.new!("schedule_directive", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, _}
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], _, _}
@@ -216,7 +216,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
           id: "telemetry-metadata-test"
         )
 
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, metadata}
       assert metadata.agent_id == "telemetry-metadata-test"
@@ -233,7 +233,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
           id: "telemetry-signal-type-test"
         )
 
-      signal = Jido.Signal.new!("emit_directive", %{}, source: "/test")
+      signal = Aikido.Signal.new!("emit_directive", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, _}
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], _, _}
@@ -255,7 +255,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
           id: "telemetry-timing-test"
         )
 
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], measurements, _}
       assert measurements.duration >= 0
@@ -270,7 +270,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
           id: "telemetry-directive-timing"
         )
 
-      signal = Jido.Signal.new!("emit_directive", %{}, source: "/test")
+      signal = Aikido.Signal.new!("emit_directive", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, _}
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], _, _}

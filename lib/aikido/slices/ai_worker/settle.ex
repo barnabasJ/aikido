@@ -32,7 +32,7 @@ defmodule Aikido.Slices.AiWorker.Settle do
         end
 
       reply =
-        %Jido.Signal{
+        %Aikido.Signal{
           id: nil,
           type: type,
           data: Map.merge(Map.take(pending, [:task_id, :member, :attempt]), %{result: result}),

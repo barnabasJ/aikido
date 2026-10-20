@@ -1,6 +1,6 @@
 defmodule AikidoTest.Identity.Actions.EvolveTest do
   use ExUnit.Case, async: true
-  alias Jido.Signal
+  alias Aikido.Signal
   alias Aikido.Slices.Identity, as: State
 
   defp sig(data) do

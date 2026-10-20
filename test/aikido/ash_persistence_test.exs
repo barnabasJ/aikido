@@ -133,7 +133,7 @@ defmodule AikidoTest.AshPersistenceTest do
   test "a temporary agent's own stop signal also deletes its saved state" do
     ref = Domain.temporary_start!(%{id: "self-stop", value: 7})
     monitor = Process.monitor(ref.pid)
-    assert :ok = Aikido.AgentServer.cast(ref.pid, Jido.Signal.new!("aikido.agent.stop", %{}))
+    assert :ok = Aikido.AgentServer.cast(ref.pid, Aikido.Signal.new!("aikido.agent.stop", %{}))
     assert_receive {:DOWN, ^monitor, :process, _, _}, 1_000
 
     restarted = Domain.temporary_start!(%{id: "self-stop", value: 99})

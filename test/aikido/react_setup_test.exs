@@ -38,7 +38,7 @@ defmodule Aikido.ReactSetupTest do
     refute_received {:model_started, _}
     assert {:error, _} = Aikido.AI.ask(pid, "another start", opts)
 
-    handoff = Jido.Signal.new!("ai.react.handoff", %{messages: []})
+    handoff = Aikido.Signal.new!("ai.react.handoff", %{messages: []})
     assert {:error, _} = Aikido.AgentServer.call(pid, handoff, fn _ -> {:ok, :unexpected} end)
 
     assert {:error, _} =
@@ -48,12 +48,12 @@ defmodule Aikido.ReactSetupTest do
              Aikido.AI.queue_message(pid, "queued", actor: %{id: "alice"}, tenant: "workspace")
 
     delivery =
-      Jido.Signal.new!("ai.react.deliver", %{
+      Aikido.Signal.new!("ai.react.deliver", %{
         text: "delivered",
         request_id: "delivery",
         metadata: %{step: "app"}
       })
-      |> Aikido.SignalCtx.put_ctx(%{actor: %{id: "alice"}, tenant: "workspace"})
+      |> Aikido.Signal.put_ctx(%{actor: %{id: "alice"}, tenant: "workspace"})
 
     assert {:ok, :accepted} = Aikido.AgentServer.call(pid, delivery, fn _ -> {:ok, :accepted} end)
 
@@ -94,7 +94,9 @@ defmodule Aikido.ReactSetupTest do
     assert {:error, :cancelled} = Task.await(task)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 5_000
 
-    late = Jido.Signal.new!("ai.react.tools.ready", %{request_id: id, prepared_tools: {[], %{}}})
+    late =
+      Aikido.Signal.new!("ai.react.tools.ready", %{request_id: id, prepared_tools: {[], %{}}})
+
     assert {:ok, :failed} = Aikido.AgentServer.call(pid, late, &{:ok, &1.agent.state.ai.status})
     refute_received {:model_started, _}
 

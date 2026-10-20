@@ -5,8 +5,9 @@ defmodule Aikido.AgentServer.Signal.LifecycleReady do
   active runtime. Routed actions may return directives for post-boot I/O.
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.lifecycle.ready",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: []
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.lifecycle.ready"
+  end
 end

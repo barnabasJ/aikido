@@ -109,10 +109,10 @@ defmodule Aikido.NativeActionTest do
   defp run(action, params \\ %{}, context \\ %{state: %{count: 2}}) do
     signal =
       Map.get(context, :signal) ||
-        %Jido.Signal{id: nil, type: "test.action", data: params, source: "/test"}
+        %Aikido.Signal{id: nil, type: "test.action", data: params, source: "/test"}
 
     signal = %{signal | data: params}
-    runtime = Map.merge(Aikido.SignalCtx.ctx(signal), Map.get(context, :ctx, %{}))
+    runtime = Map.merge(Aikido.Signal.ctx(signal), Map.get(context, :ctx, %{}))
 
     then(signal, fn signal ->
       Aikido.NativeActionTest.Actions
@@ -226,7 +226,7 @@ defmodule Aikido.NativeActionTest do
   end
 
   test "runtime context preserves signal and mount configuration" do
-    signal = Jido.Signal.new!("native.runtime", %{})
+    signal = Aikido.Signal.new!("native.runtime", %{})
 
     context = %{
       state: %{},

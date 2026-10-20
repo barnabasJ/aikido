@@ -11,7 +11,7 @@ defmodule Aikido.Slices.AiWorker.Accept do
     data = Map.delete(input.arguments, :state)
     state = input.arguments.state
     context = input.context.aikido
-    scope = Map.merge(%{actor: nil, tenant: nil}, Aikido.SignalCtx.ctx(context.signal))
+    scope = Map.merge(%{actor: nil, tenant: nil}, Aikido.Signal.ctx(context.signal))
     data = Map.put(data, :signal_context, scope)
 
     duplicate? =
@@ -50,8 +50,8 @@ defmodule Aikido.Slices.AiWorker.Accept do
       |> Map.merge(%{query: data.text, request_id: data.task_id})
 
     ask =
-      %Jido.Signal{id: nil, type: "ai.react.ask", data: payload, source: "/aikido"}
-      |> Aikido.SignalCtx.put_ctx(Map.get(data, :signal_context, %{}))
+      %Aikido.Signal{id: nil, type: "ai.react.ask", data: payload, source: "/aikido"}
+      |> Aikido.Signal.put_ctx(Map.get(data, :signal_context, %{}))
 
     Aikido.Types.ActionResult.new(
       state: %{state | pending: pending},

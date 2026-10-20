@@ -26,7 +26,8 @@ defmodule Aikido.Directives do
 
   Each directive is one struct in its own file under `lib/aikido/directives/`:
 
-  - `Aikido.Directives.Emit` — dispatch a signal via `Jido.Signal.Dispatch`
+  - `Aikido.Directives.Emit` — send a signal directly to a process
+  - `Aikido.Directives.Notify` — publish a native Ash notification
   - `Aikido.Directives.Error` — signal an error (wraps `Aikido.Error.t()`)
   - `Aikido.Directives.Spawn` — spawn a generic BEAM child process (fire-and-forget, no tracking)
   - `Aikido.Directives.AsyncTask` — run supervised async work and report success/error as signals
@@ -46,10 +47,9 @@ defmodule Aikido.Directives do
 
       alias Aikido.Directives
 
-      # Emit a signal (runtime will dispatch via configured adapters)
+      # Deliver locally or to another process
       %Directives.Emit{signal: my_signal}
-      %Directives.Emit{signal: my_signal, dispatch: {:pubsub, target: MyApp.PubSub, topic: "events"}}
-      %Directives.Emit{signal: my_signal, dispatch: {:pid, target: pid}}
+      %Directives.Emit{signal: my_signal, target: pid}
 
       # Schedule for later
       %Directives.Schedule{delay_ms: 5000, message: :timeout}
@@ -102,6 +102,7 @@ defmodule Aikido.Directives do
   @typedoc "Built-in core directives."
   @type core ::
           Emit.t()
+          | Aikido.Directives.Notify.t()
           | Error.t()
           | AsyncTask.t()
           | Spawn.t()
@@ -118,21 +119,17 @@ defmodule Aikido.Directives do
   # ============================================================================
 
   @doc """
-  Creates an Emit directive.
-
-  If `dispatch` is omitted, runtime will use `AgentServer` `default_dispatch`.
-  When no default is configured, runtime falls back to emitting to the current
-  agent process (`self()`).
-
-  ## Examples
+  Creates a signal delivery directive targeting the current agent or a PID.
 
       Directives.emit(signal)
-      Directives.emit(signal, {:pubsub, target: MyApp.PubSub, topic: "events"})
+      Directives.emit(signal, worker_pid)
   """
-  @spec emit(term(), term()) :: Emit.t()
-  def emit(signal, dispatch \\ nil) do
-    %Emit{signal: signal, dispatch: dispatch}
-  end
+  @spec emit(term(), pid() | nil) :: Emit.t()
+  def emit(signal, target \\ nil), do: %Emit{signal: signal, target: target}
+
+  @doc "Publish a native Ash notification after the action's state is applied."
+  @spec notify(Ash.Notifier.Notification.t()) :: Aikido.Directives.Notify.t()
+  def notify(notification), do: %Aikido.Directives.Notify{notification: notification}
 
   @doc """
   Creates an Error directive.
@@ -334,25 +331,7 @@ defmodule Aikido.Directives do
   # Multi-Agent Communication Helpers
   # ============================================================================
 
-  @doc """
-  Creates an Emit directive targeting a specific process by PID.
-
-  This is a convenience for sending signals directly to another agent or process.
-
-  ## Options
-
-  All options are passed to the `:pid` dispatch adapter:
-  - `:delivery_mode` - `:async` (default) or `:sync`
-  - `:timeout` - Timeout for sync delivery (default: 5000)
-
-  ## Examples
-
-      Directives.emit_to_pid(signal, some_pid)
-      Directives.emit_to_pid(signal, worker_pid, delivery_mode: :sync)
-  """
-  @spec emit_to_pid(term(), pid(), Keyword.t()) :: Emit.t()
-  def emit_to_pid(signal, pid, extra_opts \\ []) when is_pid(pid) do
-    opts = Keyword.merge([target: pid], extra_opts)
-    %Emit{signal: signal, dispatch: {:pid, opts}}
-  end
+  @doc "Creates a direct asynchronous signal delivery to a PID."
+  @spec emit_to_pid(term(), pid()) :: Emit.t()
+  def emit_to_pid(signal, pid) when is_pid(pid), do: %Emit{signal: signal, target: pid}
 end

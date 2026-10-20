@@ -62,7 +62,7 @@ defmodule Aikido.DirectiveTest do
     assert result.directives == [directive]
     refute_received {:notified, _}
 
-    signal = Jido.Signal.new!("notify", %{})
+    signal = Aikido.Signal.new!("notify", %{})
 
     runtime =
       Aikido.AgentServer.State.new!(

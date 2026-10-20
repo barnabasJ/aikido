@@ -113,7 +113,7 @@ defmodule Aikido.AI do
           {:ok, String.t()} | {:error, term()}
   def ask(pid, query, opts \\ []) when is_binary(query) and is_list(opts) do
     request_id = mint_request_id()
-    signal = build_ask_signal(query, request_id, opts) |> Aikido.SignalCtx.capture_tracing()
+    signal = build_ask_signal(query, request_id, opts) |> Aikido.Signal.capture_tracing()
     launch(pid, signal, request_id)
   end
 
@@ -136,7 +136,7 @@ defmodule Aikido.AI do
   def ask_sync(pid, query, opts \\ []) when is_binary(query) and is_list(opts) do
     timeout = Keyword.get(opts, :timeout, @default_await_timeout)
     request_id = mint_request_id()
-    signal = build_ask_signal(query, request_id, opts) |> Aikido.SignalCtx.capture_tracing()
+    signal = build_ask_signal(query, request_id, opts) |> Aikido.Signal.capture_tracing()
 
     selector = fn runtime ->
       ai = runtime.agent.state.ai
@@ -151,7 +151,7 @@ defmodule Aikido.AI do
 
     Aikido.AgentServer.call_until(pid, fn -> launch(pid, signal, request_id) end, "**", selector,
       timeout: timeout,
-      tracer: Aikido.SignalCtx.tracers(signal)
+      tracer: Aikido.Signal.tracers(signal)
     )
   end
 
@@ -163,17 +163,17 @@ defmodule Aikido.AI do
   """
   def cancel(pid, request_id \\ nil, opts \\ []) do
     signal =
-      Jido.Signal.new!("ai.react.cancel", %{request_id: request_id})
-      |> Aikido.SignalCtx.put_ctx(caller_scope(opts))
-      |> Aikido.SignalCtx.capture_tracing()
+      Aikido.Signal.new!("ai.react.cancel", %{request_id: request_id})
+      |> Aikido.Signal.put_ctx(caller_scope(opts))
+      |> Aikido.Signal.capture_tracing()
 
     Aikido.AgentServer.cast(pid, signal)
   end
 
   @doc "Queue a user message for the next model request, or the next run when idle."
   def queue_message(pid, text, opts \\ []) do
-    signal = Jido.Signal.new!("ai.react.message", %{text: text})
-    signal = Aikido.SignalCtx.put_ctx(signal, caller_scope(opts))
+    signal = Aikido.Signal.new!("ai.react.message", %{text: text})
+    signal = Aikido.Signal.put_ctx(signal, caller_scope(opts))
 
     Aikido.AgentServer.call(pid, signal, fn _ ->
       {:ok, :queued}
@@ -199,8 +199,8 @@ defmodule Aikido.AI do
       hooks: Keyword.get(opts, :hooks)
     }
 
-    Jido.Signal.new!("ai.react.ask", data)
-    |> Aikido.SignalCtx.put_ctx(caller_scope(opts))
+    Aikido.Signal.new!("ai.react.ask", data)
+    |> Aikido.Signal.put_ctx(caller_scope(opts))
   end
 
   defp caller_scope(opts) do

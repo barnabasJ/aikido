@@ -2,7 +2,7 @@ defmodule Aikido.AgentServer.CronRuntimeSpec do
   @moduledoc false
 
   alias Aikido.AgentServer.Signal.CronTick
-  alias Jido.Signal
+  alias Aikido.Signal
 
   @default_timezone "Etc/UTC"
 
@@ -42,7 +42,7 @@ defmodule Aikido.AgentServer.CronRuntimeSpec do
     }
   end
 
-  @spec build_signal(t(), String.t(), term()) :: Jido.Signal.t()
+  @spec build_signal(t(), String.t(), term()) :: Aikido.Signal.t()
   def build_signal(
         %__MODULE__{kind: :dynamic, message: %Signal{} = signal},
         _agent_id,

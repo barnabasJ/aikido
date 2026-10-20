@@ -1,7 +1,7 @@
 defmodule AikidoTest.Actions.ControlTest do
   use ExUnit.Case, async: true
   alias Aikido.Directives
-  alias Jido.Signal
+  alias Aikido.Signal
 
   defp sig(type, data \\ %{}) do
     Signal.new!(%{type: type, source: "/test", data: data})
@@ -70,8 +70,7 @@ defmodule AikidoTest.Actions.ControlTest do
 
       assert result == %{}
       assert %Directives.Emit{} = directive
-      assert {:pid, opts} = directive.dispatch
-      assert Keyword.get(opts, :target) == target
+      assert directive.target == target
     end
 
     test "uses custom signal type when provided" do
@@ -110,7 +109,7 @@ defmodule AikidoTest.Actions.ControlTest do
   end
 
   describe("Broadcast") do
-    test "creates emit directive with pubsub dispatch" do
+    test "creates a native Ash PubSub notification" do
       data = %{
         pubsub: MyApp.PubSub,
         topic: "workers",
@@ -130,9 +129,10 @@ defmodule AikidoTest.Actions.ControlTest do
         end)
 
       assert result == %{}
-      assert %Directives.Emit{} = directive
-      assert directive.dispatch == {:pubsub, target: MyApp.PubSub, topic: "workers"}
-      assert directive.signal.type == "work.available"
+      assert %Directives.Notify{notification: notification} = directive
+      assert notification.for == Aikido.Notifiers.PubSub
+      assert notification.metadata == %{pubsub: MyApp.PubSub, topic: "workers"}
+      assert notification.data.type == "work.available"
     end
 
     test "requires an explicit PubSub server through native argument validation" do

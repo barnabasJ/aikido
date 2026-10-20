@@ -198,7 +198,7 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
       assert {:ok, _} =
                Aikido.AgentServer.call(
                  reference.pid,
-                 Jido.Signal.new!(type, %{amount: "3"}),
+                 Aikido.Signal.new!(type, %{amount: "3"}),
                  fn _ -> {:ok, :processed} end
                )
 
@@ -223,10 +223,10 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
       for {"mounted.distinct", predicate, {Counter, :local}, -12} <- distinct, do: predicate
 
     assert [first, second] = predicates
-    assert first.(Jido.Signal.new!("mounted.distinct", %{first: true}))
-    refute second.(Jido.Signal.new!("mounted.distinct", %{first: true}))
-    refute first.(Jido.Signal.new!("mounted.distinct", %{second: true}))
-    assert second.(Jido.Signal.new!("mounted.distinct", %{second: true}))
+    assert first.(Aikido.Signal.new!("mounted.distinct", %{first: true}))
+    refute second.(Aikido.Signal.new!("mounted.distinct", %{first: true}))
+    refute first.(Aikido.Signal.new!("mounted.distinct", %{second: true}))
+    assert second.(Aikido.Signal.new!("mounted.distinct", %{second: true}))
   end
 
   test "unrelated public targets still conflict unless explicitly overridden" do
@@ -276,7 +276,7 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
   end
 
   defp raw_signal(reference, type, data) do
-    Aikido.AgentServer.call(reference.pid, Jido.Signal.new!(type, data), fn _ ->
+    Aikido.AgentServer.call(reference.pid, Aikido.Signal.new!(type, data), fn _ ->
       {:ok, :processed}
     end)
   end

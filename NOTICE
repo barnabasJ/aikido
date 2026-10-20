@@ -1,0 +1,28 @@
+Aikido includes an adapted Jido Signal router matching algorithm.
+
+Jido Signal 3.0.0-beta.5
+Copyright 2026 Mike Hostetler <mike.hostetler@gmail.com>
+Licensed under Apache License 2.0; see LICENSE distributed with Aikido.
+
+Source: https://github.com/agentjido/jido_signal/tree/v3.0.0-beta.5
+Package: https://repo.hex.pm/tarballs/jido_signal-3.0.0-beta.5.tar
+Package SHA-256:
+4de82f0a95200a2fe473f106621e68949e189231810d8fa7ab220e3f478b3298
+
+Adapted source mapping (upstream path => Aikido path):
+lib/jido_signal/router/index.ex => lib/aikido/signal/router/index.ex
+  Upstream SHA-256:
+  9f4efc2733e52c8705acc606649ff7663e3bb5e3b27894b4075bfc25c1833ca8
+lib/jido_signal/router.ex => lib/aikido/signal/router.ex
+  Upstream SHA-256:
+  01848cf39779a04ce641a08fc208520df03390e4fb2cba28641a915c55f02754
+lib/jido_signal/router/route.ex => lib/aikido/signal/router.ex
+  Upstream SHA-256:
+  8d6c38a8dda2489d39d7e137cca06db14e4278d7009adbaa0caf3168c0f4c55a
+
+Aikido adaptations: renamed modules; native Spark.Options route validation;
+existing Aikido structured errors; generic type-bearing envelopes; compiled
+subscription patterns; immutable construction and lookup only. Upstream Zoi
+schemas, Router DSL, mutation APIs, catalog, cache, and envelope rules are omitted.
+The packaged upstream release contained no NOTICE or test files. Aikido's router
+oracle and regression tests are locally authored, not copied upstream tests.

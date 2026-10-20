@@ -3,7 +3,7 @@ defmodule Aikido.Actions.Lifecycle.NotifyPid do
   Pure reducer that prepares a notification for `target_pid`.
 
   Returns the supplied `state` and an `Emit` directive using `signal_type`,
-  `payload`, `source` and the requested `delivery_mode`.
+  `payload` and `source`.
   """
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -12,9 +12,8 @@ defmodule Aikido.Actions.Lifecycle.NotifyPid do
     type = input.arguments[:signal_type]
     payload = input.arguments[:payload]
     source = input.arguments[:source]
-    mode = input.arguments[:delivery_mode]
-    signal = %Jido.Signal{id: nil, type: type, data: payload, source: source}
-    directive = Aikido.Directives.emit_to_pid(signal, pid, delivery_mode: mode)
+    signal = %Aikido.Signal{id: nil, type: type, data: payload, source: source}
+    directive = Aikido.Directives.emit_to_pid(signal, pid)
     Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [directive])
   end
 end

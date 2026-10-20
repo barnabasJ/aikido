@@ -48,6 +48,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Forward native Ash/Spark options in convenience hosts. Use an application domain when supplied; `Aikido.RuntimeDomain` is the agent convenience macro's default. Keep normal domain-inclusion validation.
 - Pass actor, tenant, application context and tracers through native Ash scope and tracing APIs. The external command and internal reducer are separate Ash authorization boundaries; downstream tools retain their own authorization.
 - Supply AI tools as Ash AI tool names plus native `tool_options`. Tool setup builds descriptions and registry once per run. Prepared callbacks are transient and are rebuilt for a new run.
+- Internal messages use `Aikido.Signal`; define typed payloads with its Spark `signal`/`schema` DSL. Scope and native tracer context travel directly on the envelope. Pure reducers return literals; constructors that generate IDs or timestamps belong at I/O boundaries. Deliver to agents directly; publish native Ash notifications through directives after state adoption.
 - The purity rules apply to agent/slice state reducers. Public lifecycle/signal adapters and tool implementations are I/O boundaries, not reducers; invoke tools through directives or supervised work rather than from a reducer.
 
 ## Persistence and Completion

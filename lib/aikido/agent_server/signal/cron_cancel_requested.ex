@@ -6,8 +6,13 @@ defmodule Aikido.AgentServer.Signal.CronCancelRequested do
   registration is installed before cancellation resolves its current process.
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.cron.cancel.requested",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: [job_id: [type: :any, required: true, doc: "Logical cron job id"]]
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.cron.cancel.requested"
+
+    schema do
+      attribute :job_id, :term, allow_nil?: false, description: "Logical cron job id"
+    end
+  end
 end

@@ -7,8 +7,9 @@ defmodule Aikido.AgentServer.Signal.LifecycleStarting do
   Lifecycle handlers must not depend on post-init schedules or readiness.
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.lifecycle.starting",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: []
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.lifecycle.starting"
+  end
 end

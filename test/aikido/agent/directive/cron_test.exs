@@ -3,7 +3,7 @@ defmodule AikidoTest.Agent.Directives.CronTest do
 
   alias Aikido.Directives
   alias Aikido.Directives.Cron
-  alias Jido.Signal
+  alias Aikido.Signal
 
   describe "Cron directive creation" do
     test "creates cron directive with required fields" do

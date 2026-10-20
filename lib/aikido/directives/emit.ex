@@ -1,101 +1,26 @@
 defmodule Aikido.Directives.Emit do
   @moduledoc """
-  Dispatch a signal via `Jido.Signal.Dispatch`.
+  Deliver one signal directly to a process as `{:signal, signal}`.
 
-  The runtime interprets this directive by calling:
-
-      Jido.Signal.Dispatch.dispatch(signal, dispatch_config)
-
-  ## Fields
-
-  - `signal` - A `Jido.Signal.t()` struct to dispatch
-  - `dispatch` - Dispatch config: `{adapter, opts}` or list of configs
-    - `:pid` - Direct to process
-    - `:pubsub` - Via PubSub
-    - `:bus` - To signal bus
-    - `:http` / `:webhook` - HTTP endpoints
-    - `:logger` / `:console` / `:noop` - Logging/testing
-
-  If `dispatch` is omitted and the agent has no `default_dispatch`, runtime
-  falls back to emitting to the current agent process (`self()`).
-
-  ## Examples
-
-      # Use agent's default dispatch (configured on AgentServer)
-      %Emit{signal: signal}
-
-      # Explicit dispatch to PubSub
-      %Emit{signal: signal, dispatch: {:pubsub, target: MyApp.PubSub, topic: "events"}}
-
-      # Multiple dispatch targets
-      %Emit{signal: signal, dispatch: [
-        {:pubsub, target: MyApp.PubSub, topic: "events"},
-        {:logger, level: :info}
-      ]}
+  Omitting `target` sends to the current agent. Delivery is asynchronous and
+  preserves sender ordering, including a reply followed by agent shutdown.
+  Use `Aikido.Directives.Notify` for native Ash notifications.
   """
-
   use Aikido.Directive
 
   typed_struct do
-    field :signal, :term, allow_nil?: false, description: "Jido.Signal.t() to dispatch"
-
-    field :dispatch, :term,
-      allow_nil?: true,
-      description: "Dispatch config: {adapter, opts} or list"
+    field :signal, :term, allow_nil?: false
+    field :target, :term, description: "Destination PID; defaults to the current agent"
   end
 
-  require Logger
-
   @impl true
-  def exec(%{signal: signal, dispatch: dispatch}, input_signal, state) do
-    cfg = dispatch || state.default_dispatch
-
+  def exec(%{signal: signal, target: target}, input_signal, _runtime) do
     signal =
       signal
       |> Aikido.Directive.materialize_signal()
-      |> Aikido.SignalCtx.inherit(input_signal)
+      |> Aikido.Signal.inherit(input_signal)
 
-    dispatch_signal(signal, cfg, state)
-
+    send(target || self(), {:signal, signal})
     :ok
-  end
-
-  defp dispatch_signal(signal, nil, _state) do
-    send(self(), {:signal, signal})
-  end
-
-  defp dispatch_signal(signal, {:pid, opts} = cfg, state) when is_list(opts) do
-    if Keyword.keyword?(opts) && Keyword.get(opts, :delivery_mode, :async) == :async &&
-         not Keyword.has_key?(opts, :message_format) do
-      # Plain asynchronous PID delivery cannot wait or run application callbacks.
-      # Preserve sender ordering when a reply is followed by the agent stopping.
-      Jido.Signal.Dispatch.dispatch(signal, cfg)
-    else
-      dispatch_async(signal, cfg, state)
-    end
-  end
-
-  defp dispatch_signal(signal, cfg, state), do: dispatch_async(signal, cfg, state)
-
-  defp dispatch_async(signal, cfg, state) do
-    transfer = Aikido.SignalCtx.tracer_context(signal)
-
-    case Task.Supervisor.start_child(Aikido.task_supervisor_name(state.aikido), fn ->
-           Ash.ProcessHelpers.transfer_context(transfer)
-
-           case Jido.Signal.Dispatch.dispatch(signal, cfg) do
-             {:error, reason} ->
-               Logger.error("Signal dispatch failed: #{inspect(reason)}", signal_id: signal.id)
-
-             _ ->
-               :ok
-           end
-         end) do
-      {:ok, _pid} ->
-        :ok
-
-      {:error, reason} ->
-        Logger.error("Could not start signal dispatch: #{inspect(reason)}", signal_id: signal.id)
-    end
   end
 end

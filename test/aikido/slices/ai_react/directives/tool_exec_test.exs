@@ -74,7 +74,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     :ok =
       run_in(agent, fn ->
-        Aikido.Directive.exec(directive(), Jido.Signal.new!("input", %{}), fake_state(aikido))
+        Aikido.Directive.exec(directive(), Aikido.Signal.new!("input", %{}), fake_state(aikido))
       end)
 
     assert_receive {:cast, signal}, @receive_timeout
@@ -101,7 +101,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     :ok =
       run_in(agent, fn ->
-        Aikido.Directive.exec(failing, Jido.Signal.new!("input", %{}), fake_state(aikido))
+        Aikido.Directive.exec(failing, Aikido.Signal.new!("input", %{}), fake_state(aikido))
       end)
 
     assert_receive {:cast, signal}, @receive_timeout
@@ -115,8 +115,8 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
     agent = spawn_agent_stub(self())
 
     input =
-      Jido.Signal.new!("input", %{})
-      |> Aikido.SignalCtx.put_ctx(%{
+      Aikido.Signal.new!("input", %{})
+      |> Aikido.Signal.put_ctx(%{
         actor: %{id: "alice"},
         tenant: "org-a",
         authorize?: true,
@@ -132,7 +132,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     assert_receive {:cast, signal}, @receive_timeout
 
-    assert Aikido.SignalCtx.ctx(signal) == %{
+    assert Aikido.Signal.ctx(signal) == %{
              actor: %{id: "alice"},
              tenant: "org-a",
              authorize?: true,
@@ -152,7 +152,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
     :ok =
       run_in(agent, fn ->
-        Aikido.Directive.exec(missing, Jido.Signal.new!("input", %{}), fake_state(aikido))
+        Aikido.Directive.exec(missing, Aikido.Signal.new!("input", %{}), fake_state(aikido))
       end)
 
     assert_receive {:cast, signal}, @receive_timeout

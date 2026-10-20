@@ -28,7 +28,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implemen
 
     message =
       Map.get(params, :message) ||
-        %Jido.Signal{id: nil, type: "cron.tick", source: "/test"}
+        %Aikido.Signal{id: nil, type: "cron.tick", source: "/test"}
 
     timezone = Map.get(params, :timezone)
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
@@ -468,7 +468,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :heartbeat, cron: "* * * * *"}
@@ -491,7 +491,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
       for {job_id, cron_expr} <- [heartbeat: "* * * * *", daily: "@daily", hourly: "@hourly"] do
         register_signal =
-          Jido.Signal.new!(%{
+          Aikido.Signal.new!(%{
             type: "register_cron",
             source: "/test",
             data: %{job_id: job_id, cron: cron_expr}
@@ -528,7 +528,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal1 =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :updatable, cron: "* * * * *"}
@@ -540,7 +540,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       first_monitor = Process.monitor(first_job_pid)
 
       register_signal2 =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :updatable, cron: "@hourly"}
@@ -575,7 +575,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :stable, cron: "* * * * *"}
@@ -591,7 +591,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         end)
 
       invalid_update_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :stable, cron: "not-a-cron"}
@@ -620,7 +620,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :invalid_type, cron: 123}
@@ -649,7 +649,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :invalid_message, cron: "* * * * *", message: {:notify, self()}}
@@ -682,7 +682,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :timezone_test, cron: "0 9 * * *", timezone: "Etc/UTC"}
@@ -705,7 +705,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       ref = Process.monitor(pid)
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :invalid_cron, cron: "definitely-not-a-cron"}
@@ -736,7 +736,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       ref = Process.monitor(pid)
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :invalid_tz, cron: "0 9 * * *", timezone: "Invalid/Nowhere"}
@@ -765,7 +765,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal =
-        Jido.Signal.new!(%{type: "register_cron", source: "/test", data: %{cron: "* * * * *"}})
+        Aikido.Signal.new!(%{type: "register_cron", source: "/test", data: %{cron: "* * * * *"}})
 
       :ok = Aikido.AgentServer.cast(pid, register_signal)
 
@@ -794,7 +794,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       server_ref = Process.monitor(pid)
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :restartable, cron: "* * * * *"}
@@ -834,7 +834,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :gone_runtime, cron: "* * * * *"}
@@ -857,7 +857,11 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       )
 
       cancel_signal =
-        Jido.Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :gone_runtime}})
+        Aikido.Signal.new!(%{
+          type: "cancel_cron",
+          source: "/test",
+          data: %{job_id: :gone_runtime}
+        })
 
       :ok = Aikido.AgentServer.cast(pid, cancel_signal)
 
@@ -886,7 +890,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :cancellable, cron: "* * * * *"}
@@ -898,7 +902,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       assert Process.alive?(job_pid)
 
       cancel_signal =
-        Jido.Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :cancellable}})
+        Aikido.Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :cancellable}})
 
       :ok = Aikido.AgentServer.cast(pid, cancel_signal)
 
@@ -921,7 +925,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       cancel_signal =
-        Jido.Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :nonexistent}})
+        Aikido.Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :nonexistent}})
 
       :ok = Aikido.AgentServer.cast(pid, cancel_signal)
 
@@ -943,7 +947,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :toggle, cron: "* * * * *"}
@@ -958,7 +962,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       end)
 
       cancel_signal =
-        Jido.Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :toggle}})
+        Aikido.Signal.new!(%{type: "cancel_cron", source: "/test", data: %{job_id: :toggle}})
 
       :ok = Aikido.AgentServer.cast(pid, cancel_signal)
 
@@ -969,7 +973,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       end)
 
       register_signal2 =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :toggle, cron: "@hourly"}
@@ -992,7 +996,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         )
 
       register_signal =
-        Jido.Signal.new!(%{
+        Aikido.Signal.new!(%{
           type: "register_cron",
           source: "/test",
           data: %{job_id: :cleanup_test, cron: "* * * * *"}
@@ -1018,7 +1022,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
       for job_id <- job_ids do
         register_signal =
-          Jido.Signal.new!(%{
+          Aikido.Signal.new!(%{
             type: "register_cron",
             source: "/test",
             data: %{job_id: job_id, cron: "* * * * *"}
@@ -1067,7 +1071,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
       for pid <- [pid1, pid2] do
         register_signal =
-          Jido.Signal.new!(%{
+          Aikido.Signal.new!(%{
             type: "register_cron",
             source: "/test",
             data: %{job_id: :shared_name, cron: "* * * * *"}

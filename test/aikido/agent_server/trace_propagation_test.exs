@@ -31,7 +31,7 @@ defmodule AikidoTest.TracePropagation.Reducer do
       directives: [
         %Aikido.Directives.Schedule{
           delay_ms: 0,
-          message: %Jido.Signal{
+          message: %Aikido.Signal{
             id: nil,
             type: "trace.finished",
             data: %{value: value},
@@ -243,7 +243,7 @@ defmodule AikidoTest.AgentServer.TracePropagationTest do
       assert TestTracer.get_span_context() == caller
     end
 
-    signal = Jido.Signal.new!("trace.fail", %{}) |> Aikido.SignalCtx.put(:tracer, TestTracer)
+    signal = Aikido.Signal.new!("trace.fail", %{}) |> Aikido.Signal.put(:tracer, TestTracer)
 
     assert {:error, _} =
              Aikido.AgentServer.call(reference.pid, signal, fn _ -> {:ok, :unused} end)

@@ -44,7 +44,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   end
 
   alias Aikido.AgentServer
-  alias Jido.Signal
+  alias Aikido.Signal
   alias Aikido.Slices.AiReact.Directives.LLMCall
   alias ReqLLM.Context
 
@@ -54,7 +54,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     task_sup = Aikido.task_supervisor_name(state.aikido)
     source = "/agent/#{state.id}"
 
-    tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
+    tracers = Aikido.Signal.tracers(input_signal, state.aikido)
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
 
     case Task.Supervisor.start_child(task_sup, fn ->
@@ -65,7 +65,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
                directive,
                agent_pid,
                source,
-               Aikido.SignalCtx.ctx(input_signal),
+               Aikido.Signal.ctx(input_signal),
                task_sup
              )
            end
@@ -74,7 +74,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
         :ok
 
       {:error, reason} ->
-        dispatch_failure(directive, reason, agent_pid, source, Aikido.SignalCtx.ctx(input_signal))
+        dispatch_failure(directive, reason, agent_pid, source, Aikido.Signal.ctx(input_signal))
     end
 
     :ok
@@ -112,7 +112,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
                     },
                     source: source
                   )
-                  |> Aikido.SignalCtx.put_ctx(scope)
+                  |> Aikido.Signal.put_ctx(scope)
 
                 AgentServer.cast(agent_pid, signal)
               end,
@@ -165,7 +165,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
           )
       end
 
-    AgentServer.cast(agent_pid, Aikido.SignalCtx.put_ctx(signal, scope))
+    AgentServer.cast(agent_pid, Aikido.Signal.put_ctx(signal, scope))
   rescue
     exception -> dispatch_failure(d, exception, agent_pid, source, scope)
   end
@@ -178,7 +178,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
         handoff_data(%{reason: reason, request_id: d.request_id}, d),
         source: source
       )
-      |> Aikido.SignalCtx.put_ctx(scope)
+      |> Aikido.Signal.put_ctx(scope)
     )
   end
 

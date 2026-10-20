@@ -379,7 +379,7 @@ defmodule AikidoTest.AshTest do
     agent = resource.initialize!()
 
     signal =
-      Jido.Signal.new!("aikido.ash.schedule.ash_counter_slice.tick", %{amount: 4},
+      Aikido.Signal.new!("aikido.ash.schedule.ash_counter_slice.tick", %{amount: 4},
         source: "/test"
       )
 
@@ -387,7 +387,7 @@ defmodule AikidoTest.AshTest do
              Aikido.AgentServer.apply_actions(
                signal,
                Map.merge(
-                 Aikido.SignalCtx.ctx(signal),
+                 Aikido.Signal.ctx(signal),
                  Map.merge(%{}, %{agent_module: resource, agent: agent, agent_id: agent.id})
                ),
                [{{AikidoTest.AshFixtures.CounterSlice, :tick}, %{amount: 4}}]
@@ -399,7 +399,7 @@ defmodule AikidoTest.AshTest do
   end
 
   test "native Ash slice actions preserve pure state transitions" do
-    signal = Jido.Signal.new!("slice.increment", %{amount: 3}, source: "/test")
+    signal = Aikido.Signal.new!("slice.increment", %{amount: 3}, source: "/test")
     state = %{count: 2}
 
     assert {:ok, %Aikido.Types.ActionResult{state: %{count: 5}, directives: []}} =

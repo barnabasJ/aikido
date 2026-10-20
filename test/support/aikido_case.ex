@@ -91,7 +91,7 @@ defmodule AikidoTest.Case do
   """
   def signal(type, data \\ %{}, opts \\ []) do
     source = Keyword.get(opts, :source, "/test")
-    Jido.Signal.new!(type, data, source: source)
+    Aikido.Signal.new!(type, data, source: source)
   end
 
   @doc """

@@ -40,12 +40,15 @@ defmodule Aikido.Dsl.NativeRoutesTest do
     [route] = Aikido.Dsl.Agent.Info.routes(Aikido.Dsl.NativeRoutesTest.Agent)
     assert {"gated.run", predicate, {Aikido.Dsl.NativeRoutesTest.Slice, :reduce}, -12} = route
     assert is_function(predicate, 1)
-    router = Jido.Signal.Router.new!([route])
+    router = Aikido.Signal.Router.new!([route])
 
     assert {:ok, [{Aikido.Dsl.NativeRoutesTest.Slice, :reduce}]} =
-             Jido.Signal.Router.route(router, Jido.Signal.new!("gated.run", %{allowed: true}))
+             Aikido.Signal.Router.route(router, Aikido.Signal.new!("gated.run", %{allowed: true}))
 
     assert {:error, _} =
-             Jido.Signal.Router.route(router, Jido.Signal.new!("gated.run", %{allowed: false}))
+             Aikido.Signal.Router.route(
+               router,
+               Aikido.Signal.new!("gated.run", %{allowed: false})
+             )
   end
 end

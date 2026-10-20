@@ -29,7 +29,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction.Impleme
     job_id = Map.get(params, :job_id)
 
     tick_signal =
-      %Jido.Signal{id: nil, type: "cron.tick", data: %{}, source: "/test/cron"}
+      %Aikido.Signal{id: nil, type: "cron.tick", data: %{}, source: "/test/cron"}
 
     directive = Aikido.Directives.cron(cron_expr, tick_signal, job_id: job_id)
     Aikido.Types.ActionResult.new(state: slice, directives: [directive])
@@ -93,7 +93,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest do
         )
 
       register_signal =
-        Jido.Signal.new!("register_cron", %{job_id: :tick_test, cron: "* * * * * * *"},
+        Aikido.Signal.new!("register_cron", %{job_id: :tick_test, cron: "* * * * * * *"},
           source: "/test"
         )
 
@@ -130,7 +130,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest do
           id: id
         )
 
-      tick_signal = Jido.Signal.new!("cron.tick", %{}, source: "/test/cron")
+      tick_signal = Aikido.Signal.new!("cron.tick", %{}, source: "/test/cron")
       assert :ok = Aikido.AgentServer.cast(pid, tick_signal)
 
       await_state_value(pid, fn s ->
@@ -154,7 +154,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest do
         )
 
       register_signal =
-        Jido.Signal.new!("register_cron", %{job_id: :multi_tick, cron: "* * * * * * *"},
+        Aikido.Signal.new!("register_cron", %{job_id: :multi_tick, cron: "* * * * * * *"},
           source: "/test"
         )
 

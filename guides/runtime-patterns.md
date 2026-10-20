@@ -50,7 +50,7 @@ return state transitions and directives without performing side effects. All
 side effects belong in directives; results return through signals.
 
 Signal emission descriptors may use
-`%Jido.Signal{id: nil, type: "work.ready", data: %{}, source: "/worker"}`.
+`%Aikido.Signal{id: nil, type: "work.ready", data: %{}, source: "/worker"}`.
 Emit, Schedule and Cron complete missing envelope IDs and timestamps during
 execution. Constructing the directive performs no I/O. Identity, memory and
 thread actions use the input signal's timestamp and deterministic state/entry

@@ -15,7 +15,7 @@ defmodule Aikido.Slices.AiReact.Directives.PrepareTools do
 
   @impl true
   def exec(directive, signal, runtime) do
-    scope = Aikido.SignalCtx.ctx(signal)
+    scope = Aikido.Signal.ctx(signal)
 
     owner = self()
     supervisor = Aikido.task_supervisor_name(runtime.aikido)
@@ -45,7 +45,7 @@ defmodule Aikido.Slices.AiReact.Directives.PrepareTools do
 
         case result do
           {:ok, prepared} ->
-            Jido.Signal.new!("ai.react.tools.ready", %{
+            Aikido.Signal.new!("ai.react.tools.ready", %{
               request_id: directive.request_id,
               prepared_tools: prepared
             })

@@ -113,7 +113,7 @@ defmodule Aikido.Directives.Cron do
             source: "/agent/#{state.id}"
           )
 
-        _ = AgentServer.cast(self(), Aikido.SignalCtx.inherit(signal, input_signal))
+        _ = AgentServer.cast(self(), Aikido.Signal.inherit(signal, input_signal))
 
         Logger.debug(
           "AgentServer #{state.id} registered cron job #{inspect(io_result.job_id)}: #{cron_expr}"

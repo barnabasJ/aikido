@@ -63,8 +63,7 @@ defmodule Aikido.Durable.AgentServer do
       :on_parent_death,
       :skip_schedules,
       :debug,
-      :middleware,
-      :default_dispatch
+      :middleware
     ])
   end
 
@@ -117,7 +116,7 @@ defmodule Aikido.Durable.AgentServer do
     do: wrap(AgentServer.handle_call(request, from, state.runtime), state)
 
   @impl true
-  def handle_cast({:signal, %Jido.Signal{type: "ai.react.stream"}} = request, state) do
+  def handle_cast({:signal, %Aikido.Signal{type: "ai.react.stream"}} = request, state) do
     # Streaming text is transient; the completed turn commits canonical history.
     wrap(AgentServer.handle_cast(request, state.runtime), state, false)
   end
@@ -280,7 +279,7 @@ defmodule Aikido.Durable.AgentServer do
     resource = runtime.agent_module
 
     if Aikido.Dsl.Agent.Info.team_config(resource) do
-      send(self(), {:signal, Jido.Signal.new!("aikido.ash.team.reconcile", %{})})
+      send(self(), {:signal, Aikido.Signal.new!("aikido.ash.team.reconcile", %{})})
     end
   end
 end

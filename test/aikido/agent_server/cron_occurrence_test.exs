@@ -2,7 +2,7 @@ defmodule AikidoTest.AgentServer.CronOccurrenceTest do
   use ExUnit.Case, async: true
 
   test "each generated occurrence gets its own envelope after registration" do
-    template = %Jido.Signal{id: nil, type: "test.tick", source: "/test", data: %{v: 1}}
+    template = %Aikido.Signal{id: nil, type: "test.tick", source: "/test", data: %{v: 1}}
 
     for spec <- [
           Aikido.AgentServer.CronRuntimeSpec.schedule("@yearly", "test.tick", nil, %{v: 1}),
@@ -33,8 +33,8 @@ defmodule AikidoTest.AgentServer.CronOccurrenceTest do
   end
 
   test "Cron retains an incomplete descriptor for later occurrences" do
-    template = %Jido.Signal{id: nil, type: "test.tick", source: "/test", data: %{v: 1}}
-    input = Jido.Signal.new!("test.register", %{})
+    template = %Aikido.Signal{id: nil, type: "test.tick", source: "/test", data: %{v: 1}}
+    input = Aikido.Signal.new!("test.register", %{})
 
     runtime =
       %Aikido.AgentServer.State{id: "template", agent_module: __MODULE__, agent: %{}, aikido: nil}
@@ -65,7 +65,7 @@ defmodule AikidoTest.AgentServer.CronOccurrenceTest do
   end
 
   test "an explicitly constructed envelope keeps its caller supplied identity" do
-    signal = Jido.Signal.new!("test.tick", %{}, time: "2020-01-01T00:00:00Z")
+    signal = Aikido.Signal.new!("test.tick", %{}, time: "2020-01-01T00:00:00Z")
     spec = Aikido.AgentServer.CronRuntimeSpec.dynamic("@yearly", signal)
     assert Aikido.AgentServer.CronRuntimeSpec.build_signal(spec, "agent", :tick) == signal
   end

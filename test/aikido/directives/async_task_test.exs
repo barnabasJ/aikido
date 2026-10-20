@@ -32,17 +32,17 @@ defmodule Aikido.Directives.AsyncTaskTest.Work do
     "plain-result"
   end
 
-  @spec custom_signal() :: Jido.Signal.t()
+  @spec custom_signal() :: Aikido.Signal.t()
   def custom_signal do
-    Jido.Signal.new!("custom.done", %{value: 7}, source: "/work/custom")
+    Aikido.Signal.new!("custom.done", %{value: 7}, source: "/work/custom")
   end
 
-  @spec multiple_signals() :: {:signals, [Jido.Signal.t()]}
+  @spec multiple_signals() :: {:signals, [Aikido.Signal.t()]}
   def multiple_signals do
     {:signals,
      [
-       Jido.Signal.new!("custom.one", %{index: 1}, source: "/work/multi"),
-       Jido.Signal.new!("custom.two", %{index: 2}, source: "/work/multi")
+       Aikido.Signal.new!("custom.one", %{index: 1}, source: "/work/multi"),
+       Aikido.Signal.new!("custom.two", %{index: 2}, source: "/work/multi")
      ]}
   end
 
@@ -65,11 +65,6 @@ end
 defmodule Aikido.Directives.AsyncTaskTest do
   use ExUnit.Case, async: true
 
-  setup_all do
-    {:ok, _apps} = Application.ensure_all_started(:jido_signal)
-    :ok
-  end
-
   setup do
     aikido = :"async_task_test_#{System.unique_integer([:positive])}"
     {:ok, aikido_pid} = Aikido.start_link(name: aikido)
@@ -88,7 +83,7 @@ defmodule Aikido.Directives.AsyncTaskTest do
   end
 
   defp input_signal do
-    Jido.Signal.new!("test.async_task", %{request_id: "req_1"}, source: "/test")
+    Aikido.Signal.new!("test.async_task", %{request_id: "req_1"}, source: "/test")
   end
 
   defp state(aikido) do

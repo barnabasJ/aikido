@@ -151,9 +151,9 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       server_ref = Process.monitor(pid)
 
       bad_message =
-        Jido.Signal.new!("cron.tick", %{reply_to: self(), kind: :bad_message}, source: "/test")
+        Aikido.Signal.new!("cron.tick", %{reply_to: self(), kind: :bad_message}, source: "/test")
 
-      good_message = Jido.Signal.new!("cron.tick", %{kind: :good_message}, source: "/test")
+      good_message = Aikido.Signal.new!("cron.tick", %{kind: :good_message}, source: "/test")
 
       log =
         capture_log(fn ->
@@ -199,8 +199,8 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
     test("restarting one dynamic cron job does not disrupt sibling jobs", context) do
       pid = start_cron_agent(context, id: unique_id("scheduler-siblings"))
       server_ref = Process.monitor(pid)
-      alpha_message = Jido.Signal.new!("cron.tick", %{job: :alpha}, source: "/test")
-      beta_message = Jido.Signal.new!("cron.tick", %{job: :beta}, source: "/test")
+      alpha_message = Aikido.Signal.new!("cron.tick", %{job: :alpha}, source: "/test")
+      beta_message = Aikido.Signal.new!("cron.tick", %{job: :beta}, source: "/test")
       assert :ok = register_cron(pid, "* * * * * * *", job_id: :alpha, message: alpha_message)
       assert :ok = register_cron(pid, "* * * * * * *", job_id: :beta, message: beta_message)
       alpha_job_pid = wait_for_job(pid, :alpha, timeout: 5000)

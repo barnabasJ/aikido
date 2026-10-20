@@ -61,5 +61,5 @@ defmodule Aikido.Slices.Identity.Implementation do
   end
 
   defp timestamp(input),
-    do: Aikido.SignalCtx.timestamp(get_in(input.context, [:aikido, :signal]))
+    do: Aikido.Signal.timestamp(get_in(input.context, [:aikido, :signal]))
 end

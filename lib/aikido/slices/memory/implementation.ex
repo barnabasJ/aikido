@@ -137,7 +137,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   defp ensure_memory(_, input), do: Aikido.Slices.Memory.new(initial_options(input))
 
   defp options(input) do
-    [now: Aikido.SignalCtx.timestamp(get_in(input.context, [:aikido, :signal]))]
+    [now: Aikido.Signal.timestamp(get_in(input.context, [:aikido, :signal]))]
   end
 
   defp initial_options(input) do

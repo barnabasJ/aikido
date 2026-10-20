@@ -111,7 +111,7 @@ defmodule AikidoTest.DurableRelationshipTest do
   } do
     {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "parent")
     {:ok, runtime} = AgentServer.state(parent, &{:ok, &1})
-    signal = Jido.Signal.new!("spawn.test", %{})
+    signal = Aikido.Signal.new!("spawn.test", %{})
     directive = Aikido.Directives.spawn_agent(Minimal, :worker, opts: %{id: "child"})
     assert :ok = Aikido.Directive.exec(directive, signal, runtime)
     assert {:ok, child} = AgentServer.await_child(parent, :worker)

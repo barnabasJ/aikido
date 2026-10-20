@@ -24,7 +24,7 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
   end
 
   defp signal(request_id, tool_call_id, name, content) do
-    Jido.Signal.new!("ai.react.tool.completed", %{
+    Aikido.Signal.new!("ai.react.tool.completed", %{
       request_id: request_id,
       tool_call_id: tool_call_id,
       name: name,

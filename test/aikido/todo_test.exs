@@ -25,7 +25,7 @@ defmodule Aikido.TodoTest do
   use AikidoTest.Case, async: false
 
   defp command(pid, type, data) do
-    Aikido.AgentServer.call(pid, Jido.Signal.new!(type, data), &{:ok, &1.agent.state})
+    Aikido.AgentServer.call(pid, Aikido.Signal.new!(type, data), &{:ok, &1.agent.state})
   end
 
   test "typed todos retain application metadata, reject duplicates, and complete idempotently",
@@ -58,8 +58,8 @@ defmodule Aikido.TodoTest do
   end
 
   for action <- ["complete", "remove", "block"] do
-    test "todo #{action} settles a waiting run with external default dispatch", ctx do
-      pid = start_server(ctx, Aikido.TodoTest.Agent, default_dispatch: {:pid, target: self()})
+    test "todo #{action} settles a waiting run with direct internal delivery", ctx do
+      pid = start_server(ctx, Aikido.TodoTest.Agent)
       {:ok, _} = command(pid, "aikido.todo.add", %{id: "one", text: "verify"})
 
       {:ok, waiting} =
@@ -100,7 +100,7 @@ defmodule Aikido.TodoTest do
   end
 
   test "a todo deadline fails a waiting run and codecs never leave a lost timer active", ctx do
-    pid = start_server(ctx, Aikido.TodoTest.Agent, default_dispatch: {:pid, target: self()})
+    pid = start_server(ctx, Aikido.TodoTest.Agent)
     {:ok, _} = command(pid, "aikido.todo.add", %{id: "one", text: "wait", timeout_ms: 100})
 
     opts = [

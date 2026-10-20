@@ -57,7 +57,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
   use AikidoTest.Case, async: true
 
   defp signal_carrying_directive(directive) do
-    Jido.Signal.new!(%{type: "test.directive", source: "/test", data: %{directive: directive}})
+    Aikido.Signal.new!(%{type: "test.directive", source: "/test", data: %{directive: directive}})
   end
 
   describe("SpawnAgent") do
@@ -244,7 +244,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
   end
 
   defp assert_no_runtime_mutation(pid, directive, projector) do
-    input_signal = Jido.Signal.new!(%{type: "test.harness", source: "/test", data: %{}})
+    input_signal = Aikido.Signal.new!(%{type: "test.harness", source: "/test", data: %{}})
 
     {:ok, %{before: before_value, after: after_value}} =
       Aikido.AgentServer.state(pid, fn s ->

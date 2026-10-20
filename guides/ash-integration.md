@@ -188,6 +188,74 @@ a command and waits for its selector to return a result. It handles process exit
 timeout and subscription cleanup. Use it from external callers for asynchronous
 completion; selectors return `:skip` while waiting. Team lifecycle commands use it.
 
+## Signal matching
+
+Internal messages use `Aikido.Signal`. Its payload can contain native runtime
+values, and its scope and opaque Ash tracer contexts travel with the message.
+It is an internal process contract; accepting an external event still requires
+the application to authenticate it and establish a trusted scope.
+
+Define reusable typed signals with the same attribute syntax used for state:
+
+```elixir
+defmodule MyApp.IncrementRequested do
+  use Aikido.Signal
+
+  signal do
+    type "counter.add"
+    source "/worker"
+
+    schema do
+      attribute :amount, :integer, allow_nil?: false, default: 1
+    end
+  end
+end
+
+{:ok, signal} = MyApp.IncrementRequested.new(%{amount: 2})
+```
+
+The definition casts its payload through native Ash map fields and constraints.
+Its constructors generate runtime metadata, so call them at I/O boundaries.
+
+Pure reducers construct signal descriptors without generating IDs or timestamps:
+
+```elixir
+%Aikido.Signal{type: "counter.add", data: %{amount: 1}, source: "/worker"}
+```
+
+Return an `Aikido.Directives.Emit` descriptor to deliver it directly to an agent
+process. At execution, the directive supplies missing runtime metadata and
+inherits the triggering signal's scope and tracing context. Subscriptions send
+ordinary process messages to their registered recipient PID.
+
+Broadcasts use `Ash.Notifier.Notification` through a notification directive,
+after the reducer's returned state has been applied. Application notifiers can
+publish to Phoenix PubSub or another destination. When the notification omits
+its resource, the directive supplies the originating agent resource for native
+notifier metadata. Explicit resources and notifier selections are preserved.
+Do not return native Ash
+notifications from a reducer: Ash would dispatch them before AgentServer adopts
+the returned state. Applied state does not imply a disk checkpoint has completed.
+
+`Aikido.Signal.Router` matches the complete signal type against declared paths.
+`*` consumes one dot-separated segment; `**` consumes zero or more segments,
+including in the middle of a path. An exact `counter.add` route does not match
+`counter.add.extra`.
+
+All matching declarations contribute actions. Exact paths precede paths with
+`*`, which precede paths with `**`. Within a class, positional specificity,
+priority, and declaration order determine execution order. Predicates receive
+the original signal and match only when they return `true`; a predicate that
+raises, throws or exits does not match. Router construction does not call them.
+Subscriptions compile their patterns when registered and observe state after
+signal processing.
+
+The routing core is adapted from Jido Signal v3 under Apache-2.0; see `NOTICE`
+for attribution. It uses a direct exact-path index and a wildcard trie. Local
+benchmarks show gains for small exact-heavy agent tables, but regressions for
+some wildcard-heavy tables; these are matching measurements, not end-to-end
+agent throughput guarantees. Signal delivery remains handled by directives.
+
 ## The domain is the interface
 
 ```elixir

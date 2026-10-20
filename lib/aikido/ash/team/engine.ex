@@ -2,7 +2,7 @@ defmodule Aikido.Ash.Team.Engine do
   @moduledoc false
   alias Aikido.Ash.Team.Topology
   alias Aikido.Directives
-  alias Jido.Signal
+  alias Aikido.Signal
 
   def handle(signal, state, context, config) do
     case signal.type do

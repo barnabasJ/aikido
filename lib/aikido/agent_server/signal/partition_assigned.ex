@@ -12,10 +12,13 @@ defmodule Aikido.AgentServer.Signal.PartitionAssigned do
     or `nil` if the agent runs un-partitioned.
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.identity.partition_assigned",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: [
-      partition: [type: :any, required: false, doc: "Logical partition or nil"]
-    ]
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.identity.partition_assigned"
+
+    schema do
+      attribute :partition, :term, description: "Logical partition or nil"
+    end
+  end
 end

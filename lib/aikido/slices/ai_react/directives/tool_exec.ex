@@ -26,7 +26,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   end
 
   alias Aikido.AgentServer
-  alias Jido.Signal
+  alias Aikido.Signal
   alias Aikido.Slices.AiReact.Directives.ToolExec
 
   @impl true
@@ -37,7 +37,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
     agent_module = Map.get(state, :agent_module)
 
     inherited =
-      if match?(%Jido.Signal{}, input_signal), do: Aikido.SignalCtx.ctx(input_signal), else: %{}
+      if match?(%Aikido.Signal{}, input_signal), do: Aikido.Signal.ctx(input_signal), else: %{}
 
     context =
       Map.merge(Map.merge(directive.tool_context, inherited), %{
@@ -62,7 +62,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         DeepMerge.deep_merge(directive.tool_context[:context] || %{}, inherited[:context] || %{})
       )
 
-    tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
+    tracers = Aikido.Signal.tracers(input_signal, state.aikido)
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
 
     case Task.Supervisor.start_child(task_sup, fn ->
@@ -118,7 +118,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
     _ =
       AgentServer.cast(
         agent_pid,
-        Aikido.SignalCtx.put_ctx(
+        Aikido.Signal.put_ctx(
           signal,
           Map.new(Ash.Scope.to_opts(context, context: context[:context] || %{}))
         )

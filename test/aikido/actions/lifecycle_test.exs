@@ -2,7 +2,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
   use ExUnit.Case, async: true
   alias Aikido.AgentServer.ParentRef
   alias Aikido.Directives
-  alias Jido.Signal
+  alias Aikido.Signal
 
   defp sig(type, data) do
     Signal.new!(%{type: type, source: "/test", data: data})
@@ -28,7 +28,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
       assert [%Directives.Emit{} = emit] = directives
       assert emit.signal.type == "child.done"
       assert emit.signal.data == %{result: 42}
-      assert emit.dispatch == {:pid, target: parent_pid}
+      assert emit.target == parent_pid
     end
 
     test "leaves state unchanged when ctx.parent is nil (orphaned)" do
@@ -57,8 +57,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
         target_pid: target,
         signal_type: "result.ready",
         payload: %{data: "test"},
-        source: "/agent",
-        delivery_mode: :async
+        source: "/agent"
       }
 
       {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
@@ -75,35 +74,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
       assert %Directives.Emit{} = directive
       assert directive.signal.type == "result.ready"
       assert directive.signal.data == %{data: "test"}
-      assert {:pid, opts} = directive.dispatch
-      assert Keyword.get(opts, :target) == target
-      assert Keyword.get(opts, :delivery_mode) == :async
-    end
-
-    test "supports sync delivery mode" do
-      target = self()
-
-      data = %{
-        target_pid: target,
-        signal_type: "sync.request",
-        payload: %{},
-        source: "/agent",
-        delivery_mode: :sync
-      }
-
-      {:ok, %Aikido.Types.ActionResult{state: _result, directives: [directive]}} =
-        then(sig("notify_pid", data), fn signal ->
-          Aikido.AgentServer.RuntimeActions
-          |> Ash.ActionInput.for_action(:notify_pid, Map.put(signal.data || %{}, :state, %{}),
-            context: %{aikido: Map.put(%{}, :signal, signal)},
-            skip_unknown_inputs: [:*]
-          )
-          |> Ash.run_action()
-        end)
-
-      assert {:pid, opts} = directive.dispatch
-      assert Keyword.get(opts, :target) == target
-      assert Keyword.get(opts, :delivery_mode) == :sync
+      assert directive.target == target
     end
   end
 

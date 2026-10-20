@@ -73,7 +73,7 @@ defmodule AikidoTest.MiddlewareTest do
 
     test "callback receives signal, ctx, opts, next" do
       next = fn _sig, ctx -> {:ok, ctx, []} end
-      sig = %Jido.Signal{type: "x", source: "/test", id: "1"}
+      sig = %Aikido.Signal{type: "x", source: "/test", id: "1"}
 
       assert {:ok, %{} = ctx, []} =
                AikidoTest.MiddlewareTest.PassThrough.on_signal(sig, %{}, %{}, next)
@@ -83,7 +83,7 @@ defmodule AikidoTest.MiddlewareTest do
 
     test "opts are passed verbatim and let middleware close over per-registration data" do
       next = fn _sig, ctx -> {:ok, ctx, []} end
-      sig = %Jido.Signal{type: "x", source: "/test", id: "1"}
+      sig = %Aikido.Signal{type: "x", source: "/test", id: "1"}
       {:ok, ctx, _} = AikidoTest.MiddlewareTest.Tagging.on_signal(sig, %{}, %{tag: :hot}, next)
       assert ctx.tag == :hot
       {:ok, ctx, _} = AikidoTest.MiddlewareTest.Tagging.on_signal(sig, %{}, %{tag: :cold}, next)
@@ -93,7 +93,7 @@ defmodule AikidoTest.MiddlewareTest do
 
   describe("next-passing chain composition") do
     test "middleware composes outside-in" do
-      sig = %Jido.Signal{type: "x", source: "/test", id: "1"}
+      sig = %Aikido.Signal{type: "x", source: "/test", id: "1"}
       base = fn _sig, ctx -> {:ok, ctx, []} end
       chain_inner = fn s, c -> AikidoTest.MiddlewareTest.Inner.on_signal(s, c, %{}, base) end
 
@@ -108,7 +108,7 @@ defmodule AikidoTest.MiddlewareTest do
 
   describe("tagged-tuple chain semantics") do
     test "middleware that swallows {:error, _, _} returns {:ok, ctx, []}" do
-      sig = %Jido.Signal{type: "x", source: "/test", id: "1"}
+      sig = %Aikido.Signal{type: "x", source: "/test", id: "1"}
       base = fn _sig, ctx -> {:error, ctx, :boom} end
       chain = fn s, c -> AikidoTest.MiddlewareTest.Swallow.on_signal(s, c, %{}, base) end
       assert {:ok, %{}, []} = chain.(sig, %{})

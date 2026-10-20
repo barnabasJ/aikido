@@ -9,10 +9,13 @@ defmodule Aikido.AgentServer.Signal.LifecycleStopping do
   - `:reason` - The termination reason passed to `terminate/2`.
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.lifecycle.stopping",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: [
-      reason: [type: :any, required: false, doc: "Termination reason"]
-    ]
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.lifecycle.stopping"
+
+    schema do
+      attribute :reason, :term, description: "Termination reason"
+    end
+  end
 end

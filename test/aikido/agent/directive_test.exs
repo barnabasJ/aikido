@@ -4,17 +4,17 @@ defmodule AikidoTest.Agent.DirectiveTest do
   alias Aikido.Directives
 
   describe "emit/2" do
-    test "creates Emit directive without dispatch" do
+    test "creates Emit directive without an explicit target" do
       signal = %{type: "test"}
       directive = Directives.emit(signal)
-      assert %Directives.Emit{signal: ^signal, dispatch: nil} = directive
+      assert %Directives.Emit{signal: ^signal, target: nil} = directive
     end
 
-    test "creates Emit directive with dispatch config" do
+    test "creates Emit directive with a target PID" do
       signal = %{type: "test"}
-      directive = Directives.emit(signal, {:pubsub, target: MyApp.PubSub, topic: "events"})
+      directive = Directives.emit(signal, self())
       assert directive.signal == signal
-      assert directive.dispatch == {:pubsub, target: MyApp.PubSub, topic: "events"}
+      assert directive.target == self()
     end
   end
 
@@ -158,23 +158,12 @@ defmodule AikidoTest.Agent.DirectiveTest do
     end
   end
 
-  describe "emit_to_pid/3" do
+  describe "emit_to_pid/2" do
     test "creates Emit directive targeting a pid" do
       signal = %{type: "test"}
       pid = self()
       directive = Directives.emit_to_pid(signal, pid)
-      assert %Directives.Emit{signal: ^signal, dispatch: {:pid, opts}} = directive
-      assert opts[:target] == pid
-    end
-
-    test "merges extra options" do
-      signal = %{type: "test"}
-      pid = self()
-      directive = Directives.emit_to_pid(signal, pid, delivery_mode: :sync, timeout: 10_000)
-      {:pid, opts} = directive.dispatch
-      assert opts[:target] == pid
-      assert opts[:delivery_mode] == :sync
-      assert opts[:timeout] == 10_000
+      assert %Directives.Emit{signal: ^signal, target: ^pid} = directive
     end
   end
 

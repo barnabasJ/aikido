@@ -42,7 +42,7 @@ defmodule AikidoTest.Actions.StatePreservationTest do
 
   test "effect-only native reducers preserve map and resource state exactly" do
     parent = %Aikido.AgentServer.ParentRef{pid: self(), id: "parent", tag: :child}
-    signal = Jido.Signal.new!("test", %{reply_to: self()})
+    signal = Aikido.Signal.new!("test", %{reply_to: self()})
 
     actions = [
       noop: %{},
@@ -102,7 +102,7 @@ defmodule AikidoTest.Actions.StatePreservationTest do
 
     assert after_broadcast === before
 
-    assert_receive %Jido.Signal{
+    assert_receive %Aikido.Signal{
                      id: id,
                      time: time,
                      type: "work.available",

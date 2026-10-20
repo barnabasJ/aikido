@@ -4,7 +4,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation do
   @impl true
   def run(_input, _opts, _context) do
     signal =
-      %Jido.Signal{id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test"}
+      %Aikido.Signal{id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test"}
 
     Aikido.Types.ActionResult.new(
       state: %{},
@@ -61,7 +61,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
           id: "signal-route-test"
         )
 
-      signal = Jido.Signal.new!("increment", %{amount: 5}, source: "/test")
+      signal = Aikido.Signal.new!("increment", %{amount: 5}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 5
       GenServer.stop(pid)
@@ -76,9 +76,9 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
         )
 
       signals = [
-        Jido.Signal.new!("increment", %{amount: 1}, source: "/test"),
-        Jido.Signal.new!("increment", %{amount: 2}, source: "/test"),
-        Jido.Signal.new!("increment", %{amount: 3}, source: "/test")
+        Aikido.Signal.new!("increment", %{amount: 1}, source: "/test"),
+        Aikido.Signal.new!("increment", %{amount: 2}, source: "/test"),
+        Aikido.Signal.new!("increment", %{amount: 3}, source: "/test")
       ]
 
       final_agent =
@@ -99,7 +99,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
           id: "signal-data-test"
         )
 
-      signal = Jido.Signal.new!("record", %{message: "hello"}, source: "/test")
+      signal = Aikido.Signal.new!("record", %{message: "hello"}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.messages == ["hello"]
       GenServer.stop(pid)
@@ -113,7 +113,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
           id: "directive-test"
         )
 
-      signal = Jido.Signal.new!("emit_test", %{}, source: "/test")
+      signal = Aikido.Signal.new!("emit_test", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       GenServer.stop(pid)
     end
@@ -128,12 +128,12 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
           id: "unknown-signal-test"
         )
 
-      signal = Jido.Signal.new!("unknown_action", %{}, source: "/test")
+      signal = Aikido.Signal.new!("unknown_action", %{}, source: "/test")
 
       assert {:error, %Aikido.Error.RoutingError{}} =
                Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
 
-      signal2 = Jido.Signal.new!("increment", %{amount: 1}, source: "/test")
+      signal2 = Aikido.Signal.new!("increment", %{amount: 1}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal2, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
       GenServer.stop(pid)
@@ -146,9 +146,9 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
 
       {:ok, %{agent: updated}, _directives} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},

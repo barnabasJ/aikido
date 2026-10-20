@@ -219,7 +219,7 @@ defmodule AikidoTest.AshFixtures.TaskAction.Implementation do
     result = String.upcase(data.text)
 
     reply =
-      %Jido.Signal{
+      %Aikido.Signal{
         id: nil,
         source: "/test",
         type: "aikido.ash.team.task.completed",

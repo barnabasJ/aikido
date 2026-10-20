@@ -7,13 +7,13 @@ defmodule AikidoTest.ObserverSafety.Reducer do
     directives =
       for label <- [:first, :second] do
         %Aikido.Directives.Emit{
-          signal: %Jido.Signal{
+          signal: %Aikido.Signal{
             id: nil,
             source: "/observer",
             type: "observer.effect",
             data: %{label: label}
           },
-          dispatch: {:pid, target: input.arguments.target}
+          target: input.arguments.target
         }
       end
 
@@ -124,38 +124,32 @@ defmodule AikidoTest.ObserverSafetyTest do
     assert {:ok, []} = Aikido.AgentServer.state(pid, &{:ok, &1.debug_events})
   end
 
-  test "custom subscriber delivery cannot block the mailbox and retains tracing", context do
+  test "direct subscriber delivery preserves mailbox progress and native tracing", context do
     pid = start_server(context, AikidoTest.ObserverSafety.Agent)
     start_supervised!(AikidoTest.Support.TestTracer)
-    parent = self()
-
-    formatter = fn notification ->
-      send(parent, {:adapter_waiting, self(), AikidoTest.Support.TestTracer.get_span_context()})
-
-      receive do
-        :release -> {:signal, notification}
-      end
-    end
 
     {:ok, ref} =
       Aikido.AgentServer.subscribe(pid, "observer.increment", &{:ok, &1.agent.state.state.count},
         once: true,
-        dispatch: {:pid, target: self(), message_format: formatter}
+        target: self()
       )
 
     Ash.Tracer.span :custom, "observer.external", AikidoTest.Support.TestTracer do
       Aikido.AgentServer.cast(
         pid,
         signal("observer.increment", %{target: self()})
-        |> Aikido.SignalCtx.put_ctx(%{tracer: AikidoTest.Support.TestTracer})
+        |> Aikido.Signal.put_ctx(%{tracer: AikidoTest.Support.TestTracer})
       )
     end
 
-    assert_receive {:adapter_waiting, worker, trace_context}
-    on_exit(fn -> if Process.alive?(worker), do: send(worker, :release) end)
-    refute worker == pid
+    assert_receive {:aikido_subscription, ^ref, %{result: {:ok, 1}}}
     spans = AikidoTest.Support.TestTracer.get_spans()
-    assert {:start, trace_context, {:custom, :aikido_signal}, "observer.increment"} in spans
+
+    assert {:start, trace_context, {:custom, :aikido_signal}, "observer.increment"} =
+             Enum.find(
+               spans,
+               &match?({:start, _, {:custom, :aikido_signal}, "observer.increment"}, &1)
+             )
 
     external =
       Enum.find_value(spans, fn
@@ -170,10 +164,5 @@ defmodule AikidoTest.ObserverSafetyTest do
                pid,
                &{:ok, {&1.agent.state.state.count, map_size(&1.signal_subscribers)}}
              )
-
-    send(worker, :release)
-
-    assert_receive {:signal,
-                    %{type: "aikido.subscription.fire", data: %{sub_ref: ^ref, result: {:ok, 1}}}}
   end
 end

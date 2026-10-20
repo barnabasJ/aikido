@@ -163,7 +163,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
       assert {:ok, _} =
                Aikido.AgentServer.call(
                  reference.pid,
-                 Jido.Signal.new!(type, %{amount: "3"}),
+                 Aikido.Signal.new!(type, %{amount: "3"}),
                  fn s ->
                    {:ok, s.agent.state.state.count}
                  end
@@ -173,7 +173,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
     assert {:ok, 14} =
              Aikido.AgentServer.call(
                reference.pid,
-               Jido.Signal.new!("contract.remote", %{amount: "4"}),
+               Aikido.Signal.new!("contract.remote", %{amount: "4"}),
                fn s ->
                  {:ok, s.agent.state.state.count}
                end

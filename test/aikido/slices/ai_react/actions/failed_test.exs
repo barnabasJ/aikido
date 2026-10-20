@@ -2,7 +2,7 @@ defmodule Aikido.Slices.AiReact.FailedTest do
   use ExUnit.Case, async: true
 
   defp signal(request_id, reason) do
-    Jido.Signal.new!("ai.react.failed", %{reason: reason, request_id: request_id})
+    Aikido.Signal.new!("ai.react.failed", %{reason: reason, request_id: request_id})
   end
 
   defp running_slice(request_id) do

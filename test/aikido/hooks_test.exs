@@ -252,7 +252,7 @@ defmodule Aikido.HooksTest do
     {:ok, %{state: waiting, directives: [gate]}} =
       Aikido.Hooks.transition({:ok, result}, :run_started, %{})
 
-    signal = Jido.Signal.new!("ai.react.cancel", %{request_id: "run"})
+    signal = Aikido.Signal.new!("ai.react.cancel", %{request_id: "run"})
 
     {:ok, %Aikido.Types.ActionResult{state: cancelled, directives: []}} =
       then(signal, fn signal ->
@@ -331,7 +331,7 @@ defmodule Aikido.HooksTest do
         finish_reason: :stop
       }
 
-    signal = Jido.Signal.new!("ai.react.llm.completed", %{request_id: "run", turn: turn})
+    signal = Aikido.Signal.new!("ai.react.llm.completed", %{request_id: "run", turn: turn})
 
     {:ok, %Aikido.Types.ActionResult{state: unchanged, directives: []}} =
       then(signal, fn signal ->

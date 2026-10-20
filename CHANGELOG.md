@@ -6,6 +6,17 @@
 
 ### Changed
 
+- Replace internal Jido Signal envelopes with native Ash/Spark `Aikido.Signal`
+  contracts carrying payload, scope and tracing context together. Deliver agent
+  messages directly and execute broadcasts through Ash notifiers in directives.
+  Remove dispatch adapters, dispatch-extension registration and the Jido Signal
+  dependency; keep runtime metadata generation outside pure reducers.
+
+- Use an owned, Apache-licensed adaptation of Jido Signal v3's routing core.
+  Match complete paths, support zero-segment and interior `**`, preserve stable
+  declaration order, and compile subscription patterns once. Exact-heavy route
+  tables benefit from direct lookup; wildcard-heavy workloads can be slower.
+
 - Preserve native caller options through public AI helpers, cancellation, startup,
   nested reducers, team members and result signals. Keep initialization scope out
   of durable snapshots and apply actor/tenant options to live snapshot filters.

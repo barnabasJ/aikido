@@ -114,9 +114,9 @@ defmodule AikidoTest.AgentTest do
 
       {:ok, %{agent: updated}, _directives} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},
@@ -139,9 +139,9 @@ defmodule AikidoTest.AgentTest do
 
       {:ok, %{agent: updated}, _directives} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},
@@ -164,9 +164,9 @@ defmodule AikidoTest.AgentTest do
 
       {:ok, %{agent: updated}, directives} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},
@@ -193,9 +193,9 @@ defmodule AikidoTest.AgentTest do
 
       assert {:error, _, %Ash.Error.Unknown{}} =
                Aikido.AgentServer.apply_actions(
-                 %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+                 %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
                  Map.merge(
-                   Aikido.SignalCtx.ctx(%Jido.Signal{
+                   Aikido.Signal.ctx(%Aikido.Signal{
                      id: nil,
                      type: "test.action",
                      data: %{},
@@ -220,9 +220,9 @@ defmodule AikidoTest.AgentTest do
 
       assert {:error, _, %Ash.Error.Invalid{}} =
                Aikido.AgentServer.apply_actions(
-                 %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+                 %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
                  Map.merge(
-                   Aikido.SignalCtx.ctx(%Jido.Signal{
+                   Aikido.Signal.ctx(%Aikido.Signal{
                      id: nil,
                      type: "test.action",
                      data: %{},
@@ -245,9 +245,9 @@ defmodule AikidoTest.AgentTest do
 
       {:ok, %{agent: updated}, directives} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},
@@ -272,9 +272,9 @@ defmodule AikidoTest.AgentTest do
 
       {:ok, %{agent: updated}, directives} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},
@@ -302,9 +302,9 @@ defmodule AikidoTest.AgentTest do
 
       {:ok, %{agent: updated}, directives} =
         Aikido.AgentServer.apply_actions(
-          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
+          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(%Jido.Signal{
+            Aikido.Signal.ctx(%Aikido.Signal{
               id: nil,
               type: "test.action",
               data: %{},

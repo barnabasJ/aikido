@@ -125,7 +125,7 @@ defmodule AikidoTest.DurableTest do
     assert {:ok, 7} =
              Aikido.AgentServer.call(
                first,
-               Jido.Signal.new!("increment", %{amount: 7}),
+               Aikido.Signal.new!("increment", %{amount: 7}),
                &{:ok, &1.agent.state.domain.counter}
              )
 
@@ -141,7 +141,7 @@ defmodule AikidoTest.DurableTest do
     assert {:ok, 9} =
              Aikido.AgentServer.call(
                first,
-               Jido.Signal.new!("increment", %{amount: 9}),
+               Aikido.Signal.new!("increment", %{amount: 9}),
                &{:ok, &1.agent.state.domain.counter}
              )
 
@@ -159,7 +159,7 @@ defmodule AikidoTest.DurableTest do
     assert {:ok, 4} =
              Aikido.AgentServer.call(
                first,
-               Jido.Signal.new!("increment", %{amount: 4}),
+               Aikido.Signal.new!("increment", %{amount: 4}),
                &{:ok, &1.agent.state.domain.counter}
              )
 
@@ -183,7 +183,7 @@ defmodule AikidoTest.DurableTest do
     {:ok, thread} =
       Aikido.AgentServer.call(
         first,
-        Jido.Signal.new!("aikido.thread.append", %{
+        Aikido.Signal.new!("aikido.thread.append", %{
           entry: %{kind: :message, payload: %{text: "Keep this conversation"}}
         }),
         &{:ok, &1.agent.state.thread}
@@ -202,7 +202,7 @@ defmodule AikidoTest.DurableTest do
     assert {:ok, %{entries: entries, rev: 2}} =
              Aikido.AgentServer.call(
                second,
-               Jido.Signal.new!("aikido.thread.append", %{
+               Aikido.Signal.new!("aikido.thread.append", %{
                  entry: %{kind: :message, payload: %{text: "Continue after restoration"}}
                }),
                &{:ok, &1.agent.state.thread}

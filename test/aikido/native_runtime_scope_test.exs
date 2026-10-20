@@ -67,7 +67,7 @@ defmodule Aikido.NativeRuntimeScopeTest.Capture do
         "scope.capture" ->
           [
             Aikido.Directives.async_task(fn ->
-              %Jido.Signal{
+              %Aikido.Signal{
                 id: "scope-result",
                 time: "2026-01-01T00:00:00Z",
                 type: "scope.result",

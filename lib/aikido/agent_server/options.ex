@@ -7,7 +7,7 @@ defmodule Aikido.AgentServer.Options do
   > change without notice.
 
   Validates and normalizes startup options including agent configuration,
-  hierarchy settings, middleware chain, and dispatch configuration.
+  hierarchy settings and middleware configuration.
   """
 
   alias Aikido.AgentServer.ParentRef
@@ -40,10 +40,6 @@ defmodule Aikido.AgentServer.Options do
       allow_nil?: false,
       default: %{},
       description: "Initial agent state"
-
-    field :default_dispatch, :term,
-      allow_nil?: true,
-      description: "Default dispatch config for Emit directives"
 
     field :middleware, {:array, :term},
       allow_nil?: false,

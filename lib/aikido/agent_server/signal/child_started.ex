@@ -16,17 +16,20 @@ defmodule Aikido.AgentServer.Signal.ChildStarted do
   - `:meta` - Metadata passed during spawn
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.child.started",
-    default_source: "/agent",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: [
-      parent_id: [type: :string, required: true, doc: "ID of the parent agent"],
-      child_id: [type: :string, required: true, doc: "ID of the child agent"],
-      child_partition: [type: :any, doc: "Partition of the child agent"],
-      child_module: [type: :any, required: true, doc: "Module of the child agent"],
-      tag: [type: :any, required: true, doc: "Tag used when spawning"],
-      pid: [type: :any, required: true, doc: "PID of the child process"],
-      meta: [type: :map, default: %{}, doc: "Metadata passed during spawn"]
-    ]
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.child.started"
+    source "/agent"
+
+    schema do
+      attribute :parent_id, :string, allow_nil?: false, description: "ID of the parent agent"
+      attribute :child_id, :string, allow_nil?: false, description: "ID of the child agent"
+      attribute :child_partition, :term, description: "Partition of the child agent"
+      attribute :child_module, :term, allow_nil?: false, description: "Module of the child agent"
+      attribute :tag, :term, allow_nil?: false, description: "Tag used when spawning"
+      attribute :pid, :term, allow_nil?: false, description: "PID of the child process"
+      attribute :meta, :map, default: %{}, description: "Metadata passed during spawn"
+    end
+  end
 end

@@ -23,7 +23,7 @@ defmodule Aikido.Directives.Reply do
   ## Fields
 
   * `input_signal` — the query signal (carries `id` for correlation and
-    `jido_dispatch` for the reply channel).
+    `reply_to` for the reply channel).
   * `reply_type` — signal type for a successful reply.
   * `error_type` — signal type when `build` returns `{:error, _}`.
   * `build` — `{module, fun, extra_args}`. Runtime calls
@@ -54,14 +54,14 @@ defmodule Aikido.Directives.Reply do
   @type builder ::
           {module :: module(), fun :: atom(), extra_args :: [term()]}
 
-  alias Jido.Signal
+  alias Aikido.Signal
 
   require Logger
 
   @impl true
   def exec(%{input_signal: nil}, _input_signal, _state), do: :ok
 
-  def exec(%{input_signal: %{jido_dispatch: nil}}, _input_signal, _state) do
+  def exec(%{input_signal: %{reply_to: nil}}, _input_signal, _state) do
     # No reply channel on the input signal — caller wasn't using
     # Signal.Call.call/3, so there's no one to reply to.
     :ok
@@ -87,7 +87,7 @@ defmodule Aikido.Directives.Reply do
       {:ok, reply_signal} ->
         _ =
           Aikido.Directives.Emit.exec(
-            %Aikido.Directives.Emit{signal: reply_signal, dispatch: input.jido_dispatch},
+            %Aikido.Directives.Emit{signal: reply_signal, target: input.reply_to},
             input,
             state
           )

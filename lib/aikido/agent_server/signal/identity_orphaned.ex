@@ -15,15 +15,19 @@ defmodule Aikido.AgentServer.Signal.IdentityOrphaned do
   - `:reason` - Exit reason from the parent process.
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.identity.orphaned",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: [
-      former_parent: [
-        type: :any,
-        required: true,
-        doc: "%ParentRef{} of the parent that died"
-      ],
-      reason: [type: :any, required: true, doc: "Exit reason from the parent process"]
-    ]
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.identity.orphaned"
+
+    schema do
+      attribute :former_parent, :term,
+        allow_nil?: false,
+        description: "%ParentRef{} of the parent that died"
+
+      attribute :reason, :term,
+        allow_nil?: false,
+        description: "Exit reason from the parent process"
+    end
+  end
 end

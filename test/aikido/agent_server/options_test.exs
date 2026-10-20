@@ -89,19 +89,6 @@ defmodule AikidoTest.AgentServer.OptionsTest do
       assert opts.initial_state == %{foo: :bar}
     end
 
-    test "creates options with default_dispatch" do
-      {:ok, opts} =
-        Aikido.AgentServer.Options.new(
-          @base_opts ++
-            [
-              agent_module: AikidoTest.AgentServer.OptionsTest.ValidAgent,
-              default_dispatch: {:logger, level: :info}
-            ]
-        )
-
-      assert opts.default_dispatch == {:logger, level: :info}
-    end
-
     test "creates options with on_parent_death" do
       {:ok, opts} =
         Aikido.AgentServer.Options.new(

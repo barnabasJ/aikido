@@ -13,7 +13,7 @@ defmodule Aikido.Actions.Scheduling.ScheduleCron do
     type = input.arguments[:signal_type]
     payload = input.arguments[:payload]
     tz = input.arguments[:timezone]
-    signal = %Jido.Signal{id: nil, type: type, data: payload, source: "/cron"}
+    signal = %Aikido.Signal{id: nil, type: type, data: payload, source: "/cron"}
 
     opts =
       if is_nil(job_id), do: [], else: [job_id: job_id]

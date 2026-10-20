@@ -98,8 +98,8 @@ defmodule Aikido.Ash.Team do
   @doc false
   def start(resource, pid, topology, context \\ %{}) do
     signal =
-      Jido.Signal.new!("aikido.ash.team.start", %{topology: topology})
-      |> Aikido.SignalCtx.put_ctx(context)
+      Aikido.Signal.new!("aikido.ash.team.start", %{topology: topology})
+      |> Aikido.Signal.put_ctx(context)
 
     call(resource, pid, signal)
   end

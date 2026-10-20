@@ -228,7 +228,7 @@ defmodule Aikido.ReactFeaturesTest do
     handoff = fn messages ->
       Aikido.AgentServer.call(
         pid,
-        Jido.Signal.new!("ai.react.handoff", %{messages: messages}),
+        Aikido.Signal.new!("ai.react.handoff", %{messages: messages}),
         &{:ok, &1.agent.state.ai}
       )
     end
@@ -250,7 +250,7 @@ defmodule Aikido.ReactFeaturesTest do
     assert_receive {:model, worker, _}, 2_000
 
     signal =
-      Jido.Signal.new!("ai.react.deliver", %{
+      Aikido.Signal.new!("ai.react.deliver", %{
         text: "worker result",
         request_id: "delivery",
         metadata: %{step_id: "application"}

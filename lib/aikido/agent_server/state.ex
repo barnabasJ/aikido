@@ -102,15 +102,13 @@ defmodule Aikido.AgentServer.State do
       allow_nil?: true,
       description: "Logical partition within the Aikido instance"
 
-    field :default_dispatch, :term, allow_nil?: true, description: "Default dispatch config"
-
     field :middleware_chain, :term,
       allow_nil?: true,
       description: "Composed middleware chain function (Signal, ctx -> {ctx, dirs})"
 
     field :signal_router, :term,
       allow_nil?: true,
-      description: "Jido.Signal.Router for signal routing"
+      description: "Aikido.Signal.Router for signal routing"
 
     field :durable_server, :atom, description: "DurableServer supervisor"
     field :durable_key, :term, description: "Logical DurableServer key"
@@ -119,7 +117,7 @@ defmodule Aikido.AgentServer.State do
       allow_nil?: false,
       default: %{},
       description:
-        "Map of sub_ref => %{pattern_compiled, selector, dispatch, monitor_ref, once} for subscribe"
+        "Map of sub_ref => %{pattern_compiled, selector, target, monitor_ref, once} for subscribe"
 
     field :ready_waiters, :map,
       allow_nil?: false,

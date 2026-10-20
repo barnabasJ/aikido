@@ -77,7 +77,7 @@ defmodule Aikido.RuntimeNativeContractTest do
       )
 
     assert {:error, _} =
-             Aikido.AgentServer.call(pid, Jido.Signal.new!("invalid.directive", %{}), fn _ ->
+             Aikido.AgentServer.call(pid, Aikido.Signal.new!("invalid.directive", %{}), fn _ ->
                {:ok, :accepted}
              end)
 
@@ -106,7 +106,7 @@ defmodule Aikido.RuntimeNativeContractTest do
     assert {:ok, 2} =
              Aikido.AgentServer.call(
                pid,
-               Jido.Signal.new!("increment", %{amount: 2}),
+               Aikido.Signal.new!("increment", %{amount: 2}),
                &{:ok, &1.agent.state.domain.counter}
              )
 
@@ -117,7 +117,7 @@ defmodule Aikido.RuntimeNativeContractTest do
     {:ok, pid} = AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Counter)
 
     dispatch = fn ->
-      Aikido.AgentServer.call(pid, Jido.Signal.new!("increment", %{amount: 3}), fn _ ->
+      Aikido.AgentServer.call(pid, Aikido.Signal.new!("increment", %{amount: 3}), fn _ ->
         {:ok, :receipt}
       end)
     end
@@ -143,7 +143,7 @@ defmodule Aikido.RuntimeNativeContractTest do
                    :ok =
                      Aikido.Directive.exec(
                        %Aikido.Directives.AdoptChild{child: child, tag: :worker},
-                       Jido.Signal.new!("adopt", %{}),
+                       Aikido.Signal.new!("adopt", %{}),
                        runtime
                      )
 

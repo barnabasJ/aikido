@@ -20,12 +20,23 @@ defmodule Aikido.AgentServer.Signal.CronDied do
     treated as normal exits; anything else is abnormal and triggers restart)
   """
 
-  use Jido.Signal,
-    type: "aikido.agent.cron.died",
-    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
-    schema: [
-      job_id: [type: :any, required: true, doc: "Logical cron job id within the agent"],
-      pid: [type: :any, required: true, doc: "PID of the cron-job process that exited"],
-      reason: [type: :any, required: true, doc: "Exit reason from the cron-job process"]
-    ]
+  use Aikido.Signal
+
+  signal do
+    type "aikido.agent.cron.died"
+
+    schema do
+      attribute :job_id, :term,
+        allow_nil?: false,
+        description: "Logical cron job id within the agent"
+
+      attribute :pid, :term,
+        allow_nil?: false,
+        description: "PID of the cron-job process that exited"
+
+      attribute :reason, :term,
+        allow_nil?: false,
+        description: "Exit reason from the cron-job process"
+    end
+  end
 end

@@ -255,8 +255,8 @@ defmodule Aikido.AICapacityTest do
 
   defp launch(pid, kind, id, observer) do
     signal =
-      Jido.Signal.new!("capacity.launch", %{kind: kind, request_id: id})
-      |> Aikido.SignalCtx.put_ctx(%{
+      Aikido.Signal.new!("capacity.launch", %{kind: kind, request_id: id})
+      |> Aikido.Signal.put_ctx(%{
         actor: %{id: "capacity-actor"},
         tenant: "capacity-tenant",
         tracer: AikidoTest.Support.TestTracer,

@@ -54,7 +54,7 @@ defmodule AikidoTest.AgentServer.MiddlewarePipelineTest do
   use AikidoTest.Case, async: false
 
   defp inspect_sig do
-    {:ok, sig} = Jido.Signal.new(%{type: "inspect", source: "/test", data: %{}})
+    {:ok, sig} = Aikido.Signal.new(%{type: "inspect", source: "/test", data: %{}})
     sig
   end
 

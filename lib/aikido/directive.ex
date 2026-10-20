@@ -32,7 +32,7 @@ defmodule Aikido.Directive do
 
   require Ash.Tracer
 
-  @callback exec(struct(), Jido.Signal.t(), Aikido.AgentServer.State.t()) ::
+  @callback exec(struct(), Aikido.Signal.t(), Aikido.AgentServer.State.t()) ::
               :ok | {:stop, term()}
 
   use Spark.Dsl, default_extensions: [extensions: [Ash.TypedStruct.Dsl]]
@@ -54,15 +54,15 @@ defmodule Aikido.Directive do
   @doc """
   Complete a signal envelope during directive execution.
 
-  Actions can return `%Jido.Signal{id: nil, type: type, data: data, source: source}`
+  Actions can return `%Aikido.Signal{id: nil, type: type, data: data, source: source}`
   without generating IDs or reading the clock. Emit, Schedule and Cron supply
   that runtime metadata here. Fully constructed signals retain their identity.
   This function performs runtime work and must not be called from an action.
   """
-  def materialize_signal(%Jido.Signal{id: id, time: time} = signal)
+  def materialize_signal(%Aikido.Signal{id: id, time: time} = signal)
       when is_binary(id) and is_binary(time), do: signal
 
-  def materialize_signal(%Jido.Signal{} = signal) do
+  def materialize_signal(%Aikido.Signal{} = signal) do
     signal
     |> Map.from_struct()
     |> materialize_signal()
@@ -71,14 +71,14 @@ defmodule Aikido.Directive do
   def materialize_signal(signal) when is_map(signal) do
     signal
     |> Map.reject(fn {key, value} -> key in [:id, :time, :source] && is_nil(value) end)
-    |> Jido.Signal.new!()
+    |> Aikido.Signal.new!()
   end
 
   @doc "Execute a directive through its module's behaviour callback."
-  @spec exec(struct(), Jido.Signal.t(), Aikido.AgentServer.State.t()) ::
+  @spec exec(struct(), Aikido.Signal.t(), Aikido.AgentServer.State.t()) ::
           :ok | {:stop, term()}
   def exec(%module{} = directive, signal, runtime) do
-    tracers = Aikido.SignalCtx.tracers(signal, Map.get(runtime, :aikido))
+    tracers = Aikido.Signal.tracers(signal, Map.get(runtime, :aikido))
 
     Ash.Tracer.span {:custom, :aikido_directive}, inspect(module), tracers do
       Ash.Tracer.set_metadata(tracers, {:custom, :aikido_directive}, %{

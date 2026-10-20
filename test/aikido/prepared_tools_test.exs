@@ -108,7 +108,7 @@ defmodule Aikido.PreparedToolsTest do
 
     for current <- [state, %{state | status: :failed, request_id: "old"}] do
       signal =
-        Jido.Signal.new!("ai.react.tools.ready", %{request_id: "old", prepared_tools: {[], %{}}})
+        Aikido.Signal.new!("ai.react.tools.ready", %{request_id: "old", prepared_tools: {[], %{}}})
 
       assert {:ok, %Aikido.Types.ActionResult{state: ^current, directives: []}} =
                then(signal, fn signal ->
