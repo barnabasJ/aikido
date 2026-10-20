@@ -69,14 +69,6 @@ defmodule AikidoTest.Actions.ForwardTest do
     downstream = start_server(context, AikidoTest.TestAgents.Minimal)
     forwarder = start_server(context, AikidoTest.Actions.ForwardTest.Agent)
 
-    assert {:ok, subscription} =
-             Aikido.AgentServer.subscribe(
-               downstream,
-               "aikido.agent.query.children",
-               fn _ -> {:ok, :processed} end,
-               once: true
-             )
-
     query =
       Aikido.Signal.new!("test.forward", %{
         target_pid: downstream,
@@ -85,13 +77,21 @@ defmodule AikidoTest.Actions.ForwardTest do
       })
       |> Aikido.Signal.put_ctx(%{actor: %{id: "caller"}, tenant: "workspace"})
 
-    assert {:ok, reply} = Aikido.Signal.Call.call(forwarder, query)
-    assert reply.type == "aikido.agent.query.children.reply"
-    assert reply.subject == query.id
-    assert reply.data == %{children: %{}}
-    assert reply.scope.actor == %{id: "caller"}
-    assert reply.scope.tenant == "workspace"
-    assert_receive {:aikido_subscription, ^subscription, %{result: {:ok, :processed}}}
+    assert {:ok, :processed} =
+             Aikido.AgentServer.call_until(
+               downstream,
+               fn ->
+                 assert {:ok, reply} = Aikido.Signal.Call.call(forwarder, query)
+                 assert reply.type == "aikido.agent.query.children.reply"
+                 assert reply.subject == query.id
+                 assert reply.data == %{children: %{}}
+                 assert reply.scope.actor == %{id: "caller"}
+                 assert reply.scope.tenant == "workspace"
+                 :ok
+               end,
+               "aikido.agent.query.children",
+               fn _ -> {:ok, :processed} end
+             )
   end
 
   defp forward(signal, overrides \\ %{}) do
