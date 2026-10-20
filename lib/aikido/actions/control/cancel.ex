@@ -16,7 +16,7 @@ defmodule Aikido.Actions.Control.Cancel do
         changeset = state |> Ash.Changeset.new() |> Ash.Changeset.change_attributes(changes)
 
         if changeset.valid? do
-          Aikido.Types.ActionResult.new(state: struct!(state, changeset.attributes))
+          Aikido.Types.ActionResult.new(state: Map.merge(state, changeset.attributes))
         else
           {:error, Ash.Error.to_error_class(changeset.errors)}
         end
