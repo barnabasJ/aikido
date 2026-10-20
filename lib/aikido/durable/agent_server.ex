@@ -17,6 +17,10 @@ defmodule Aikido.Durable.AgentServer do
     })
   end
 
+  # DurableServer re-dumps a loaded envelope while claiming its initialization
+  # lock, before init/1 has reconstructed the runtime. Its codecs already ran.
+  def dump_state(%{agent: _, options: _, permanent: _} = saved), do: encode(saved)
+
   def dump_state(%{options: options} = initial) do
     module = Keyword.fetch!(options, :agent_module)
     Code.ensure_loaded!(module)

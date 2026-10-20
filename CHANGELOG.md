@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Preserve already encoded snapshots during DurableServer's initialization-lock
+  checkpoint instead of rebuilding defaults or rerunning codecs. Verify state,
+  logical parent bindings and saved cron definitions across repeated dumps.
+
 - Preserve supplied state in effect-only built-in reducers; remove incidental
   tracking fields. Cancel alone validates and applies its status/error transition
   without evaluating resource update defaults. Run child startup as supervised

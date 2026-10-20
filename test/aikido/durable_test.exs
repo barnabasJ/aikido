@@ -57,6 +57,14 @@ defmodule AikidoTest.DurableTest.CodecAgent do
 
   @impl true
   def restore(checkpoint, _context) do
+    if observer = Process.whereis(AikidoTest.DurableTest.InitObserver) do
+      send(observer, {:restoring_checkpoint, self()})
+
+      receive do
+        :resume_restore -> :ok
+      end
+    end
+
     agent = initialize!(%{id: checkpoint.id})
     {:ok, %{agent | state: checkpoint.custom_state}}
   end
@@ -211,6 +219,22 @@ defmodule AikidoTest.DurableTest do
     :ok = SchedulerIntegrationHarness.register_cron(first, "0 0 0 1 1 *", job_id: :annual)
     old_job = SchedulerIntegrationHarness.wait_for_job(first, :annual)
 
+    {key, _} =
+      Enum.find(DurableServer.Supervisor.global_members(durable), fn {_, {pid, _}} ->
+        pid == first
+      end)
+
+    assert {:ok, info} = DurableServer.Supervisor.get_server_info(durable, key)
+    saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
+    assert Map.has_key?(saved.cron_specs, :annual)
+
+    redumped =
+      saved
+      |> Aikido.Durable.AgentServer.dump_state()
+      |> then(&Aikido.Durable.AgentServer.load_state(1, &1))
+
+    assert saved == redumped
+
     :ok = Aikido.Durable.stop(durable, "scheduled")
     {:ok, second} = Aikido.Durable.ensure_started(durable, "scheduled", opts)
     new_job = SchedulerIntegrationHarness.wait_for_job(second, :annual)
@@ -272,6 +296,13 @@ defmodule AikidoTest.DurableTest do
     refute Keyword.has_key?(saved.options, :initial_state)
     assert {:checkpoint, %{custom_state: %{domain: %{encoded: "7"}}}} = saved.agent
 
+    redumped =
+      saved
+      |> Aikido.Durable.AgentServer.dump_state()
+      |> then(&Aikido.Durable.AgentServer.load_state(1, &1))
+
+    assert saved == redumped
+
     {:ok, pid} =
       Aikido.Durable.ensure_started(durable, "safe",
         agent: module,
@@ -287,9 +318,57 @@ defmodule AikidoTest.DurableTest do
     saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
     refute inspect(saved) =~ "private-marker"
     refute Keyword.has_key?(saved.options, :initial_state)
+
+    redumped =
+      saved
+      |> Aikido.Durable.AgentServer.dump_state()
+      |> then(&Aikido.Durable.AgentServer.load_state(1, &1))
+
+    assert saved == redumped
     assert :ok = Aikido.Durable.stop(durable, "safe")
     {:ok, restored} = Aikido.Durable.ensure_started(durable, "safe", agent: module)
     assert {:ok, 7} = Aikido.AgentServer.state(restored, &{:ok, &1.agent.state.domain.value})
+  end
+
+  test "initialization lock preserves the encoded state and logical parent before restore completes",
+       %{durable: durable} do
+    {:ok, parent} = Aikido.Durable.ensure_started(durable, "lock-parent")
+    Process.register(self(), AikidoTest.DurableTest.InitObserver)
+
+    activation =
+      Task.async(fn ->
+        Aikido.Durable.ensure_started(durable, "lock-child",
+          agent: AikidoTest.DurableTest.CodecAgent,
+          permanent: false,
+          initial_state: %{domain: %{value: 91}},
+          agent_opts: [
+            parent: %{pid: parent, id: "lock-parent", tag: :child, partition: nil, meta: %{}}
+          ]
+        )
+      end)
+
+    assert_receive {:restoring_checkpoint, child}, 5_000
+    on_exit(fn -> send(child, :resume_restore) end)
+
+    storage_key =
+      "agent/" <> Base.url_encode64(:erlang.term_to_binary({nil, "lock-child"}), padding: false)
+
+    assert {:ok, info} = DurableServer.Supervisor.get_server_info(durable, storage_key)
+    saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
+    assert {:checkpoint, %{custom_state: %{domain: %{encoded: "91"}}}} = saved.agent
+    assert saved.parent == %{id: "lock-parent", tag: :child, partition: nil, meta: %{}}
+    assert saved.initial?
+
+    redumped =
+      saved
+      |> Aikido.Durable.AgentServer.dump_state()
+      |> then(&Aikido.Durable.AgentServer.load_state(1, &1))
+
+    assert saved == redumped
+    send(child, :resume_restore)
+    assert {:ok, ^child} = Task.await(activation)
+    Process.unregister(AikidoTest.DurableTest.InitObserver)
+    assert {:ok, 91} = Aikido.AgentServer.state(child, &{:ok, &1.agent.state.domain.value})
   end
 
   test("the default Aikido lifecycle uses DurableServer", %{directory: directory}) do
@@ -343,7 +422,7 @@ defmodule AikidoTest.DurableTest do
             state.agent.state.team.members["counter"]
           end
         end,
-        timeout: 10000
+        timeout: 10_000
       )
 
     assert Process.alive?(member)
@@ -364,7 +443,7 @@ defmodule AikidoTest.DurableTest do
             state.agent.state.team.members["counter"]
           end
         end,
-        timeout: 10000
+        timeout: 10_000
       )
 
     assert Process.alive?(worker)
