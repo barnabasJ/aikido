@@ -58,33 +58,6 @@ defmodule Aikido.AI.TestActions.TestMultiply do
   end
 end
 
-defmodule Aikido.AI.TestActions.TestEcho.Implementation do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(input, _opts, _context) do
-    message = input.arguments.message
-
-    {:ok, %{echo: message}}
-  end
-end
-
-defmodule Aikido.AI.TestActions.TestEcho do
-  @moduledoc false
-  use Ash.Resource,
-    domain: Aikido.AI.TestToolDomain,
-    data_layer: Ash.DataLayer.Simple,
-    validate_domain_inclusion?: false
-
-  actions do
-    action :test_echo, :map do
-      argument :message, :string, description: "The message to echo", allow_nil?: false
-      description "Echoes the input message back as the result."
-      run Aikido.AI.TestActions.TestEcho.Implementation
-    end
-  end
-end
-
 defmodule Aikido.AI.TestActions.TestFails.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation

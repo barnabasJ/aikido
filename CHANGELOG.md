@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Remove the local LM Studio ReAct test suite and its unused echo fixture; retain
+  deterministic mock integration coverage for answers, tools and subscriptions.
+
 - Standardize agent and slice declarations on native Ash resources. Remove the
   parallel DSL hosts, implicit default mounts, contributed-section machinery,
   single-action fixture resources and action-module inference. Use Spark entity
