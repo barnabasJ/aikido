@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Replace the Native validation wrapper with native Ash atom constraints and
+  typed arrays of key/value tuples for open keyword options. Preserve arbitrary
+  tool/provider keys without a custom cast implementation.
+
 - Move agent, slice, domain, AI and composition declaration checks into Spark
   verifiers. Delegate field uniqueness to Ash; keep construction preconditions
   with the transformations that require them.

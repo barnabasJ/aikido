@@ -16,12 +16,12 @@ defmodule Aikido.Ash.Transformers.AI do
     fields = [
       options: [Aikido.AI.Options, %{}, false],
       tools: [{:array, :atom}, [], false],
-      tool_options: [Aikido.Types.Native, [], false],
+      tool_options: [{:array, :tuple}, [], false],
       hooks: [{:array, Aikido.Hooks.Hook}, [], false],
       tool_context: [:map, %{}, false],
       model: [:term, nil, true],
       client: [:atom, ReqLLM.Generation, false],
-      llm_opts: [Aikido.Types.Native, [], false],
+      llm_opts: [{:array, :tuple}, [], false],
       system_prompt: [:string, nil, true],
       max_iterations: [:integer, 10, false]
     ]
@@ -45,7 +45,9 @@ defmodule Aikido.Ash.Transformers.AI do
                    Keyword.put(options, :constraints, min: 1)
 
                  name when name in [:llm_opts, :tool_options] ->
-                   Keyword.put(options, :constraints, kind: :keyword_list)
+                   Keyword.put(options, :constraints,
+                     items: [fields: [key: [type: :atom], value: [type: :term]]]
+                   )
 
                  _ ->
                    options

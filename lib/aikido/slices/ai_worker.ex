@@ -13,6 +13,8 @@ defmodule Aikido.Slices.AiWorker do
     validate_domain_inclusion?: false,
     extensions: [Aikido.Ash.Slice]
 
+  @keyword_constraints [items: [fields: [key: [type: :atom], value: [type: :term]]]]
+
   slice do
     name "ai_worker"
 
@@ -43,9 +45,9 @@ defmodule Aikido.Slices.AiWorker do
       argument :client, :atom
       argument :tool_context, :map
       argument :tools, {:array, :atom}
-      argument :tool_options, Aikido.Types.Native, constraints: [kind: :keyword_list]
+      argument :tool_options, {:array, :tuple}, constraints: @keyword_constraints
       argument :system_prompt, :string
-      argument :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list]
+      argument :llm_opts, {:array, :tuple}, constraints: @keyword_constraints
       argument :max_iterations, :integer, constraints: [min: 1]
       run Aikido.Slices.AiWorker.Accept
     end

@@ -85,6 +85,8 @@ defmodule Aikido.Slices.AiReact do
     validate_domain_inclusion?: false,
     extensions: [Aikido.Ash.Slice]
 
+  @keyword_constraints [items: [fields: [key: [type: :atom], value: [type: :term]]]]
+
   slice do
     name "ai"
     description "ReAct reasoning slice attached via `slices:` on a Aikido.Agent."
@@ -143,14 +145,18 @@ defmodule Aikido.Slices.AiReact do
       attribute :client, :atom, public?: true, allow_nil?: false, default: ReqLLM.Generation
       attribute :tools, {:array, :atom}, public?: true, allow_nil?: false, default: []
 
-      attribute :tool_options, Aikido.Types.Native,
+      attribute :tool_options, {:array, :tuple},
         public?: true,
         default: [otp_app: :aikido],
-        constraints: [kind: :keyword_list]
+        constraints: @keyword_constraints
 
       attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
       attribute :system_prompt, :term, public?: true, allow_nil?: true, default: nil
-      attribute :llm_opts, :term, public?: true, allow_nil?: false, default: []
+      attribute :llm_opts, {:array, :tuple},
+        public?: true,
+        allow_nil?: false,
+        default: [],
+        constraints: @keyword_constraints
       attribute :hooks, {:array, Aikido.Hooks.Hook}, public?: true, allow_nil?: false, default: []
       attribute :hooks_pending, :map, public?: true, allow_nil?: false, default: %{}
       attribute :hook_sequence, :integer, public?: true, allow_nil?: false, default: 0
@@ -166,17 +172,21 @@ defmodule Aikido.Slices.AiReact do
       attribute :client, :atom, public?: true, allow_nil?: false, default: ReqLLM.Generation
       attribute :tools, {:array, :atom}, public?: true, allow_nil?: false, default: []
 
-      attribute :tool_options, Aikido.Types.Native,
+      attribute :tool_options, {:array, :tuple},
         public?: true,
         default: [otp_app: :aikido],
-        constraints: [kind: :keyword_list]
+        constraints: @keyword_constraints
 
       attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
       attribute :system_prompt, :term, public?: true, allow_nil?: true
       attribute :max_iterations, :integer, public?: true, allow_nil?: false, default: 10
       attribute :max_tokens, :integer, public?: true, allow_nil?: false, default: 4096
       attribute :temperature, :term, public?: true, allow_nil?: false, default: 0.2
-      attribute :llm_opts, :term, public?: true, allow_nil?: false, default: []
+      attribute :llm_opts, {:array, :tuple},
+        public?: true,
+        allow_nil?: false,
+        default: [],
+        constraints: @keyword_constraints
     end
 
     config_transform {__MODULE__, :__fold_llm_opts__, []}
@@ -328,7 +338,7 @@ defmodule Aikido.Slices.AiReact do
     action :ask, Aikido.ActionResult do
       argument :state, :term
       argument :options, Aikido.AI.Options
-      argument :tool_options, Aikido.Types.Native, constraints: [kind: :keyword_list]
+      argument :tool_options, {:array, :tuple}, constraints: @keyword_constraints
       argument :tool_context, :map
       argument :metadata, :map, default: %{}
       argument :query, :string, allow_nil?: false
@@ -338,7 +348,7 @@ defmodule Aikido.Slices.AiReact do
       argument :tools, {:array, :atom}
       argument :system_prompt, :string
       argument :max_iterations, :integer, constraints: [min: 1]
-      argument :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list]
+      argument :llm_opts, {:array, :tuple}, constraints: @keyword_constraints
       argument :hooks, {:array, Aikido.Hooks.Hook}
       description "Open a ReAct run on a Aikido.Slices.AiReact-equipped agent."
       run {Aikido.Slices.AiReact.Implementation, action: :ask}

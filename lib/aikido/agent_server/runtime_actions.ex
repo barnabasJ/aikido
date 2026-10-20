@@ -69,10 +69,10 @@ defmodule Aikido.AgentServer.RuntimeActions do
       argument :payload, :map, description: "Signal payload data", default: %{}
       argument :source, :string, description: "Signal source path", default: "/agent"
 
-      argument :delivery_mode, Aikido.Types.Native,
+      argument :delivery_mode, :atom,
         description: "Delivery mode",
         default: :async,
-        constraints: [kind: {:in, [:async, :sync]}]
+        constraints: [one_of: [:async, :sync]]
 
       description "Emit a signal to a specific process"
       run Aikido.Actions.Lifecycle.NotifyPid
@@ -85,10 +85,10 @@ defmodule Aikido.AgentServer.RuntimeActions do
       argument :initial_state, :map, description: "Initial state for child", default: %{}
       argument :meta, :map, description: "Metadata to pass to child", default: %{}
 
-      argument :restart, Aikido.Types.Native,
+      argument :restart, :atom,
         description: "Restart policy for the child",
         default: :transient,
-        constraints: [kind: {:in, Aikido.Directives.valid_restart_policies()}]
+        constraints: [one_of: Aikido.Directives.valid_restart_policies()]
 
       description "Spawn a child agent with hierarchy tracking"
       run Aikido.Actions.Lifecycle.SpawnChild

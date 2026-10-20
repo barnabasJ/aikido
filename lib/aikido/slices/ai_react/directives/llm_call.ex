@@ -36,7 +36,9 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     field :tools, {:array, :term}, allow_nil?: false, default: []
 
     field :request_id, :string, allow_nil?: false
-    field :llm_opts, Aikido.Types.Native, constraints: [kind: :keyword_list], default: []
+    field :llm_opts, {:array, :tuple},
+      constraints: [items: [fields: [key: [type: :atom], value: [type: :term]]]],
+      default: []
   end
 
   alias Aikido.AgentServer
