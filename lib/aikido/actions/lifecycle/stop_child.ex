@@ -8,7 +8,7 @@ defmodule Aikido.Actions.Lifecycle.StopChild do
     directive = Aikido.Directives.stop_child(tag, reason)
 
     Aikido.Types.ActionResult.new(
-      state: %{stopping_child: tag, reason: reason},
+      state: input.arguments.state,
       directives: [directive]
     )
   end

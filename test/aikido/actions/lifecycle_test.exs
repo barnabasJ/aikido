@@ -24,14 +24,14 @@ defmodule AikidoTest.Actions.LifecycleTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{notified: true}
+      assert result == %{}
       assert [%Directives.Emit{} = emit] = directives
       assert emit.signal.type == "child.done"
       assert emit.signal.data == %{result: 42}
       assert emit.dispatch == {:pid, target: parent_pid}
     end
 
-    test "returns notified: false when ctx.parent is nil (orphaned)" do
+    test "leaves state unchanged when ctx.parent is nil (orphaned)" do
       data = %{signal_type: "child.done", payload: %{}, source: "/child"}
 
       {:ok, %Aikido.Types.ActionResult{state: result, directives: directives}} =
@@ -44,7 +44,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{notified: false}
+      assert result == %{}
       assert directives == []
     end
   end
@@ -71,7 +71,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{sent_to: target}
+      assert result == %{}
       assert %Directives.Emit{} = directive
       assert directive.signal.type == "result.ready"
       assert directive.signal.data == %{data: "test"}
@@ -127,7 +127,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{spawning: :worker_1}
+      assert result == %{}
       assert %Directives.SpawnAgent{} = directive
       assert directive.agent == AikidoTest.TestAgents.Minimal
       assert directive.tag == :worker_1
@@ -172,7 +172,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{stopping: true, reason: :normal}
+      assert result == %{}
       assert %Directives.Stop{} = directive
       assert directive.reason == :normal
     end
@@ -188,7 +188,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{stopping: true, reason: :work_complete}
+      assert result == %{}
       assert directive.reason == :work_complete
     end
   end
@@ -207,7 +207,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{stopping_child: :worker_1, reason: :normal}
+      assert result == %{}
       assert %Directives.StopChild{} = directive
       assert directive.tag == :worker_1
       assert directive.reason == :normal

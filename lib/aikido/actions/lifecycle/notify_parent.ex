@@ -19,7 +19,7 @@ defmodule Aikido.Actions.Lifecycle.NotifyParent do
       end
 
     Aikido.Types.ActionResult.new(
-      state: %{notified: directive != nil},
+      state: input.arguments.state,
       directives: List.wrap(directive)
     )
   end

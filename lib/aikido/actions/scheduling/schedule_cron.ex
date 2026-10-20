@@ -27,7 +27,7 @@ defmodule Aikido.Actions.Scheduling.ScheduleCron do
     directive = Aikido.Directives.cron(cron_expr, signal, opts)
 
     Aikido.Types.ActionResult.new(
-      state: %{cron_scheduled: cron_expr, job_id: job_id},
+      state: input.arguments.state,
       directives: [directive]
     )
   end

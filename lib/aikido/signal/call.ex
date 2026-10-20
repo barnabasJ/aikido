@@ -125,8 +125,8 @@ defmodule Aikido.Signal.Call do
   lets action code be flexible:
 
       case Aikido.Signal.Call.reply(input.context.aikido.signal, "my.reply", %{value: 42}) do
-        nil -> {:ok, %{}, []}
-        emit -> {:ok, %{}, [emit]}
+        nil -> Aikido.Types.ActionResult.new(state: input.arguments.state)
+        emit -> Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [emit])
       end
   """
   @spec reply(Signal.t() | nil, String.t(), map()) :: Emit.t() | nil

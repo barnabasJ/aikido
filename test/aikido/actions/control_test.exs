@@ -38,7 +38,7 @@ defmodule AikidoTest.Actions.ControlTest do
   end
 
   describe("Noop") do
-    test "returns empty state change" do
+    test "preserves the supplied state" do
       {:ok, %Aikido.Types.ActionResult{state: result, directives: []}} =
         then(sig("noop"), fn signal ->
           Aikido.AgentServer.RuntimeActions
@@ -68,7 +68,7 @@ defmodule AikidoTest.Actions.ControlTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{forwarded_to: target}
+      assert result == %{}
       assert %Directives.Emit{} = directive
       assert {:pid, opts} = directive.dispatch
       assert Keyword.get(opts, :target) == target
@@ -128,7 +128,7 @@ defmodule AikidoTest.Actions.ControlTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{broadcast_to: "workers"}
+      assert result == %{}
       assert %Directives.Emit{} = directive
       assert directive.dispatch == {:pubsub, topic: "workers"}
       assert directive.signal.type == "work.available"
@@ -156,13 +156,13 @@ defmodule AikidoTest.Actions.ControlTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{replied_to: reply_pid}
+      assert result == %{}
       assert %Directives.Emit{} = directive
       assert directive.signal.type == "response"
       assert directive.signal.data == %{answer: 42}
     end
 
-    test "returns warning when no reply_to found" do
+    test "preserves state when no reply_to is found" do
       input =
         Signal.new!(%{
           type: "query",
@@ -180,10 +180,10 @@ defmodule AikidoTest.Actions.ControlTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{replied_to: nil, warning: "No reply_to found in signal"}
+      assert result == %{}
     end
 
-    test "returns warning when reply_to is missing on the input signal" do
+    test "leaves state unchanged when the input signal has no reply_to" do
       input =
         Signal.new!(%{
           type: "query",
@@ -201,7 +201,7 @@ defmodule AikidoTest.Actions.ControlTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{replied_to: nil, warning: "No reply_to found in signal"}
+      assert result == %{}
     end
   end
 end

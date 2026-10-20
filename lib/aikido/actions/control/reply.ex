@@ -5,17 +5,17 @@ defmodule Aikido.Actions.Control.Reply do
   def run(input, _opts, _context) do
     type = input.arguments[:signal_type]
     payload = input.arguments[:payload]
-    input = input.context.aikido.signal
+    signal = input.context.aikido.signal
 
-    case extract_reply_to(input) do
+    case extract_reply_to(signal) do
       {:ok, pid} ->
         out = struct!(Jido.Signal, id: nil, type: type, data: payload, source: "/reply")
         directive = Aikido.Directives.emit_to_pid(out, pid)
-        Aikido.Types.ActionResult.new(state: %{replied_to: pid}, directives: [directive])
+        Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [directive])
 
       :error ->
         Aikido.Types.ActionResult.new(
-          state: %{replied_to: nil, warning: "No reply_to found in signal"},
+          state: input.arguments.state,
           directives: []
         )
     end

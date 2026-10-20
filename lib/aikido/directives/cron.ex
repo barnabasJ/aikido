@@ -4,7 +4,9 @@ defmodule Aikido.Directives.Cron do
 
   The job is owned by the agent's `id` and identified within that agent
   by `job_id`. On each tick, the scheduler sends `message` (or `signal`)
-  back to the agent via `Aikido.AgentServer.cast/2`.
+  back to the agent via `Aikido.AgentServer.cast/2`. Incomplete signal
+  descriptors receive a fresh ID and timestamp on each occurrence. A fully
+  constructed signal retains its caller-supplied identity.
 
   ## Fields
 
@@ -97,12 +99,6 @@ defmodule Aikido.Directives.Cron do
         input_signal,
         state
       ) do
-    message =
-      case message do
-        %Jido.Signal{} -> Aikido.Directive.materialize_signal(message)
-        other -> other
-      end
-
     case Aikido.Directives.Cron.register_io(state, cron_expr, message, logical_id, tz) do
       {:ok, io_result} ->
         signal =

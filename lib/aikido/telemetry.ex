@@ -331,7 +331,11 @@ defmodule Aikido.Telemetry do
         "[signal] type=#{Formatter.format_signal_type(metadata[:signal_type])} " <>
           "directives=#{directive_count} " <>
           directive_summary <>
-          "duration=#{Formatter.format_duration(duration)}"
+          "duration=#{Formatter.format_duration(duration)}" <>
+          if(is_nil(metadata[:error]),
+            do: "",
+            else: " error=#{Formatter.safe_inspect(metadata.error)}"
+          )
       end,
       agent_id: metadata[:agent_id],
       signal_id: metadata[:signal_id]

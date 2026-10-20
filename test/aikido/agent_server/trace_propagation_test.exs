@@ -127,6 +127,20 @@ defmodule AikidoTest.AgentServer.TracePropagationTest do
   test "one native Ash trace connects the external action, async effect, result signals and final state",
        %{reference: reference} do
     previous = TestTracer.get_span_context()
+    handler = {__MODULE__, make_ref()}
+
+    :ok =
+      :telemetry.attach_many(
+        handler,
+        [
+          [:aikido, :agent_server, :directive, :start],
+          [:aikido, :agent_server, :directive, :stop]
+        ],
+        fn event, _, metadata, pid -> send(pid, {handler, event, metadata}) end,
+        self()
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
 
     Ash.Tracer.span :custom, "test.external_caller", TestTracer do
       caller = TestTracer.get_span_context()
@@ -206,6 +220,18 @@ defmodule AikidoTest.AgentServer.TracePropagationTest do
     assert is_binary(first.metadata.signal_id)
     assert is_binary(result.metadata.signal_id)
     refute first.metadata.signal_id == result.metadata.signal_id
+
+    for phase <- [:start, :stop] do
+      origin_id = first.metadata.signal_id
+
+      assert_receive {^handler, [:aikido, :agent_server, :directive, ^phase],
+                      %{signal_type: "trace.start", signal_id: ^origin_id}}
+
+      result_id = result.metadata.signal_id
+
+      assert_receive {^handler, [:aikido, :agent_server, :directive, ^phase],
+                      %{signal_type: "trace.completed", signal_id: ^result_id}}
+    end
   end
 
   @tag capture_log: true

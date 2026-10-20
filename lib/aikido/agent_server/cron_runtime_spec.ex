@@ -48,7 +48,7 @@ defmodule Aikido.AgentServer.CronRuntimeSpec do
         _agent_id,
         _logical_id
       ),
-      do: signal
+      do: Aikido.Directive.materialize_signal(signal)
 
   def build_signal(%__MODULE__{kind: :dynamic, message: message}, agent_id, logical_id) do
     CronTick.new!(

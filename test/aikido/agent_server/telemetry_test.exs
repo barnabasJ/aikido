@@ -194,12 +194,14 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
                       %{directive_type: "Schedule", signal_type: "schedule_directive"} = metadata},
                      500
 
+      assert metadata.signal_id == signal.id
       assert match?(%Aikido.Directives.Schedule{}, metadata.directive)
 
       assert_receive {:telemetry_event, [:aikido, :agent_server, :directive, :stop], _,
                       %{result: :ok, signal_type: "schedule_directive"} = metadata},
                      500
 
+      assert metadata.signal_id == signal.id
       assert match?(%Aikido.Directives.Schedule{}, metadata.directive)
       GenServer.stop(pid)
     end

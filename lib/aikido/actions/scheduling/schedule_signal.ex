@@ -11,7 +11,7 @@ defmodule Aikido.Actions.Scheduling.ScheduleSignal do
     directive = Aikido.Directives.schedule(delay, signal)
 
     Aikido.Types.ActionResult.new(
-      state: %{scheduled_for_ms: delay, signal_type: type},
+      state: input.arguments.state,
       directives: [directive]
     )
   end

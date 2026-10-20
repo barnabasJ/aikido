@@ -19,6 +19,6 @@ defmodule Aikido.Actions.Lifecycle.SpawnChild do
     directive =
       Aikido.Directives.spawn_agent(mod, tag, opts: opts, meta: meta, restart?: restart?)
 
-    Aikido.Types.ActionResult.new(state: %{spawning: tag}, directives: [directive])
+    Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [directive])
   end
 end

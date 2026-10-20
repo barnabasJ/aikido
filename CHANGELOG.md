@@ -6,6 +6,14 @@
 
 ### Changed
 
+- Preserve supplied state in effect-only built-in reducers; remove incidental
+  tracking fields. Cancel alone validates and applies its status/error transition
+  without evaluating resource update defaults. Run child startup as supervised
+  work and retain parent-death policies during delayed activation.
+- Give generated cron occurrences fresh envelopes, retain explicit signal
+  identities, and correlate directive telemetry and bounded failure logs with
+  the originating signal ID.
+
 - Settle rejected model/tool task starts through correlated result signals and
   preserve caller scope. Enforce positive ReAct iteration limits with native
   constraints and simplify task cleanup and normalized run-state handling.

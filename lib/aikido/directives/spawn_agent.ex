@@ -77,8 +77,8 @@ defmodule Aikido.Directives.SpawnAgent do
   end
 
   @doc """
-  Pure I/O directive: starts the child through DurableServer with its logical
-  parent binding. The
+  Pure I/O directive: starts the child in supervised work through DurableServer
+  with its logical parent binding. The
   child's own `notify_parent_of_startup/1` then casts
   `aikido.agent.child.started` back to this agent, where
   `maybe_track_child_started/2` records the `%ChildInfo{}` and creates
@@ -95,16 +95,30 @@ defmodule Aikido.Directives.SpawnAgent do
   @reserved_child_opts [:agent, :agent_module, :id, :aikido, :parent, :partition]
 
   @impl true
-  def exec(%{agent: agent, tag: tag, opts: opts, meta: meta, restart?: restart?}, _signal, state) do
-    spawn_child(state, agent, tag, opts, meta, restart?)
+  def exec(%{agent: agent, tag: tag, opts: opts, meta: meta, restart?: restart?}, signal, state) do
+    parent_pid = self()
+
+    task = %Aikido.Directives.AsyncTask{
+      work: fn ->
+        spawn_child(state, parent_pid, agent, tag, opts, meta, restart?)
+        {:signals, []}
+      end
+    }
+
+    case Aikido.Directives.AsyncTask.start(task, signal, state) do
+      {:ok, _pid} -> :ok
+      {:error, reason} -> Logger.error("Failed to start agent spawn task: #{inspect(reason)}")
+    end
+
+    :ok
   end
 
-  defp spawn_child(state, agent, tag, opts, meta, restart?) do
+  defp spawn_child(state, parent_pid, agent, tag, opts, meta, restart?) do
     child_id = opts[:id] || "#{state.id}/#{tag}"
     child_partition = Map.get(opts, :partition, state.partition)
 
     parent_ref = %{
-      pid: self(),
+      pid: parent_pid,
       id: state.id,
       partition: state.partition,
       tag: tag,
@@ -130,7 +144,14 @@ defmodule Aikido.Directives.SpawnAgent do
            agent_opts: child_opts,
            permanent: restart?
          ) do
-      {:ok, _pid} ->
+      {:ok, pid} ->
+        if !Process.alive?(parent_pid) do
+          GenServer.cast(
+            pid,
+            {:ensure_initial_parent, Aikido.AgentServer.ParentRef.new!(parent_ref)}
+          )
+        end
+
         :ok
 
       {:error, reason} ->

@@ -28,7 +28,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{scheduled_for_ms: 5000, signal_type: "work.check"}
+      assert result == %{}
       assert %Directives.Schedule{} = directive
       assert directive.delay_ms == 5000
       assert directive.message.type == "work.check"
@@ -70,7 +70,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{timeout_set: :work_deadline, expires_in_ms: 30000}
+      assert result == %{}
       assert %Directives.Schedule{} = directive
       assert directive.delay_ms == 30000
       assert directive.message.type == "agent.timeout"
@@ -80,7 +80,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
     test "uses default timeout_id" do
       data = %{timeout_ms: 5000, timeout_id: :default, signal_type: "agent.timeout"}
 
-      {:ok, %Aikido.Types.ActionResult{state: result, directives: [_directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(sig("schedule_timeout", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(
@@ -92,7 +92,8 @@ defmodule AikidoTest.Actions.SchedulingTest do
           |> Ash.run_action()
         end)
 
-      assert result.timeout_set == :default
+      assert result == %{}
+      assert directive.message.data.timeout_id == :default
     end
   end
 
@@ -116,7 +117,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{cron_scheduled: "* * * * *", job_id: :heartbeat}
+      assert result == %{}
       assert %Directives.Cron{} = directive
       assert directive.cron == "* * * * *"
       assert directive.job_id == :heartbeat
@@ -160,7 +161,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
           |> Ash.run_action()
         end)
 
-      assert result == %{cancelled_job: :heartbeat}
+      assert result == %{}
       assert %Directives.CronCancel{} = directive
       assert directive.job_id == :heartbeat
     end

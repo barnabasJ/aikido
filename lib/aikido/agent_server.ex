@@ -769,11 +769,12 @@ defmodule Aikido.AgentServer do
           {:ok, pid()} | {:error, term()}
   def start_runtime_cron_job(%State{} = state, logical_id, %CronRuntimeSpec{} = runtime_spec) do
     agent_pid = self()
-    signal = CronRuntimeSpec.build_signal(runtime_spec, state.id, logical_id)
+    agent_id = state.id
 
     Aikido.Scheduler.run_every(
       fn ->
         if Process.alive?(agent_pid) do
+          signal = CronRuntimeSpec.build_signal(runtime_spec, agent_id, logical_id)
           _ = Aikido.AgentServer.cast(agent_pid, signal)
         end
 
@@ -1137,6 +1138,19 @@ defmodule Aikido.AgentServer do
         {:noreply, state}
     end
   end
+
+  # Initial activation can outlive its parent before DurableServer resolves the
+  # saved logical binding. Repair only an untouched binding; an existing parent
+  # or completed orphan transition must retain its current lifecycle decision.
+  def handle_cast(
+        {:ensure_initial_parent, %ParentRef{} = parent_ref},
+        %State{parent: nil, orphaned_from: nil} = state
+      ) do
+    handle_cast({:adopt_parent, parent_ref}, state)
+  end
+
+  def handle_cast({:ensure_initial_parent, %ParentRef{}}, %State{} = state),
+    do: {:noreply, state}
 
   def handle_cast({:unsubscribe, sub_ref}, %State{} = state) when is_reference(sub_ref) do
     case Map.pop(state.signal_subscribers, sub_ref) do
@@ -1533,7 +1547,7 @@ defmodule Aikido.AgentServer do
   end
 
   defp signal_stop_metadata_for({:error, _state, reason}) do
-    %{directive_count: 0, directive_types: %{}, chain_error: reason}
+    %{directive_count: 0, directive_types: %{}, error: reason}
   end
 
   defp maybe_track_child_started(
@@ -2386,6 +2400,7 @@ defmodule Aikido.AgentServer do
         agent_module: state.agent_module,
         directive_type: directive_type,
         directive: directive,
+        signal_id: signal.id,
         signal_type: signal.type,
         aikido_instance: state.aikido,
         aikido_partition: state.partition

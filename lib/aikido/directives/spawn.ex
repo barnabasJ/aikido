@@ -28,25 +28,34 @@ defmodule Aikido.Directives.Spawn do
   require Logger
 
   @impl true
-  def exec(%{child_spec: child_spec, tag: tag}, _input_signal, state) do
-    agent_sup = Aikido.process_supervisor_name(state.aikido)
-    result = DynamicSupervisor.start_child(agent_sup, child_spec)
+  def exec(%{child_spec: child_spec, tag: tag}, input_signal, state) do
+    supervisor = Aikido.process_supervisor_name(state.aikido)
 
-    case result do
-      {:ok, pid} ->
-        Logger.debug("Spawned child process #{inspect(pid)} with tag #{inspect(tag)}")
-        :ok
+    task = %Aikido.Directives.AsyncTask{
+      work: fn ->
+        case DynamicSupervisor.start_child(supervisor, child_spec) do
+          {:ok, pid} ->
+            Logger.debug("Spawned child process #{inspect(pid)} with tag #{inspect(tag)}")
 
-      {:ok, pid, _info} ->
-        Logger.debug("Spawned child process #{inspect(pid)} with tag #{inspect(tag)}")
-        :ok
+          {:ok, pid, _info} ->
+            Logger.debug("Spawned child process #{inspect(pid)} with tag #{inspect(tag)}")
 
-      {:error, reason} ->
-        Logger.error("Failed to spawn child: #{inspect(reason)}")
-        :ok
+          {:error, reason} ->
+            Logger.error("Failed to spawn child: #{inspect(reason)}")
 
-      :ignored ->
-        :ok
+          :ignore ->
+            :ok
+        end
+
+        {:signals, []}
+      end
+    }
+
+    case Aikido.Directives.AsyncTask.start(task, input_signal, state) do
+      {:ok, _pid} -> :ok
+      {:error, reason} -> Logger.error("Failed to start spawn task: #{inspect(reason)}")
     end
+
+    :ok
   end
 end
