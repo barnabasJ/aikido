@@ -5,15 +5,15 @@ defmodule Aikido.Slices.Thread do
 
   ## State shape
 
-  Declared by the embedded resource attributes. Explicit mounts initialize from
-  native defaults. When called with nil state, the first inbound `aikido.thread.*` signal creates a fresh
-  `%Aikido.Slices.Thread{}` via the relevant action.
+  Declared by the embedded resource attributes. Mounted slices are initialized
+  through their native create action before receiving signals. Reducers require
+  the initialized resource struct and retain native Ash type validation.
 
   ## Routes
 
-      route "aikido.thread.ensure", :ensure
-      route "aikido.thread.append", :append
-      route "aikido.thread.clear", :clear
+      route Aikido.Signals.Thread.Ensure, Aikido.Slices.Thread.Implementation
+      route Aikido.Signals.Thread.Append, Aikido.Slices.Thread.Implementation
+      route Aikido.Signals.Thread.Clear, Aikido.Slices.Thread.Implementation
 
   ## Persistence
 
@@ -77,43 +77,9 @@ defmodule Aikido.Slices.Thread do
         description: "Cached aggregates"
     end
 
-    route "aikido.thread.ensure", :ensure
-    route "aikido.thread.append", :append
-    route "aikido.thread.clear", :clear
-  end
-
-  actions do
-    action :append, Aikido.Types.ActionResult do
-      argument :state, :term
-
-      argument :entry, :union,
-        description: "Entry map (or list of entry maps) to append.",
-        allow_nil?: false,
-        constraints: [
-          types: [entry: [type: :map], entries: [type: {:array, :map}]]
-        ]
-
-      description "Append one or more entries to the thread."
-      run {Aikido.Slices.Thread.Implementation, action: :append}
-    end
-
-    action :clear, Aikido.Types.ActionResult do
-      argument :state, :term
-      description "Reset the thread to an empty state."
-      run {Aikido.Slices.Thread.Implementation, action: :clear}
-    end
-
-    action :ensure, Aikido.Types.ActionResult do
-      argument :state, :term
-
-      argument :metadata, :map,
-        description: "Optional metadata for newly created thread.",
-        default: %{}
-
-      argument :id, :string, description: "Optional explicit thread id."
-      description "Initialize thread state if missing."
-      run {Aikido.Slices.Thread.Implementation, action: :ensure}
-    end
+    route Aikido.Signals.Thread.Ensure, Aikido.Slices.Thread.Implementation
+    route Aikido.Signals.Thread.Append, Aikido.Slices.Thread.Implementation
+    route Aikido.Signals.Thread.Clear, Aikido.Slices.Thread.Implementation
   end
 
   alias Aikido.Slices.Thread.Entry

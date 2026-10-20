@@ -52,7 +52,9 @@ defmodule Aikido.AI.ContextRepairTest do
 
   test "next ask and reinstatement preserve completed builtin history" do
     context = history([ToolCall.new_builtin("builtin", "web_search", "{}")])
-    state = %{status: :completed, context: context, model: "offline"}
+
+    state =
+      AikidoTest.SliceState.new(AiReact, %{status: :completed, context: context, model: "offline"})
 
     restored = state |> AiReact.externalize() |> AiReact.reinstate()
     assert restored.status == :completed

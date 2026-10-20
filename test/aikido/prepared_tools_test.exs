@@ -99,12 +99,13 @@ defmodule Aikido.PreparedToolsTest do
   end
 
   test "late preparation results cannot restart a cancelled or replaced run" do
-    state = %{
-      status: :setup,
-      request_id: "new",
-      tool_preparation: [:waiting],
-      prepared_tools: nil
-    }
+    state =
+      AikidoTest.SliceState.new(Aikido.Slices.AiReact, %{
+        status: :setup,
+        request_id: "new",
+        tool_preparation: [:waiting],
+        prepared_tools: nil
+      })
 
     for current <- [state, %{state | status: :failed, request_id: "old"}] do
       signal =

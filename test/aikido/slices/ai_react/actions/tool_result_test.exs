@@ -5,7 +5,7 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
   alias ReqLLM.Context
 
   defp slice_with_pending(calls, opts \\ []) do
-    %{
+    AikidoTest.SliceState.new(Aikido.Slices.AiReact, %{
       status: :running,
       prepared_tools: {[], %{}},
       request_id: Keyword.get(opts, :request_id, "req_1"),
@@ -20,7 +20,7 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
       model: "anthropic:claude-haiku-4-5-20251001",
       tools: [:test_add],
       llm_opts: []
-    }
+    })
   end
 
   defp signal(request_id, tool_call_id, name, content) do

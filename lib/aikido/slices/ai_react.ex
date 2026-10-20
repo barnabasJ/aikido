@@ -137,21 +137,28 @@ defmodule Aikido.Slices.AiReact do
         constraints: @keyword_constraints
     end
 
-    route "ai.react.context_handoff.completed", :handoff_completed
-    route "ai.react.context_handoff.failed", :handoff_failed
-    route "ai.react.tools.ready", :tools_ready
-    route "ai.react.ask", :ask
-    route "ai.react.message", :message
-    route "ai.react.deliver", :deliver
-    route "ai.react.handoff", :handoff
-    route "aikido.todo.changed", :todo_changed
-    route "ai.react.stream", :stream
-    route "ai.react.llm.completed", :llm_turn
-    route "ai.react.tool.completed", :tool_result
-    route "ai.react.failed", :failed
-    route "ai.react.cancel", :cancel
-    route "ai.react.hook.completed", :hook_completed
-    route "ai.react.hook.context", :hook_context
+    route Aikido.Signals.AiReact.HandoffCompleted, Aikido.Slices.AiReact.Implementation,
+      public?: false
+
+    route Aikido.Signals.AiReact.HandoffFailed, Aikido.Slices.AiReact.Implementation,
+      public?: false
+
+    route Aikido.Signals.AiReact.ToolsReady, Aikido.Slices.AiReact.Implementation, public?: false
+    route Aikido.Signals.AiReact.Ask, Aikido.Slices.AiReact.Implementation
+    route Aikido.Signals.AiReact.Message, Aikido.Slices.AiReact.Implementation
+    route Aikido.Signals.AiReact.Deliver, Aikido.Slices.AiReact.Implementation
+    route Aikido.Signals.AiReact.Handoff, Aikido.Slices.AiReact.Implementation
+    route Aikido.Signals.AiReact.TodoChanged, Aikido.Slices.AiReact.Implementation, public?: false
+    route Aikido.Signals.AiReact.Stream, Aikido.Slices.AiReact.Implementation, public?: false
+    route Aikido.Signals.AiReact.LlmTurn, Aikido.Slices.AiReact.Implementation, public?: false
+    route Aikido.Signals.AiReact.ToolResult, Aikido.Slices.AiReact.Implementation, public?: false
+    route Aikido.Signals.AiReact.Failed, Aikido.Slices.AiReact.Implementation, public?: false
+    route Aikido.Signals.AiReact.Cancel, Aikido.Slices.AiReact.Implementation
+
+    route Aikido.Signals.AiReact.HookCompleted, Aikido.Slices.AiReact.Implementation,
+      public?: false
+
+    route Aikido.Signals.AiReact.HookContext, Aikido.Slices.AiReact.Implementation, public?: false
   end
 
   @doc """
@@ -182,148 +189,6 @@ defmodule Aikido.Slices.AiReact do
   end
 
   @behaviour Aikido.Durable.Codec
-
-  actions do
-    action :handoff_completed, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      argument :request_id, :string, allow_nil?: false
-      argument :handoff_id, :integer, allow_nil?: false
-      argument :turn, :term, allow_nil?: false
-      argument :iteration, :integer
-      run {Aikido.Slices.AiReact.Implementation, action: :handoff_completed}
-    end
-
-    action :handoff_failed, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      argument :request_id, :string, allow_nil?: false
-      argument :handoff_id, :integer, allow_nil?: false
-      argument :reason, :term, allow_nil?: false
-      run {Aikido.Slices.AiReact.Implementation, action: :handoff_failed}
-    end
-
-    action :tools_ready, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      argument :request_id, :string, allow_nil?: false
-      argument :prepared_tools, :term, allow_nil?: false
-      run {Aikido.Slices.AiReact.Implementation, action: :tools_ready}
-    end
-
-    action :ask, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :options, Aikido.AI.Options
-      argument :tool_options, {:array, :tuple}, constraints: @keyword_constraints
-      argument :tool_context, :map
-      argument :metadata, :map, default: %{}
-      argument :query, :string, allow_nil?: false
-      argument :request_id, :string, allow_nil?: false
-      argument :model, :term
-      argument :client, :module
-      argument :tools, {:array, :atom}
-      argument :system_prompt, :string
-      argument :max_iterations, :integer, constraints: [min: 1]
-      argument :llm_opts, {:array, :tuple}, constraints: @keyword_constraints
-      argument :hooks, {:array, Aikido.Hooks.Hook}
-      description "Open a ReAct run on a Aikido.Slices.AiReact-equipped agent."
-      run {Aikido.Slices.AiReact.Implementation, action: :ask}
-    end
-
-    action :message, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :text, :string, allow_nil?: false
-      run {Aikido.Slices.AiReact.Implementation, action: :message}
-    end
-
-    action :handoff, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :messages, {:array, :term}, allow_nil?: false
-      run {Aikido.Slices.AiReact.Implementation, action: :handoff}
-    end
-
-    action :deliver, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :metadata, :map, default: %{}
-      argument :text, :string, allow_nil?: false
-      argument :request_id, :string, allow_nil?: false
-      run {Aikido.Slices.AiReact.Implementation, action: :deliver}
-    end
-
-    action :todo_changed, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      run {Aikido.Slices.AiReact.Implementation, action: :todo_changed}
-    end
-
-    action :stream, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      argument :request_id, :string, allow_nil?: false
-      argument :iteration, :integer, allow_nil?: false
-      argument :attempt, :integer, default: 0
-      argument :text, :string, default: "", constraints: [allow_empty?: true, trim?: false]
-      argument :thinking, :string, default: "", constraints: [allow_empty?: true, trim?: false]
-      run {Aikido.Slices.AiReact.Implementation, action: :stream}
-    end
-
-    action :cancel, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :request_id, :string, default: nil
-      run {Aikido.Slices.AiReact.Implementation, action: :cancel}
-    end
-
-    action :failed, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      argument :reason, :term, allow_nil?: false
-      argument :request_id, :string, allow_nil?: false
-      description "Settle the slice as :failed with the reason."
-      run {Aikido.Slices.AiReact.Implementation, action: :failed}
-    end
-
-    action :llm_turn, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      argument :iteration, :integer
-      argument :turn, :term, allow_nil?: false
-      argument :request_id, :string, allow_nil?: false
-      description "Process a completed LLM turn and decide the next ReAct step."
-      run {Aikido.Slices.AiReact.Implementation, action: :llm_turn}
-    end
-
-    action :tool_result, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      argument :tool_call_id, :string, allow_nil?: false
-      argument :name, :string, allow_nil?: false
-      argument :content, :term, allow_nil?: true
-      argument :request_id, :string, allow_nil?: false
-      description "Process one tool result and fan-in to the next LLM turn."
-      run {Aikido.Slices.AiReact.Implementation, action: :tool_result}
-    end
-
-    action :hook_completed, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      argument :request_id, :string, allow_nil?: false
-      argument :token, :integer, allow_nil?: false
-      argument :name, :string, allow_nil?: false
-      argument :mode, :atom, allow_nil?: false, constraints: [one_of: [:sync, :async]]
-      argument :result, :term
-      argument :reason, :term
-      run {Aikido.Slices.AiReact.Implementation, action: :hook_completed}
-    end
-
-    action :hook_context, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      argument :request_id, :string, allow_nil?: false
-      argument :text, :string, allow_nil?: false
-      argument :name, :string
-      run {Aikido.Slices.AiReact.Implementation, action: :hook_context}
-    end
-  end
 
   @doc false
   @impl true

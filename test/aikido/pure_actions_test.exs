@@ -5,14 +5,14 @@ defmodule Aikido.PureActionsTest do
   alias Aikido.Directives.{Emit, Schedule}
   alias Aikido.Slices.{Identity, Memory, Thread, Todo}
 
-  test "lazy slice initialization and updates replay with the input timestamp and stable IDs" do
+  test "initialized slice updates replay with the input timestamp and stable IDs" do
     signal = Aikido.Signal.new!("test", %{}, time: "2026-10-19T10:11:12Z")
     timestamp = Signal.timestamp(signal)
 
     for {resource, params} <- [{Identity, %{profile: %{age: 1}}}, {Memory, %{}}, {Thread, %{}}] do
-      initialized = replay(resource, :ensure, %{state: nil} |> Map.merge(params), signal)
-      assert initialized.state.created_at == timestamp
-      assert initialized.state.updated_at == timestamp
+      state = AikidoTest.SliceState.new(resource, params)
+      initialized = replay(resource, :ensure, %{state: state} |> Map.merge(params), signal)
+      assert initialized.state == state
 
       result =
         case resource do
@@ -54,17 +54,22 @@ defmodule Aikido.PureActionsTest do
     end
   end
 
-  test "actions without a signal still have deterministic metadata" do
-    for resource <- [Identity, Memory, Thread] do
-      result = replay(resource, :ensure, %{state: nil}, nil)
-      if resource in [Memory, Thread], do: replay(resource, :ensure, %{state: nil, id: nil}, nil)
-      assert result.state.created_at == 0
+  test "initialized updates without a signal still have deterministic metadata" do
+    for {resource, action, params} <- [
+          {Identity, :evolve, %{years: 1}},
+          {Memory, :put_in_space, %{space: :world, key: :hello, value: "world"}},
+          {Thread, :append, %{entry: %{payload: %{text: "one"}}}}
+        ] do
+      state = AikidoTest.SliceState.new(resource)
+      result = replay(resource, action, Map.put(params, :state, state), nil)
+      assert result.state.created_at == state.created_at
+      assert result.state.updated_at == 0
     end
   end
 
   test "actions return identical emission descriptors without delivering anything" do
     signal = Aikido.Signal.new!("aikido.todo.add", %{})
-    state = %{items: [], revision: 0}
+    state = AikidoTest.SliceState.new(Todo)
 
     result =
       replay(Todo, :todo_add, %{state: state, id: "todo", text: "work", timeout_ms: 100}, signal)

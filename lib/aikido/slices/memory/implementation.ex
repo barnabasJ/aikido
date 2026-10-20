@@ -2,13 +2,13 @@ defmodule Aikido.Slices.Memory.Implementation do
   @moduledoc """
   Pure reducers for named memory spaces and their map or list contents.
 
-  The configured `:action` option selects initialization, space replacement or a
+  The native action name selects initialization, space replacement or a
   content update. Returns the next memory state without directives, deriving
   missing IDs and timestamps deterministically from the input context.
   """
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, [action: :append_to_space], _context) do
+  def run(%{action: %{name: :append_to_space}} = input, _opts, _context) do
     name = input.arguments[:space]
     item = input.arguments[:item]
     slice = input.arguments.state
@@ -21,7 +21,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   end
 
   @impl true
-  def run(input, [action: :delete_from_space], _context) do
+  def run(%{action: %{name: :delete_from_space}} = input, _opts, _context) do
     name = input.arguments[:space]
     key = input.arguments[:key]
     slice = input.arguments.state
@@ -34,7 +34,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   end
 
   @impl true
-  def run(input, [action: :delete_space], _context) do
+  def run(%{action: %{name: :delete_space}} = input, _opts, _context) do
     name = input.arguments[:space]
     slice = input.arguments.state
     memory = ensure_memory(slice, input)
@@ -46,7 +46,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   end
 
   @impl true
-  def run(input, [action: :ensure], _context) do
+  def run(%{action: %{name: :ensure}} = input, _opts, _context) do
     data = Map.delete(input.arguments, :state)
     slice = input.arguments.state
 
@@ -69,7 +69,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   end
 
   @impl true
-  def run(input, [action: :ensure_space], _context) do
+  def run(%{action: %{name: :ensure_space}} = input, _opts, _context) do
     name = input.arguments[:space]
 
     default =
@@ -88,7 +88,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   end
 
   @impl true
-  def run(input, [action: :put_in_space], _context) do
+  def run(%{action: %{name: :put_in_space}} = input, _opts, _context) do
     name = input.arguments[:space]
     key = input.arguments[:key]
     value = input.arguments[:value]
@@ -102,7 +102,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   end
 
   @impl true
-  def run(input, [action: :put_space], _context) do
+  def run(%{action: %{name: :put_space}} = input, _opts, _context) do
     name = input.arguments[:space]
     space = input.arguments.value
     slice = input.arguments.state
@@ -115,7 +115,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   end
 
   @impl true
-  def run(input, [action: :update_space], _context) do
+  def run(%{action: %{name: :update_space}} = input, _opts, _context) do
     name = input.arguments[:space]
     new_space = input.arguments.value
     slice = input.arguments.state

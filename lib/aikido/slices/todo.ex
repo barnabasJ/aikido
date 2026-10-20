@@ -27,58 +27,12 @@ defmodule Aikido.Slices.Todo do
       attribute :revision, :integer, public?: true, default: 0, allow_nil?: false
     end
 
-    route "aikido.todo.add", :todo_add
-    route "aikido.todo.remove", :todo_remove
-    route "aikido.todo.activate", :todo_activate
-    route "aikido.todo.complete", :todo_complete
-    route "aikido.todo.block", :todo_block
-    route "aikido.todo.expire", :expire
-  end
-
-  actions do
-    action :todo_add, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :id, :string, allow_nil?: false
-      argument :text, :string, allow_nil?: false
-      argument :metadata, :map, default: %{}
-      argument :blocking?, :boolean, default: true
-      argument :timeout_ms, :integer, constraints: [min: 1]
-      run {Aikido.Slices.Todo.Implementation, action: :add}
-    end
-
-    action :todo_remove, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :id, :string, allow_nil?: false
-      run {Aikido.Slices.Todo.Implementation, action: :remove}
-    end
-
-    action :todo_activate, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :id, :string, allow_nil?: false
-      run {Aikido.Slices.Todo.Implementation, action: :activate}
-    end
-
-    action :todo_complete, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :id, :string, allow_nil?: false
-      argument :result, :term
-      run {Aikido.Slices.Todo.Implementation, action: :complete}
-    end
-
-    action :todo_block, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :id, :string, allow_nil?: false
-      argument :reason, :term, allow_nil?: false
-      run {Aikido.Slices.Todo.Implementation, action: :block}
-    end
-
-    action :expire, Aikido.Types.ActionResult do
-      public? false
-      argument :state, :term
-      argument :id, :string, allow_nil?: false
-      argument :revision, :integer, allow_nil?: false
-      run {Aikido.Slices.Todo.Implementation, action: :expire}
-    end
+    route Aikido.Signals.Todo.TodoAdd, Aikido.Slices.Todo.Implementation
+    route Aikido.Signals.Todo.TodoRemove, Aikido.Slices.Todo.Implementation
+    route Aikido.Signals.Todo.TodoActivate, Aikido.Slices.Todo.Implementation
+    route Aikido.Signals.Todo.TodoComplete, Aikido.Slices.Todo.Implementation
+    route Aikido.Signals.Todo.TodoBlock, Aikido.Slices.Todo.Implementation
+    route Aikido.Signals.Todo.Expire, Aikido.Slices.Todo.Implementation, public?: false
   end
 
   @doc false

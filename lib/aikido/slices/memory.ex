@@ -5,9 +5,9 @@ defmodule Aikido.Slices.Memory do
 
   ## State shape
 
-  Declared by the embedded resource attributes. Explicit mounts initialize from
-  native defaults. When called with nil state, the first inbound `aikido.memory.*` signal creates a fresh
-  `%Aikido.Slices.Memory{}` via the relevant action.
+  Declared by the embedded resource attributes. Mounted slices are initialized
+  through their native create action before receiving signals. Reducers require
+  the initialized resource struct and retain native Ash type validation.
 
   ## Routes
 
@@ -15,18 +15,18 @@ defmodule Aikido.Slices.Memory do
   `Aikido.Slices.Memory`:
 
       # ensure / put / update / delete
-      route "aikido.memory.ensure", :ensure
-      route "aikido.memory.put_space", :put_space
-      route "aikido.memory.update_space", :update_space
-      route "aikido.memory.ensure_space", :ensure_space
-      route "aikido.memory.delete_space", :delete_space
+      route Aikido.Signals.Memory.Ensure, Aikido.Slices.Memory.Implementation
+      route Aikido.Signals.Memory.PutSpace, Aikido.Slices.Memory.Implementation
+      route Aikido.Signals.Memory.UpdateSpace, Aikido.Slices.Memory.Implementation
+      route Aikido.Signals.Memory.EnsureSpace, Aikido.Slices.Memory.Implementation
+      route Aikido.Signals.Memory.DeleteSpace, Aikido.Slices.Memory.Implementation
 
       # map space ops
-      route "aikido.memory.put_in_space", :put_in_space
-      route "aikido.memory.delete_from_space", :delete_from_space
+      route Aikido.Signals.Memory.PutInSpace, Aikido.Slices.Memory.Implementation
+      route Aikido.Signals.Memory.DeleteFromSpace, Aikido.Slices.Memory.Implementation
 
       # list space ops
-      route "aikido.memory.append_to_space", :append_to_space
+      route Aikido.Signals.Memory.AppendToSpace, Aikido.Slices.Memory.Implementation
 
   Mount with `slice :memory, Aikido.Slices.Memory` inside an agent resource.
 
@@ -88,95 +88,14 @@ defmodule Aikido.Slices.Memory do
         description: "Arbitrary metadata"
     end
 
-    route "aikido.memory.ensure", :ensure
-    route "aikido.memory.put_space", :put_space
-    route "aikido.memory.update_space", :update_space
-    route "aikido.memory.ensure_space", :ensure_space
-    route "aikido.memory.delete_space", :delete_space
-    route "aikido.memory.put_in_space", :put_in_space
-    route "aikido.memory.delete_from_space", :delete_from_space
-    route "aikido.memory.append_to_space", :append_to_space
-  end
-
-  actions do
-    action :append_to_space, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :space, :atom, description: "List space name.", allow_nil?: false
-      argument :item, :term, description: "Item to append.", allow_nil?: false
-      description "Append an item to a list space."
-      run {Aikido.Slices.Memory.Implementation, action: :append_to_space}
-    end
-
-    action :delete_from_space, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :space, :atom, description: "Map space name.", allow_nil?: false
-      argument :key, :term, description: "Key to remove.", allow_nil?: false
-      description "Delete a key from a map space."
-      run {Aikido.Slices.Memory.Implementation, action: :delete_from_space}
-    end
-
-    action :delete_space, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :space, :atom, description: "Space name to delete.", allow_nil?: false
-      description "Delete a non-reserved space."
-      run {Aikido.Slices.Memory.Implementation, action: :delete_space}
-    end
-
-    action :ensure, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :metadata, :map, description: "Optional metadata for new memory.", default: %{}
-      argument :id, :string, description: "Optional explicit memory id."
-      description "Initialize memory state if missing."
-      run {Aikido.Slices.Memory.Implementation, action: :ensure}
-    end
-
-    action :ensure_space, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :space, :atom, description: "Space name to ensure.", allow_nil?: false
-
-      argument :default, :union,
-        description: "Default data for the new space (map → kv, list → list).",
-        default: %Ash.Union{type: :kv, value: %{}},
-        constraints: [
-          types: [kv: [type: :map], list: [type: {:array, :term}]]
-        ]
-
-      description "Create a space with default data if missing."
-      run {Aikido.Slices.Memory.Implementation, action: :ensure_space}
-    end
-
-    action :put_in_space, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :space, :atom, description: "Map space name.", allow_nil?: false
-      argument :key, :term, description: "Key to set.", allow_nil?: false
-      argument :value, :term, description: "Value to associate with `key`.", allow_nil?: false
-      description "Set a key in a map space."
-      run {Aikido.Slices.Memory.Implementation, action: :put_in_space}
-    end
-
-    action :put_space, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :space, :atom, description: "Space name to set.", allow_nil?: false
-
-      argument :value, Aikido.Slices.Memory.Space,
-        description: "%Aikido.Slices.Memory.Space{} to install at the named key.",
-        allow_nil?: false
-
-      description "Store a space wholesale at the named key."
-      run {Aikido.Slices.Memory.Implementation, action: :put_space}
-    end
-
-    action :update_space, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :space, :atom, description: "Space name to update.", allow_nil?: false
-
-      argument :value, Aikido.Slices.Memory.Space,
-        description: "Replacement %Aikido.Slices.Memory.Space{} value.",
-        allow_nil?: false
-
-      description "Replace the value of an existing space."
-      run {Aikido.Slices.Memory.Implementation, action: :update_space}
-    end
+    route Aikido.Signals.Memory.Ensure, Aikido.Slices.Memory.Implementation
+    route Aikido.Signals.Memory.PutSpace, Aikido.Slices.Memory.Implementation
+    route Aikido.Signals.Memory.UpdateSpace, Aikido.Slices.Memory.Implementation
+    route Aikido.Signals.Memory.EnsureSpace, Aikido.Slices.Memory.Implementation
+    route Aikido.Signals.Memory.DeleteSpace, Aikido.Slices.Memory.Implementation
+    route Aikido.Signals.Memory.PutInSpace, Aikido.Slices.Memory.Implementation
+    route Aikido.Signals.Memory.DeleteFromSpace, Aikido.Slices.Memory.Implementation
+    route Aikido.Signals.Memory.AppendToSpace, Aikido.Slices.Memory.Implementation
   end
 
   alias Aikido.Slices.Memory.Space

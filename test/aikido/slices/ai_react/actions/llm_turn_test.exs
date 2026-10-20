@@ -5,7 +5,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
   alias ReqLLM.Context
 
   defp running_slice(opts \\ []) do
-    %{
+    AikidoTest.SliceState.new(Aikido.Slices.AiReact, %{
       status: :running,
       prepared_tools: {[], %{}},
       request_id: Keyword.get(opts, :request_id, "req_1"),
@@ -20,7 +20,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
       model: "anthropic:claude-haiku-4-5-20251001",
       tools: Keyword.get(opts, :tools, [:test_add]),
       llm_opts: []
-    }
+    })
   end
 
   defp signal(request_id, turn) do

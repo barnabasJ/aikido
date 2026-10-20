@@ -2,14 +2,14 @@ defmodule Aikido.Slices.Todo.Implementation do
   @moduledoc """
   Pure reducers for todo creation, status changes, removal and expiration.
 
-  The configured `:action` option selects the operation on `state` and `id`.
+  The native action name selects the operation on `state` and `id`.
   Returns updated items and revision with a change notification directive to the
   owning agent, plus a deadline directive for timed additions. Stale expirations
   and updates to completed items preserve state.
   """
   use Ash.Resource.Actions.Implementation
 
-  def run(input, [action: :remove], _context) do
+  def run(%{action: %{name: :todo_remove}} = input, _opts, _context) do
     state = input.arguments.state
     id = input.arguments.id
 
@@ -37,7 +37,16 @@ defmodule Aikido.Slices.Todo.Implementation do
     end
   end
 
-  def run(input, [action: action], _context) do
+  def run(input, _opts, _context) do
+    action =
+      case input.action.name do
+        :todo_add -> :add
+        :todo_activate -> :activate
+        :todo_complete -> :complete
+        :todo_block -> :block
+        :expire -> :expire
+      end
+
     state = input.arguments.state
     data = input.arguments
     item = Enum.find(state.items, &(&1.id == data.id))

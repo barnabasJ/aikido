@@ -6,7 +6,7 @@ defmodule Aikido.Slices.AiReact.FailedTest do
   end
 
   defp running_slice(request_id) do
-    %{
+    AikidoTest.SliceState.new(Aikido.Slices.AiReact, %{
       status: :running,
       request_id: request_id,
       context: nil,
@@ -20,7 +20,7 @@ defmodule Aikido.Slices.AiReact.FailedTest do
       model: nil,
       tools: [],
       llm_opts: []
-    }
+    })
   end
 
   test "settles a matching :running slice to :failed and stores the reason" do

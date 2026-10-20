@@ -58,14 +58,14 @@ defmodule Aikido.HooksTest do
   end
 
   defp state(hooks) do
-    %{
+    AikidoTest.SliceState.new(Aikido.Slices.AiReact, %{
       status: :running,
       request_id: "run",
       iteration: 0,
       context: ReqLLM.Context.new([ReqLLM.Context.user("hello")]),
       hooks: hooks,
       result: nil
-    }
+    })
   end
 
   defp complete(state, effect, result) do

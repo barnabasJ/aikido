@@ -2,7 +2,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
   @moduledoc """
   Pure reducers for the ReAct conversation and run lifecycle.
 
-  The configured `:action` option selects the command or result handler. Native
+  The native action name selects the command or result handler. Native
   arguments supply `state`, request correlation and payload; returned state tracks
   conversation, tools and hooks. Preparation, model, tool and hook work is returned
   as directives, with context handoff and todo completion planned between steps.
@@ -13,8 +13,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
   alias Aikido.Slices.AiReact.Directives.{LLMCall, PrepareTools, ToolExec}
 
   @impl true
-  def run(input, opts, context) do
-    case handle(input, opts, context) do
+  def run(input, _opts, context) do
+    case handle(input, input.action.name, context) do
       {:ok, %{state: state, directives: []}} = unchanged when state == input.arguments.state ->
         unchanged
 
@@ -83,13 +83,13 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
   defp prepare_tools(error), do: error
 
-  defp handle(input, [action: :handoff_completed], _context),
+  defp handle(input, :handoff_completed, _context),
     do: Aikido.AI.Handoff.complete(input.arguments.state, Map.delete(input.arguments, :state))
 
-  defp handle(input, [action: :handoff_failed], _context),
+  defp handle(input, :handoff_failed, _context),
     do: Aikido.AI.Handoff.fail(input.arguments.state, Map.delete(input.arguments, :state))
 
-  defp handle(input, [action: :tools_ready], _context) do
+  defp handle(input, :tools_ready, _context) do
     state = input.arguments.state
 
     if state.request_id == input.arguments.request_id && state.status == :setup &&
@@ -124,13 +124,13 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  defp handle(input, [action: :hook_completed], _context),
+  defp handle(input, :hook_completed, _context),
     do: Aikido.Hooks.completed(input.arguments.state, Map.delete(input.arguments, :state))
 
-  defp handle(input, [action: :hook_context], _context),
+  defp handle(input, :hook_context, _context),
     do: Aikido.Hooks.context(input.arguments.state, Map.delete(input.arguments, :state))
 
-  defp handle(input, [action: action], context) when action in [:message, :deliver] do
+  defp handle(input, action, context) when action in [:message, :deliver] do
     state = input.arguments.state
     scope = caller_scope(input)
 
@@ -142,7 +142,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  defp handle(input, [action: :handoff], _context) do
+  defp handle(input, :handoff, _context) do
     state = input.arguments.state
 
     if state.status in [:setup, :running, :waiting] do
@@ -154,7 +154,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  defp handle(input, [action: :todo_changed], _context) do
+  defp handle(input, :todo_changed, _context) do
     state = input.arguments.state
 
     if state.status == :waiting do
@@ -168,7 +168,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  defp handle(input, [action: :stream], _context) do
+  defp handle(input, :stream, _context) do
     data = input.arguments
     state = data.state
 
@@ -195,15 +195,15 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
   defp handle(
          %{arguments: %{state: %{hook_terminal: terminal}}} = input,
-         [action: action],
+         action,
          _context
        )
        when not is_nil(terminal) and action in [:llm_turn, :tool_result, :failed] do
     Aikido.Types.ActionResult.new(state: input.arguments.state)
   end
 
-  defp handle(input, [action: action] = opts, context) do
-    result = decide(input, opts, context)
+  defp handle(input, action, context) do
+    result = decide(input, action, context)
     result = if action == :ask, do: bind_scope(result, input), else: result
 
     result =
@@ -321,7 +321,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
   defp caller_scope(input),
     do: Map.merge(%{actor: nil, tenant: nil}, Map.take(input.context.aikido, [:actor, :tenant]))
 
-  defp decide(input, [action: :ask], _context) do
+  defp decide(input, :ask, _context) do
     data = Map.delete(input.arguments, :state)
     slice = input.arguments.state
 
@@ -332,7 +332,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  defp decide(input, [action: :cancel], _context) do
+  defp decide(input, :cancel, _context) do
     signal = input.context.aikido.signal
     slice = input.arguments.state
     requested = Map.get(signal.data, :request_id)
@@ -352,7 +352,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  defp decide(input, [action: :failed], _context) do
+  defp decide(input, :failed, _context) do
     reason = input.arguments[:reason]
     id = input.arguments[:request_id]
     slice = input.arguments.state
@@ -376,7 +376,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  defp decide(input, [action: :llm_turn], _context) do
+  defp decide(input, :llm_turn, _context) do
     response = input.arguments[:turn]
     turn = ReqLLM.Response.classify(response)
     request_id = input.arguments[:request_id]
@@ -412,7 +412,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     end
   end
 
-  defp decide(input, [action: :tool_result], _context) do
+  defp decide(input, :tool_result, _context) do
     data = Map.delete(input.arguments, :state)
     slice = input.arguments.state
 

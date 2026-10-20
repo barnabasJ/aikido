@@ -22,7 +22,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
   end
 
   defp idle_slice do
-    %{
+    AikidoTest.SliceState.new(Aikido.Slices.AiReact, %{
       status: :idle,
       request_id: nil,
       context: nil,
@@ -36,7 +36,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
       model: nil,
       tools: [],
       llm_opts: []
-    }
+    })
   end
 
   test "initialization and mount configuration enforce positive iteration budgets" do
@@ -161,16 +161,16 @@ defmodule Aikido.Slices.AiReact.AskTest do
              end)
   end
 
-  test "accepts the ask when the slice is nil (uninitialized)" do
-    {:ok, %Aikido.Types.ActionResult{state: %{status: :setup}, directives: [%PrepareTools{}]}} =
-      then(ask_signal(), fn signal ->
-        Aikido.Slices.AiReact
-        |> Ash.ActionInput.for_action(:ask, Map.put(signal.data || %{}, :state, nil),
-          context: %{aikido: Map.put(%{}, :signal, signal)},
-          skip_unknown_inputs: [:*]
-        )
-        |> Ash.run_action()
-      end)
+  test "requires initialized state before opening a run" do
+    input =
+      Ash.ActionInput.for_action(
+        Aikido.Slices.AiReact,
+        :ask,
+        Map.put(ask_signal().data, :state, nil)
+      )
+
+    refute input.valid?
+    assert Enum.any?(input.errors, &(&1.field == :state))
   end
 
   test "native module contracts accept loaded modules and reject unknown modules before setup" do

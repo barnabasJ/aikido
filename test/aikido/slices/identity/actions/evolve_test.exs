@@ -8,11 +8,15 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
   end
 
   describe("native evolve action") do
-    test "initializes identity when slice is nil" do
+    test "evolves initialized identity by zero without changing its age" do
+      identity = AikidoTest.SliceState.new(State, %{profile: %{age: 0}})
+
       assert {:ok, %Aikido.Types.ActionResult{state: %State{} = evolved, directives: []}} =
                then(sig(%{days: 0, years: 0}), fn signal ->
                  Aikido.Slices.Identity
-                 |> Ash.ActionInput.for_action(:evolve, Map.put(signal.data || %{}, :state, nil),
+                 |> Ash.ActionInput.for_action(
+                   :evolve,
+                   Map.put(signal.data || %{}, :state, identity),
                    context: %{aikido: Map.put(%{}, :signal, signal)},
                    skip_unknown_inputs: [:*]
                  )

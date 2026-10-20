@@ -2,13 +2,13 @@ defmodule Aikido.Slices.Thread.Implementation do
   @moduledoc """
   Pure reducers for thread initialization, entry append and clearing.
 
-  The configured `:action` option selects `:ensure`, `:append` or `:clear`.
+  The native action name selects `:ensure`, `:append` or `:clear`.
   Returns the next thread state without directives, using the input signal for
   timestamps and stable thread/entry identifiers.
   """
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, [action: :append], _context) do
+  def run(%{action: %{name: :append}} = input, _opts, _context) do
     %Ash.Union{value: entry} = input.arguments.entry
     slice = input.arguments.state
     thread = append_ensure_thread(slice, input)
@@ -20,7 +20,7 @@ defmodule Aikido.Slices.Thread.Implementation do
   end
 
   @impl true
-  def run(input, [action: :clear], _context) do
+  def run(%{action: %{name: :clear}} = input, _opts, _context) do
     slice = input.arguments.state
 
     case slice do
@@ -39,7 +39,7 @@ defmodule Aikido.Slices.Thread.Implementation do
   end
 
   @impl true
-  def run(input, [action: :ensure], _context) do
+  def run(%{action: %{name: :ensure}} = input, _opts, _context) do
     data = Map.delete(input.arguments, :state)
     slice = input.arguments.state
 

@@ -5,15 +5,15 @@ defmodule Aikido.Slices.Identity do
 
   ## State shape
 
-  Declared by the embedded resource attributes. Explicit mounts initialize from
-  native defaults. When called with nil state, the first inbound `aikido.identity.*` signal creates a fresh
-  `%Aikido.Slices.Identity{}` via the relevant action.
+  Declared by the embedded resource attributes. Mounted slices are initialized
+  through their native create action before receiving signals. Reducers require
+  the initialized resource struct and retain native Ash type validation.
 
   ## Routes
 
-      route "aikido.identity.ensure", :ensure
-      route "aikido.identity.evolve", :evolve
-      route "aikido.identity.update_profile", :update_profile
+      route Aikido.Signals.Identity.Ensure, Aikido.Slices.Identity.Implementation
+      route Aikido.Signals.Identity.Evolve, Aikido.Slices.Identity.Implementation
+      route Aikido.Signals.Identity.UpdateProfile, Aikido.Slices.Identity.Implementation
 
   Mount with `slice :identity, Aikido.Slices.Identity` inside an agent resource.
 
@@ -53,41 +53,9 @@ defmodule Aikido.Slices.Identity do
         description: "Last update timestamp (ms)"
     end
 
-    route "aikido.identity.ensure", :ensure
-    route "aikido.identity.evolve", :evolve
-    route "aikido.identity.update_profile", :update_profile
-  end
-
-  actions do
-    action :ensure, Aikido.Types.ActionResult do
-      argument :state, :term
-
-      argument :profile, :map,
-        description: "Initial profile map for new identities.",
-        default: %{age: nil}
-
-      description "Initialize identity state if missing."
-      run {Aikido.Slices.Identity.Implementation, action: :ensure}
-    end
-
-    action :evolve, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :days, :integer, description: "Days of simulated time to add", default: 0
-      argument :years, :integer, description: "Years of simulated time to add", default: 0
-      description "Evolve agent identity over simulated time"
-      run {Aikido.Slices.Identity.Implementation, action: :evolve}
-    end
-
-    action :update_profile, Aikido.Types.ActionResult do
-      argument :state, :term
-
-      argument :profile, :map,
-        description: "Partial profile map to merge into the identity.",
-        allow_nil?: false
-
-      description "Merge a partial profile map into the identity profile."
-      run {Aikido.Slices.Identity.Implementation, action: :update_profile}
-    end
+    route Aikido.Signals.Identity.Ensure, Aikido.Slices.Identity.Implementation
+    route Aikido.Signals.Identity.Evolve, Aikido.Slices.Identity.Implementation
+    route Aikido.Signals.Identity.UpdateProfile, Aikido.Slices.Identity.Implementation
   end
 
   @type t :: map()
