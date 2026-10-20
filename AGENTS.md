@@ -27,7 +27,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 ## Commands
 - `mix test` (full suite; no default tag exclusions)
 - `mix test --cover` (coverage gate)
-- `mix q` or `mix quality` (`format --check-formatted`, `compile --warnings-as-errors`, `credo`, `dialyzer`)
+- `mix q` or `mix quality` (`format --check-formatted`, `compile --warnings-as-errors`, `credo`, `argus --all`, `dialyzer`)
 - `mix docs` (local docs)
 
 ## Architecture Snapshot

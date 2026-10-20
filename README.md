@@ -174,6 +174,11 @@ mix q
 mix docs
 ```
 
+`mix q` includes all Argus BEAM analyses alongside formatting, compilation,
+Credo and Dialyzer. Run `mix argus --all` separately to inspect its findings.
+The first run downloads verified analysis engines; subsequent runs reuse the
+local cache. CI caches these engines with the build dependencies.
+
 See [Contributing](CONTRIBUTING.md) and [Changelog](CHANGELOG.md).
 
 Aikido is derived from Jido and is developed independently. Original copyright

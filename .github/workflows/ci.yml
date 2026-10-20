@@ -31,6 +31,7 @@ jobs:
           path: |
             deps
             _build
+            ~/.cache/argus/flowlog
           key: ${{ runner.os }}-otp28-elixir${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
       - run: mix deps.get
       - run: mix test

@@ -38,6 +38,27 @@ defmodule Aikido.MixProject do
       # Dialyzer
       dialyzer: [
         plt_add_apps: [:mix]
+      ],
+      argus: [
+        ignore: [
+          findings: [
+            # DurableServer owns the process, traps exits and delegates termination.
+            {:shutdown, {Aikido.AgentServer, :terminate, 2}},
+            # Each durable identity has its own PID; this is not one shared server.
+            {:blocking, {Aikido.AgentServer, :handle_call, 3}},
+            # These finite names come from compiled Spark declarations, not runtime input.
+            # Exact generated anchors fail closed if compiler output changes.
+            {:unsafe_input,
+             {Aikido.Ash.Transformers.Agent, :"-resolve_local_actions/3-fun-1-", 3}},
+            {:unsafe_input, {Aikido.Ash.Transformers.Domain, :"-register/2-fun-1-", 2}},
+            # Reads our trusted, compressed backend snapshots, including native callbacks.
+            {:unsafe_input, {Aikido.Durable.AgentServer, :load_state, 2}},
+            # Task-capacity fallback kills only the already retired scheduler PID.
+            {:failure, {Aikido.Directives.CronCancel, :shutdown_io, 3}},
+            # Flushes only a queued worker EXIT after unlink, with a zero timeout.
+            {:blocking, {Aikido.Scheduler.Job, :handle_info, 2}}
+          ]
+        ]
       ]
     ]
   end
@@ -158,6 +179,7 @@ defmodule Aikido.MixProject do
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test]},
+      {:argus_beam, "~> 0.24.0", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.21", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
@@ -198,6 +220,7 @@ defmodule Aikido.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "credo --min-priority high",
+        "argus --all --fail-above 0",
         "dialyzer"
       ]
     ]
