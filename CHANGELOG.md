@@ -6,6 +6,22 @@
 
 ### Changed
 
+- Flatten team send arguments to native `member`, `type` and `payload` fields.
+  Share ownership traversal and simplify topological ordering; preserve explicit
+  nil slice configuration and explicit false FSM initialization values.
+- Restrict persisted Lua request callbacks to portable external function captures
+  through Ash's `mfa: true` constraint. Pass per-run callback configuration in
+  event metadata. Preserve caller scope and tracing in Lua-emitted signals;
+  finish model responses with no executable tool calls without stranding a run.
+- Retire cron ownership before supervised shutdown, clean replacement/restart
+  bookkeeping consistently, and preserve replacement jobs when old work completes.
+  Isolate raising observers and blocking dispatch adapters from committed state;
+  retain directive debug events and restore team metadata in the right partition.
+- Reconcile example subscriptions by path and process incarnation, remove unused
+  test fixtures and the Mock dependency, and align contributor instructions and
+  logger metadata with the current implementation.
+
+
 - Remove the `Aikido.Ash` forwarding facade. Invoke lifecycle and signal actions
   through application domain interfaces or native `Ash.ActionInput` and
   `Ash.run_action`; update example callers and tests accordingly.
