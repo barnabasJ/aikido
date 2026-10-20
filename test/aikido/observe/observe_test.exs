@@ -7,6 +7,15 @@ defmodule AikidoTest.ObserveTest do
 
   setup do
     previous_level = Logger.level()
+    previous_observability = Application.get_env(:aikido, :observability)
+    Application.delete_env(:aikido, :observability)
+
+    on_exit(fn ->
+      if previous_observability,
+        do: Application.put_env(:aikido, :observability, previous_observability),
+        else: Application.delete_env(:aikido, :observability)
+    end)
+
     Logger.configure(level: :debug)
     on_exit(fn -> Logger.configure(level: previous_level) end)
     :ok
@@ -216,7 +225,7 @@ defmodule AikidoTest.ObserveTest do
       assert span_ctx.metadata == %{meta: "data"}
       assert is_integer(span_ctx.start_time)
       assert is_integer(span_ctx.start_system_time)
-      assert span_ctx.tracer_module == Aikido.Observe.NoopTracer
+      assert span_ctx.tracer_module == nil
     end
   end
 
@@ -465,68 +474,44 @@ defmodule AikidoTest.ObserveTest do
     end
   end
 
-  describe("Aikido.Observe.NoopTracer") do
-    test "span_start/2 returns nil" do
-      result = Aikido.Observe.NoopTracer.span_start([:aikido, :test], %{key: "value"})
-      assert result == nil
-    end
-
-    test "span_stop/2 returns :ok" do
-      result = Aikido.Observe.NoopTracer.span_stop(nil, %{duration: 1000})
-      assert result == :ok
-    end
-
-    test "span_exception/4 returns :ok" do
-      result =
-        Aikido.Observe.NoopTracer.span_exception(nil, :error, %RuntimeError{message: "error"}, [])
-
-      assert result == :ok
-    end
-
-    test "implements Aikido.Observe.Tracer behaviour" do
-      behaviours = Aikido.Observe.NoopTracer.__info__(:attributes)[:behaviour]
-      assert Aikido.Observe.Tracer in behaviours
-    end
-  end
-
-  describe("custom tracer integration") do
+  describe "native Ash tracer integration" do
     setup do
-      original_config = Application.get_env(:aikido, :observability)
-
-      on_exit(fn ->
-        if original_config do
-          Application.put_env(:aikido, :observability, original_config)
-        else
-          Application.delete_env(:aikido, :observability)
-        end
-      end)
-
+      start_supervised!(AikidoTest.Support.TestTracer)
+      Application.put_env(:aikido, :observability, tracer: AikidoTest.Support.TestTracer)
       :ok
     end
 
-    test "uses configured tracer for span operations" do
-      defmodule Elixir.AikidoTest.ObserveTest.TestTracer do
-        @behaviour Aikido.Observe.Tracer
-        def span_start(event_prefix, metadata) do
-          send(self(), {:tracer_start, event_prefix, metadata})
-          :test_ctx
-        end
+    test "executes work once and retains span context across nested operations" do
+      tracer = AikidoTest.Support.TestTracer
 
-        def span_stop(tracer_ctx, measurements) do
-          send(self(), {:tracer_stop, tracer_ctx, measurements})
-          :ok
-        end
+      assert :result =
+               Aikido.Observe.with_span([:aikido, :outer], %{test: true}, fn ->
+                 outer = tracer.get_span_context()
+                 assert is_reference(outer)
 
-        def span_exception(tracer_ctx, kind, reason, stacktrace) do
-          send(self(), {:tracer_exception, tracer_ctx, kind, reason, stacktrace})
-          :ok
-        end
+                 Aikido.Observe.with_span([:aikido, :inner], %{}, fn ->
+                   refute tracer.get_span_context() == outer
+                 end)
+
+                 assert tracer.get_span_context() == outer
+                 :result
+               end)
+
+      assert tracer.get_span_context() == nil
+      spans = tracer.get_spans()
+      assert Enum.count(spans, &match?({:stop, _}, &1)) == 2
+      assert Enum.any?(spans, &match?({:start, _, {:custom, :aikido}, "aikido.outer"}, &1))
+    end
+
+    test "reports errors and preserves the original exception" do
+      assert_raise RuntimeError, "failure", fn ->
+        Aikido.Observe.with_span([:aikido, :failed], %{}, fn -> raise "failure" end)
       end
 
-      Application.put_env(:aikido, :observability, tracer: AikidoTest.ObserveTest.TestTracer)
-      Aikido.Observe.with_span([:aikido, :custom], %{test: true}, fn -> :result end)
-      assert_receive {:tracer_start, [:aikido, :custom], %{test: true}}
-      assert_receive {:tracer_stop, :test_ctx, %{duration: _}}
+      assert Enum.any?(
+               AikidoTest.Support.TestTracer.get_spans(),
+               &match?({:exception, _, %RuntimeError{}, _}, &1)
+             )
     end
   end
 end

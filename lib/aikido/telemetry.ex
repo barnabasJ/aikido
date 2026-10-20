@@ -61,7 +61,6 @@ defmodule Aikido.Telemetry do
   - `[:aikido, :agent_server, :cron, :cancel]` - Dynamic cron cancelled
   - `[:aikido, :agent_server, :cron, :restart_scheduled]` - Dynamic cron restart scheduled
   - `[:aikido, :agent_server, :cron, :restart_succeeded]` - Dynamic cron restart completed
-  - `[:aikido, :agent_server, :cron, :persist_failure]` - Cron persistence failed
 
   """
 
@@ -159,8 +158,7 @@ defmodule Aikido.Telemetry do
       [:aikido, :agent_server, :cron, :register],
       [:aikido, :agent_server, :cron, :cancel],
       [:aikido, :agent_server, :cron, :restart_scheduled],
-      [:aikido, :agent_server, :cron, :restart_succeeded],
-      [:aikido, :agent_server, :cron, :persist_failure]
+      [:aikido, :agent_server, :cron, :restart_succeeded]
     ]
   end
 
@@ -314,18 +312,6 @@ defmodule Aikido.Telemetry do
       ) do
     Logger.debug(
       "[cron.restart_succeeded] job_id=#{inspect(metadata[:job_id])} cron=#{inspect(metadata[:cron_expression])}",
-      agent_id: metadata[:agent_id]
-    )
-  end
-
-  def handle_event(
-        [:aikido, :agent_server, :cron, :persist_failure],
-        _measurements,
-        metadata,
-        _config
-      ) do
-    Logger.warning(
-      "[cron.persist_failure] job_id=#{inspect(metadata[:job_id])} reason=#{Formatter.safe_inspect(metadata[:reason], 200)}",
       agent_id: metadata[:agent_id]
     )
   end

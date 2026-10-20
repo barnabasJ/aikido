@@ -29,6 +29,7 @@ defmodule Aikido.Observe.Log do
       Log.log(:info, "Agent completed", agent_id: agent.id)
   """
 
+  require Logger
   @type level :: Logger.level()
 
   @doc """
@@ -46,7 +47,7 @@ defmodule Aikido.Observe.Log do
   Conditionally logs a message based on the observability threshold.
 
   The message is logged only if the threshold level allows it.
-  Uses `Aikido.Util.cond_log/4` under the hood.
+  Uses the configured threshold before calling Logger.
 
   ## Parameters
 
@@ -66,6 +67,10 @@ defmodule Aikido.Observe.Log do
   def log(level, message, metadata \\ []) do
     instance = Keyword.get(metadata, :aikido_instance)
     threshold = Aikido.Observe.Config.observe_log_level(instance)
-    Aikido.Util.cond_log(threshold, level, message, metadata)
+
+    if Logger.compare_levels(threshold, level) in [:lt, :eq],
+      do: Logger.log(level, message, metadata)
+
+    :ok
   end
 end

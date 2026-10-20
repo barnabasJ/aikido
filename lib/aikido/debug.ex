@@ -28,14 +28,12 @@ defmodule Aikido.Debug do
 
   @on_overrides %{
     telemetry_log_level: :debug,
-    telemetry_log_args: :keys_only,
     observe_log_level: :debug,
     observe_debug_events: :minimal
   }
 
   @verbose_overrides %{
     telemetry_log_level: :trace,
-    telemetry_log_args: :full,
     observe_log_level: :debug,
     observe_debug_events: :all
   }

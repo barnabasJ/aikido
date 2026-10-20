@@ -25,10 +25,8 @@ defmodule Aikido.Observe.Config do
   }
 
   @telemetry_log_levels [:trace, :debug, :info, :warning, :error]
-  @telemetry_log_args_modes [:keys_only, :full, :none]
   @debug_events_modes [:off, :minimal, :all]
   @observe_log_levels Logger.levels()
-  @tracer_failure_modes [:warn, :strict]
 
   # --- Telemetry settings ---
 
@@ -47,23 +45,6 @@ defmodule Aikido.Observe.Config do
       global_telemetry(:log_level, Defaults.telemetry_log_level())
     end
     |> normalize_telemetry_log_level()
-  end
-
-  @doc "Returns the argument logging mode for the given instance."
-  @spec telemetry_log_args(instance()) :: :keys_only | :full | :none
-  def telemetry_log_args(instance \\ nil)
-
-  def telemetry_log_args(nil) do
-    global_telemetry(:log_args, Defaults.telemetry_log_args())
-    |> normalize_telemetry_log_args()
-  end
-
-  def telemetry_log_args(instance) do
-    with nil <- Aikido.Debug.override(instance, :telemetry_log_args),
-         nil <- instance_telemetry(instance, :log_args) do
-      global_telemetry(:log_args, Defaults.telemetry_log_args())
-    end
-    |> normalize_telemetry_log_args()
   end
 
   @doc "Returns the slow signal threshold in milliseconds."
@@ -219,23 +200,6 @@ defmodule Aikido.Observe.Config do
     |> normalize_tracer()
   end
 
-  @doc "Returns tracer callback failure handling mode."
-  @spec tracer_failure_mode(instance()) :: :warn | :strict
-  def tracer_failure_mode(instance \\ nil)
-
-  def tracer_failure_mode(nil) do
-    global_observability(:tracer_failure_mode, Defaults.tracer_failure_mode())
-    |> normalize_tracer_failure_mode()
-  end
-
-  def tracer_failure_mode(instance) do
-    with nil <- Aikido.Debug.override(instance, :tracer_failure_mode),
-         nil <- instance_observability(instance, :tracer_failure_mode) do
-      global_observability(:tracer_failure_mode, Defaults.tracer_failure_mode())
-    end
-    |> normalize_tracer_failure_mode()
-  end
-
   # --- Debug buffer settings ---
 
   @doc "Returns the maximum number of debug events to store."
@@ -280,9 +244,6 @@ defmodule Aikido.Observe.Config do
   defp normalize_telemetry_log_level(level) when level in @telemetry_log_levels, do: level
   defp normalize_telemetry_log_level(_), do: Defaults.telemetry_log_level()
 
-  defp normalize_telemetry_log_args(mode) when mode in @telemetry_log_args_modes, do: mode
-  defp normalize_telemetry_log_args(_), do: Defaults.telemetry_log_args()
-
   defp normalize_observe_log_level(level) when level in @observe_log_levels, do: level
   defp normalize_observe_log_level(_), do: Defaults.observe_log_level()
 
@@ -301,24 +262,9 @@ defmodule Aikido.Observe.Config do
   defp normalize_boolean(true), do: true
   defp normalize_boolean(_), do: false
 
-  defp normalize_tracer_failure_mode(mode) when mode in @tracer_failure_modes, do: mode
-  defp normalize_tracer_failure_mode(_), do: Defaults.tracer_failure_mode()
-
-  defp normalize_tracer(module) when is_atom(module) do
-    case Code.ensure_loaded(module) do
-      {:module, ^module} ->
-        if function_exported?(module, :span_start, 2) and
-             function_exported?(module, :span_stop, 2) and
-             function_exported?(module, :span_exception, 4) do
-          module
-        else
-          Defaults.tracer()
-        end
-
-      _ ->
-        Defaults.tracer()
-    end
+  defp normalize_tracer(module) when is_atom(module) and not is_nil(module) do
+    if Spark.implements_behaviour?(module, Ash.Tracer), do: module
   end
 
-  defp normalize_tracer(_), do: Defaults.tracer()
+  defp normalize_tracer(_), do: nil
 end

@@ -10,7 +10,7 @@ defmodule Aikido.Observe do
   - Automatic telemetry event emission (start/stop/exception)
   - Duration measurement for all spans (nanoseconds)
   - Automatic correlation ID enrichment from `Aikido.Tracing.Context`
-  - Pluggable tracer callbacks via `Aikido.Observe.Tracer`
+  - Pluggable tracer callbacks via `Ash.Tracer`
   - Threshold-based logging via `Aikido.Observe.Log`
 
   ## Correlation Tracing Integration
@@ -29,13 +29,9 @@ defmodule Aikido.Observe do
 
       config :aikido, :observability,
         log_level: :info,
-        tracer: Aikido.Observe.NoopTracer,
-        tracer_failure_mode: :warn
+        tracer: MyApp.AshTracer
 
-  `:tracer_failure_mode` controls tracer callback errors:
-
-  - `:warn` (default) isolates tracer failures and logs warnings
-  - `:strict` raises immediately on tracer callback failures
+  Tracers implement `Ash.Tracer`. With no tracer configured, only telemetry is emitted.
 
   ## Usage
 
@@ -45,14 +41,6 @@ defmodule Aikido.Observe do
         # Your code here
         {:ok, result}
       end)
-
-  If the configured tracer implements optional `with_span_scope/3`, `with_span/3`
-  uses that callback for sync span scoping. Adapter contract for `with_span_scope/3`:
-
-  - Call the provided function in the caller process
-  - Call the provided function exactly once
-  - Preserve the function return value
-  - Preserve exception/throw/exit semantics
 
   ### Asynchronous work (Tasks)
 
@@ -104,7 +92,6 @@ defmodule Aikido.Observe do
   @type metadata :: map()
   @type measurements :: map()
   @type span_ctx :: SpanCtx.t()
-  @type tracer_failure_mode :: :warn | :strict
 
   @doc """
   Wraps synchronous work with telemetry span events.
@@ -131,14 +118,20 @@ defmodule Aikido.Observe do
   @spec with_span(event_prefix(), metadata(), (-> result)) :: result when result: term()
   def with_span(event_prefix, metadata, fun)
       when is_list(event_prefix) and is_map(metadata) and is_function(fun, 0) do
-    enriched_metadata = enrich_with_correlation(metadata)
-    tracer_module = tracer(enriched_metadata)
+    span = start_span(event_prefix, metadata)
+    previous = Ash.Tracer.get_span_context(span.tracer_module)
+    Ash.Tracer.set_span_context(span.tracer_module, span.tracer_ctx)
 
-    if function_exported?(tracer_module, :with_span_scope, 3) do
-      span_ctx = init_span_ctx(event_prefix, enriched_metadata, tracer_module)
-      with_span_scoped(span_ctx, fun)
-    else
-      with_span_unscoped(event_prefix, metadata, fun)
+    try do
+      result = fun.()
+      finish_span(span)
+      result
+    catch
+      kind, reason ->
+        finish_span_error(span, kind, reason, __STACKTRACE__)
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    after
+      Ash.Tracer.set_span_context(span.tracer_module, previous)
     end
   end
 
@@ -168,18 +161,16 @@ defmodule Aikido.Observe do
   """
   @spec start_span(event_prefix(), metadata()) :: span_ctx()
   def start_span(event_prefix, metadata) when is_list(event_prefix) and is_map(metadata) do
-    %SpanCtx{} = span_ctx = init_span_ctx(event_prefix, metadata)
+    span = init_span_ctx(event_prefix, metadata)
+    previous = Ash.Tracer.get_span_context(span.tracer_module)
 
-    tracer_ctx =
-      invoke_tracer_callback(
-        span_ctx,
-        :span_start,
-        [event_prefix, span_ctx.metadata],
-        nil,
-        "span_start/2"
-      )
-
-    %SpanCtx{span_ctx | tracer_ctx: tracer_ctx}
+    try do
+      Ash.Tracer.start_span(span.tracer_module, {:custom, :aikido}, Enum.join(event_prefix, "."))
+      Ash.Tracer.set_metadata(span.tracer_module, {:custom, :aikido}, span.metadata)
+      %{span | tracer_ctx: Ash.Tracer.get_span_context(span.tracer_module)}
+    after
+      Ash.Tracer.set_span_context(span.tracer_module, previous)
+    end
   end
 
   @doc """
@@ -200,13 +191,10 @@ defmodule Aikido.Observe do
   def finish_span(%SpanCtx{} = span_ctx, extra_measurements) when is_map(extra_measurements) do
     measurements = emit_stop_event(span_ctx, extra_measurements)
 
-    invoke_tracer_callback(
-      span_ctx,
-      :span_stop,
-      [span_ctx.tracer_ctx, measurements],
-      :ok,
-      "span_stop/2"
-    )
+    with_tracer_context(span_ctx, fn ->
+      Ash.Tracer.set_metadata(span_ctx.tracer_module, {:custom, :aikido}, measurements)
+      Ash.Tracer.stop_span(span_ctx.tracer_module)
+    end)
 
     :ok
   end
@@ -230,14 +218,15 @@ defmodule Aikido.Observe do
   """
   @spec finish_span_error(span_ctx(), atom(), term(), list()) :: :ok
   def finish_span_error(%SpanCtx{} = span_ctx, kind, reason, stacktrace) do
-    invoke_tracer_callback(
-      span_ctx,
-      :span_exception,
-      [span_ctx.tracer_ctx, kind, reason, stacktrace],
-      :ok,
-      "span_exception/4",
-      fn -> emit_exception_event(span_ctx, kind, reason, stacktrace) end
-    )
+    emit_exception_event(span_ctx, kind, reason, stacktrace)
+
+    with_tracer_context(span_ctx, fn ->
+      Ash.Tracer.set_error(span_ctx.tracer_module, Exception.normalize(kind, reason, stacktrace),
+        stacktrace: stacktrace
+      )
+
+      Ash.Tracer.stop_span(span_ctx.tracer_module)
+    end)
 
     :ok
   end
@@ -389,224 +378,9 @@ defmodule Aikido.Observe do
     end
   end
 
-  defp with_span_unscoped(event_prefix, metadata, fun) do
-    span_ctx = start_span(event_prefix, metadata)
-
-    try do
-      result = fun.()
-      finish_span(span_ctx)
-      result
-    rescue
-      e ->
-        finish_span_error(span_ctx, :error, e, __STACKTRACE__)
-        reraise e, __STACKTRACE__
-    catch
-      kind, reason ->
-        finish_span_error(span_ctx, kind, reason, __STACKTRACE__)
-        :erlang.raise(kind, reason, __STACKTRACE__)
-    end
-  end
-
-  defp with_span_scoped(%SpanCtx{} = span_ctx, fun) do
-    key = {__MODULE__, :scoped_guard, make_ref()}
-    wrapped_fun = scoped_wrapped_fun(fun, span_ctx, key, self())
-
-    Process.put(key, %{count: 0, outcome: nil})
-
-    try do
-      tracer_result =
-        invoke_scoped_callback(span_ctx, key, wrapped_fun, fn ->
-          span_ctx.tracer_module.with_span_scope(
-            span_ctx.event_prefix,
-            span_ctx.metadata,
-            wrapped_fun
-          )
-        end)
-
-      resolve_scoped_callback_result(span_ctx, key, tracer_result, wrapped_fun)
-    after
-      Process.delete(key)
-    end
-  end
-
-  defp invoke_scoped_callback(%SpanCtx{} = span_ctx, key, wrapped_fun, callback_fun) do
-    callback_fun.()
-  rescue
-    e ->
-      handle_scoped_callback_failure(span_ctx, key, {:error, e, __STACKTRACE__}, wrapped_fun)
-  catch
-    kind, reason ->
-      handle_scoped_callback_failure(span_ctx, key, {kind, reason, __STACKTRACE__}, wrapped_fun)
-  end
-
-  defp handle_scoped_callback_failure(%SpanCtx{} = span_ctx, key, failure, wrapped_fun) do
-    %{outcome: outcome} = scoped_state(key)
-
-    case outcome do
-      {:raised, kind, reason, stacktrace} ->
-        :erlang.raise(kind, reason, stacktrace)
-
-      {:ok, result} ->
-        case tracer_failure_mode(span_ctx.metadata) do
-          :warn ->
-            log_tracer_warning(span_ctx, "with_span_scope/3", failure)
-            result
-
-          :strict ->
-            raise_tracer_failure(span_ctx, "with_span_scope/3", failure)
-        end
-
-      nil ->
-        case tracer_failure_mode(span_ctx.metadata) do
-          :warn ->
-            log_tracer_warning(span_ctx, "with_span_scope/3", failure)
-            wrapped_fun.()
-
-          :strict ->
-            raise_tracer_failure(span_ctx, "with_span_scope/3", failure)
-        end
-    end
-  end
-
-  defp resolve_scoped_callback_result(%SpanCtx{} = span_ctx, key, tracer_result, wrapped_fun) do
-    %{count: count, outcome: outcome} = scoped_state(key)
-
-    case outcome do
-      nil ->
-        handle_scoped_missing_invocation(span_ctx, wrapped_fun)
-
-      {:ok, result} ->
-        handle_scoped_success_result(span_ctx, tracer_result, result, count)
-
-      {:raised, kind, reason, stacktrace} ->
-        handle_scoped_raised_result(span_ctx, tracer_result, count)
-        :erlang.raise(kind, reason, stacktrace)
-    end
-  end
-
-  defp handle_scoped_missing_invocation(%SpanCtx{} = span_ctx, wrapped_fun) do
-    message = "did not invoke wrapped function"
-
-    case tracer_failure_mode(span_ctx.metadata) do
-      :warn ->
-        log_scoped_contract_warning(span_ctx, message)
-        wrapped_fun.()
-
-      :strict ->
-        raise_scoped_contract_violation(span_ctx, message)
-    end
-  end
-
-  defp handle_scoped_success_result(%SpanCtx{} = span_ctx, tracer_result, result, count) do
-    has_violation = false
-
-    has_violation =
-      if count > 1 do
-        handle_scoped_violation(span_ctx, "invoked wrapped function more than once")
-        true
-      else
-        has_violation
-      end
-
-    has_violation =
-      if tracer_result !== result do
-        handle_scoped_violation(span_ctx, "did not preserve wrapped function return value")
-        true
-      else
-        has_violation
-      end
-
-    if has_violation and tracer_failure_mode(span_ctx.metadata) == :strict do
-      raise_scoped_contract_violation(
-        span_ctx,
-        "strict mode rejected scoped callback contract violations"
-      )
-    end
-
-    result
-  end
-
-  defp handle_scoped_raised_result(%SpanCtx{} = span_ctx, _tracer_result, count) do
-    if count > 1 do
-      log_scoped_contract_warning(span_ctx, "invoked wrapped function more than once")
-    end
-
-    log_scoped_contract_warning(span_ctx, "swallowed wrapped function exception")
-  end
-
-  defp handle_scoped_violation(%SpanCtx{} = span_ctx, message) do
-    case tracer_failure_mode(span_ctx.metadata) do
-      :warn ->
-        log_scoped_contract_warning(span_ctx, message)
-
-      :strict ->
-        :ok
-    end
-  end
-
-  defp scoped_wrapped_fun(fun, span_ctx, key, owner_pid) do
-    fn ->
-      if self() != owner_pid do
-        raise RuntimeError,
-              "with_span_scope/3 must execute wrapped function in caller process " <>
-                "(owner=#{inspect(owner_pid)}, caller=#{inspect(self())})"
-      else
-        state = scoped_state(key)
-
-        case state.count do
-          0 ->
-            Process.put(key, %{count: 1, outcome: nil})
-            execute_scoped_fun(fun, span_ctx, key)
-
-          count when is_integer(count) and count > 0 ->
-            Process.put(key, %{state | count: count + 1})
-            replay_scoped_outcome(state.outcome)
-        end
-      end
-    end
-  end
-
-  defp execute_scoped_fun(fun, span_ctx, key) do
-    result = fun.()
-    emit_stop_event(span_ctx)
-    Process.put(key, %{count: 1, outcome: {:ok, result}})
-    result
-  rescue
-    e ->
-      stacktrace = __STACKTRACE__
-      emit_exception_event(span_ctx, :error, e, stacktrace)
-      Process.put(key, %{count: 1, outcome: {:raised, :error, e, stacktrace}})
-      reraise e, stacktrace
-  catch
-    kind, reason ->
-      stacktrace = __STACKTRACE__
-      emit_exception_event(span_ctx, kind, reason, stacktrace)
-      Process.put(key, %{count: 1, outcome: {:raised, kind, reason, stacktrace}})
-      :erlang.raise(kind, reason, stacktrace)
-  end
-
-  defp replay_scoped_outcome({:ok, result}), do: result
-
-  defp replay_scoped_outcome({:raised, kind, reason, stacktrace}) do
-    :erlang.raise(kind, reason, stacktrace)
-  end
-
-  defp replay_scoped_outcome(_), do: nil
-
-  defp scoped_state(key) do
-    Process.get(key, %{count: 0, outcome: nil})
-  end
-
-  defp init_span_ctx(event_prefix, metadata, tracer_module \\ nil)
-
-  defp init_span_ctx(event_prefix, metadata, nil) do
-    enriched_metadata = enrich_with_correlation(metadata)
-    tracer_module = tracer(enriched_metadata)
-    init_span_ctx(event_prefix, enriched_metadata, tracer_module)
-  end
-
-  defp init_span_ctx(event_prefix, metadata, tracer_module)
-       when is_list(event_prefix) and is_map(metadata) and is_atom(tracer_module) do
+  defp init_span_ctx(event_prefix, metadata) do
+    metadata = enrich_with_correlation(metadata)
+    tracer_module = tracer(metadata)
     start_time = System.monotonic_time(:nanosecond)
     start_system_time = System.system_time(:nanosecond)
 
@@ -626,7 +400,7 @@ defmodule Aikido.Observe do
     }
   end
 
-  defp emit_stop_event(%SpanCtx{} = span_ctx, extra_measurements \\ %{}) do
+  defp emit_stop_event(%SpanCtx{} = span_ctx, extra_measurements) do
     duration = System.monotonic_time(:nanosecond) - span_ctx.start_time
     measurements = Map.merge(%{duration: duration}, extra_measurements)
 
@@ -656,85 +430,20 @@ defmodule Aikido.Observe do
     )
   end
 
-  defp invoke_tracer_callback(
-         %SpanCtx{} = span_ctx,
-         callback,
-         args,
-         fallback,
-         callback_name,
-         before_fun \\ nil
-       ) do
-    if is_function(before_fun, 0) do
-      before_fun.()
-    end
+  defp with_tracer_context(span, fun) do
+    previous = Ash.Tracer.get_span_context(span.tracer_module)
+    Ash.Tracer.set_span_context(span.tracer_module, span.tracer_ctx)
 
     try do
-      apply(span_ctx.tracer_module || tracer(span_ctx.metadata), callback, args)
-    rescue
-      e ->
-        handle_tracer_failure(span_ctx, callback_name, {:error, e, __STACKTRACE__}, fallback)
-    catch
-      kind, reason ->
-        handle_tracer_failure(span_ctx, callback_name, {kind, reason, __STACKTRACE__}, fallback)
+      fun.()
+    after
+      Ash.Tracer.set_span_context(span.tracer_module, previous)
     end
   end
-
-  defp handle_tracer_failure(%SpanCtx{} = span_ctx, callback_name, failure, fallback) do
-    case tracer_failure_mode(span_ctx.metadata) do
-      :warn ->
-        log_tracer_warning(span_ctx, callback_name, failure)
-        fallback
-
-      :strict ->
-        raise_tracer_failure(span_ctx, callback_name, failure)
-    end
-  end
-
-  defp log_tracer_warning(%SpanCtx{} = span_ctx, callback_name, failure) do
-    Logger.warning(
-      "Aikido.Observe tracer #{callback_name} failed " <>
-        "(tracer=#{inspect(span_ctx.tracer_module || tracer(span_ctx.metadata))}, " <>
-        "event_prefix=#{inspect(span_ctx.event_prefix)}, " <>
-        "failure_mode=#{tracer_failure_mode(span_ctx.metadata)}): #{format_tracer_failure(failure)}"
-    )
-  end
-
-  defp log_scoped_contract_warning(%SpanCtx{} = span_ctx, message) do
-    Logger.warning(
-      "Aikido.Observe tracer with_span_scope/3 contract violation " <>
-        "(tracer=#{inspect(span_ctx.tracer_module)}, " <>
-        "event_prefix=#{inspect(span_ctx.event_prefix)}, " <>
-        "failure_mode=#{tracer_failure_mode(span_ctx.metadata)}): #{message}"
-    )
-  end
-
-  defp raise_tracer_failure(%SpanCtx{} = span_ctx, callback_name, failure) do
-    raise RuntimeError,
-          "Aikido.Observe tracer #{callback_name} failed " <>
-            "(tracer=#{inspect(span_ctx.tracer_module || tracer(span_ctx.metadata))}, " <>
-            "event_prefix=#{inspect(span_ctx.event_prefix)}, " <>
-            "failure_mode=#{tracer_failure_mode(span_ctx.metadata)}): #{format_tracer_failure(failure)}"
-  end
-
-  defp raise_scoped_contract_violation(%SpanCtx{} = span_ctx, message) do
-    raise RuntimeError,
-          "Aikido.Observe tracer with_span_scope/3 contract violation " <>
-            "(tracer=#{inspect(span_ctx.tracer_module)}, " <>
-            "event_prefix=#{inspect(span_ctx.event_prefix)}, " <>
-            "failure_mode=#{tracer_failure_mode(span_ctx.metadata)}): #{message}"
-  end
-
-  defp format_tracer_failure({:error, error, _stacktrace}), do: inspect(error)
-  defp format_tracer_failure({kind, reason, _stacktrace}), do: inspect({kind, reason})
 
   defp tracer(metadata) when is_map(metadata) do
     instance = Map.get(metadata, :aikido_instance)
     ObserveConfig.tracer(instance)
-  end
-
-  defp tracer_failure_mode(metadata) when is_map(metadata) do
-    instance = Map.get(metadata, :aikido_instance)
-    ObserveConfig.tracer_failure_mode(instance)
   end
 
   defp enrich_with_correlation(metadata) do

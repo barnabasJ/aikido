@@ -2,7 +2,7 @@ defmodule Aikido.Telemetry.Formatter do
   @moduledoc """
   Structured log formatting utilities for the Aikido telemetry system.
 
-  Provides functions to format durations, metadata, directives, and other
+  Provides functions to format durations, directives, and other
   telemetry data into human-readable, scannable log output.
 
   ## Examples
@@ -10,12 +10,9 @@ defmodule Aikido.Telemetry.Formatter do
       iex> Aikido.Telemetry.Formatter.format_duration(1_500_000)
       "1.5ms"
 
-      iex> Aikido.Telemetry.Formatter.format_metadata(%{agent_id: "abc123", trace_id: "xyz"})
-      "agent_id=abc123 trace_id=xyz"
   """
 
   @default_max_length 100
-  @default_value_max_length 50
 
   @doc """
   Convert native time to human-readable format.
@@ -83,62 +80,6 @@ defmodule Aikido.Telemetry.Formatter do
   end
 
   def to_ms(_), do: 0
-
-  @doc """
-  Format metadata map into a scannable key=value string for logs.
-
-  Handles nil values gracefully and truncates long values.
-
-  ## Options
-
-    * `:max_value_length` - Maximum length for individual values (default: 50)
-
-  ## Examples
-
-      iex> Formatter.format_metadata(%{agent_id: "abc123", trace_id: "xyz"})
-      "agent_id=abc123 trace_id=xyz"
-
-      iex> Formatter.format_metadata(%{key: nil, other: "value"})
-      "other=value"
-
-      iex> Formatter.format_metadata(nil)
-      ""
-  """
-  @spec format_metadata(map() | nil, keyword()) :: String.t()
-  def format_metadata(metadata, opts \\ [])
-  def format_metadata(nil, _opts), do: ""
-
-  def format_metadata(metadata, opts) when is_map(metadata) do
-    max_value_length = Keyword.get(opts, :max_value_length, @default_value_max_length)
-
-    metadata
-    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-    |> Enum.sort_by(fn {k, _v} -> to_string(k) end)
-    |> Enum.map_join(" ", fn {k, v} ->
-      formatted_value = format_value(v, max_value_length)
-      "#{k}=#{formatted_value}"
-    end)
-  end
-
-  def format_metadata(_, _opts), do: ""
-
-  defp format_value(value, max_length) when is_binary(value) do
-    truncate_string(value, max_length)
-  end
-
-  defp format_value(value, _max_length) when is_atom(value) do
-    to_string(value)
-  end
-
-  defp format_value(value, _max_length) when is_number(value) do
-    to_string(value)
-  end
-
-  defp format_value(value, max_length) do
-    value
-    |> inspect(limit: 10, printable_limit: max_length)
-    |> truncate_string(max_length)
-  end
 
   defp truncate_string(str, max_length) when byte_size(str) <= max_length, do: str
 
@@ -253,58 +194,4 @@ defmodule Aikido.Telemetry.Formatter do
   rescue
     _ -> "<inspect_error>"
   end
-
-  @doc """
-  Extract just the keys from a map for safe logging.
-
-  Useful when you want to log what fields are present without exposing values.
-
-  ## Examples
-
-      iex> Formatter.extract_keys(%{user_id: 123, secret: "password", data: %{}})
-      [:data, :secret, :user_id]
-
-      iex> Formatter.extract_keys(nil)
-      []
-
-      iex> Formatter.extract_keys("not a map")
-      []
-  """
-  @spec extract_keys(map() | nil) :: list(atom() | String.t())
-  def extract_keys(nil), do: []
-
-  def extract_keys(map) when is_map(map) do
-    map |> Map.keys() |> Enum.sort()
-  end
-
-  def extract_keys(_), do: []
-
-  @doc """
-  Format a complete log line with standard telemetry fields.
-
-  Combines multiple formatting functions into a single log-ready string.
-
-  ## Examples
-
-      iex> Formatter.format_log_line(%{
-      ...>   agent_id: "agent-1",
-      ...>   trace_id: "trace-abc",
-      ...>   signal_type: :user_request,
-      ...>   duration: 1_500_000
-      ...> })
-      "agent_id=agent-1 duration=1.5ms signal_type=user_request trace_id=trace-abc"
-  """
-  @spec format_log_line(map()) :: String.t()
-  def format_log_line(fields) when is_map(fields) do
-    fields
-    |> Enum.map(fn
-      {:duration, v} -> {:duration, format_duration(v)}
-      {:signal_type, v} -> {:signal_type, format_signal_type(v)}
-      {k, v} -> {k, v}
-    end)
-    |> Map.new()
-    |> format_metadata()
-  end
-
-  def format_log_line(_), do: ""
 end

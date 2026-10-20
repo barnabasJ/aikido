@@ -176,14 +176,6 @@ defmodule AikidoTest.TelemetryTest do
                  %{agent_id: "test", job_id: :job, cron_expression: "* * * * *"},
                  nil
                )
-
-      assert :ok =
-               Aikido.Telemetry.handle_event(
-                 [:aikido, :agent_server, :cron, :persist_failure],
-                 %{},
-                 %{agent_id: "test", job_id: :job, reason: :boom},
-                 nil
-               )
     end
   end
 end

@@ -30,30 +30,5 @@ defmodule Aikido.Observe.SpanCtx do
     field :tracer_ctx, :term, allow_nil?: true, description: "Tracer-specific context"
   end
 
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
-
-  @doc """
-  Creates a new SpanCtx from a map of attributes.
-
-  Returns `{:ok, span_ctx}` or `{:error, reason}`.
-  """
-  @spec new(map()) :: {:ok, t()} | {:error, term()}
-  def new(attrs) when is_map(attrs) do
-    super(attrs)
-  end
-
-  def new(_), do: {:error, Aikido.Error.validation_error("SpanCtx requires a map")}
-
-  @doc """
-  Creates a new SpanCtx from a map, raising on error.
-  """
-  @spec new!(map()) :: t()
-  def new!(attrs) do
-    case new(attrs) do
-      {:ok, span_ctx} -> span_ctx
-      {:error, reason} -> raise Aikido.Error.validation_error("Invalid SpanCtx", details: reason)
-    end
-  end
 end

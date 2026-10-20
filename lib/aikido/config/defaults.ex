@@ -7,9 +7,7 @@ defmodule Aikido.Config.Defaults do
   """
 
   @type telemetry_log_level :: :trace | :debug | :info | :warning | :error
-  @type telemetry_log_args :: :keys_only | :full | :none
   @type debug_events_mode :: :off | :minimal | :all
-  @type tracer_failure_mode :: :warn | :strict
 
   @aikido_shutdown_timeout_ms 10_000
 
@@ -17,19 +15,14 @@ defmodule Aikido.Config.Defaults do
   @agent_server_call_timeout_ms 5_000
   @agent_server_await_timeout_ms 10_000
 
-  @worker_pool_checkout_timeout_ms 5_000
-  @worker_pool_call_timeout_ms 5_000
-
   @telemetry_log_level :info
-  @telemetry_log_args :keys_only
   @slow_signal_threshold_ms 10
   @slow_directive_threshold_ms 5
   @interesting_signal_types []
   @observe_log_level :info
   @observe_debug_events :off
   @redact_sensitive false
-  @tracer Aikido.Observe.NoopTracer
-  @tracer_failure_mode :warn
+  @tracer nil
   @debug_max_events 500
 
   @doc "Default shutdown timeout for the top-level Aikido supervisor."
@@ -48,21 +41,9 @@ defmodule Aikido.Config.Defaults do
   @spec agent_server_await_timeout_ms() :: pos_integer()
   def agent_server_await_timeout_ms, do: @agent_server_await_timeout_ms
 
-  @doc "Default checkout timeout for worker pools."
-  @spec worker_pool_checkout_timeout_ms() :: pos_integer()
-  def worker_pool_checkout_timeout_ms, do: @worker_pool_checkout_timeout_ms
-
-  @doc "Default call timeout when signaling pooled agents."
-  @spec worker_pool_call_timeout_ms() :: pos_integer()
-  def worker_pool_call_timeout_ms, do: @worker_pool_call_timeout_ms
-
   @doc "Default telemetry log level."
   @spec telemetry_log_level() :: telemetry_log_level()
   def telemetry_log_level, do: @telemetry_log_level
-
-  @doc "Default telemetry argument logging mode."
-  @spec telemetry_log_args() :: telemetry_log_args()
-  def telemetry_log_args, do: @telemetry_log_args
 
   @doc "Default slow-signal threshold in milliseconds."
   @spec slow_signal_threshold_ms() :: non_neg_integer()
@@ -91,10 +72,6 @@ defmodule Aikido.Config.Defaults do
   @doc "Default tracer module."
   @spec tracer() :: module()
   def tracer, do: @tracer
-
-  @doc "Default tracer failure mode."
-  @spec tracer_failure_mode() :: tracer_failure_mode()
-  def tracer_failure_mode, do: @tracer_failure_mode
 
   @doc "Default max debug-event buffer size."
   @spec debug_max_events() :: non_neg_integer()

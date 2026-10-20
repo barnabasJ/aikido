@@ -73,7 +73,6 @@ defmodule AikidoTest.DebugTest do
     test "returns override when :on" do
       Debug.enable(@test_instance, :on)
       assert Debug.override(@test_instance, :telemetry_log_level) == :debug
-      assert Debug.override(@test_instance, :telemetry_log_args) == :keys_only
       assert Debug.override(@test_instance, :observe_log_level) == :debug
       assert Debug.override(@test_instance, :observe_debug_events) == :minimal
     end
@@ -81,7 +80,6 @@ defmodule AikidoTest.DebugTest do
     test "returns override when :verbose" do
       Debug.enable(@test_instance, :verbose)
       assert Debug.override(@test_instance, :telemetry_log_level) == :trace
-      assert Debug.override(@test_instance, :telemetry_log_args) == :full
       assert Debug.override(@test_instance, :observe_debug_events) == :all
     end
 
@@ -202,7 +200,6 @@ defmodule AikidoTest.DebugTest do
       Debug.enable(@test_instance, :verbose)
 
       assert Aikido.Observe.Config.telemetry_log_level(@test_instance) == :trace
-      assert Aikido.Observe.Config.telemetry_log_args(@test_instance) == :full
       assert Aikido.Observe.Config.debug_events(@test_instance) == :all
     end
   end

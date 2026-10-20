@@ -1,22 +1,3 @@
-defmodule AikidoTest.Observe.ConfigTest.ValidTracer do
-  @moduledoc false
-  @behaviour Aikido.Observe.Tracer
-  @impl true
-  def span_start(_event_prefix, _metadata) do
-    :ok
-  end
-
-  @impl true
-  def span_stop(_ctx, _measurements) do
-    :ok
-  end
-
-  @impl true
-  def span_exception(_ctx, _kind, _reason, _stacktrace) do
-    :ok
-  end
-end
-
 defmodule AikidoTest.Observe.ConfigTest do
   use ExUnit.Case, async: false
   @test_instance :"aikido_observe_config_#{System.unique_integer([:positive])}"
@@ -54,25 +35,6 @@ defmodule AikidoTest.Observe.ConfigTest do
     test "nil instance skips debug override" do
       assert Aikido.Observe.Config.telemetry_log_level(nil) ==
                Aikido.Config.Defaults.telemetry_log_level()
-    end
-  end
-
-  describe("telemetry_log_args/1") do
-    test "returns default when no config set" do
-      assert Aikido.Observe.Config.telemetry_log_args(nil) ==
-               Aikido.Config.Defaults.telemetry_log_args()
-    end
-
-    test "reads from global config" do
-      Application.put_env(:aikido, :telemetry, log_args: :full)
-      assert Aikido.Observe.Config.telemetry_log_args(nil) == :full
-    end
-
-    test "falls back to default when value is invalid" do
-      Application.put_env(:aikido, :telemetry, log_args: :verbose)
-
-      assert Aikido.Observe.Config.telemetry_log_args(nil) ==
-               Aikido.Config.Defaults.telemetry_log_args()
     end
   end
 
@@ -211,37 +173,19 @@ defmodule AikidoTest.Observe.ConfigTest do
   end
 
   describe("tracer/1") do
-    test "returns NoopTracer by default" do
-      assert Aikido.Observe.Config.tracer(nil) == Aikido.Observe.NoopTracer
+    test "has no tracer by default" do
+      assert Aikido.Observe.Config.tracer(nil) == nil
     end
 
     test "returns configured tracer when it implements the contract" do
-      Application.put_env(:aikido, :observability,
-        tracer: AikidoTest.Observe.ConfigTest.ValidTracer
-      )
+      Application.put_env(:aikido, :observability, tracer: AikidoTest.Support.TestTracer)
 
-      assert Aikido.Observe.Config.tracer(nil) == AikidoTest.Observe.ConfigTest.ValidTracer
+      assert Aikido.Observe.Config.tracer(nil) == AikidoTest.Support.TestTracer
     end
 
     test "falls back to default tracer when configured module is invalid" do
       Application.put_env(:aikido, :observability, tracer: Date)
       assert Aikido.Observe.Config.tracer(nil) == Aikido.Config.Defaults.tracer()
-    end
-  end
-
-  describe("tracer_failure_mode/1") do
-    test "returns :warn by default" do
-      assert Aikido.Observe.Config.tracer_failure_mode(nil) == :warn
-    end
-
-    test "reads from global observability config" do
-      Application.put_env(:aikido, :observability, tracer_failure_mode: :strict)
-      assert Aikido.Observe.Config.tracer_failure_mode(nil) == :strict
-    end
-
-    test "falls back to default when value is invalid" do
-      Application.put_env(:aikido, :observability, tracer_failure_mode: :invalid)
-      assert Aikido.Observe.Config.tracer_failure_mode(nil) == :warn
     end
   end
 
