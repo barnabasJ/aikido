@@ -45,7 +45,7 @@ defmodule Aikido.Directives.Reply do
   use Aikido.Directive
 
   typed_struct do
-    field :input_signal, :term do
+    field :input_signal, Aikido.Signal do
       description "Original query signal supplying the correlation identity and reply destination."
       allow_nil? false
     end

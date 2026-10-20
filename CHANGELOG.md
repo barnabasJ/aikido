@@ -6,6 +6,13 @@
 
 ### Changed
 
+- Attach dedicated native implementations to public lifecycle, inspection, list
+  and signal actions. Remove the action-name dispatcher and retain only shared
+  reference, snapshot, scope and error helpers in `Aikido.Ash.Runtime`.
+
+- Validate emitted signals and reply inputs with the native `Aikido.Signal` type
+  while keeping signal ID and timestamp generation at I/O boundaries.
+
 - Document every field and attribute with a description in native DSL blocks,
   including runtime descriptors, signal schemas, examples and test fixtures.
 
@@ -226,7 +233,7 @@
 
 - Store agent state fields, AI flags and team configuration in Spark instead of
   generating functions on every resource.
-  Read it through `Aikido.Dsl.Agent.Info`.
+  Read it through `Aikido.Ash.Agent.Info`.
 
 - Replace generated agent constructors, setters and whole-agent validators with
   a configured native initialization action and Ash code interface. Embedded
@@ -259,7 +266,7 @@
 
 - Remove generated runtime wrappers and private configuration accessors from
   instance modules. Keep supervision entry points on the Spark host, read DSL
-  configuration through `Aikido.Dsl.Instance.Info`, and use `Aikido.config/2`
+  configuration through `Aikido.Instance.Info`, and use `Aikido.config/2`
   plus the shared lifecycle, persistence and debug APIs.
 
 - Move emitted signal ID/time generation into directive execution. Make identity,

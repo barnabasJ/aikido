@@ -9,7 +9,7 @@ defmodule Aikido.Directives.Emit do
   use Aikido.Directive
 
   typed_struct do
-    field :signal, :term do
+    field :signal, Aikido.Signal do
       description "Signal descriptor materialized and delivered with the originating caller scope."
       allow_nil? false
     end

@@ -19,7 +19,7 @@ executes them after applying the action result.
 AgentServer runs the original resource module. Its attributes, actions, slice mounts
 and middleware configuration are reused directly; no companion resource is generated.
 Own-state fields, AI flags and team configuration live in Spark and are read through
-`Aikido.Dsl.Agent.Info.state_fields/1`, `ai?/1` and `team_config/1`.
+`Aikido.Ash.Agent.Info.state_fields/1`, `ai?/1` and `team_config/1`.
 
 A private `:initialize` generic action uses a shared implementation, configured
 by the transformer with the state path and slice mounts. Native create actions
@@ -114,6 +114,10 @@ command. Attributes carry Ash types, constraints, defaults, visibility and nil
 validation. Mounted slices become additional attributes. Internally the runtime
 groups the agent's own fields under `:state`; `path :other_name` changes that path.
 
+Each public command uses its own native implementation under `Aikido.Ash.Actions`.
+The transformer attaches that implementation directly. Shared reference resolution,
+snapshot projection and caller-scope helpers live in `Aikido.Ash.Runtime`.
+
 The generated public actions are all generic Ash actions: `start`, `stop`,
 `delete`, `inspect`, `list`, and the declared signals. These public commands do
 not use CRUD actions; internal create/update actions handle typed state
@@ -205,6 +209,12 @@ timeout and subscription cleanup. Use it from external callers for asynchronous
 completion; selectors return `:skip` while waiting. Team lifecycle commands use it.
 
 ## Signal matching
+
+Native `Aikido.Signal.new/1` and `new!/1` validate envelopes without generating
+IDs or timestamps, so native Ash casting remains pure. At an I/O boundary, use
+`Aikido.Signal.materialize/1` to supply missing metadata. The `new(type, data, opts)`
+convenience and typed definition constructors also materialize their envelopes.
+Directive execution materializes incomplete signals before delivery.
 
 Internal messages use `Aikido.Signal`. Its payload can contain native runtime
 values, and its scope and opaque Ash tracer contexts travel with the message.

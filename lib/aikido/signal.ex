@@ -2,9 +2,19 @@ defmodule Aikido.Signal do
   @moduledoc """
   An internal signal envelope carrying arbitrary data and native Ash caller scope.
 
-  Pure actions may return literals with nil identity and time. Constructors
-  materialize runtime metadata and therefore belong at I/O boundaries. Typed
-  definitions use `use Aikido.Signal` with the `signal` and `schema` Spark DSL.
+  Native `new/1` and Ash type casting validate envelopes without generating
+  identity or time. Pure actions can use these constructors or return literals.
+  `materialize/1`, `new/2`, and `new/3` supply runtime metadata at I/O boundaries.
+  Typed definitions use `use Aikido.Signal` with the `signal` and `schema` Spark DSL.
+
+  Pass `scope: signal` to native Ash actions to reuse its resolved caller scope,
+  including ordinary application context. Use `Ash.Scope.to_opts(signal)` when
+  forwarding tracer options as well; native generic action scope extraction
+  currently omits the tracer getter. At a new process boundary, restore captured
+  span ancestry with
+  `Ash.ProcessHelpers.transfer_context(Aikido.Signal.tracer_context(signal))`
+  before invoking the action. Scope extraction includes the captured tracers;
+  restoring their process-local span context remains an I/O boundary operation.
   """
   use Ash.TypedStruct
 
@@ -64,10 +74,11 @@ defmodule Aikido.Signal do
     end
   end
 
-  @doc "Validate an envelope and supply missing runtime identity and timestamp."
-  def new(%__MODULE__{} = signal), do: signal |> Map.from_struct() |> new()
+  @doc "Validate an envelope and supply missing identity and timestamp at an I/O boundary."
+  def materialize(%__MODULE__{} = signal),
+    do: signal |> Map.from_struct() |> materialize()
 
-  def new(attrs) do
+  def materialize(attrs) do
     attrs = Map.new(attrs)
 
     attrs =
@@ -84,11 +95,12 @@ defmodule Aikido.Signal do
         end
       end)
 
-    super(attrs)
+    new(attrs)
   end
 
-  @doc "Construct an internal signal with arbitrary data."
-  def new(type, data, opts \\ []), do: new(Map.merge(Map.new(opts), %{type: type, data: data}))
+  @doc "Construct and materialize an internal signal with arbitrary data at an I/O boundary."
+  def new(type, data, opts \\ []),
+    do: materialize(Map.merge(Map.new(opts), %{type: type, data: data}))
 
   @doc "Construct a signal, raising on invalid envelope fields."
   def new!(type, data, opts \\ []), do: new(type, data, opts) |> Ash.Helpers.unwrap_or_raise!()
@@ -162,4 +174,22 @@ defmodule Aikido.Signal do
   end
 
   def timestamp(_), do: 0
+end
+
+defimpl Ash.Scope.ToOpts, for: Aikido.Signal do
+  def get_actor(%{scope: scope}), do: Map.fetch(scope, :actor)
+  def get_tenant(%{scope: scope}), do: Map.fetch(scope, :tenant)
+  def get_context(%{scope: scope}), do: Map.fetch(scope, :context)
+  def get_authorize?(%{scope: scope}), do: Map.fetch(scope, :authorize?)
+
+  def get_tracer(%{scope: scope, tracer_context: tracer_context}) do
+    case {Map.fetch(scope, :tracer), Map.keys(tracer_context)} do
+      {:error, []} -> :error
+      {{:ok, tracer}, []} -> {:ok, tracer}
+      {configured, captured} -> {:ok, Enum.uniq(tracers(configured) ++ captured)}
+    end
+  end
+
+  defp tracers({:ok, tracer}), do: List.wrap(tracer)
+  defp tracers(:error), do: []
 end

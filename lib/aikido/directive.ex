@@ -77,7 +77,8 @@ defmodule Aikido.Directive do
   def materialize_signal(signal) when is_map(signal) do
     signal
     |> Map.reject(fn {key, value} -> key in [:id, :time, :source] && is_nil(value) end)
-    |> Aikido.Signal.new!()
+    |> Aikido.Signal.materialize()
+    |> Ash.Helpers.unwrap_or_raise!()
   end
 
   @doc "Execute a directive through its module's behaviour callback."

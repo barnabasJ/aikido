@@ -34,6 +34,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - `Aikido.Agent`: immutable identity/state struct and a convenience macro over `Ash.Resource` with `Aikido.Ash.Agent`
 - `Aikido.Ash.Agent`: resource extension that compiles state declarations into attributes and exposes generic lifecycle/signal actions
 - `Aikido.Ash.Domain`: domain interfaces named `<agent>_<action>`; start returns a reference, signal commands return processing receipts, and inspect/list explicitly read live state
+- `Aikido.Ash.Actions`: dedicated native I/O implementations for public lifecycle, inspection, list and signal commands; `Aikido.Ash.Runtime` contains only shared helpers
 - `Aikido.Ash.Slice`: embedded resource extension; slices own their attributes, native reducer actions and routes
 - `Aikido.Ash.Team`: topology and coordination on an agent resource, including nested teams and dynamic workers
 - `Aikido.AgentServer`: signal routing, native Ash reducer execution, directive execution and runtime bookkeeping, hosted by DurableServer
