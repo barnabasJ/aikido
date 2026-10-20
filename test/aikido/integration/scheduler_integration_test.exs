@@ -63,7 +63,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
   @moduledoc """
   Scheduler integration tests for invasive runtime failure scenarios.
 
-  Target only with:
+  Run this subset with:
 
       mix test --only scheduler_integration test/aikido/integration/scheduler_integration_test.exs
   """
@@ -76,8 +76,12 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
   @moduletag timeout: 20000
 
   defp slice_job_id do
-    {:slice_schedule, :scheduler_integration_slice,
-     {AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice, :slice_tick}}
+    [spec] =
+      Aikido.Dsl.Agent.Info.schedules(
+        AikidoTest.Integration.SchedulerIntegrationTest.SliceScheduledAgent
+      )
+
+    spec.job_id
   end
 
   describe("runtime scheduler failures") do

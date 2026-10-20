@@ -1220,9 +1220,8 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, cron_jobs} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs} end)
       assert map_size(cron_jobs) == 1
 
-      job_id =
-        {:slice_schedule, :scheduled_slice,
-         {AikidoTest.AgentServerTest.ScheduledSlice, :scheduled_action}}
+      [spec] = Aikido.Dsl.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+      job_id = spec.job_id
 
       assert Map.has_key?(cron_jobs, job_id)
       cron_pid = Map.get(cron_jobs, job_id)
@@ -1253,9 +1252,8 @@ defmodule AikidoTest.AgentServerTest do
 
       {:ok, cron_jobs} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs} end)
 
-      job_id =
-        {:slice_schedule, :scheduled_slice,
-         {AikidoTest.AgentServerTest.ScheduledSlice, :scheduled_action}}
+      [spec] = Aikido.Dsl.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+      job_id = spec.job_id
 
       cron_pid = Map.get(cron_jobs, job_id)
       assert Process.alive?(cron_pid)
@@ -1276,7 +1274,8 @@ defmodule AikidoTest.AgentServerTest do
 
       assert spec.job_id ==
                {:slice_schedule, :scheduled_slice,
-                {AikidoTest.AgentServerTest.ScheduledSlice, :scheduled_action}}
+                {{AikidoTest.AgentServerTest.ScheduledSlice, :scheduled_action}, "* * * * *",
+                 "Etc/UTC", "scheduled_slice.__schedule__.scheduled_action", %{}}}
 
       assert spec.signal_type == "scheduled_slice.__schedule__.scheduled_action"
     end

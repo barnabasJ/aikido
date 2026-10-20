@@ -17,7 +17,7 @@ defmodule Aikido.Ash.Transformers.Agent do
     entities = Transformer.get_entities(dsl, [:agent])
     mounts = Enum.filter(entities, &match?(%Aikido.Dsl.Agent.SliceMount{}, &1))
     declared_signals = Enum.filter(entities, &match?(%Aikido.Ash.Agent.Signal{}, &1))
-    {dsl, declared_signals} = resolve_local_actions(dsl, declared_signals, resource)
+    {dsl, declared_signals, aliases} = resolve_local_actions(dsl, declared_signals, resource)
     inherited = inherited_signals(mounts, declared_signals)
     signals = declared_signals ++ inherited
     dsl = Enum.reduce(inherited, dsl, &Transformer.add_entity(&2, [:agent], &1))
@@ -41,18 +41,7 @@ defmodule Aikido.Ash.Transformers.Agent do
          {:ok, dsl} <- add_signals(dsl, signals) do
       declared_routes =
         for route <- entities, match?(%Aikido.Dsl.Agent.Route{}, route) do
-          case route.action do
-            name when is_atom(name) ->
-              name =
-                if Ash.Resource.Info.action(dsl, name),
-                  do: name,
-                  else: String.to_atom("__aikido_reduce_#{name}")
-
-              %{route | action: {resource, name}}
-
-            {_resource, _action} ->
-              route
-          end
+          %{route | action: resolve_local_target(route.action, aliases, resource)}
         end
 
       routes =
@@ -87,8 +76,8 @@ defmodule Aikido.Ash.Transformers.Agent do
   # A local reducer and its public command may share a declared name. Keep the
   # native reducer private and generate the command under the public name.
   defp resolve_local_actions(dsl, signals, resource) do
-    {signals, {dsl, _aliases}} =
-      Enum.map_reduce(signals, {dsl, %{}}, fn signal, {dsl, aliases} ->
+    {dsl, aliases} =
+      Enum.reduce(signals, {dsl, %{}}, fn signal, {dsl, aliases} ->
         local =
           case signal.target do
             name when is_atom(name) -> name
@@ -96,37 +85,43 @@ defmodule Aikido.Ash.Transformers.Agent do
             _ -> nil
           end
 
-        if local do
-          name = Map.get(aliases, local, local)
+        if local == signal.name && !Map.has_key?(aliases, local) do
+          case Ash.Resource.Info.action(dsl, local) do
+            %{type: :action, returns: Aikido.Types.ActionResult} = action ->
+              internal = String.to_atom("__aikido_reduce_#{local}")
+              reducer = %{action | name: internal, public?: false}
 
-          {dsl, name, aliases} =
-            case Ash.Resource.Info.action(dsl, name) do
-              %{type: :action, returns: Aikido.Types.ActionResult} = action
-              when name == signal.name ->
-                internal = String.to_atom("__aikido_reduce_#{name}")
-                reducer = %{action | name: internal, public?: false}
+              next =
+                dsl
+                |> Transformer.remove_entity([:actions], &(&1.name == local))
+                |> Transformer.add_entity([:actions], reducer)
 
-                next =
-                  dsl
-                  |> Transformer.remove_entity([:actions], &(&1.name == name))
-                  |> Transformer.add_entity([:actions], reducer)
+              {next, Map.put(aliases, local, internal)}
 
-                {next, internal, Map.put(aliases, local, internal)}
-
-              _ ->
-                {dsl, name, aliases}
-            end
-
-          resolved = %{signal | target: {resource, name}}
-          dsl = Transformer.replace_entity(dsl, [:agent], resolved, &(&1 == signal))
-          {resolved, {dsl, aliases}}
+            _ ->
+              {dsl, aliases}
+          end
         else
-          {signal, {dsl, aliases}}
+          {dsl, aliases}
         end
       end)
 
-    {dsl, signals}
+    {signals, dsl} =
+      Enum.map_reduce(signals, dsl, fn signal, dsl ->
+        resolved = %{signal | target: resolve_local_target(signal.target, aliases, resource)}
+        {resolved, Transformer.replace_entity(dsl, [:agent], resolved, &(&1 == signal))}
+      end)
+
+    {dsl, signals, aliases}
   end
+
+  defp resolve_local_target(name, aliases, resource) when is_atom(name),
+    do: {resource, Map.get(aliases, name, name)}
+
+  defp resolve_local_target({resource, name}, aliases, resource),
+    do: {resource, Map.get(aliases, name, name)}
+
+  defp resolve_local_target(target, _aliases, _resource), do: target
 
   defp inherited_signals(mounts, declared) do
     for mount <- mounts,

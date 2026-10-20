@@ -298,6 +298,13 @@ schedules do
 end
 ```
 
+Slice schedules receive an identity containing the mount path and the normalized
+`{target, cron, timezone, signal_type, data}` declaration. Distinct declarations
+can schedule the same reducer independently; shared generated routes invoke the
+reducer once for each occurrence. Agent schedules keep their explicit `job_id`
+(or signal type by default); duplicate expanded IDs are rejected at compile time.
+Use distinct `job_id` options for multiple agent schedules sharing a signal.
+
 Declare ordered middleware with `middleware [MyApp.Audit]` inside the agent
 section; it wraps signals using the existing Aikido middleware contract.
 

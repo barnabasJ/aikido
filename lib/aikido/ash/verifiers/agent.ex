@@ -14,8 +14,16 @@ defmodule Aikido.Ash.Verifiers.Agent do
     fields = Verifier.get_persisted(dsl, :aikido_state_fields, [])
 
     resource = Verifier.get_persisted(dsl, :module)
+    schedules = Verifier.get_persisted(dsl, :expanded_agent_schedules, [])
+    job_ids = Enum.map(schedules, & &1.job_id)
 
     cond do
+      length(job_ids) != length(Enum.uniq(job_ids)) ->
+        error(
+          "Agent schedules require unique job IDs; use distinct job_id options for schedules sharing a signal",
+          resource
+        )
+
       function_exported?(resource, :externalize, 1) != function_exported?(resource, :reinstate, 1) ->
         error("Agent externalize/1 and reinstate/1 must be implemented together", resource)
 

@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Resolve all local reducer routes after public command renaming, allow team
+  members named `nodes`, and distinguish slice schedules by their full normalized
+  declaration. Deduplicate shared schedule routes and reject colliding agent job
+  IDs through Spark verification; explicit agent `job_id` values remain supported.
+
 - Flatten team send arguments to native `member`, `type` and `payload` fields.
   Share ownership traversal and simplify topological ordering; preserve explicit
   nil slice configuration and explicit false FSM initialization values.

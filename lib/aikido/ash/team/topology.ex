@@ -13,11 +13,8 @@ defmodule Aikido.Ash.Team.Topology do
 
   def build(definition, instance, limit \\ 128)
 
-  def build(definition, instance, limit) when is_map(definition) do
-    nodes = Map.get(definition, :nodes, definition)
-
-    with true <- is_map(nodes) || {:error, :invalid_topology},
-         true <- map_size(nodes) <= limit || {:error, :member_limit},
+  def build(nodes, instance, limit) when is_map(nodes) do
+    with true <- map_size(nodes) <= limit || {:error, :member_limit},
          {:ok, nodes} <- normalize(nodes, instance),
          true <-
            length(Enum.uniq(Enum.map(Map.keys(nodes), &to_string/1))) == map_size(nodes) ||

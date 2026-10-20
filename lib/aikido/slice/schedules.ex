@@ -23,7 +23,9 @@ defmodule Aikido.Slice.Schedules do
   ## Job ID Namespacing
 
   Job IDs are namespaced as tuples to ensure uniqueness across slice mounts:
-  `{:slice_schedule, mount_path, {Resource, :action}}`
+  `{:slice_schedule, mount_path, {target, cron, timezone, signal_type, data}}`.
+  Each distinct normalized declaration has its own job; identical generated
+  routes are shared so each occurrence invokes its target once.
   """
 
   alias Aikido.Dsl.Slice.Info, as: SliceInfo
@@ -37,7 +39,9 @@ defmodule Aikido.Slice.Schedules do
   @type schedule_spec :: %{
           cron_expression: String.t(),
           action: {module(), atom()},
-          job_id: {:slice_schedule, atom(), {module(), atom()}},
+          job_id:
+            {:slice_schedule, atom(),
+             {{module(), atom()}, String.t(), String.t(), String.t(), map()}},
           signal_type: String.t(),
           timezone: String.t(),
           data: map()
@@ -76,6 +80,7 @@ defmodule Aikido.Slice.Schedules do
     |> Enum.map(fn spec ->
       {spec.signal_type, spec.action, [priority: @schedule_route_priority]}
     end)
+    |> Enum.uniq()
   end
 
   defp expand_schedule({cron_expr, action}, mount_path, prefix) do
@@ -84,7 +89,8 @@ defmodule Aikido.Slice.Schedules do
 
   defp expand_schedule({cron_expr, action, opts}, mount_path, prefix)
        when is_list(opts) do
-    timezone = Keyword.get(opts, :tz, "Etc/UTC")
+    timezone = Keyword.get(opts, :tz)
+    timezone = if timezone in [nil, ""], do: "Etc/UTC", else: timezone
     custom_signal = Keyword.get(opts, :signal)
 
     signal_type =
@@ -94,7 +100,8 @@ defmodule Aikido.Slice.Schedules do
         generate_signal_type(prefix, action)
       end
 
-    job_id = {:slice_schedule, mount_path, action}
+    data = Keyword.get(opts, :data, %{})
+    job_id = {:slice_schedule, mount_path, {action, cron_expr, timezone, signal_type, data}}
 
     %{
       cron_expression: cron_expr,
@@ -102,7 +109,7 @@ defmodule Aikido.Slice.Schedules do
       job_id: job_id,
       signal_type: signal_type,
       timezone: timezone,
-      data: Keyword.get(opts, :data, %{})
+      data: data
     }
   end
 
