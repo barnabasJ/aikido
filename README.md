@@ -22,6 +22,10 @@ Start the default runtime in your supervision tree:
 children = [Aikido]
 ```
 
+This starts shared task, non-agent process, and DurableServer supervision once.
+All agents in the runtime use DurableServer's shared dynamic supervisor;
+starting an agent does not create another runtime supervision tree.
+
 If you need a separate named runtime, define its module yourself:
 
 ```elixir

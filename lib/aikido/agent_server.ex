@@ -22,8 +22,9 @@ defmodule Aikido.AgentServer do
 
   ## Public API
 
-  - `start/1` - Start under DurableServer
-  - `start_link/1` - Start linked to caller
+  Start agents through their generated Ash domain actions. AgentServer exposes
+  runtime coordination primitives:
+
   - `call/4` - Synchronous signal processing with selector projection
   - `cast/2` - Asynchronous signal processing
   - `state/3` - Synchronous selector-driven state read (no signal pipeline)
@@ -59,20 +60,21 @@ defmodule Aikido.AgentServer do
     - `:emit_orphan` - become orphaned and process `aikido.agent.orphaned`
   - `:debug` - Enable debug mode with event buffer (default: `false`)
 
-  ## Examples
+  ## Starting agents
 
-      # Using global Aikido instance (default)
-      {:ok, pid} = AgentServer.start_link(agent_module: SimpleAgent)
+  Add `Aikido` to your application's supervision tree once. All agents in that
+  runtime share DurableServer's dynamic supervisor; starting an agent does not
+  create another supervisor tree. A separate named runtime creates a separate
+  shared tree only when explicitly configured.
 
-      # Using a named Aikido instance
-      {:ok, pid} = AgentServer.start_link(aikido: MyApp.Aikido, agent_module: MyAgent)
+  Use the generated domain interface:
 
-      # With explicit id and initial state
-      {:ok, pid} = AgentServer.start_link(
-        agent_module: MyAgent,
-        id: "my-id",
-        initial_state: %{counter: 42}
-      )
+      {:ok, agent} = MyApp.Agents.worker_start(%{id: "my-id", counter: 42})
+      pid = agent.pid
+
+  The domain action calls the internal activation path through DurableServer.
+  Agent processes are supervised independently of the process that invokes the
+  domain action.
 
   ## Completion Detection
 
@@ -114,11 +116,7 @@ defmodule Aikido.AgentServer do
   AgentServer can record recent events in an in-memory ring buffer (max 50)
   to help diagnose what happened inside a running agent.
 
-  Enable at start:
-
-      {:ok, pid} = AgentServer.start_link(agent: MyAgent, debug: true)
-
-  Or toggle at runtime:
+  Enable on a running agent:
 
       :ok = AgentServer.set_debug(pid, true)
 
@@ -212,30 +210,6 @@ defmodule Aikido.AgentServer do
   # ---------------------------------------------------------------------------
   # Public API
   # ---------------------------------------------------------------------------
-  @doc """
-  Starts an agent through the instance DurableServer supervisor.
-
-  ## Examples
-
-      {:ok, pid} = Aikido.AgentServer.start(agent: MyAgent)
-      {:ok, pid} = Aikido.AgentServer.start(agent: MyAgent, id: "my-agent")
-  """
-  @spec start(keyword() | map()) :: {:ok, pid()} | {:error, term()}
-  def start(opts) do
-    opts = Enum.into(opts, [])
-    {agent, opts} = Keyword.pop!(opts, :agent_module)
-    Aikido.start_agent(Keyword.get(opts, :aikido, Aikido.Default), agent, opts)
-  end
-
-  @doc "Activates through DurableServer and links the agent to the calling process."
-  @spec start_link(keyword() | map()) :: GenServer.on_start()
-  def start_link(opts) when is_list(opts) or is_map(opts) do
-    with {:ok, pid} <- start(opts) do
-      Process.link(pid)
-      {:ok, pid}
-    end
-  end
-
   @typedoc """
   Selector for `call/4` and `state/3`. Receives the full
   `%AgentServer.State{}`; the slice the user cares about lives at

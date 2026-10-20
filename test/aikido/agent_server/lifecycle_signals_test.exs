@@ -17,9 +17,7 @@ defmodule AikidoTest.AgentServer.LifecycleSignalsTest do
   describe("await_ready/2") do
     test("returns :ok after the agent emits aikido.agent.lifecycle.ready", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          aikido: aikido,
-          agent_module: AikidoTest.AgentServer.LifecycleSignalsTest.LifecycleAgent,
+        Aikido.start_agent(aikido, AikidoTest.AgentServer.LifecycleSignalsTest.LifecycleAgent,
           id: "ready-1"
         )
 
@@ -28,9 +26,7 @@ defmodule AikidoTest.AgentServer.LifecycleSignalsTest do
 
     test("is idempotent — subsequent calls return :ok immediately", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          aikido: aikido,
-          agent_module: AikidoTest.AgentServer.LifecycleSignalsTest.LifecycleAgent,
+        Aikido.start_agent(aikido, AikidoTest.AgentServer.LifecycleSignalsTest.LifecycleAgent,
           id: "ready-2"
         )
 

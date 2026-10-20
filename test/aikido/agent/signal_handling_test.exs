@@ -55,10 +55,8 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
   describe("signal routing via AgentServer") do
     test("signals are routed to actions by type", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
-          id: "signal-route-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+          id: "signal-route-test"
         )
 
       signal = Jido.Signal.new!("increment", %{amount: 5}, source: "/test")
@@ -69,10 +67,8 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
 
     test("multiple signals processed in sequence", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
-          id: "multi-signal-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+          id: "multi-signal-test"
         )
 
       signals = [
@@ -93,10 +89,8 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
 
     test("signal data is passed to action", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
-          id: "signal-data-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+          id: "signal-data-test"
         )
 
       signal = Jido.Signal.new!("record", %{message: "hello"}, source: "/test")
@@ -107,10 +101,8 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
 
     test("action can return directives", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
-          id: "directive-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+          id: "directive-test"
         )
 
       signal = Jido.Signal.new!("emit_test", %{}, source: "/test")
@@ -122,10 +114,8 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
       aikido: aikido
     }) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
-          id: "unknown-signal-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+          id: "unknown-signal-test"
         )
 
       signal = Jido.Signal.new!("unknown_action", %{}, source: "/test")

@@ -28,10 +28,10 @@ defmodule AikidoTest.AikidoTest do
 
     test "returns the persisted binding for an adopted child", %{aikido: aikido} do
       {:ok, parent_pid} =
-        AgentServer.start(agent_module: Minimal, id: "parent-binding-parent", aikido: aikido)
+        Aikido.start_agent(aikido, Minimal, id: "parent-binding-parent")
 
       {:ok, child_pid} =
-        AgentServer.start(agent_module: Minimal, id: "parent-binding-child", aikido: aikido)
+        Aikido.start_agent(aikido, Minimal, id: "parent-binding-child")
 
       assert {:ok, ^child_pid} = AgentServer.adopt_child(parent_pid, child_pid, :worker)
 
@@ -44,28 +44,13 @@ defmodule AikidoTest.AikidoTest do
 
     test "respects partitioned bindings", %{aikido: aikido} do
       {:ok, parent_pid} =
-        AgentServer.start(
-          agent_module: Minimal,
-          id: "partitioned-parent",
-          aikido: aikido,
-          partition: :alpha
-        )
+        Aikido.start_agent(aikido, Minimal, id: "partitioned-parent", partition: :alpha)
 
       {:ok, alpha_child_pid} =
-        AgentServer.start(
-          agent_module: Minimal,
-          id: "shared-child",
-          aikido: aikido,
-          partition: :alpha
-        )
+        Aikido.start_agent(aikido, Minimal, id: "shared-child", partition: :alpha)
 
       {:ok, _beta_child_pid} =
-        AgentServer.start(
-          agent_module: Minimal,
-          id: "shared-child",
-          aikido: aikido,
-          partition: :beta
-        )
+        Aikido.start_agent(aikido, Minimal, id: "shared-child", partition: :beta)
 
       assert {:ok, ^alpha_child_pid} =
                AgentServer.adopt_child(parent_pid, alpha_child_pid, :worker)

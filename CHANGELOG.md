@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Remove AgentServer startup wrappers. Start application agents through their
+  Ash domain actions, with one internal activation path through DurableServer.
+  Runtime tests use that internal path without linking agents to the caller.
+
 - Use Ash typed structs for AI execution options and Lua hook decisions instead
   of data-only embedded resources. Cast parent references and validate
   parent-death policies through native startup option field types.

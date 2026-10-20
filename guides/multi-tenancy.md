@@ -4,12 +4,20 @@ A runtime partition scopes an agent's logical identity. The same key can run in
 several partitions without collision:
 
 ```elixir
-{:ok, alpha} = Aikido.start_agent(MyApp.Aikido, MyApp.Worker, id: "worker", partition: :alpha)
-{:ok, beta} = Aikido.start_agent(MyApp.Aikido, MyApp.Worker, id: "worker", partition: :beta)
+alpha = MyApp.Agents.worker_start!(%{id: "worker"},
+  context: %{aikido_runtime_options: [partition: :alpha]}
+)
+beta = MyApp.Agents.worker_start!(%{id: "worker"},
+  context: %{aikido_runtime_options: [partition: :beta]}
+)
 
-Aikido.whereis(MyApp.Aikido, "worker", partition: :alpha)
-Aikido.stop_agent(MyApp.Aikido, "worker", partition: :beta)
+MyApp.Agents.worker_inspect!(alpha.pid)
+MyApp.Agents.worker_stop!(beta.pid)
 ```
+
+Applications supply runtime partitions through the start action's context.
+Use the current PID for subsequent domain commands in a partition; string ID
+resolution uses the runtime's default partition.
 
 DurableServer keys include the partition. Snapshots and activation therefore
 remain independent for those identities. Separately configured `Aikido.Durable`

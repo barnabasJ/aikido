@@ -91,10 +91,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
   describe("signal telemetry") do
     test("emits start and stop events for signal processing", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
-          id: "telemetry-signal-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+          id: "telemetry-signal-test"
         )
 
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
@@ -118,10 +116,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
     test("includes directive count in stop event", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
-          id: "telemetry-directive-count",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+          id: "telemetry-directive-count"
         )
 
       signal = Jido.Signal.new!("emit_directive", %{}, source: "/test")
@@ -137,10 +133,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
   describe("directive telemetry") do
     test("emits start and stop events for directive execution", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
-          id: "telemetry-directive-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+          id: "telemetry-directive-test"
         )
 
       drain_directive_events()
@@ -179,10 +173,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
     test("reports correct directive type", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
-          id: "telemetry-type-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+          id: "telemetry-type-test"
         )
 
       signal = Jido.Signal.new!("schedule_directive", %{}, source: "/test")
@@ -208,10 +200,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
   describe("metadata correctness") do
     test("includes agent_id and agent_module in signal events", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
-          id: "telemetry-metadata-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+          id: "telemetry-metadata-test"
         )
 
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
@@ -225,10 +215,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
     test("includes signal_type in directive events", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
-          id: "telemetry-signal-type-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+          id: "telemetry-signal-type-test"
         )
 
       signal = Jido.Signal.new!("emit_directive", %{}, source: "/test")
@@ -247,10 +235,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
   describe("timing measurements") do
     test("duration is positive for signal processing", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
-          id: "telemetry-timing-test",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+          id: "telemetry-timing-test"
         )
 
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
@@ -262,10 +248,8 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
     test("duration is positive for directive execution", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
-          id: "telemetry-directive-timing",
-          aikido: aikido
+        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+          id: "telemetry-directive-timing"
         )
 
       signal = Jido.Signal.new!("emit_directive", %{}, source: "/test")

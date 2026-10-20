@@ -55,6 +55,31 @@ defmodule AikidoTest.AshTest do
     assert {:error, _} = AikidoTest.AshFixtures.Domain.counter_inspect(reference.id)
   end
 
+  test "domain starts share the runtime's durable supervisor and do not link the caller" do
+    instance = AikidoTest.AshFixtures.Instance
+    runtime = Process.whereis(instance)
+    children = Supervisor.which_children(runtime)
+    durable = Aikido.durable_supervisor_name(instance)
+    dynamic = DurableServer.Supervisor.get_dynamic_supervisor(durable)
+
+    first = AikidoTest.AshFixtures.Domain.counter_start!(%{id: "shared-first"})
+    second = AikidoTest.AshFixtures.Domain.counter_start!(%{id: "shared-second"})
+
+    assert Supervisor.which_children(runtime) == children
+    supervised = DynamicSupervisor.which_children(dynamic) |> Enum.map(&elem(&1, 1))
+    assert first.pid in supervised
+    assert second.pid in supervised
+
+    {:links, links} = Process.info(self(), :links)
+    refute first.pid in links
+    refute second.pid in links
+
+    assert {:ok, %{status: :stopped}} = AikidoTest.AshFixtures.Domain.counter_stop(first)
+    assert Process.alive?(second.pid)
+    assert Process.alive?(runtime)
+    assert {:ok, %{status: :stopped}} = AikidoTest.AshFixtures.Domain.counter_stop(second)
+  end
+
   test "agent extension leaves the native data layer independent of process actions" do
     resource = AikidoTest.AshFixtures.GeneratedCounter
     assert Ash.DataLayer.data_layer(AikidoTest.AshFixtures.Counter) == Ash.DataLayer.Simple

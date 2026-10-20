@@ -61,11 +61,7 @@ defmodule AikidoTest.Signal.CallTest do
   describe("call/3") do
     test("the built-in children action replies without changing domain state", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.Signal.CallTest.CallTestAgent,
-          id: "children-query",
-          aikido: aikido
-        )
+        Aikido.start_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent, id: "children-query")
 
       :ok = Aikido.AgentServer.await_ready(pid)
       assert {:ok, before_state} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state})
@@ -80,11 +76,7 @@ defmodule AikidoTest.Signal.CallTest do
 
     test("returns the reply signal on the happy path", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.Signal.CallTest.CallTestAgent,
-          id: "echo",
-          aikido: aikido
-        )
+        Aikido.start_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent, id: "echo")
 
       query = Jido.Signal.new!("aikido.test.echo", %{}, source: "/test")
       assert {:ok, reply} = Aikido.Signal.Call.call(pid, query)
@@ -99,11 +91,7 @@ defmodule AikidoTest.Signal.CallTest do
       %{aikido: aikido}
     ) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.Signal.CallTest.CallTestAgent,
-          id: "silent",
-          aikido: aikido
-        )
+        Aikido.start_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent, id: "silent")
 
       query = Jido.Signal.new!("aikido.test.silent", %{}, source: "/test")
       assert {:error, :timeout} = Aikido.Signal.Call.call(pid, query, timeout: 50)
@@ -134,11 +122,7 @@ defmodule AikidoTest.Signal.CallTest do
       %{aikido: aikido}
     ) do
       {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.Signal.CallTest.CallTestAgent,
-          id: "dying",
-          aikido: aikido
-        )
+        Aikido.start_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent, id: "dying")
 
       Process.unlink(pid)
 

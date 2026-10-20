@@ -80,7 +80,7 @@ defmodule AikidoTest.Case do
 
   ## Options
 
-  All options are passed to `Aikido.AgentServer.start_link/1`, with defaults:
+  Runtime integration tests use the internal `Aikido.start_agent/3` path, with defaults:
 
     * `:aikido` - Uses the test context's aikido instance
     * `:id` - Generates a unique ID if not provided
@@ -91,14 +91,14 @@ defmodule AikidoTest.Case do
       pid = start_server(context, MyAgent, id: "custom-id")
   """
   def start_server(context, agent, opts \\ []) do
-    opts = Keyword.put_new(opts, :aikido, context.aikido)
+    {instance, opts} = Keyword.pop(opts, :aikido, context.aikido)
     opts = Keyword.put_new(opts, :id, unique_id())
-    {:ok, pid} = Aikido.AgentServer.start_link([agent_module: agent] ++ opts)
+    {:ok, pid} = Aikido.start_agent(instance, agent, opts)
 
     ExUnit.Callbacks.on_exit(fn ->
       if Process.alive?(pid) do
         try do
-          Aikido.stop_agent(context.aikido, pid)
+          Aikido.stop_agent(instance, pid)
         catch
           :exit, _ -> :ok
         end

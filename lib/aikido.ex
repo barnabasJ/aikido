@@ -23,12 +23,14 @@ defmodule Aikido do
 
       children = [MyApp.Aikido]
 
-  Start and manage agents:
+  Start and manage agents through their Ash domain interfaces:
 
-      {:ok, pid} = Aikido.start_agent(MyApp.Aikido, MyAgent, id: "agent-1")
-      pid = Aikido.whereis(MyApp.Aikido, "agent-1")
-      agents = Aikido.list_agents(MyApp.Aikido)
-      :ok = Aikido.stop_agent(MyApp.Aikido, "agent-1")
+      agent = MyApp.Agents.worker_start!(%{id: "agent-1"})
+      MyApp.Agents.worker_inspect!(agent)
+      MyApp.Agents.worker_stop!(agent)
+
+  Each runtime starts one shared DurableServer supervision tree for all agents.
+  Starting an agent adds a process to that tree, not another runtime supervisor.
 
   ## Core Concepts
 
@@ -164,7 +166,7 @@ defmodule Aikido do
 
       # In a script or Livebook
       {:ok, _} = Aikido.start()
-      {:ok, pid} = Aikido.start_agent(Aikido.default_instance(), MyAgent)
+      agent = MyApp.Agents.worker_start!(%{})
 
       # With custom options
       {:ok, _} = Aikido.start(max_tasks: 2000)
@@ -278,14 +280,8 @@ defmodule Aikido do
   # Agent Lifecycle
   # ---------------------------------------------------------------------------
 
-  @doc """
-  Starts an agent under a specific Aikido instance.
-
-  ## Examples
-
-      {:ok, pid} = Aikido.start_agent(MyApp.Aikido, MyAgent)
-      {:ok, pid} = Aikido.start_agent(MyApp.Aikido, MyAgent, id: "custom-id")
-  """
+  # Internal activation shared by Ash lifecycle commands and spawning directives.
+  @doc false
   @spec start_agent(atom(), module(), keyword()) :: {:ok, pid()} | {:error, term()}
   def start_agent(aikido_instance, agent_module, opts \\ [])
       when is_atom(aikido_instance) and is_atom(agent_module) do

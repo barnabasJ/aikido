@@ -9,17 +9,21 @@ and recovery. Configure its backend with `durable: [...]`. Use `Aikido.Durable`
 for a separately configured DurableServer namespace; it delegates process ownership
 and storage to DurableServer.
 
-Activate agents through their generated domain `start` action. `AgentServer.start_link/1`
-provides linked activation through the same DurableServer namespace; the runtime
-supervision tree owns the agent process. `restart?` controls automatic crash recovery,
-while the agent's `persistence` setting controls whether stopping retains its snapshot.
+Activate agents through their generated domain `start` action. Adding `Aikido`
+to the application supervision tree starts one shared runtime. Its DurableServer
+dynamic supervisor owns all agent processes in that runtime; starting an agent
+does not start another supervisor tree or link the agent to its caller.
+The separate process supervisor handles non-agent children from `Spawn` directives.
+Explicitly starting a second named runtime creates another shared tree.
+`restart?` controls automatic crash recovery, while the agent's `persistence`
+setting controls whether stopping retains its snapshot.
 
 For a named runtime, declare `use Aikido, otp_app: :my_app` on a module and put
 that module in your supervision tree. It supplies only `child_spec/1` and
 `start_link/1` (with optional arguments). Call shared APIs explicitly:
 
 ```elixir
-Aikido.start_agent(MyApp.Runtime, MyApp.Worker, id: "worker")
+MyApp.Agents.worker_start!(%{id: "worker"})
 Aikido.whereis(MyApp.Runtime, "worker")
 Aikido.config(MyApp.Runtime, max_tasks: 2_000)
 Aikido.Dsl.Instance.Info.instance_options(MyApp.Runtime)

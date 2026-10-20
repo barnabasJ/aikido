@@ -21,17 +21,13 @@ defmodule AikidoTest.AgentServer.StopChildTest do
 
   test("stop_child/3 stops an adopted child with an atom tag", %{aikido: aikido}) do
     {:ok, parent_pid} =
-      Aikido.AgentServer.start(
-        agent_module: AikidoTest.AgentServer.StopChildTest.ParentAgent,
-        id: unique_id("parent"),
-        aikido: aikido
+      Aikido.start_agent(aikido, AikidoTest.AgentServer.StopChildTest.ParentAgent,
+        id: unique_id("parent")
       )
 
     {:ok, child_pid} =
-      Aikido.AgentServer.start(
-        agent_module: AikidoTest.AgentServer.StopChildTest.ChildAgent,
-        id: unique_id("child"),
-        aikido: aikido
+      Aikido.start_agent(aikido, AikidoTest.AgentServer.StopChildTest.ChildAgent,
+        id: unique_id("child")
       )
 
     assert {:ok, ^child_pid} = Aikido.AgentServer.adopt_child(parent_pid, child_pid, :worker)
@@ -47,17 +43,13 @@ defmodule AikidoTest.AgentServer.StopChildTest do
 
   test("stop_child/3 stops an adopted child with a string tag", %{aikido: aikido}) do
     {:ok, parent_pid} =
-      Aikido.AgentServer.start(
-        agent_module: AikidoTest.AgentServer.StopChildTest.ParentAgent,
-        id: unique_id("parent"),
-        aikido: aikido
+      Aikido.start_agent(aikido, AikidoTest.AgentServer.StopChildTest.ParentAgent,
+        id: unique_id("parent")
       )
 
     {:ok, child_pid} =
-      Aikido.AgentServer.start(
-        agent_module: AikidoTest.AgentServer.StopChildTest.ChildAgent,
-        id: unique_id("child"),
-        aikido: aikido
+      Aikido.start_agent(aikido, AikidoTest.AgentServer.StopChildTest.ChildAgent,
+        id: unique_id("child")
       )
 
     assert {:ok, ^child_pid} = Aikido.AgentServer.adopt_child(parent_pid, child_pid, "worker")
