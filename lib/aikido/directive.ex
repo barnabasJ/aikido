@@ -54,7 +54,7 @@ defmodule Aikido.Directive do
   @doc """
   Complete a signal envelope during directive execution.
 
-  Actions can return `struct!(Jido.Signal, id: nil, type: type, data: data, source: source)`
+  Actions can return `%Jido.Signal{id: nil, type: type, data: data, source: source}`
   without generating IDs or reading the clock. Emit, Schedule and Cron supply
   that runtime metadata here. Fully constructed signals retain their identity.
   This function performs runtime work and must not be called from an action.

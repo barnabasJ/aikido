@@ -1,5 +1,10 @@
 defmodule Aikido.Slices.AiWorker.Observe do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that defers worker settlement until AI state has been committed.
+
+  Preserves worker `state` and returns an `Emit` directive to the owning agent
+  when work is pending or queued. Streaming signals do not trigger observations.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
@@ -9,12 +14,12 @@ defmodule Aikido.Slices.AiWorker.Observe do
     if (state.pending || Map.get(state, :queue, []) != []) &&
          input.context.aikido.signal.type != "ai.react.stream" do
       observe =
-        struct!(Jido.Signal,
+        %Jido.Signal{
           id: nil,
           type: "harness.ai.observe",
           data: %{task_id: state.pending && state.pending.task_id},
           source: "/aikido"
-        )
+        }
 
       Aikido.Types.ActionResult.new(
         state: state,

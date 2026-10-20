@@ -181,7 +181,7 @@ defmodule Aikido.ReactFeaturesTest do
     assert_receive {:model, worker, _}, 2_000
 
     turn =
-      struct!(ReqLLM.Response,
+      %ReqLLM.Response{
         id: "scripted",
         model: "offline",
         context: ReqLLM.Context.new(),
@@ -190,7 +190,7 @@ defmodule Aikido.ReactFeaturesTest do
             tool_calls: [%{id: "one", name: "test_wait", arguments: %{}}]
           ),
         finish_reason: :tool_calls
-      )
+      }
 
     send(worker, {:answer, {:ok, turn}})
     assert_receive {:tool_running, tool_worker}, 2_000

@@ -99,7 +99,7 @@ defmodule AgentExamples.NativeLuaToolsTest.Client do
 
     if last.role == :user do
       {:ok,
-       struct!(ReqLLM.Response,
+       %ReqLLM.Response{
          id: "scripted",
          model: "offline",
          context: ReqLLM.Context.new(),
@@ -110,16 +110,16 @@ defmodule AgentExamples.NativeLuaToolsTest.Client do
              ]
            ),
          finish_reason: :tool_calls
-       )}
+       }}
     else
       {:ok,
-       struct!(ReqLLM.Response,
+       %ReqLLM.Response{
          id: "scripted",
          model: "offline",
          context: ReqLLM.Context.new(),
          message: ReqLLM.Context.assistant(text, tool_calls: []),
          finish_reason: :stop
-       )}
+       }}
     end
   end
 end

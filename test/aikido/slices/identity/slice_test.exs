@@ -75,11 +75,14 @@ defmodule AikidoTest.Identity.SliceTest do
 
       {:ok, %{agent: agent}, []} =
         Aikido.AgentServer.apply_actions(
-          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(
-              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
-            ),
+            Aikido.SignalCtx.ctx(%Jido.Signal{
+              id: nil,
+              type: "test.action",
+              data: %{},
+              source: "/test"
+            }),
             Map.merge(%{}, %{
               agent_module: AikidoTest.Identity.SliceTest.AgentWithIdentity,
               agent: agent,
@@ -97,11 +100,14 @@ defmodule AikidoTest.Identity.SliceTest do
 
       {:ok, %{agent: agent}, []} =
         Aikido.AgentServer.apply_actions(
-          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(
-              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
-            ),
+            Aikido.SignalCtx.ctx(%Jido.Signal{
+              id: nil,
+              type: "test.action",
+              data: %{},
+              source: "/test"
+            }),
             Map.merge(%{}, %{
               agent_module: AikidoTest.Identity.SliceTest.AgentWithIdentity,
               agent: agent,

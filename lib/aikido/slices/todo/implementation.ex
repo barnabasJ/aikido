@@ -1,5 +1,12 @@
 defmodule Aikido.Slices.Todo.Implementation do
-  @moduledoc false
+  @moduledoc """
+  Pure reducers for todo creation, status changes, removal and expiration.
+
+  The configured `:action` option selects the operation on `state` and `id`.
+  Returns updated items and revision with a change notification directive to the
+  owning agent, plus a deadline directive for timed additions. Stale expirations
+  and updates to completed items preserve state.
+  """
   use Ash.Resource.Actions.Implementation
 
   def run(input, [action: :remove], _context) do
@@ -15,12 +22,12 @@ defmodule Aikido.Slices.Todo.Implementation do
         },
         directives: [
           Aikido.Directives.emit_to_pid(
-            struct!(Jido.Signal,
+            %Jido.Signal{
               id: nil,
               type: "aikido.todo.changed",
               data: %{id: id, removed: true},
               source: "/aikido"
-            ),
+            },
             input.context.aikido.agent_pid
           )
         ]
@@ -95,12 +102,12 @@ defmodule Aikido.Slices.Todo.Implementation do
         state = %{state | items: items, revision: revision}
 
         changed =
-          struct!(Jido.Signal,
+          %Jido.Signal{
             id: nil,
             type: "aikido.todo.changed",
             data: %{id: data.id, item: next},
             source: "/aikido"
-          )
+          }
 
         effects = [Aikido.Directives.emit_to_pid(changed, input.context.aikido.agent_pid)]
 
@@ -110,12 +117,12 @@ defmodule Aikido.Slices.Todo.Implementation do
               [
                 Aikido.Directives.schedule(
                   data.timeout_ms,
-                  struct!(Jido.Signal,
+                  %Jido.Signal{
                     id: nil,
                     type: "aikido.todo.expire",
                     data: %{id: data.id, revision: revision},
                     source: "/aikido"
-                  )
+                  }
                 )
               ]
           else

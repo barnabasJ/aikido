@@ -1,5 +1,10 @@
 defmodule Aikido.Actions.Control.Forward do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that forwards the current signal to `target_pid`.
+
+  Optional `signal_type`, `payload` and `source` override the outgoing envelope.
+  Returns the supplied state and an `Emit` directive; delivery happens later.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
@@ -13,7 +18,7 @@ defmodule Aikido.Actions.Control.Forward do
     final_source = resolve_source(source, original)
 
     out_signal =
-      struct!(Jido.Signal, id: nil, type: final_type, data: final_payload, source: final_source)
+      %Jido.Signal{id: nil, type: final_type, data: final_payload, source: final_source}
 
     directive = Aikido.Directives.emit_to_pid(out_signal, pid)
     Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [directive])

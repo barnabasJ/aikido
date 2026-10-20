@@ -109,7 +109,7 @@ defmodule AikidoTest.SignalCtxTest do
     test "without an explicit signal, ctx defaults to %{}" do
       assert {:ok,
               %Aikido.Types.ActionResult{state: %{workflow_id: nil, user: nil}, directives: []}} =
-               then(struct!(Jido.Signal, id: nil, type: "test", source: "/test"), fn signal ->
+               then(%Jido.Signal{id: nil, type: "test", source: "/test"}, fn signal ->
                  AikidoTest.SignalCtxTest.ContextProbe
                  |> Ash.ActionInput.for_action(
                    :context_probe,

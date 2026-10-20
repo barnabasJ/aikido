@@ -1,5 +1,11 @@
 defmodule Aikido.Slices.Memory.Implementation do
-  @moduledoc false
+  @moduledoc """
+  Pure reducers for named memory spaces and their map or list contents.
+
+  The configured `:action` option selects initialization, space replacement or a
+  content update. Returns the next memory state without directives, deriving
+  missing IDs and timestamps deterministically from the input context.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, [action: :append_to_space], _context) do

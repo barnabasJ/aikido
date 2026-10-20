@@ -7,13 +7,12 @@ defmodule AikidoTest.ObserverSafety.Reducer do
     directives =
       for label <- [:first, :second] do
         %Aikido.Directives.Emit{
-          signal:
-            struct!(Jido.Signal,
-              id: nil,
-              source: "/observer",
-              type: "observer.effect",
-              data: %{label: label}
-            ),
+          signal: %Jido.Signal{
+            id: nil,
+            source: "/observer",
+            type: "observer.effect",
+            data: %{label: label}
+          },
           dispatch: {:pid, target: input.arguments.target}
         }
       end

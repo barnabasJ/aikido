@@ -1,5 +1,12 @@
 defmodule Aikido.Slices.AiReact.Implementation do
-  @moduledoc false
+  @moduledoc """
+  Pure reducers for the ReAct conversation and run lifecycle.
+
+  The configured `:action` option selects the command or result handler. Native
+  arguments supply `state`, request correlation and payload; returned state tracks
+  conversation, tools and hooks. Preparation, model, tool and hook work is returned
+  as directives, with context handoff and todo completion planned between steps.
+  """
   use Ash.Resource.Actions.Implementation
 
   alias Aikido.AI.Context, as: Conversation

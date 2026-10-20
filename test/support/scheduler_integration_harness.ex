@@ -30,7 +30,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Impl
 
     message =
       Map.get(params, :message) ||
-        struct!(Jido.Signal, id: nil, type: "cron.tick", data: %{}, source: "/test")
+        %Jido.Signal{id: nil, type: "cron.tick", data: %{}, source: "/test"}
 
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
     Aikido.Types.ActionResult.new(state: slice, directives: [directive])
@@ -149,7 +149,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
       Keyword.get(
         opts,
         :message,
-        struct!(Jido.Signal, id: nil, type: "cron.tick", source: "/test")
+        %Jido.Signal{id: nil, type: "cron.tick", source: "/test"}
       )
 
     signal =

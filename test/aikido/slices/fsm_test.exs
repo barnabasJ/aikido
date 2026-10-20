@@ -74,11 +74,14 @@ defmodule AikidoTest.Slices.FSMTest do
 
       {:ok, %{agent: agent}, _} =
         Aikido.AgentServer.apply_actions(
-          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(
-              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
-            ),
+            Aikido.SignalCtx.ctx(%Jido.Signal{
+              id: nil,
+              type: "test.action",
+              data: %{},
+              source: "/test"
+            }),
             Map.merge(%{}, %{
               agent_module: AikidoTest.Slices.FSMTest.DefaultFSMAgent,
               agent: agent,
@@ -97,11 +100,14 @@ defmodule AikidoTest.Slices.FSMTest do
 
       {:ok, %{agent: agent}, _} =
         Aikido.AgentServer.apply_actions(
-          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(
-              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
-            ),
+            Aikido.SignalCtx.ctx(%Jido.Signal{
+              id: nil,
+              type: "test.action",
+              data: %{},
+              source: "/test"
+            }),
             Map.merge(%{}, %{
               agent_module: AikidoTest.Slices.FSMTest.DefaultFSMAgent,
               agent: agent,
@@ -113,11 +119,14 @@ defmodule AikidoTest.Slices.FSMTest do
 
       {:ok, %{agent: agent}, _} =
         Aikido.AgentServer.apply_actions(
-          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(
-              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
-            ),
+            Aikido.SignalCtx.ctx(%Jido.Signal{
+              id: nil,
+              type: "test.action",
+              data: %{},
+              source: "/test"
+            }),
             Map.merge(%{}, %{
               agent_module: AikidoTest.Slices.FSMTest.DefaultFSMAgent,
               agent: agent,
@@ -190,11 +199,14 @@ defmodule AikidoTest.Slices.FSMTest do
 
       {:ok, %{agent: agent}, _} =
         Aikido.AgentServer.apply_actions(
-          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(
-              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
-            ),
+            Aikido.SignalCtx.ctx(%Jido.Signal{
+              id: nil,
+              type: "test.action",
+              data: %{},
+              source: "/test"
+            }),
             Map.merge(%{}, %{
               agent_module: AikidoTest.Slices.FSMTest.ConfiguredFSMAgent,
               agent: agent,
@@ -208,11 +220,14 @@ defmodule AikidoTest.Slices.FSMTest do
 
       {:ok, %{agent: agent}, _} =
         Aikido.AgentServer.apply_actions(
-          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(
-              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
-            ),
+            Aikido.SignalCtx.ctx(%Jido.Signal{
+              id: nil,
+              type: "test.action",
+              data: %{},
+              source: "/test"
+            }),
             Map.merge(%{}, %{
               agent_module: AikidoTest.Slices.FSMTest.ConfiguredFSMAgent,
               agent: agent,
@@ -231,16 +246,14 @@ defmodule AikidoTest.Slices.FSMTest do
 
       assert {:error, _, _reason} =
                Aikido.AgentServer.apply_actions(
-                 struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+                 %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
                  Map.merge(
-                   Aikido.SignalCtx.ctx(
-                     struct!(Jido.Signal,
-                       id: nil,
-                       type: "test.action",
-                       data: %{},
-                       source: "/test"
-                     )
-                   ),
+                   Aikido.SignalCtx.ctx(%Jido.Signal{
+                     id: nil,
+                     type: "test.action",
+                     data: %{},
+                     source: "/test"
+                   }),
                    Map.merge(%{}, %{
                      agent_module: AikidoTest.Slices.FSMTest.ConfiguredFSMAgent,
                      agent: agent,

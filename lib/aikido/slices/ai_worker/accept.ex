@@ -1,5 +1,10 @@
 defmodule Aikido.Slices.AiWorker.Accept do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that accepts a correlated team task and its caller scope.
+
+  Ignores duplicate task IDs, queues work while AI is busy, or returns updated
+  worker state and an `Emit` directive starting an AI request on the owning agent.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
@@ -45,7 +50,7 @@ defmodule Aikido.Slices.AiWorker.Accept do
       |> Map.merge(%{query: data.text, request_id: data.task_id})
 
     ask =
-      struct!(Jido.Signal, id: nil, type: "ai.react.ask", data: payload, source: "/aikido")
+      %Jido.Signal{id: nil, type: "ai.react.ask", data: payload, source: "/aikido"}
       |> Aikido.SignalCtx.put_ctx(Map.get(data, :signal_context, %{}))
 
     Aikido.Types.ActionResult.new(

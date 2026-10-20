@@ -1,5 +1,10 @@
 defmodule Aikido.Actions.Scheduling.ScheduleCron do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that prepares a recurring signal from `cron` and `signal_type`.
+
+  Preserves `state` and returns a `Cron` directive with `payload`, optional
+  `job_id` and `timezone`. Signal metadata and registration are deferred to execution.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
@@ -8,7 +13,7 @@ defmodule Aikido.Actions.Scheduling.ScheduleCron do
     type = input.arguments[:signal_type]
     payload = input.arguments[:payload]
     tz = input.arguments[:timezone]
-    signal = struct!(Jido.Signal, id: nil, type: type, data: payload, source: "/cron")
+    signal = %Jido.Signal{id: nil, type: type, data: payload, source: "/cron"}
 
     opts =
       if is_nil(job_id), do: [], else: [job_id: job_id]

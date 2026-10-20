@@ -1,5 +1,11 @@
 defmodule Aikido.Slices.Thread.Implementation do
-  @moduledoc false
+  @moduledoc """
+  Pure reducers for thread initialization, entry append and clearing.
+
+  The configured `:action` option selects `:ensure`, `:append` or `:clear`.
+  Returns the next thread state without directives, using the input signal for
+  timestamps and stable thread/entry identifiers.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, [action: :append], _context) do

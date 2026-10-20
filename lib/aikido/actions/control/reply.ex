@@ -1,5 +1,10 @@
 defmodule Aikido.Actions.Control.Reply do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that replies to the PID in the current signal's `data.reply_to`.
+
+  Uses `signal_type` and `payload` to return an `Emit` directive while preserving
+  `state`. Returns no directives when the signal has no reply PID.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
@@ -9,7 +14,7 @@ defmodule Aikido.Actions.Control.Reply do
 
     case extract_reply_to(signal) do
       {:ok, pid} ->
-        out = struct!(Jido.Signal, id: nil, type: type, data: payload, source: "/reply")
+        out = %Jido.Signal{id: nil, type: type, data: payload, source: "/reply"}
         directive = Aikido.Directives.emit_to_pid(out, pid)
         Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [directive])
 

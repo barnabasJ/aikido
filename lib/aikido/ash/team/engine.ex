@@ -90,12 +90,12 @@ defmodule Aikido.Ash.Team.Engine do
       timer =
         Directives.schedule(
           config.timeout,
-          struct!(Signal,
+          %Signal{
             id: nil,
             type: "aikido.ash.team.timeout",
             data: %{operation_id: signal.id},
             source: "/aikido"
-          )
+          }
         )
 
       {:ok, state, directives ++ [timer]}
@@ -227,25 +227,23 @@ defmodule Aikido.Ash.Team.Engine do
     state = put_in(state.operation.status, :completed)
 
     completed =
-      struct!(Signal,
+      %Signal{
         id: nil,
         type: "aikido.ash.team.operation.completed",
         data: %{operation_id: state.operation.id},
         source: "/aikido"
-      )
+      }
 
     pending = Map.get(state, :pending_tasks, %{})
 
     dispatch =
       Enum.map(pending, fn {id, data} ->
-        Directives.emit(
-          struct!(Signal,
-            id: nil,
-            type: "aikido.ash.team.assign_task",
-            data: Map.put(data, :task_id, id),
-            source: "/aikido"
-          )
-        )
+        Directives.emit(%Signal{
+          id: nil,
+          type: "aikido.ash.team.assign_task",
+          data: Map.put(data, :task_id, id),
+          source: "/aikido"
+        })
       end)
 
     recovered =
@@ -446,14 +444,12 @@ defmodule Aikido.Ash.Team.Engine do
           if Map.has_key?(state.topology.nodes, name) and
                not Map.has_key?(state.paused, name) and state.operation.status != :running do
             [
-              Directives.emit(
-                struct!(Signal,
-                  id: nil,
-                  type: "aikido.ash.team.reconcile",
-                  data: %{members: affected, replace: affected -- [name]},
-                  source: "/aikido"
-                )
-              )
+              Directives.emit(%Signal{
+                id: nil,
+                type: "aikido.ash.team.reconcile",
+                data: %{members: affected, replace: affected -- [name]},
+                source: "/aikido"
+              })
             ]
           else
             []
@@ -474,12 +470,7 @@ defmodule Aikido.Ash.Team.Engine do
   defp send_message(data, state) do
     with {:ok, pid} <- fetch_member(state, data.member) do
       signal =
-        struct!(Signal,
-          id: nil,
-          type: data.type,
-          data: Map.get(data, :payload, %{}),
-          source: "/ash/team"
-        )
+        %Signal{id: nil, type: data.type, data: Map.get(data, :payload, %{}), source: "/ash/team"}
 
       {:ok, state, [Directives.emit_to_pid(signal, pid)]}
     end
@@ -496,12 +487,7 @@ defmodule Aikido.Ash.Team.Engine do
              end
            end) do
       signal =
-        struct!(Signal,
-          id: nil,
-          type: data.type,
-          data: Map.get(data, :payload, %{}),
-          source: "/ash/team"
-        )
+        %Signal{id: nil, type: data.type, data: Map.get(data, :payload, %{}), source: "/ash/team"}
 
       {:ok, state, Enum.map(pids, &Directives.emit_to_pid(signal, &1))}
     end
@@ -544,7 +530,7 @@ defmodule Aikido.Ash.Team.Engine do
     with true <- !Map.has_key?(state.tasks, id) || {:error, {:task_exists, id}},
          {:ok, pid} <- fetch_member(state, data.member) do
       outgoing =
-        struct!(Signal,
+        %Signal{
           id: nil,
           type: Map.get(data, :type, "harness.task"),
           data:
@@ -556,7 +542,7 @@ defmodule Aikido.Ash.Team.Engine do
               attempt: state.incarnations[data.member]
             }),
           source: "/ash/team"
-        )
+        }
 
       task = %{
         id: id,
@@ -578,7 +564,7 @@ defmodule Aikido.Ash.Team.Engine do
               [
                 Directives.schedule(
                   timeout,
-                  struct!(Signal,
+                  %Signal{
                     id: nil,
                     type: "aikido.ash.team.task.timeout",
                     data: %{
@@ -586,7 +572,7 @@ defmodule Aikido.Ash.Team.Engine do
                       attempt: task.attempt
                     },
                     source: "/aikido"
-                  )
+                  }
                 )
               ],
           else: effects
@@ -622,12 +608,12 @@ defmodule Aikido.Ash.Team.Engine do
             pid ->
               [
                 Directives.emit_to_pid(
-                  struct!(Signal,
+                  %Signal{
                     id: nil,
                     type: "harness.cancel_task",
                     data: %{task_id: task.id},
                     source: "/aikido"
-                  ),
+                  },
                   pid
                 )
               ]
@@ -654,7 +640,7 @@ defmodule Aikido.Ash.Team.Engine do
           inspect(task.result, limit: 100, printable_limit: 4_000)
 
       signal =
-        struct!(Signal,
+        %Signal{
           id: nil,
           type: "ai.react.deliver",
           data: %{
@@ -663,7 +649,7 @@ defmodule Aikido.Ash.Team.Engine do
             metadata: %{task: Map.take(task, [:id, :member, :status, :result, :metadata])}
           },
           source: "/aikido"
-        )
+        }
 
       [Directives.emit_to_pid(signal, pid)]
     else

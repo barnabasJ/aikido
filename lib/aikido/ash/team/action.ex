@@ -1,5 +1,11 @@
 defmodule Aikido.Ash.Team.Action do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer adapter for the team lifecycle and task protocol.
+
+  Combines native payload arguments with the current signal, passes `state` and
+  the owning agent's team configuration to the team engine, and returns its next
+  team state and directives. The signal type selects the operation.
+  """
   use Ash.Resource.Actions.Implementation
 
   @impl true

@@ -15,13 +15,13 @@ defmodule Aikido.TeamDeliveryTest.Client do
     text = messages |> List.last() |> Map.fetch!(:content) |> Enum.map_join(& &1.text)
 
     {:ok,
-     struct!(ReqLLM.Response,
+     %ReqLLM.Response{
        id: "scripted",
        model: "offline",
        context: ReqLLM.Context.new(),
        message: ReqLLM.Context.assistant(text, tool_calls: []),
        finish_reason: :stop
-     )}
+     }}
   end
 end
 
@@ -180,7 +180,7 @@ defmodule Aikido.TeamDeliveryTest do
     )
 
     tool_turn =
-      struct!(ReqLLM.Response,
+      %ReqLLM.Response{
         id: "scripted",
         model: "offline",
         context: ReqLLM.Context.new(),
@@ -189,16 +189,16 @@ defmodule Aikido.TeamDeliveryTest do
             tool_calls: [%{id: "identity", name: "test_identity", arguments: %{}}]
           ),
         finish_reason: :tool_calls
-      )
+      }
 
     final =
-      struct!(ReqLLM.Response,
+      %ReqLLM.Response{
         id: "scripted",
         model: "offline",
         context: ReqLLM.Context.new(),
         message: ReqLLM.Context.assistant("done", tool_calls: []),
         finish_reason: :stop
-      )
+      }
 
     send(first, {:answer, tool_turn})
     assert_receive {:tool_scope, "alice", "a"}, 2_000
@@ -243,13 +243,13 @@ defmodule Aikido.TeamDeliveryTest do
     send(
       next,
       {:answer,
-       struct!(ReqLLM.Response,
+       %ReqLLM.Response{
          id: "scripted",
          model: "offline",
          context: ReqLLM.Context.new(),
          message: ReqLLM.Context.assistant("done", tool_calls: []),
          finish_reason: :stop
-       )}
+       }}
     )
   end
 
@@ -306,13 +306,13 @@ defmodule Aikido.TeamDeliveryTest do
     send(
       next,
       {:answer,
-       struct!(ReqLLM.Response,
+       %ReqLLM.Response{
          id: "scripted",
          model: "offline",
          context: ReqLLM.Context.new(),
          message: ReqLLM.Context.assistant("done", tool_calls: []),
          finish_reason: :stop
-       )}
+       }}
     )
 
     assert_receive {:aikido_subscription, ^completed, %{result: {:ok, "done"}}}, 2_000

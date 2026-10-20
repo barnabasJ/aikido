@@ -24,13 +24,13 @@ defmodule Aikido.NativeToolResultsTest.Client do
       end
 
     {:ok,
-     struct!(ReqLLM.Response,
+     %ReqLLM.Response{
        id: "native-results",
        model: "offline",
        context: ReqLLM.Context.new(),
        message: ReqLLM.Context.assistant(if(done?, do: "complete", else: ""), tool_calls: calls),
        finish_reason: if(done?, do: :stop, else: :tool_calls)
-     )}
+     }}
   end
 
   def output(%{"index" => index}, context),

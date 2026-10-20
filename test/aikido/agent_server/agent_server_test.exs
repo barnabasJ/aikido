@@ -627,7 +627,7 @@ defmodule AikidoTest.AgentServerTest do
           slice = input.arguments.state
 
           scheduled =
-            struct!(Jido.Signal, id: nil, type: "scheduled.ping", data: %{}, source: "/test")
+            %Jido.Signal{id: nil, type: "scheduled.ping", data: %{}, source: "/test"}
 
           Aikido.Types.ActionResult.new(
             state: slice,
@@ -713,7 +713,7 @@ defmodule AikidoTest.AgentServerTest do
 
           directives =
             for i <- 1..3 do
-              sig = struct!(Jido.Signal, id: nil, type: "tick", data: %{n: i}, source: "/test")
+              sig = %Jido.Signal{id: nil, type: "tick", data: %{n: i}, source: "/test"}
               %Aikido.Directives.Schedule{delay_ms: i * 20, message: sig}
             end
 

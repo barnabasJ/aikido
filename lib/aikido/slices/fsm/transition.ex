@@ -1,5 +1,10 @@
 defmodule Aikido.Slices.FSM.Transition do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer for a finite-state machine transition to `to`.
+
+  Checks the supplied slice's transition map, then returns updated state, history
+  and terminal status without directives. Disallowed transitions return an error.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do

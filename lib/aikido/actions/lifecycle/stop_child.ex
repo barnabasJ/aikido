@@ -1,5 +1,10 @@
 defmodule Aikido.Actions.Lifecycle.StopChild do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that requests termination of the child identified by `tag`.
+
+  Preserves `state` and returns a `StopChild` directive carrying the supplied
+  `reason`; child signaling and runtime bookkeeping happen outside this reducer.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do

@@ -84,7 +84,7 @@ defmodule Aikido.PureActionsTest do
     signal = Jido.Signal.new!("test.input", %{}) |> SignalCtx.put(:tenant, "tenant")
 
     envelope =
-      struct!(Jido.Signal, id: nil, source: "/test", type: "test.output", data: %{value: 1})
+      %Jido.Signal{id: nil, source: "/test", type: "test.output", data: %{value: 1}}
 
     runtime =
       struct(Aikido.AgentServer.State,

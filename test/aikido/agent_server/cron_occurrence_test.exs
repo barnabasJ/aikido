@@ -2,7 +2,7 @@ defmodule AikidoTest.AgentServer.CronOccurrenceTest do
   use ExUnit.Case, async: true
 
   test "each generated occurrence gets its own envelope after registration" do
-    template = struct!(Jido.Signal, id: nil, type: "test.tick", source: "/test", data: %{v: 1})
+    template = %Jido.Signal{id: nil, type: "test.tick", source: "/test", data: %{v: 1}}
 
     for spec <- [
           Aikido.AgentServer.CronRuntimeSpec.schedule("@yearly", "test.tick", nil, %{v: 1}),
@@ -10,12 +10,12 @@ defmodule AikidoTest.AgentServer.CronOccurrenceTest do
           Aikido.AgentServer.CronRuntimeSpec.dynamic("@yearly", :tick)
         ] do
       runtime =
-        struct!(Aikido.AgentServer.State,
+        %Aikido.AgentServer.State{
           id: "occurrences",
           agent_module: __MODULE__,
           agent: %{},
           aikido: nil
-        )
+        }
 
       {:ok, job} = Aikido.AgentServer.start_runtime_cron_job(runtime, :tick, spec)
       on_exit(fn -> Aikido.Scheduler.cancel(job) end)
@@ -33,16 +33,11 @@ defmodule AikidoTest.AgentServer.CronOccurrenceTest do
   end
 
   test "Cron retains an incomplete descriptor for later occurrences" do
-    template = struct!(Jido.Signal, id: nil, type: "test.tick", source: "/test", data: %{v: 1})
+    template = %Jido.Signal{id: nil, type: "test.tick", source: "/test", data: %{v: 1}}
     input = Jido.Signal.new!("test.register", %{})
 
     runtime =
-      struct!(Aikido.AgentServer.State,
-        id: "template",
-        agent_module: __MODULE__,
-        agent: %{},
-        aikido: nil
-      )
+      %Aikido.AgentServer.State{id: "template", agent_module: __MODULE__, agent: %{}, aikido: nil}
 
     directive = %Aikido.Directives.Cron{cron: "@yearly", job_id: :tick, message: template}
     assert :ok = Aikido.Directive.exec(directive, input, runtime)

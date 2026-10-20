@@ -1,5 +1,10 @@
 defmodule Aikido.Slices.AiWorker.Cancel do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that removes `task_id` from the worker queue.
+
+  When that task is active, clears its pending record and returns an `Emit`
+  directive cancelling the matching AI request on the owning agent.
+  """
   use Ash.Resource.Actions.Implementation
 
   def run(input, _, _) do
@@ -9,12 +14,7 @@ defmodule Aikido.Slices.AiWorker.Cancel do
 
     if state.pending && state.pending.task_id == id do
       signal =
-        struct!(Jido.Signal,
-          id: nil,
-          type: "ai.react.cancel",
-          data: %{request_id: id},
-          source: "/aikido"
-        )
+        %Jido.Signal{id: nil, type: "ai.react.cancel", data: %{request_id: id}, source: "/aikido"}
 
       Aikido.Types.ActionResult.new(
         state: %{state | pending: nil},

@@ -4,7 +4,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation do
   @impl true
   def run(_input, _opts, _context) do
     signal =
-      struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test")
+      %Jido.Signal{id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test"}
 
     Aikido.Types.ActionResult.new(
       state: %{},
@@ -146,11 +146,14 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
 
       {:ok, %{agent: updated}, _directives} =
         Aikido.AgentServer.apply_actions(
-          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          %Jido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
           Map.merge(
-            Aikido.SignalCtx.ctx(
-              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
-            ),
+            Aikido.SignalCtx.ctx(%Jido.Signal{
+              id: nil,
+              type: "test.action",
+              data: %{},
+              source: "/test"
+            }),
             Map.merge(%{}, %{
               agent_module: AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
               agent: agent,

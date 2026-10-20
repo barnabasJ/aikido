@@ -1,5 +1,10 @@
 defmodule Aikido.Actions.Control.Cancel do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that marks the supplied `state` as failed with a cancellation reason.
+
+  Preserves unrelated fields, validates resource attributes through Ash when state
+  is a struct, and returns the updated state without directives.
+  """
   use Ash.Resource.Actions.Implementation
 
   @impl true

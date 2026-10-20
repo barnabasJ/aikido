@@ -12,13 +12,13 @@ defmodule Aikido.TodoTest.Client do
   def generate_text(_, _, _),
     do:
       {:ok,
-       struct!(ReqLLM.Response,
+       %ReqLLM.Response{
          id: "scripted",
          model: "offline",
          context: ReqLLM.Context.new(),
          message: ReqLLM.Context.assistant("finished", tool_calls: []),
          finish_reason: :stop
-       )}
+       }}
 end
 
 defmodule Aikido.TodoTest do

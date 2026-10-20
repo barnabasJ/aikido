@@ -1,5 +1,11 @@
 defmodule Aikido.Slices.AiWorker.Settle do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that correlates an observation with the pending task's AI run.
+
+  For a terminal result, clears pending state, increments the completion count and
+  returns a reply directive to the assigning team. Starts the next queued task by
+  directive when AI is available; unrelated results cannot complete a pending task.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
@@ -26,12 +32,12 @@ defmodule Aikido.Slices.AiWorker.Settle do
         end
 
       reply =
-        struct!(Jido.Signal,
+        %Jido.Signal{
           id: nil,
           type: type,
           data: Map.merge(Map.take(pending, [:task_id, :member, :attempt]), %{result: result}),
           source: "/aikido"
-        )
+        }
 
       next(%{state | pending: nil, completed: state.completed + 1}, context, [
         Aikido.Directives.emit_to_pid(reply, pending.reply_to)

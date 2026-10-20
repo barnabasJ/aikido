@@ -109,7 +109,7 @@ defmodule Aikido.NativeActionTest do
   defp run(action, params \\ %{}, context \\ %{state: %{count: 2}}) do
     signal =
       Map.get(context, :signal) ||
-        struct!(Jido.Signal, id: nil, type: "test.action", data: params, source: "/test")
+        %Jido.Signal{id: nil, type: "test.action", data: params, source: "/test"}
 
     signal = %{signal | data: params}
     runtime = Map.merge(Aikido.SignalCtx.ctx(signal), Map.get(context, :ctx, %{}))

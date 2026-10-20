@@ -26,7 +26,7 @@ defmodule AgentExamples.AI.ScriptedClient do
     cond do
       tools == [] && String.starts_with?(query, "This conversation is about to be replaced") ->
         {:ok,
-         struct!(ReqLLM.Response,
+         %ReqLLM.Response{
            id: "scripted",
            model: "offline",
            context: ReqLLM.Context.new(),
@@ -36,7 +36,7 @@ defmodule AgentExamples.AI.ScriptedClient do
                tool_calls: []
              ),
            finish_reason: :stop
-         )}
+         }}
 
       String.starts_with?(query, "orchestrate:") &&
           ("spawn_worker" in tools || "run_lua" in tools) ->
@@ -52,13 +52,13 @@ defmodule AgentExamples.AI.ScriptedClient do
               do: call(name, arguments(name, query))
 
         {:ok,
-         struct!(ReqLLM.Response,
+         %ReqLLM.Response{
            id: "scripted",
            model: "offline",
            context: ReqLLM.Context.new(),
            message: ReqLLM.Context.assistant("", tool_calls: calls),
            finish_reason: :tool_calls
-         )}
+         }}
 
       true ->
         final(results)
@@ -140,7 +140,7 @@ defmodule AgentExamples.AI.ScriptedClient do
   defp tool(name, arguments),
     do:
       {:ok,
-       struct!(ReqLLM.Response,
+       %ReqLLM.Response{
          id: "scripted",
          model: "offline",
          context: ReqLLM.Context.new(),
@@ -153,7 +153,7 @@ defmodule AgentExamples.AI.ScriptedClient do
              ]
            ),
          finish_reason: :tool_calls
-       )}
+       }}
 
   defp call(name, arguments),
     do: %{id: Ash.UUIDv7.generate(), name: name, arguments: arguments}
@@ -199,13 +199,13 @@ defmodule AgentExamples.AI.ScriptedClient do
       end)
 
     {:ok,
-     struct!(ReqLLM.Response,
+     %ReqLLM.Response{
        id: "scripted",
        model: "offline",
        context: ReqLLM.Context.new(),
        message: ReqLLM.Context.assistant(output, tool_calls: []),
        finish_reason: :stop
-     )}
+     }}
   end
 
   defp text(message), do: Enum.map_join(message.content, "", &(&1.text || ""))

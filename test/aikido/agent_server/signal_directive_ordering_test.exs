@@ -5,7 +5,7 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Impleme
   def run(input, _opts, _context) do
     slice = input.arguments.state
     slice = slice || %{}
-    followup = struct!(Jido.Signal, id: nil, type: "step1.followup", source: "/test", data: %{})
+    followup = %Jido.Signal{id: nil, type: "step1.followup", source: "/test", data: %{}}
 
     Aikido.Types.ActionResult.new(
       state: Map.put(slice, :step1_action_ran, true),

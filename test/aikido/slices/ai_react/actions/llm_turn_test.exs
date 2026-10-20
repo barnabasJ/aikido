@@ -47,13 +47,13 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
         ])
 
       response =
-        struct!(ReqLLM.Response,
+        %ReqLLM.Response{
           id: "provider-response",
           model: "offline",
           context: Context.new(),
           message: message,
           finish_reason: if(tool_calls == [], do: :stop, else: :tool_calls)
-        )
+        }
 
       assert {:ok, %Aikido.Types.ActionResult{state: state, directives: _directives}} =
                then(signal("req_1", response), fn signal ->
@@ -73,23 +73,23 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
   end
 
   defp final_turn(text) do
-    struct!(ReqLLM.Response,
+    %ReqLLM.Response{
       id: "scripted",
       model: "offline",
       context: ReqLLM.Context.new(),
       message: ReqLLM.Context.assistant(text, tool_calls: []),
       finish_reason: :stop
-    )
+    }
   end
 
   defp tool_turn(calls, opts \\ []) do
-    struct!(ReqLLM.Response,
+    %ReqLLM.Response{
       id: "scripted",
       model: "offline",
       context: ReqLLM.Context.new(),
       message: ReqLLM.Context.assistant(Keyword.get(opts, :text, ""), tool_calls: calls),
       finish_reason: :tool_calls
-    )
+    }
   end
 
   describe("final answer turn") do
@@ -231,13 +231,13 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
         )
 
       response =
-        struct!(ReqLLM.Response,
+        %ReqLLM.Response{
           id: "empty",
           model: "offline",
           context: Context.new(),
           message: message,
           finish_reason: :tool_calls
-        )
+        }
 
       {:ok, hook} =
         Ash.Type.cast_input(Aikido.Hooks.Hook, %{

@@ -49,7 +49,7 @@ defmodule Aikido.HooksScopeTest.Client do
     done? = Enum.any?(messages, &(&1.role == :tool))
 
     {:ok,
-     struct!(ReqLLM.Response,
+     %ReqLLM.Response{
        id: "scope-tool",
        model: "offline",
        context: ReqLLM.Context.new(),
@@ -59,7 +59,7 @@ defmodule Aikido.HooksScopeTest.Client do
              if(done?, do: [], else: [ReqLLM.ToolCall.new("scope-call", "scope_callback", "{}")])
          ),
        finish_reason: if(done?, do: :stop, else: :tool_calls)
-     )}
+     }}
   end
 
   def generate_text(_, _, opts) do
@@ -68,13 +68,13 @@ defmodule Aikido.HooksScopeTest.Client do
     receive do
       :finish ->
         {:ok,
-         struct!(ReqLLM.Response,
+         %ReqLLM.Response{
            id: "hook",
            model: "offline",
            context: ReqLLM.Context.new(),
            message: ReqLLM.Context.assistant("done"),
            finish_reason: :stop
-         )}
+         }}
     end
   end
 

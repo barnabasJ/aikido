@@ -16,13 +16,13 @@ defmodule Aikido.HookRequestsTest.Client do
     text = messages |> Enum.flat_map(& &1.content) |> Enum.map_join("\n", & &1.text)
 
     {:ok,
-     struct!(ReqLLM.Response,
+     %ReqLLM.Response{
        id: "scripted",
        model: "offline",
        context: ReqLLM.Context.new(),
        message: ReqLLM.Context.assistant(text, tool_calls: []),
        finish_reason: :stop
-     )}
+     }}
   end
 end
 

@@ -150,7 +150,7 @@ defmodule Aikido.AshScopeTest do
       )
 
     turn =
-      struct!(ReqLLM.Response,
+      %ReqLLM.Response{
         id: "scripted",
         model: "offline",
         context: ReqLLM.Context.new(),
@@ -159,7 +159,7 @@ defmodule Aikido.AshScopeTest do
             tool_calls: [%{id: "identity", name: tool.name, arguments: %{}}]
           ),
         finish_reason: :tool_calls
-      )
+      }
 
     send(model, {:answer, {:ok, turn}})
     assert_receive {:model, next, messages}, 2_000
@@ -171,13 +171,13 @@ defmodule Aikido.AshScopeTest do
       next,
       {:answer,
        {:ok,
-        struct!(ReqLLM.Response,
+        %ReqLLM.Response{
           id: "scripted",
           model: "offline",
           context: ReqLLM.Context.new(),
           message: ReqLLM.Context.assistant("done", tool_calls: []),
           finish_reason: :stop
-        )}}
+        }}}
     )
   end
 end

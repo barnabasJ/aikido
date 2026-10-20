@@ -1,9 +1,10 @@
 defmodule Aikido.AgentServer.Actions.QueryChildren do
   @moduledoc """
-  Implements the runtime's `:query_children` generic action.
+  Pure reducer for the runtime's `:query_children` action.
 
-  Returns a reply directive that projects children from runtime bookkeeping
-  during execution, without changing domain state.
+  Reads reply routing from the current signal and returns an empty `SliceUpdate`
+  with a reply directive. That directive projects child PIDs from live runtime
+  bookkeeping during execution, leaving domain state unchanged.
   """
   use Ash.Resource.Actions.Implementation
 

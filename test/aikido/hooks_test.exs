@@ -15,7 +15,7 @@ defmodule Aikido.HooksTest.Client do
   def generate_text(model, messages, _opts) do
     if model == "tools" && not Enum.any?(messages, &(&1.role == :tool)) do
       {:ok,
-       struct!(ReqLLM.Response,
+       %ReqLLM.Response{
          id: "scripted",
          model: "offline",
          context: ReqLLM.Context.new(),
@@ -26,18 +26,18 @@ defmodule Aikido.HooksTest.Client do
              ]
            ),
          finish_reason: :tool_calls
-       )}
+       }}
     else
       text = messages |> Enum.flat_map(& &1.content) |> Enum.map_join("\n", &(&1.text || ""))
 
       {:ok,
-       struct!(ReqLLM.Response,
+       %ReqLLM.Response{
          id: "scripted",
          model: "offline",
          context: ReqLLM.Context.new(),
          message: ReqLLM.Context.assistant(text, tool_calls: []),
          finish_reason: :stop
-       )}
+       }}
     end
   end
 end
@@ -323,13 +323,13 @@ defmodule Aikido.HooksTest do
     assert waiting.hook_terminal == :completed
 
     turn =
-      struct!(ReqLLM.Response,
+      %ReqLLM.Response{
         id: "scripted",
         model: "offline",
         context: ReqLLM.Context.new(),
         message: ReqLLM.Context.assistant("late", tool_calls: []),
         finish_reason: :stop
-      )
+      }
 
     signal = Jido.Signal.new!("ai.react.llm.completed", %{request_id: "run", turn: turn})
 

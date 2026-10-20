@@ -31,13 +31,12 @@ defmodule AikidoTest.TracePropagation.Reducer do
       directives: [
         %Aikido.Directives.Schedule{
           delay_ms: 0,
-          message:
-            struct!(Jido.Signal,
-              id: nil,
-              type: "trace.finished",
-              data: %{value: value},
-              source: "/test"
-            )
+          message: %Jido.Signal{
+            id: nil,
+            type: "trace.finished",
+            data: %{value: value},
+            source: "/test"
+          }
         }
       ]
     )

@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Document each reusable native action implementation and replace static `struct!`
+  calls with compile-checked struct literals. Pure reducers continue to defer
+  signal ID and timestamp generation to directives.
+
+
 - Run all Argus BEAM analyses in the quality and CI checks, with strict failure
   handling and documented exclusions for reviewed framework/runtime patterns.
   Report AI cleanup callback failures while preserving the primary task result

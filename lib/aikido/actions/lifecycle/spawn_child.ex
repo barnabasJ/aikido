@@ -1,5 +1,10 @@
 defmodule Aikido.Actions.Lifecycle.SpawnChild do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that requests a child agent using `agent_module` and `tag`.
+
+  Returns the supplied `state` and a `SpawnAgent` directive carrying the child's
+  `initial_state`, `meta` and `restart?` policy. The directive performs activation.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do

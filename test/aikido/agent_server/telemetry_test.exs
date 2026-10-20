@@ -3,7 +3,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementatio
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
-    signal = struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{}, source: "/test")
+    signal = %Jido.Signal{id: nil, type: "test.emitted", data: %{}, source: "/test"}
 
     Aikido.Types.ActionResult.new(
       state: %{},

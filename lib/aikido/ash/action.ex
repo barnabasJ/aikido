@@ -1,5 +1,12 @@
 defmodule Aikido.Ash.Action do
-  @moduledoc false
+  @moduledoc """
+  I/O adapter for public agent lifecycle, signal and inspection actions.
+
+  Dispatches by the native action name: lifecycle commands activate or stop durable
+  agents, signal commands return processing receipts, and inspection/list commands
+  read live snapshots. Caller scope accompanies signal delivery; this adapter is
+  an external command boundary, not a state reducer.
+  """
   use Ash.Resource.Actions.Implementation
 
   @impl true

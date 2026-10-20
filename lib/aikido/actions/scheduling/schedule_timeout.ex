@@ -1,5 +1,10 @@
 defmodule Aikido.Actions.Scheduling.ScheduleTimeout do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that prepares a deadline signal after `timeout_ms`.
+
+  Returns the supplied `state` and a `Schedule` directive using `signal_type`
+  and a payload containing `timeout_id`.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
@@ -8,7 +13,7 @@ defmodule Aikido.Actions.Scheduling.ScheduleTimeout do
     type = input.arguments[:signal_type]
 
     signal =
-      struct!(Jido.Signal, id: nil, type: type, data: %{timeout_id: id}, source: "/timeout")
+      %Jido.Signal{id: nil, type: type, data: %{timeout_id: id}, source: "/timeout"}
 
     directive = Aikido.Directives.schedule(timeout, signal)
 

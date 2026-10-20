@@ -9,13 +9,13 @@ defmodule AgentExamples.AITest do
       send(probe, {:runtime_model_call, model, messages, options})
 
       {:ok,
-       struct!(ReqLLM.Response,
+       %ReqLLM.Response{
          id: "scripted",
          model: "offline",
          context: ReqLLM.Context.new(),
          message: ReqLLM.Context.assistant("runtime configured", tool_calls: []),
          finish_reason: :stop
-       )}
+       }}
     end
   end
 

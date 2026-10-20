@@ -28,7 +28,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implemen
 
     message =
       Map.get(params, :message) ||
-        struct!(Jido.Signal, id: nil, type: "cron.tick", source: "/test")
+        %Jido.Signal{id: nil, type: "cron.tick", source: "/test"}
 
     timezone = Map.get(params, :timezone)
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)

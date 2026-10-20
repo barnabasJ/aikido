@@ -1,5 +1,10 @@
 defmodule Aikido.Actions.Lifecycle.NotifyParent do
-  @moduledoc false
+  @moduledoc """
+  Pure reducer that prepares a notification for the runtime context's parent.
+
+  Uses `signal_type`, `payload` and `source`; preserves `state` and returns an
+  `Emit` directive when a parent PID exists, or no directives when orphaned.
+  """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
@@ -7,7 +12,7 @@ defmodule Aikido.Actions.Lifecycle.NotifyParent do
     payload = input.arguments[:payload]
     source = input.arguments[:source]
     ctx = input.context.aikido
-    signal = struct!(Jido.Signal, id: nil, type: type, data: payload, source: source)
+    signal = %Jido.Signal{id: nil, type: type, data: payload, source: source}
 
     directive =
       case Map.get(ctx, :parent) do

@@ -83,7 +83,7 @@ defmodule AikidoTest.Agent.Directives.CronCancelTest do
     end
 
     test "allows valid struct creation" do
-      directive = struct!(CronCancel, %{job_id: :test})
+      directive = %CronCancel{job_id: :test}
       assert directive.job_id == :test
     end
   end
