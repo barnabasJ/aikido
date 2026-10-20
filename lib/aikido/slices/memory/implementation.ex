@@ -2,17 +2,16 @@ defmodule Aikido.Slices.Memory.Implementation do
   @moduledoc """
   Pure reducers for named memory spaces and their map or list contents.
 
-  The native action name selects initialization, space replacement or a
-  content update. Returns the next memory state without directives, deriving
-  missing IDs and timestamps deterministically from the input context.
+  The native action name selects space replacement or a content update.
+  Returns the next memory state without directives, deriving timestamps
+  deterministically from the input context.
   """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(%{action: %{name: :append_to_space}} = input, _opts, _context) do
     name = input.arguments[:space]
     item = input.arguments[:item]
-    slice = input.arguments.state
-    memory = ensure_memory(slice, input)
+    memory = input.arguments.state
 
     Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.append_to_space(memory, name, item, options(input)),
@@ -24,8 +23,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   def run(%{action: %{name: :delete_from_space}} = input, _opts, _context) do
     name = input.arguments[:space]
     key = input.arguments[:key]
-    slice = input.arguments.state
-    memory = ensure_memory(slice, input)
+    memory = input.arguments.state
 
     Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.delete_from_space(memory, name, key, options(input)),
@@ -36,8 +34,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   @impl true
   def run(%{action: %{name: :delete_space}} = input, _opts, _context) do
     name = input.arguments[:space]
-    slice = input.arguments.state
-    memory = ensure_memory(slice, input)
+    memory = input.arguments.state
 
     Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.delete_space(memory, name, options(input)),
@@ -47,25 +44,7 @@ defmodule Aikido.Slices.Memory.Implementation do
 
   @impl true
   def run(%{action: %{name: :ensure}} = input, _opts, _context) do
-    data = Map.delete(input.arguments, :state)
-    slice = input.arguments.state
-
-    case slice do
-      %Aikido.Slices.Memory{} = memory ->
-        Aikido.Types.ActionResult.new(state: memory, directives: [])
-
-      _ ->
-        Aikido.Types.ActionResult.new(
-          state:
-            Aikido.Slices.Memory.new(
-              Keyword.merge(
-                initial_options(input),
-                Enum.reject(Map.to_list(data), fn {_, value} -> is_nil(value) end)
-              )
-            ),
-          directives: []
-        )
-    end
+    Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [])
   end
 
   @impl true
@@ -78,8 +57,7 @@ defmodule Aikido.Slices.Memory.Implementation do
         nil -> nil
       end
 
-    slice = input.arguments.state
-    memory = ensure_memory(slice, input)
+    memory = input.arguments.state
 
     Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.ensure_space(memory, name, default, options(input)),
@@ -92,8 +70,7 @@ defmodule Aikido.Slices.Memory.Implementation do
     name = input.arguments[:space]
     key = input.arguments[:key]
     value = input.arguments[:value]
-    slice = input.arguments.state
-    memory = ensure_memory(slice, input)
+    memory = input.arguments.state
 
     Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.put_in_space(memory, name, key, value, options(input)),
@@ -105,8 +82,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   def run(%{action: %{name: :put_space}} = input, _opts, _context) do
     name = input.arguments[:space]
     space = input.arguments.value
-    slice = input.arguments.state
-    memory = ensure_memory(slice, input)
+    memory = input.arguments.state
 
     Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.put_space(memory, name, space, options(input)),
@@ -118,8 +94,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   def run(%{action: %{name: :update_space}} = input, _opts, _context) do
     name = input.arguments[:space]
     new_space = input.arguments.value
-    slice = input.arguments.state
-    memory = ensure_memory(slice, input)
+    memory = input.arguments.state
 
     Aikido.Types.ActionResult.new(
       state:
@@ -133,18 +108,7 @@ defmodule Aikido.Slices.Memory.Implementation do
     )
   end
 
-  defp ensure_memory(%Aikido.Slices.Memory{} = memory, _input), do: memory
-  defp ensure_memory(_, input), do: Aikido.Slices.Memory.new(initial_options(input))
-
   defp options(input) do
     [now: Aikido.Signal.timestamp(get_in(input.context, [:aikido, :signal]))]
-  end
-
-  defp initial_options(input) do
-    runtime = input.context[:aikido] || %{}
-    signal = runtime[:signal]
-    seed = {signal && signal.id, runtime[:agent_id], runtime[:slice_path], input.arguments}
-    id = :crypto.hash(:sha256, :erlang.term_to_binary(seed)) |> Base.url_encode64(padding: false)
-    Keyword.put(options(input), :id, "mem_" <> id)
   end
 end

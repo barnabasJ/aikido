@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Remove lazy initialization fallbacks from Identity, Memory and Thread reducers;
+  native actions require their initialized owning slice state.
+
 - Respect private mounted routes when exporting agent commands. Keep example
   worker completion and failure signals internal while exposing its run command.
 

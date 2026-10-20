@@ -1,17 +1,16 @@
 defmodule Aikido.Slices.Thread.Implementation do
   @moduledoc """
-  Pure reducers for thread initialization, entry append and clearing.
+  Pure reducers for preserving a thread, appending entries and clearing.
 
   The native action name selects `:ensure`, `:append` or `:clear`.
   Returns the next thread state without directives, using the input signal for
-  timestamps and stable thread/entry identifiers.
+  timestamps and stable entry identifiers.
   """
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(%{action: %{name: :append}} = input, _opts, _context) do
     %Ash.Union{value: entry} = input.arguments.entry
-    slice = input.arguments.state
-    thread = append_ensure_thread(slice, input)
+    thread = input.arguments.state
 
     Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Thread.append(thread, entry, entry_options(input, thread)),
@@ -21,64 +20,19 @@ defmodule Aikido.Slices.Thread.Implementation do
 
   @impl true
   def run(%{action: %{name: :clear}} = input, _opts, _context) do
-    slice = input.arguments.state
-
-    case slice do
-      %Aikido.Slices.Thread{} = thread ->
-        Aikido.Types.ActionResult.new(
-          state: Aikido.Slices.Thread.clear(thread, options(input)),
-          directives: []
-        )
-
-      _ ->
-        Aikido.Types.ActionResult.new(
-          state: Aikido.Slices.Thread.new(initial_options(input)),
-          directives: []
-        )
-    end
+    Aikido.Types.ActionResult.new(
+      state: Aikido.Slices.Thread.clear(input.arguments.state, options(input)),
+      directives: []
+    )
   end
 
   @impl true
   def run(%{action: %{name: :ensure}} = input, _opts, _context) do
-    data = Map.delete(input.arguments, :state)
-    slice = input.arguments.state
-
-    case slice do
-      %Aikido.Slices.Thread{} = thread ->
-        Aikido.Types.ActionResult.new(state: thread, directives: [])
-
-      _ ->
-        Aikido.Types.ActionResult.new(
-          state:
-            Aikido.Slices.Thread.new(
-              Keyword.merge(
-                initial_options(input),
-                Enum.reject(Map.to_list(data), fn {_, value} -> is_nil(value) end)
-              )
-            ),
-          directives: []
-        )
-    end
-  end
-
-  defp append_ensure_thread(%Aikido.Slices.Thread{} = thread, _input) do
-    thread
-  end
-
-  defp append_ensure_thread(_, input) do
-    Aikido.Slices.Thread.new(initial_options(input))
+    Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [])
   end
 
   defp options(input) do
     [now: Aikido.Signal.timestamp(get_in(input.context, [:aikido, :signal]))]
-  end
-
-  defp initial_options(input) do
-    runtime = input.context[:aikido] || %{}
-    signal = runtime[:signal]
-    seed = {signal && signal.id, runtime[:agent_id], runtime[:slice_path], input.arguments}
-    id = :crypto.hash(:sha256, :erlang.term_to_binary(seed)) |> Base.url_encode64(padding: false)
-    Keyword.put(options(input), :id, "thread_" <> id)
   end
 
   defp entry_options(input, thread) do
