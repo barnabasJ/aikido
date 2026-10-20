@@ -22,9 +22,11 @@ Own-state fields, AI flags and team configuration live in Spark and are read thr
 `Aikido.Dsl.Agent.Info.state_fields/1`, `ai?/1` and `team_config/1`.
 
 A private `:initialize` generic action uses a shared implementation, configured
-by the transformer with the state path and slice mounts. Ash changesets apply the
-original resource's defaults and validation without writing its data layer. Mounted
-embedded resources are initialized through their native create actions. The native
+by the transformer with the state path and slice mounts. Native create actions
+apply defaults, validation, authorization and hooks with the caller's scope. The
+own-state create action is manual, so it constructs the record without writing
+the resource's independent data layer. Mounted embedded slices run their native
+create actions. The native
 initialization code interface accepts a parameter map, such as
 `MyAgent.initialize!(%{id: "example", state: %{count: 1}})`.
 
@@ -220,8 +222,17 @@ arguments, including defaulted values passed as nil.
 The public command runs in the caller's process and sends a signal to the agent.
 The reducer runs as a separate native Ash action inside AgentServer. Each is an
 Ash authorization boundary when configured with authorizers and policies. Caller
-scope propagates through signals and directives to reducers and tools; an outer
-command's `authorize?: false` does not disable downstream tool authorization.
+scope, including explicit authorization options and application context, propagates
+through startup, signals and directives. Startup scope remains transient and is
+not stored in the durable identity. Each configured initialization/create policy
+must permit the caller as well as the public start action.
+
+The pinned Ash AI tool executor forwards actor, tenant and application context to
+its underlying Ash actions, but does not forward per-call `tracer` or `authorize?`
+options. Those tool actions retain their configured authorization. Native runtime
+filter loading receives actor and tenant but likewise does not forward arbitrary
+context or per-call tracers internally. Aikido uses these native implementations
+rather than replacing their action or filtering engines.
 Use normal Ash `tracer:` options to follow the chain across processes; see
 [native Ash tracing](runtime-patterns.md#native-ash-tracing).
 

@@ -255,9 +255,12 @@ keep credentials out of that configuration and resolve them through application
 providers instead.
 
 Native Ash commands carry the caller's actor, tenant and application context
-through signal processing and follow-up effects. They do not turn an outer
-action's authorization bypass into a bypass for downstream tools. A later
-command supplies its own scope; command scope is not durable agent identity.
+through initialization, signal processing and follow-up effects. Explicit native
+authorization options reach Aikido's nested actions. The pinned Ash AI executor
+forwards actor, tenant and context to tool actions; its underlying calls do not
+forward per-call authorization or tracer options. Those actions use their own
+configured authorization and tracing. A later command supplies its own scope;
+startup and command scope are not durable agent identity.
 Queued messages and deliveries must match the active run's actor and tenant;
 a different scope is rejected with `:scope_mismatch`. Worker queues retain each
 task's original scope in memory and discard those queued executions on restoration.

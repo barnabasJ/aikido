@@ -6,6 +6,13 @@
 
 ### Changed
 
+- Preserve native caller options through public AI helpers, cancellation, startup,
+  nested reducers, team members and result signals. Keep initialization scope out
+  of durable snapshots and apply actor/tenant options to live snapshot filters.
+- Require an explicit `pubsub` server for built-in broadcasts and verify actual
+  delivery through an application-owned Phoenix.PubSub process.
+
+
 - Run native create hooks and authorization during agent and embedded-slice
   initialization, forwarding caller scope. Own-state creation is manual so an
   agent's separate data layer receives no extra row.
