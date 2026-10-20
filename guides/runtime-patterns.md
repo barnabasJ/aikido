@@ -25,6 +25,10 @@ Aikido.config(MyApp.Runtime, max_tasks: 2_000)
 Aikido.Dsl.Instance.Info.instance_options(MyApp.Runtime)
 ```
 
+`use Aikido` forwards native Spark options, including custom extensions and
+fragments, to its instance host. `use Aikido.Directive` also accepts native Spark
+options while retaining Ash's typed-struct DSL and the directive behaviour.
+
 Spark validates and stores the instance configuration. The Info module reads
 those options; `Aikido.config/2` combines application configuration and runtime
 overrides. Instance modules do not generate lifecycle, persistence, debug or

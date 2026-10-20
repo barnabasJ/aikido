@@ -2,7 +2,6 @@ defmodule Aikido.Ash.Team.State do
   @moduledoc "Native slice owning team topology, lifecycle progress, tasks, and their actions."
   use Ash.Resource,
     data_layer: :embedded,
-    validate_domain_inclusion?: false,
     extensions: [Aikido.Ash.Slice]
 
   attributes do

@@ -3,20 +3,22 @@ defmodule Aikido.Agent do
   Immutable agent identity and typed state.
 
   Declare agents as Ash resources with `Aikido.Ash.Agent`. The convenience
-  `use Aikido.Agent` installs that same extension and uses the shared runtime
-  domain. Reducers are native generic actions returning `Aikido.Types.ActionResult`;
-  they are pure and return directives for all I/O.
+  `use Aikido.Agent` merges that extension into native `Ash.Resource` options.
+  Pass `domain: MyApp.Agents` for your application's domain. The shared runtime
+  domain is the default; ordinary Ash domain-inclusion validation stays enabled.
+
+  Reducers are native generic actions returning `Aikido.Types.ActionResult`.
+  They are pure and return directives for all I/O.
   """
 
   defmacro __using__(opts) do
-    opts = Keyword.validate!(opts, [:extensions])
-    extensions = [Aikido.Ash.Agent | Keyword.get(opts, :extensions, [])]
+    opts =
+      opts
+      |> Keyword.put_new(:domain, Aikido.RuntimeDomain)
+      |> Keyword.update(:extensions, [Aikido.Ash.Agent], &[Aikido.Ash.Agent | &1])
 
     quote do
-      use Ash.Resource,
-        domain: Aikido.RuntimeDomain,
-        validate_domain_inclusion?: false,
-        extensions: unquote(extensions)
+      use Ash.Resource, unquote(opts)
     end
   end
 

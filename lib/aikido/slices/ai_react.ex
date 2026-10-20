@@ -19,7 +19,6 @@ defmodule Aikido.Slices.AiReact do
   @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
   use Ash.Resource,
     data_layer: :embedded,
-    validate_domain_inclusion?: false,
     extensions: [Aikido.Ash.Slice]
 
   @keyword_constraints [items: [fields: [key: [type: :atom], value: [type: :term]]]]

@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Forward native Ash resource options through `use Aikido.Agent` and
+  `use Aikido.Slice`, preserving caller domains, authorizers and extensions.
+  Keep ordinary domain-inclusion validation enabled, remove redundant overrides
+  from embedded resources, and forward Spark options through `use Aikido`.
+
 - Move the shared action return contract to `Aikido.Types.ActionResult`. Generate
   public signal arguments directly from native Ash argument metadata and remove
   the redundant `Aikido.ActionRef` schema conversion helper.

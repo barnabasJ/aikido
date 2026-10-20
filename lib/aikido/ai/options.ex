@@ -1,6 +1,6 @@
 defmodule Aikido.AI.Options do
   @moduledoc "Optional ReAct execution and context controls, supplied at start or per request."
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  use Ash.Resource, data_layer: :embedded
 
   attributes do
     attribute :completion, :atom,

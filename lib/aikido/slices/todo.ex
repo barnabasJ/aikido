@@ -10,7 +10,6 @@ defmodule Aikido.Slices.Todo do
   """
   use Ash.Resource,
     data_layer: :embedded,
-    validate_domain_inclusion?: false,
     extensions: [Aikido.Ash.Slice]
 
   slice do

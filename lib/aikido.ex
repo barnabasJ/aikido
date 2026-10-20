@@ -70,6 +70,8 @@ defmodule Aikido do
   ## Options
 
     - `:otp_app` - Required. Your application name (e.g., `:my_app`).
+    - Native Spark options, such as `:extensions` and `:fragments`, pass through
+      to the instance DSL host.
 
   ## Example
 
@@ -87,10 +89,10 @@ defmodule Aikido do
         max_tasks: 2000
   """
   defmacro __using__(opts) do
-    otp_app = Keyword.fetch!(opts, :otp_app)
+    {otp_app, host_opts} = Keyword.pop!(opts, :otp_app)
 
     quote location: :keep do
-      use Aikido.Dsl.Instance.Host
+      use Aikido.Dsl.Instance.Host, unquote(host_opts)
 
       instance do
         otp_app unquote(otp_app)

@@ -33,6 +33,13 @@ Use `Ash.Changeset.for_create/4` or `for_update/4` to validate proposed inputs
 without executing an action. There is no separate whole-agent validation API.
 Commands to running agents continue to use the public domain's signal actions.
 
+The convenience form `use Aikido.Agent, domain: MyApp.Agents` accepts native
+`Ash.Resource` options, including authorizers, data layers, notifiers and extra
+extensions. Aikido adds its agent extension and supplies `Aikido.RuntimeDomain`
+only when no domain is specified. Domain inclusion uses Ash's normal validation;
+register application agents in their domain. `use Aikido.Slice` likewise forwards
+native resource options and defaults to the embedded data layer.
+
 ## An agent resource
 
 Start a Aikido instance in your application supervision tree:

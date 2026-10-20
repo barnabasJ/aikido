@@ -1,6 +1,6 @@
 defmodule Aikido.Hooks.Decision do
   @moduledoc "The validated result of a synchronous Lua hook."
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  use Ash.Resource, data_layer: :embedded
 
   attributes do
     attribute :decision, :atom,

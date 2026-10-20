@@ -16,7 +16,7 @@ defmodule Aikido.Hooks.Hook do
   waiting, deadlines, cancellation and UI communication. Without a callback,
   `aikido.request` returns an error to Lua.
   """
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  use Ash.Resource, data_layer: :embedded
 
   attributes do
     attribute :name, :string, allow_nil?: false, public?: true
