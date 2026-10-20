@@ -22,10 +22,7 @@ defmodule Aikido.AgentServer.Signal.CronDied do
 
   use Jido.Signal,
     type: "aikido.agent.cron.died",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
+    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
     schema: [
       job_id: [type: :any, required: true, doc: "Logical cron job id within the agent"],
       pid: [type: :any, required: true, doc: "PID of the cron-job process that exited"],

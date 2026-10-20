@@ -213,28 +213,6 @@ defmodule AikidoTest.SchedulerTest do
     end
   end
 
-  describe("alive?/1") do
-    test "returns true for a running cron job" do
-      {:ok, pid} = Aikido.Scheduler.run_every(fn -> :ok end, "* * * * *")
-      assert Aikido.Scheduler.alive?(pid) == true
-      Aikido.Scheduler.cancel(pid)
-    end
-
-    test "returns false after cancellation" do
-      {:ok, pid} = Aikido.Scheduler.run_every(fn -> :ok end, "* * * * *")
-      Aikido.Scheduler.cancel(pid)
-      AikidoTest.LifecycleWait.await_down(pid)
-      refute Aikido.Scheduler.alive?(pid)
-    end
-
-    test "returns false for a dead pid" do
-      {:ok, pid} = Aikido.Scheduler.run_every(fn -> :ok end, "* * * * *")
-      Aikido.Scheduler.cancel(pid)
-      AikidoTest.LifecycleWait.await_down(pid)
-      refute Aikido.Scheduler.alive?(pid)
-    end
-  end
-
   describe("DST handling") do
     test "skips nonexistent spring-forward occurrences" do
       timezone = "America/Chicago"

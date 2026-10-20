@@ -16,12 +16,17 @@ defmodule Aikido.AgentServer.Actions.QueryChildren do
         input.context.aikido.signal,
         "aikido.agent.query.children.reply",
         "aikido.agent.query.children.error",
-        {Aikido.AgentServer.Queries, :build_children_reply, []}
+        {__MODULE__, :build_reply, []}
       )
 
     Aikido.Types.ActionResult.new(
       state: %Aikido.Agent.SliceUpdate{slices: %{}},
       directives: List.wrap(directive)
     )
+  end
+
+  @doc false
+  def build_reply(%Aikido.AgentServer.State{children: children}) do
+    {:ok, %{children: Map.new(children, fn {tag, child} -> {tag, child.pid} end)}}
   end
 end

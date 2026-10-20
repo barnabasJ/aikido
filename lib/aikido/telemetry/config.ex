@@ -1,4 +1,4 @@
-defmodule Aikido.Observe.Config do
+defmodule Aikido.Telemetry.Config do
   @moduledoc """
   Resolves observability configuration with per-instance support.
 
@@ -16,17 +16,7 @@ defmodule Aikido.Observe.Config do
 
   @type instance :: atom() | nil
 
-  @log_level_priority %{
-    trace: 0,
-    debug: 1,
-    info: 2,
-    warning: 3,
-    error: 4
-  }
-
   @telemetry_log_levels [:trace, :debug, :info, :warning, :error]
-  @debug_events_modes [:off, :minimal, :all]
-  @observe_log_levels Logger.levels()
 
   # --- Telemetry settings ---
 
@@ -107,15 +97,7 @@ defmodule Aikido.Observe.Config do
   @doc "Returns true if debug-level logging is enabled."
   @spec debug_enabled?(instance()) :: boolean()
   def debug_enabled?(instance \\ nil) do
-    level = telemetry_log_level(instance)
-    Map.get(@log_level_priority, level, 5) <= Map.get(@log_level_priority, :debug, 1)
-  end
-
-  @doc "Returns true if the given log level is enabled."
-  @spec level_enabled?(instance(), atom()) :: boolean()
-  def level_enabled?(instance \\ nil, level) do
-    current = telemetry_log_level(instance)
-    Map.get(@log_level_priority, level, 5) >= Map.get(@log_level_priority, current, 1)
+    telemetry_log_level(instance) in [:trace, :debug]
   end
 
   @doc "Returns true if the signal type is considered interesting."
@@ -126,65 +108,8 @@ defmodule Aikido.Observe.Config do
 
   # --- Observe settings ---
 
-  @doc "Returns the observability log level for the given instance."
-  @spec observe_log_level(instance()) :: Logger.level()
-  def observe_log_level(instance \\ nil)
-
-  def observe_log_level(nil) do
-    global_observability(:log_level, Defaults.observe_log_level())
-    |> normalize_observe_log_level()
-  end
-
-  def observe_log_level(instance) do
-    with nil <- Aikido.Debug.override(instance, :observe_log_level),
-         nil <- instance_observability(instance, :log_level) do
-      global_observability(:log_level, Defaults.observe_log_level())
-    end
-    |> normalize_observe_log_level()
-  end
-
-  @doc "Returns the debug events mode for the given instance."
-  @spec debug_events(instance()) :: :off | :minimal | :all
-  def debug_events(instance \\ nil)
-
-  def debug_events(nil) do
-    global_observability(:debug_events, Defaults.observe_debug_events())
-    |> normalize_debug_events()
-  end
-
-  def debug_events(instance) do
-    with nil <- Aikido.Debug.override(instance, :observe_debug_events),
-         nil <- instance_observability(instance, :debug_events) do
-      global_observability(:debug_events, Defaults.observe_debug_events())
-    end
-    |> normalize_debug_events()
-  end
-
-  @doc "Returns true if debug events are enabled."
-  @spec debug_events_enabled?(instance()) :: boolean()
-  def debug_events_enabled?(instance \\ nil) do
-    debug_events(instance) != :off
-  end
-
-  @doc "Returns true if sensitive data should be redacted."
-  @spec redact_sensitive?(instance()) :: boolean()
-  def redact_sensitive?(instance \\ nil)
-
-  def redact_sensitive?(nil),
-    do:
-      global_observability(:redact_sensitive, Defaults.redact_sensitive())
-      |> normalize_boolean()
-
-  def redact_sensitive?(instance) do
-    with nil <- Aikido.Debug.override(instance, :redact_sensitive),
-         nil <- instance_observability(instance, :redact_sensitive) do
-      global_observability(:redact_sensitive, Defaults.redact_sensitive())
-    end
-    |> normalize_boolean()
-  end
-
   @doc "Returns the tracer module for the given instance."
-  @spec tracer(instance()) :: module()
+  @spec tracer(instance()) :: module() | [module()] | nil
   def tracer(instance \\ nil)
 
   def tracer(nil) do
@@ -244,12 +169,6 @@ defmodule Aikido.Observe.Config do
   defp normalize_telemetry_log_level(level) when level in @telemetry_log_levels, do: level
   defp normalize_telemetry_log_level(_), do: Defaults.telemetry_log_level()
 
-  defp normalize_observe_log_level(level) when level in @observe_log_levels, do: level
-  defp normalize_observe_log_level(_), do: Defaults.observe_log_level()
-
-  defp normalize_debug_events(mode) when mode in @debug_events_modes, do: mode
-  defp normalize_debug_events(_), do: Defaults.observe_debug_events()
-
   defp normalize_interesting_signal_types(types) when is_list(types) do
     if Enum.all?(types, &is_binary/1), do: types, else: Defaults.interesting_signal_types()
   end
@@ -258,9 +177,6 @@ defmodule Aikido.Observe.Config do
 
   defp normalize_non_neg_integer(value, _default) when is_integer(value) and value >= 0, do: value
   defp normalize_non_neg_integer(_, default), do: default
-
-  defp normalize_boolean(true), do: true
-  defp normalize_boolean(_), do: false
 
   defp normalize_tracer(module) when is_atom(module) and not is_nil(module) do
     if Spark.implements_behaviour?(module, Ash.Tracer), do: module

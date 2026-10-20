@@ -8,8 +8,8 @@ defmodule Aikido.Debug do
   ## Debug Levels
 
   - `:off` - No debug overrides, uses configured defaults
-  - `:on` - Developer-friendly verbosity (debug logging, keys_only args, minimal debug events)
-  - `:verbose` - Maximum detail (trace logging, full args, all debug events)
+  - `:on` - Developer-friendly verbosity (debug logging and the runtime event buffer)
+  - `:verbose` - Maximum detail (trace logging and the runtime event buffer)
 
   ## Usage
 
@@ -26,34 +26,16 @@ defmodule Aikido.Debug do
   @type level :: :off | :on | :verbose
   @type instance :: atom()
 
-  @on_overrides %{
-    telemetry_log_level: :debug,
-    observe_log_level: :debug,
-    observe_debug_events: :minimal
-  }
+  @on_overrides %{telemetry_log_level: :debug}
+  @verbose_overrides %{telemetry_log_level: :trace}
 
-  @verbose_overrides %{
-    telemetry_log_level: :trace,
-    observe_log_level: :debug,
-    observe_debug_events: :all
-  }
+  @spec enable(instance(), level()) :: :ok
+  def enable(instance, level \\ :on)
 
-  @spec enable(instance(), level(), keyword()) :: :ok
-  def enable(instance, level \\ :on, opts \\ [])
+  def enable(instance, :off), do: disable(instance)
 
-  def enable(instance, :off, _opts) do
-    disable(instance)
-  end
-
-  def enable(instance, level, opts) when level in [:on, :verbose] do
+  def enable(instance, level) when level in [:on, :verbose] do
     overrides = build_overrides(level)
-
-    overrides =
-      if Keyword.get(opts, :redact) == false do
-        Map.put(overrides, :redact_sensitive, false)
-      else
-        overrides
-      end
 
     :persistent_term.put({:aikido_debug, instance}, %{level: level, overrides: overrides})
     :ok
@@ -63,8 +45,6 @@ defmodule Aikido.Debug do
   def disable(instance) do
     :persistent_term.erase({:aikido_debug, instance})
     :ok
-  rescue
-    ArgumentError -> :ok
   end
 
   @spec level(instance()) :: level()
@@ -97,11 +77,6 @@ defmodule Aikido.Debug do
       :verbose -> enable(instance, :verbose)
       _ -> disable(instance)
     end
-  end
-
-  @spec reset(instance()) :: :ok
-  def reset(instance) do
-    disable(instance)
   end
 
   @spec status(instance()) :: map()

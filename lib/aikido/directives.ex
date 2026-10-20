@@ -3,7 +3,7 @@ defmodule Aikido.Directives do
   Framework-level directive structs and constructor helpers.
 
   A *directive* is a pure description of an external effect for the runtime
-  (e.g. `Aikido.AgentServer`) to execute. Agents and strategies **never**
+  (e.g. `Aikido.AgentServer`) to execute. Reducers **never**
   interpret or execute directives; they only emit them.
 
   ## The Bright Line
@@ -58,11 +58,23 @@ defmodule Aikido.Directives do
 
   External packages can define their own directive structs:
 
-      defmodule MyApp.Directive.CallLLM do
-        defstruct [:model, :prompt, :tag]
+      defmodule MyApp.Directives.Notify do
+        use Aikido.Directive
+
+        typed_struct do
+          field :recipient, :term, allow_nil?: false
+          field :message, :term
+        end
+
+        @impl true
+        def exec(directive, _signal, _runtime) do
+          send(directive.recipient, directive.message)
+          :ok
+        end
       end
 
-  The runtime dispatches on struct type, so no changes to core are needed.
+  The runtime invokes the struct module's behaviour callback. The shared result
+  type validates each descriptor's declared fields and directive behaviour.
   """
 
   alias Aikido.Directives.{

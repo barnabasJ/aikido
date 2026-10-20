@@ -11,10 +11,7 @@ defmodule Aikido.AgentServer.Signal.LifecycleStopping do
 
   use Jido.Signal,
     type: "aikido.agent.lifecycle.stopping",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
+    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
     schema: [
       reason: [type: :any, required: false, doc: "Termination reason"]
     ]

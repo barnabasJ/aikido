@@ -17,10 +17,7 @@ defmodule Aikido.AgentServer.Signal.CronRestarted do
 
   use Jido.Signal,
     type: "aikido.agent.cron.restarted",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
+    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
     schema: [
       job_id: [type: :any, required: true, doc: "Logical cron job id within the agent"],
       pid: [type: :any, required: true, doc: "PID of the freshly-spawned cron-job process"]

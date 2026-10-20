@@ -37,10 +37,10 @@ defmodule Aikido.AgentServer.SignalRouter do
   Builds a unified router from all route sources in the agent state.
 
   Collects routes from:
-  - Agent routes (priority 0) via `agent_module.signal_routes/1`
+  - Agent routes (priority 0) via `Aikido.Dsl.Agent.Info.signal_routes/1`
   - Slice routes (priority -10) via the compiled slice route table
 
-  Returns an empty router if no routes are found or if building fails.
+  Native router validation rejects invalid routes instead of silently dropping them.
   """
   @spec build(State.t()) :: Router.Router.t()
   def build(%State{} = state) do
@@ -50,10 +50,7 @@ defmodule Aikido.AgentServer.SignalRouter do
       |> add_slice_routes(state)
       |> add_builtin_routes()
 
-    case Router.new(routes) do
-      {:ok, router} -> router
-      {:error, _} -> Router.new!([])
-    end
+    Router.new!(routes)
   end
 
   # Built-in system routes available on every agent. Priority sits below

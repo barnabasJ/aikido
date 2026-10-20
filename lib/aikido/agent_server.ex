@@ -180,8 +180,7 @@ defmodule Aikido.AgentServer do
     Options,
     ParentRef,
     SignalRouter,
-    State,
-    StopChildRuntime
+    State
   }
 
   alias Aikido.Directives
@@ -310,7 +309,7 @@ defmodule Aikido.AgentServer do
           Enum.uniq(
             List.wrap(Keyword.get(opts, :tracer)) ++
               List.wrap(Application.get_env(:ash, :tracer)) ++
-              List.wrap(Aikido.Observe.Config.tracer())
+              List.wrap(Aikido.Telemetry.Config.tracer())
           )
 
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
@@ -588,7 +587,7 @@ defmodule Aikido.AgentServer do
 
   defp subscribe_and_await_child(pid, child_tag, timeout) do
     selector = fn %State{} = state ->
-      case State.get_child(state, child_tag) do
+      case Map.get(state.children, child_tag) do
         %ChildInfo{pid: child_pid} when is_pid(child_pid) -> {:ok, child_pid}
         _ -> :skip
       end
@@ -967,7 +966,7 @@ defmodule Aikido.AgentServer do
     state = register_restored_cron_specs(state)
     notify_parent_of_startup(state)
     state = emit_through_chain(state, lifecycle_ready_signal(state))
-    state = State.set_status(state, :idle)
+    state = %{state | status: :idle}
 
     emit_telemetry(
       [:aikido, :agent_server, :ready],
@@ -1002,7 +1001,7 @@ defmodule Aikido.AgentServer do
           # post-directive state so the caller still gets a tagged tuple,
           # then stop after replying.
           reply = invoke_call_selector(selector, executed_state)
-          {:stop, stop_reason, reply, State.set_status(executed_state, :stopping)}
+          {:stop, stop_reason, reply, %{executed_state | status: :stopping}}
       end
     catch
       kind, reason ->
@@ -1024,7 +1023,7 @@ defmodule Aikido.AgentServer do
   end
 
   def handle_call({:set_debug, enabled}, _from, %State{} = state) do
-    new_state = State.set_debug(state, enabled)
+    new_state = %{state | debug: enabled}
     {:reply, :ok, new_state}
   end
 
@@ -1038,7 +1037,7 @@ defmodule Aikido.AgentServer do
   end
 
   def handle_call({:get_child_pid, child_tag}, _from, %State{} = state) do
-    case State.get_child(state, child_tag) do
+    case Map.get(state.children, child_tag) do
       %ChildInfo{pid: pid} when is_pid(pid) -> {:reply, {:ok, pid}, state}
       _ -> {:reply, :not_found, state}
     end
@@ -1091,7 +1090,13 @@ defmodule Aikido.AgentServer do
         source: "/agent/#{state.id}"
       )
 
-    :ok = StopChildRuntime.exec(tag, reason, signal, state)
+    :ok =
+      Aikido.Directives.StopChild.exec(
+        %Aikido.Directives.StopChild{tag: tag, reason: reason},
+        signal,
+        state
+      )
+
     {:reply, :ok, state}
   end
 
@@ -1141,7 +1146,7 @@ defmodule Aikido.AgentServer do
     case process_signal(state, signal) do
       {:ok, new_state, _directives} -> {:noreply, new_state}
       {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
+      {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
     end
   end
 
@@ -1154,7 +1159,7 @@ defmodule Aikido.AgentServer do
     case process_signal(state, signal) do
       {:ok, new_state, _directives} -> {:noreply, new_state}
       {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
+      {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
     end
   end
 
@@ -1213,7 +1218,7 @@ defmodule Aikido.AgentServer do
     case process_signal(state, signal) do
       {:ok, new_state, _directives} -> {:noreply, new_state}
       {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
+      {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
     end
   end
 
@@ -1386,11 +1391,11 @@ defmodule Aikido.AgentServer do
 
     case chain.(signal, ctx) do
       {:ok, new_ctx, directives} ->
-        new_state = State.update_agent(state, new_ctx.agent)
+        new_state = %{state | agent: new_ctx.agent}
         {:ok, new_state, List.wrap(directives)}
 
       {:error, new_ctx, reason} ->
-        new_state = State.update_agent(state, new_ctx.agent)
+        new_state = %{state | agent: new_ctx.agent}
         {:error, new_state, reason}
     end
   end
@@ -1510,7 +1515,7 @@ defmodule Aikido.AgentServer do
       meta = Map.get(data, :meta, %{})
       child_partition = Map.get(data, :child_partition)
 
-      case State.get_child(state, tag) do
+      case Map.get(state.children, tag) do
         %ChildInfo{pid: ^pid} ->
           state
 
@@ -2021,7 +2026,6 @@ defmodule Aikido.AgentServer do
   defp register_schedule(%State{} = state, schedule_spec) do
     %{
       cron_expression: cron_expr,
-      action: _action,
       job_id: job_id,
       signal_type: signal_type,
       timezone: timezone
@@ -2058,7 +2062,7 @@ defmodule Aikido.AgentServer do
       # timer succeeds (only for abnormal exits).
       state = dispatch_synthetic_signal(cron_died_signal(state, logical_id, pid, reason), state)
 
-      if normal_cron_exit?(reason) do
+      if clean_shutdown?(reason) do
         state
       else
         schedule_cron_restart(state, logical_id, reason)
@@ -2122,22 +2126,6 @@ defmodule Aikido.AgentServer do
       {_other, timers} ->
         %{state | cron_restart_timers: timers}
     end
-  end
-
-  defp normal_cron_exit?(:normal) do
-    true
-  end
-
-  defp normal_cron_exit?(:shutdown) do
-    true
-  end
-
-  defp normal_cron_exit?({:shutdown, _}) do
-    true
-  end
-
-  defp normal_cron_exit?(_) do
-    false
   end
 
   # ---------------------------------------------------------------------------
@@ -2210,7 +2198,7 @@ defmodule Aikido.AgentServer do
   # ---------------------------------------------------------------------------
 
   defp ensure_adopt_tag_available(state, tag) do
-    case State.get_child(state, tag) do
+    case Map.get(state.children, tag) do
       nil -> :ok
       _child -> {:error, {:tag_in_use, tag}}
     end
@@ -2297,7 +2285,7 @@ defmodule Aikido.AgentServer do
       "AgentServer #{state.id} stopping: parent died (#{inspect(reason)}), wrapped stop_reason: #{inspect(stop_reason)}"
     )
 
-    {:stop, stop_reason, State.set_status(state, :stopping)}
+    {:stop, stop_reason, %{state | status: :stopping}}
   end
 
   defp handle_parent_down(%State{on_parent_death: :continue} = state, _pid, reason) do
@@ -2331,7 +2319,7 @@ defmodule Aikido.AgentServer do
     case process_signal(orphaned_state, signal) do
       {:ok, new_state, _directives} -> {:noreply, new_state}
       {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
+      {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
     end
   end
 
@@ -2397,7 +2385,7 @@ defmodule Aikido.AgentServer do
       case process_signal(state, signal) do
         {:ok, new_state, _directives} -> {:noreply, new_state}
         {:error, committed_state, _reason} -> {:noreply, committed_state}
-        {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
+        {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
       end
     else
       {:noreply, state}

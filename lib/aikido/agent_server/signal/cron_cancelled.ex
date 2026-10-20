@@ -1,16 +1,16 @@
 defmodule Aikido.AgentServer.Signal.CronCancelled do
   @moduledoc """
   Synthesized by the `Aikido.Directives.CronCancel` impl after the
-  scheduler job is cancelled and the spec map is persisted, then cast
+  scheduler job is cancelled, then cast
   back to the agent so the cascade callback
   `maybe_track_cron_cancelled/2` can drop the entry from
   `state.cron_specs`, `state.cron_jobs`, `state.cron_monitors`,
   `state.cron_monitor_refs`, and `state.cron_runtime_specs`.
 
   Directives mutate no state. The directive does the I/O (cancel the
-  scheduler job + `Process.demonitor` + persist the new spec map); the
+  scheduler job + `Process.demonitor`); the
   cascade callback observes this synthetic signal and rewrites the
-  runtime maps.
+  runtime maps. DurableServer persists the resulting schedule definitions.
 
   Note: this is distinct from `aikido.agent.cron.died` — `cron.cancelled`
   fires when the directive intentionally cancels a job; `cron.died` fires
@@ -27,10 +27,7 @@ defmodule Aikido.AgentServer.Signal.CronCancelled do
 
   use Jido.Signal,
     type: "aikido.agent.cron.cancelled",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
+    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
     schema: [
       job_id: [type: :any, required: true, doc: "Logical cron job id within the agent"],
       pid: [type: :any, doc: "PID of the cancelled cron-job process (nil if untracked)"],

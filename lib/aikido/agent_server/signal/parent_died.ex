@@ -16,10 +16,7 @@ defmodule Aikido.AgentServer.Signal.ParentDied do
 
   use Jido.Signal,
     type: "aikido.agent.identity.parent_died",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
+    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
     schema: [
       former_parent: [
         type: :any,

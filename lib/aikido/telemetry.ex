@@ -25,9 +25,7 @@ defmodule Aikido.Telemetry do
           "aikido.agent.user_request",
           "aikido.tool.result",
           "aikido.llm.done"
-        ],
-        log_prompts: false,                   # Privacy: don't log LLM prompts
-        log_tool_args: :keys_only             # :keys_only | :full | :none
+        ]
 
   ## "Interestingness" Filtering
 
@@ -66,7 +64,7 @@ defmodule Aikido.Telemetry do
 
   require Logger
 
-  alias Aikido.Observe.Config, as: ObserveConfig
+  alias Aikido.Telemetry.Config
   alias Aikido.Telemetry.Formatter
 
   @typedoc """
@@ -166,7 +164,7 @@ defmodule Aikido.Telemetry do
   Handles telemetry events for AgentServer signals, directives and schedules.
 
   Uses intelligent filtering to reduce noise while preserving actionable information.
-  Events are logged based on "interestingness" criteria configured via `Aikido.Observe.Config`.
+  Events are logged based on "interestingness" criteria configured via `Aikido.Telemetry.Config`.
   """
   @spec handle_event(event_name(), measurements(), metadata(), config :: term()) :: :ok
 
@@ -187,11 +185,11 @@ defmodule Aikido.Telemetry do
 
     cond do
       # At trace level, log everything
-      ObserveConfig.trace_enabled?(instance) ->
+      Config.trace_enabled?(instance) ->
         log_signal_stop(metadata, duration, directive_count)
 
       # At debug level, only log "interesting" signals
-      ObserveConfig.debug_enabled?(instance) and
+      Config.debug_enabled?(instance) and
           interesting_signal?(instance, signal_type, duration_ms, directive_count, metadata) ->
         log_signal_stop(metadata, duration, directive_count)
 
@@ -241,11 +239,11 @@ defmodule Aikido.Telemetry do
 
     cond do
       # At trace level, log everything
-      ObserveConfig.trace_enabled?(instance) ->
+      Config.trace_enabled?(instance) ->
         log_directive_stop(metadata, duration)
 
       # At debug level, only log slow or interesting directives
-      ObserveConfig.debug_enabled?(instance) and
+      Config.debug_enabled?(instance) and
           interesting_directive?(instance, directive_type, duration_ms, metadata) ->
         log_directive_stop(metadata, duration)
 
@@ -357,16 +355,16 @@ defmodule Aikido.Telemetry do
   # ---------------------------------------------------------------------------
 
   defp interesting_signal?(instance, signal_type, duration_ms, directive_count, metadata) do
-    is_slow = duration_ms > ObserveConfig.slow_signal_threshold_ms(instance)
+    is_slow = duration_ms > Config.slow_signal_threshold_ms(instance)
     has_directives = directive_count > 0
-    is_interesting_type = ObserveConfig.interesting_signal_type?(instance, to_string(signal_type))
+    is_interesting_type = Config.interesting_signal_type?(instance, to_string(signal_type))
     has_error = metadata[:error] != nil
 
     is_slow or has_directives or is_interesting_type or has_error
   end
 
   defp interesting_directive?(instance, directive_type, duration_ms, metadata) do
-    is_slow = duration_ms > ObserveConfig.slow_directive_threshold_ms(instance)
+    is_slow = duration_ms > Config.slow_directive_threshold_ms(instance)
     has_error = metadata[:error] != nil
     interesting_types = ["Tool", "LLM", "Await", "Spawn"]
     is_interesting_type = directive_type in interesting_types

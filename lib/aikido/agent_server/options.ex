@@ -17,12 +17,14 @@ defmodule Aikido.AgentServer.Options do
   use Ash.TypedStruct
 
   typed_struct do
-    field :agent_module, :atom,
+    field :agent_module, :module,
       allow_nil?: false,
+      constraints: [behaviour: Aikido.Agent],
       description: "Agent module; required. Initialized through its :initialize Ash action."
 
     field :aikido, :atom,
-      allow_nil?: true,
+      allow_nil?: false,
+      default: Aikido.Default,
       description: "Aikido instance name for DurableServer scoping (default: Aikido.Default)"
 
     field :partition, :term,
@@ -30,7 +32,7 @@ defmodule Aikido.AgentServer.Options do
       description: "Logical partition within a Aikido instance"
 
     field :id, :string,
-      allow_nil?: true,
+      allow_nil?: false,
       description: "Instance ID (auto-generated if not provided)",
       constraints: [trim?: false, allow_empty?: true]
 
@@ -76,85 +78,17 @@ defmodule Aikido.AgentServer.Options do
       description: "Enable debug mode with event buffer"
   end
 
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
 
-  @doc """
-  Creates validated Options from a keyword list or map.
+  @doc "Creates typed startup options, generating an identity when omitted."
+  def new(attrs) do
+    attrs = if is_struct(attrs, __MODULE__), do: Map.from_struct(attrs), else: Map.new(attrs)
+    # Ash.TypedStruct defaults are literal values; runtime ID generation belongs here.
+    attrs =
+      if Map.get(attrs, :id, attrs["id"]) in [nil, ""],
+        do: Map.put(attrs, :id, Ash.UUIDv7.generate()),
+        else: attrs
 
-  Normalizes and validates all options, including:
-  - Generating an ID if not provided
-  - Validating the agent module
-  - Parsing parent reference
-
-  Returns `{:ok, options}` or `{:error, reason}`.
-  """
-  @spec new(keyword() | map()) :: {:ok, t()} | {:error, term()}
-  def new(opts) when is_list(opts) do
-    opts |> Map.new() |> new()
+    super(attrs)
   end
-
-  def new(attrs) when is_map(attrs) do
-    attrs = normalize_attrs(attrs)
-
-    with {:ok, agent_module} <- validate_agent_module(attrs[:agent_module]) do
-      super(Map.put(attrs, :agent_module, agent_module))
-    end
-  end
-
-  def new(_),
-    do: {:error, Aikido.Error.validation_error("Options requires a keyword list or map")}
-
-  @doc """
-  Creates validated Options from a keyword list or map, raising on error.
-  """
-  @spec new!(keyword() | map()) :: t()
-  def new!(opts) do
-    case new(opts) do
-      {:ok, options} -> options
-      {:error, reason} -> raise Aikido.Error.validation_error("Invalid Options", details: reason)
-    end
-  end
-
-  # Normalize attributes with defaults
-  defp normalize_attrs(attrs) do
-    id =
-      case Map.get(attrs, :id) do
-        nil -> Ash.UUIDv7.generate()
-        "" -> Ash.UUIDv7.generate()
-        id when is_binary(id) -> id
-        id when is_atom(id) -> Atom.to_string(id)
-      end
-
-    partition = Map.get(attrs, :partition)
-
-    aikido_instance = Map.get(attrs, :aikido, Aikido.Default)
-    attrs = Map.put(attrs, :aikido, aikido_instance)
-
-    attrs
-    |> Map.put(:id, id)
-    |> Map.put(:partition, partition)
-  end
-
-  defp validate_agent_module(nil),
-    do: {:error, Aikido.Error.validation_error("agent_module is required")}
-
-  defp validate_agent_module(mod) when is_atom(mod) do
-    case Code.ensure_loaded(mod) do
-      {:module, _} ->
-        if Spark.Dsl.is?(mod, Ash.Resource) && Ash.Resource.Info.action(mod, :initialize, :action) do
-          {:ok, mod}
-        else
-          {:error,
-           Aikido.Error.validation_error("agent_module must define an :initialize Ash action")}
-        end
-
-      {:error, _} ->
-        {:error, Aikido.Error.validation_error("agent_module not found: #{inspect(mod)}")}
-    end
-  end
-
-  defp validate_agent_module(_),
-    do: {:error, Aikido.Error.validation_error("agent_module must be a module atom")}
 end

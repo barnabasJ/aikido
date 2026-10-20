@@ -7,11 +7,9 @@ defmodule Aikido.Config.Defaults do
   """
 
   @type telemetry_log_level :: :trace | :debug | :info | :warning | :error
-  @type debug_events_mode :: :off | :minimal | :all
 
   @aikido_shutdown_timeout_ms 10_000
 
-  @agent_server_shutdown_timeout_ms 5_000
   @agent_server_call_timeout_ms 5_000
   @agent_server_await_timeout_ms 10_000
 
@@ -19,19 +17,12 @@ defmodule Aikido.Config.Defaults do
   @slow_signal_threshold_ms 10
   @slow_directive_threshold_ms 5
   @interesting_signal_types []
-  @observe_log_level :info
-  @observe_debug_events :off
-  @redact_sensitive false
   @tracer nil
   @debug_max_events 500
 
   @doc "Default shutdown timeout for the top-level Aikido supervisor."
   @spec aikido_shutdown_timeout_ms() :: pos_integer()
   def aikido_shutdown_timeout_ms, do: @aikido_shutdown_timeout_ms
-
-  @doc "Default shutdown timeout for AgentServer workers."
-  @spec agent_server_shutdown_timeout_ms() :: pos_integer()
-  def agent_server_shutdown_timeout_ms, do: @agent_server_shutdown_timeout_ms
 
   @doc "Default timeout for synchronous AgentServer calls."
   @spec agent_server_call_timeout_ms() :: pos_integer()
@@ -57,20 +48,8 @@ defmodule Aikido.Config.Defaults do
   @spec interesting_signal_types() :: [String.t()]
   def interesting_signal_types, do: @interesting_signal_types
 
-  @doc "Default observe log level."
-  @spec observe_log_level() :: Logger.level()
-  def observe_log_level, do: @observe_log_level
-
-  @doc "Default debug-events mode."
-  @spec observe_debug_events() :: debug_events_mode()
-  def observe_debug_events, do: @observe_debug_events
-
-  @doc "Default redact-sensitive flag."
-  @spec redact_sensitive() :: boolean()
-  def redact_sensitive, do: @redact_sensitive
-
   @doc "Default tracer module."
-  @spec tracer() :: module()
+  @spec tracer() :: nil
   def tracer, do: @tracer
 
   @doc "Default max debug-event buffer size."

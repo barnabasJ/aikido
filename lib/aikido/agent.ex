@@ -25,7 +25,7 @@ defmodule Aikido.Agent do
   use Ash.TypedStruct
 
   typed_struct do
-    field :id, :string, allow_nil?: false, default: &Ash.UUIDv7.generate/0
+    field :id, :string, allow_nil?: false
     field :agent_module, :atom
     field :name, :string
     field :description, :string

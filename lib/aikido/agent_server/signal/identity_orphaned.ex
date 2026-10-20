@@ -17,10 +17,7 @@ defmodule Aikido.AgentServer.Signal.IdentityOrphaned do
 
   use Jido.Signal,
     type: "aikido.agent.identity.orphaned",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
+    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
     schema: [
       former_parent: [
         type: :any,

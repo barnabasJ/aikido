@@ -67,12 +67,12 @@ defmodule AikidoTest.InstanceTest do
         instance,
         Keyword.merge(config,
           telemetry: [log_level: :warning],
-          observability: [log_level: :debug]
+          observability: [tracer: AikidoTest.Support.TestTracer]
         )
       )
 
-      assert Aikido.Observe.Config.telemetry_log_level(instance) == :warning
-      assert Aikido.Observe.Config.observe_log_level(instance) == :debug
+      assert Aikido.Telemetry.Config.telemetry_log_level(instance) == :warning
+      assert Aikido.Telemetry.Config.tracer(instance) == AikidoTest.Support.TestTracer
     end
   end
 

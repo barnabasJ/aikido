@@ -6,16 +6,16 @@ defmodule AikidoTest.DebugTest do
   @test_instance :"aikido_debug_test_#{System.unique_integer([:positive])}"
 
   setup do
-    Debug.reset(@test_instance)
+    Debug.disable(@test_instance)
 
     on_exit(fn ->
-      Debug.reset(@test_instance)
+      Debug.disable(@test_instance)
     end)
 
     :ok
   end
 
-  describe "enable/3 and level/1" do
+  describe "enable/2 and level/1" do
     test "default level is :off" do
       assert Debug.level(@test_instance) == :off
     end
@@ -73,37 +73,16 @@ defmodule AikidoTest.DebugTest do
     test "returns override when :on" do
       Debug.enable(@test_instance, :on)
       assert Debug.override(@test_instance, :telemetry_log_level) == :debug
-      assert Debug.override(@test_instance, :observe_log_level) == :debug
-      assert Debug.override(@test_instance, :observe_debug_events) == :minimal
     end
 
     test "returns override when :verbose" do
       Debug.enable(@test_instance, :verbose)
       assert Debug.override(@test_instance, :telemetry_log_level) == :trace
-      assert Debug.override(@test_instance, :observe_debug_events) == :all
     end
 
     test "returns nil for unknown override key" do
       Debug.enable(@test_instance, :on)
       assert Debug.override(@test_instance, :nonexistent_key) == nil
-    end
-
-    test "redact override when redact: false passed" do
-      Debug.enable(@test_instance, :on, redact: false)
-      assert Debug.override(@test_instance, :redact_sensitive) == false
-    end
-
-    test "no redact override by default" do
-      Debug.enable(@test_instance, :on)
-      assert Debug.override(@test_instance, :redact_sensitive) == nil
-    end
-  end
-
-  describe "reset/1" do
-    test "resets to :off" do
-      Debug.enable(@test_instance, :verbose)
-      assert :ok = Debug.reset(@test_instance)
-      assert Debug.level(@test_instance) == :off
     end
   end
 
@@ -167,8 +146,8 @@ defmodule AikidoTest.DebugTest do
       instance_b = :"aikido_debug_test_b_#{System.unique_integer([:positive])}"
 
       on_exit(fn ->
-        Debug.reset(instance_a)
-        Debug.reset(instance_b)
+        Debug.disable(instance_a)
+        Debug.disable(instance_b)
       end)
 
       Debug.enable(instance_a, :on)
@@ -183,15 +162,15 @@ defmodule AikidoTest.DebugTest do
     end
   end
 
-  describe "integration with Observe.Config" do
+  describe "integration with Telemetry.Config" do
     test "debug override takes priority over global config" do
       Application.put_env(:aikido, :telemetry, log_level: :info)
 
       Debug.enable(@test_instance, :on)
 
-      assert Aikido.Observe.Config.telemetry_log_level(@test_instance) == :debug
+      assert Aikido.Telemetry.Config.telemetry_log_level(@test_instance) == :debug
 
-      assert Aikido.Observe.Config.telemetry_log_level(nil) == :info
+      assert Aikido.Telemetry.Config.telemetry_log_level(nil) == :info
 
       Application.delete_env(:aikido, :telemetry)
     end
@@ -199,8 +178,7 @@ defmodule AikidoTest.DebugTest do
     test "verbose override enables trace" do
       Debug.enable(@test_instance, :verbose)
 
-      assert Aikido.Observe.Config.telemetry_log_level(@test_instance) == :trace
-      assert Aikido.Observe.Config.debug_events(@test_instance) == :all
+      assert Aikido.Telemetry.Config.telemetry_log_level(@test_instance) == :trace
     end
   end
 end

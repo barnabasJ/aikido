@@ -44,8 +44,6 @@ defmodule Aikido.Directives.Emit do
       description: "Dispatch config: {adapter, opts} or list"
   end
 
-  require Logger
-
   @impl true
   def exec(%{signal: signal, dispatch: dispatch}, input_signal, state) do
     cfg = dispatch || state.default_dispatch
@@ -65,20 +63,11 @@ defmodule Aikido.Directives.Emit do
   end
 
   defp dispatch_signal(signal, cfg, state) do
-    if Code.ensure_loaded?(Jido.Signal.Dispatch) do
-      task_sup =
-        if state.aikido,
-          do: Aikido.task_supervisor_name(state.aikido),
-          else: Aikido.TaskSupervisor
+    transfer = Aikido.SignalCtx.tracer_context(signal)
 
-      transfer = Aikido.SignalCtx.tracer_context(signal)
-
-      Task.Supervisor.start_child(task_sup, fn ->
-        Ash.ProcessHelpers.transfer_context(transfer)
-        Jido.Signal.Dispatch.dispatch(signal, cfg)
-      end)
-    else
-      Logger.warning("Jido.Signal.Dispatch not available, skipping emit")
-    end
+    Task.Supervisor.start_child(Aikido.task_supervisor_name(state.aikido), fn ->
+      Ash.ProcessHelpers.transfer_context(transfer)
+      Jido.Signal.Dispatch.dispatch(signal, cfg)
+    end)
   end
 end

@@ -14,10 +14,7 @@ defmodule Aikido.AgentServer.Signal.PartitionAssigned do
 
   use Jido.Signal,
     type: "aikido.agent.identity.partition_assigned",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
+    extension_policy: [{Jido.Signal.Ext.Dispatch, :optional}],
     schema: [
       partition: [type: :any, required: false, doc: "Logical partition or nil"]
     ]

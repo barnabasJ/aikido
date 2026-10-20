@@ -16,8 +16,8 @@ defmodule AikidoTest.DebugIntegrationTest do
   use AikidoTest.Case, async: false
 
   setup context do
-    Aikido.Debug.reset(context.aikido)
-    on_exit(fn -> Aikido.Debug.reset(context.aikido) end)
+    Aikido.Debug.disable(context.aikido)
+    on_exit(fn -> Aikido.Debug.disable(context.aikido) end)
     context
   end
 

@@ -39,10 +39,35 @@ defmodule Aikido.Directives.StopChild do
     field :reason, :term, allow_nil?: false, default: :normal, description: "Reason for stopping"
   end
 
-  alias Aikido.AgentServer.StopChildRuntime
+  require Logger
 
   @impl true
   def exec(%{tag: tag, reason: reason}, input_signal, state) do
-    StopChildRuntime.exec(tag, reason, input_signal, state)
+    case Map.get(state.children, tag) do
+      nil ->
+        Logger.debug("AgentServer #{state.id} cannot stop child #{inspect(tag)}: not found")
+
+      %{pid: pid} ->
+        Logger.debug(
+          "AgentServer #{state.id} stopping child #{inspect(tag)} with reason #{inspect(reason)}"
+        )
+
+        signal =
+          "aikido.agent.stop"
+          |> Jido.Signal.new!(%{reason: normalize_stop_reason(reason)},
+            source: "/agent/#{state.id}"
+          )
+          |> Aikido.SignalCtx.inherit(input_signal)
+
+        Aikido.AgentServer.cast(pid, signal)
+    end
+
+    :ok
   end
+
+  # Clean shutdown prevents automatic recovery; preserve custom reasons inside it.
+  defp normalize_stop_reason(:normal), do: :normal
+  defp normalize_stop_reason(:shutdown), do: :shutdown
+  defp normalize_stop_reason({:shutdown, _} = reason), do: reason
+  defp normalize_stop_reason(reason), do: {:shutdown, reason}
 end

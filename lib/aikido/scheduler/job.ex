@@ -68,14 +68,6 @@ defmodule Aikido.Scheduler.Job do
     GenServer.start(__MODULE__, Map.merge(schedule, %{fun: fun, owner_pid: owner_pid}))
   end
 
-  @spec start_link((-> term()), schedule()) :: GenServer.on_start()
-  def start_link(fun, %{cron_expr: cron_expr, cron: cron, timezone: timezone} = schedule)
-      when is_function(fun, 0) and is_binary(cron_expr) and
-             is_struct(cron, Crontab.CronExpression) and
-             is_binary(timezone) do
-    GenServer.start_link(__MODULE__, Map.put(schedule, :fun, fun))
-  end
-
   @impl true
   def init(%{fun: fun, cron_expr: cron_expr, cron: cron, timezone: timezone} = init_state) do
     owner_pid = Map.get(init_state, :owner_pid)
@@ -105,13 +97,13 @@ defmodule Aikido.Scheduler.Job do
   def handle_info(@tick, state) do
     state =
       state
-      |> schedule_after_tick()
+      |> reschedule()
       |> spawn_callback_worker()
 
     {:noreply, state}
   end
 
-  def handle_info(@retry_schedule, state), do: {:noreply, retry_schedule(state)}
+  def handle_info(@retry_schedule, state), do: {:noreply, reschedule(state)}
 
   def handle_info({:DOWN, ref, :process, pid, reason}, %{owner_ref: ref, owner_pid: pid} = state) do
     {:stop, {:owner_down, reason}, state}
@@ -206,19 +198,8 @@ defmodule Aikido.Scheduler.Job do
       :ok
   end
 
-  @spec schedule_after_tick(state()) :: state()
-  defp schedule_after_tick(%{cron: cron, timezone: timezone} = state) do
-    case schedule_next_tick(cron, timezone) do
-      {:ok, timer_ref} ->
-        clear_retry(state, timer_ref)
-
-      {:error, reason} ->
-        enter_retry(state, reason)
-    end
-  end
-
-  @spec retry_schedule(state()) :: state()
-  defp retry_schedule(%{cron: cron, timezone: timezone} = state) do
+  @spec reschedule(state()) :: state()
+  defp reschedule(%{cron: cron, timezone: timezone} = state) do
     case schedule_next_tick(cron, timezone) do
       {:ok, timer_ref} ->
         clear_retry(state, timer_ref)

@@ -166,7 +166,7 @@ defmodule Aikido.Signal.Call do
             input.context.aikido.signal,
             "aikido.agent.query.children.reply",
             "aikido.agent.query.children.error",
-            {Aikido.AgentServer.Queries, :build_children_reply, []}
+            {Aikido.AgentServer.Actions.QueryChildren, :build_reply, []}
           )
 
         Aikido.Types.ActionResult.new(state: input.arguments.state, directives: List.wrap(directive))

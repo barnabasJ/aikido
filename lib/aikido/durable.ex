@@ -142,15 +142,15 @@ defmodule Aikido.Durable do
   def stop(name, key_or_pid, opts \\ [])
 
   def stop(_name, pid, _opts) when is_pid(pid) do
-    with {:ok, {pool, key, partition, keep_snapshot?}} <-
+    with {:ok, {supervisor, key, partition, keep_snapshot?}} <-
            Aikido.AgentServer.state(pid, fn runtime ->
              {:ok,
               {runtime.durable_server, runtime.durable_key, runtime.partition,
                keep_snapshot?(runtime.agent_module)}}
            end) do
       if keep_snapshot?,
-        do: DurableServer.Supervisor.terminate_child_permanent(pool, pid),
-        else: delete(pool, key, partition: partition)
+        do: DurableServer.Supervisor.terminate_child_permanent(supervisor, pid),
+        else: delete(supervisor, key, partition: partition)
     end
   end
 

@@ -36,7 +36,7 @@ defmodule Aikido.Directives.Reply do
         input_signal: sig,
         reply_type: "aikido.agent.query.children.reply",
         error_type: "aikido.agent.query.children.error",
-        build: {Aikido.AgentServer.Queries, :build_children_reply, []}
+        build: {Aikido.AgentServer.Actions.QueryChildren, :build_reply, []}
       }
 
   `Aikido.Signal.Call.reply_from_state/4` is the recommended builder.

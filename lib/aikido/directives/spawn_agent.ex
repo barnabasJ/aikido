@@ -102,7 +102,6 @@ defmodule Aikido.Directives.SpawnAgent do
   defp spawn_child(state, agent, tag, opts, meta, restart?) do
     child_id = opts[:id] || "#{state.id}/#{tag}"
     child_partition = Map.get(opts, :partition, state.partition)
-    agent_module = agent
 
     parent_ref = %{
       pid: self(),
@@ -115,17 +114,17 @@ defmodule Aikido.Directives.SpawnAgent do
     child_opts =
       opts
       |> Map.drop(@reserved_child_opts)
-      |> Map.put(:agent_module, agent_module)
+      |> Map.put(:agent_module, agent)
       |> Map.put(:id, child_id)
       |> Map.put(:partition, child_partition)
       |> Map.put(:parent, parent_ref)
-      |> maybe_put_aikido(state.aikido)
+      |> Map.put(:aikido, state.aikido)
       |> Map.to_list()
 
     case Aikido.Durable.start(
-           Aikido.durable_supervisor_name(state.aikido || Aikido.Default),
+           Aikido.durable_supervisor_name(state.aikido),
            child_id,
-           agent: agent_module,
+           agent: agent,
            initial_state: Keyword.get(child_opts, :initial_state, %{}),
            partition: child_partition,
            agent_opts: child_opts,
@@ -142,7 +141,4 @@ defmodule Aikido.Directives.SpawnAgent do
         :ok
     end
   end
-
-  defp maybe_put_aikido(opts, nil), do: opts
-  defp maybe_put_aikido(opts, aikido), do: Map.put(opts, :aikido, aikido)
 end

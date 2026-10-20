@@ -16,6 +16,43 @@ defmodule AikidoTest.AgentServer.OptionsTest do
   use ExUnit.Case, async: true
   @base_opts aikido: :test_aikido
 
+  test "runtime identity requires an ID while initialization generates one" do
+    assert {:error, %Ash.Error.Changes.InvalidAttribute{field: :id}} = Aikido.Agent.new(%{})
+    assert %Aikido.Agent{id: id} = AikidoTest.AgentServer.OptionsTest.ValidAgent.initialize!(%{})
+    assert is_binary(id)
+    assert id != ""
+  end
+
+  test "native startup fields reject invalid IDs without crashing normalization" do
+    assert {:error, %Ash.Error.Changes.InvalidAttribute{field: :id}} =
+             Aikido.AgentServer.Options.new(
+               agent_module: AikidoTest.AgentServer.OptionsTest.ValidAgent,
+               id: %{}
+             )
+  end
+
+  test "startup fields provide the shared runtime default" do
+    assert {:ok, %{aikido: Aikido.Default}} =
+             Aikido.AgentServer.Options.new(
+               agent_module: AikidoTest.AgentServer.OptionsTest.ValidAgent
+             )
+  end
+
+  test "recasting typed options preserves their identity" do
+    options =
+      Aikido.AgentServer.Options.new!(agent_module: AikidoTest.AgentServer.OptionsTest.ValidAgent)
+
+    assert {:ok, ^options} = Aikido.AgentServer.Options.new(options)
+  end
+
+  test "string-key startup input preserves the supplied identity" do
+    assert {:ok, %{id: "existing-id"}} =
+             Aikido.AgentServer.Options.new(%{
+               "agent_module" => AikidoTest.AgentServer.OptionsTest.ValidAgent,
+               "id" => "existing-id"
+             })
+  end
+
   describe("new/1 with keyword list") do
     test "creates options with agent module" do
       {:ok, opts} =
@@ -104,7 +141,7 @@ defmodule AikidoTest.AgentServer.OptionsTest do
     end
 
     test "raises on error" do
-      assert_raise Aikido.Error.ValidationError, fn ->
+      assert_raise Ash.Error.Invalid, fn ->
         Aikido.AgentServer.Options.new!(@base_opts ++ [agent_module: nil])
       end
     end
@@ -113,24 +150,24 @@ defmodule AikidoTest.AgentServer.OptionsTest do
   describe("agent module validation") do
     test "requires agent_module" do
       {:error, error} = Aikido.AgentServer.Options.new(@base_opts)
-      assert error.message =~ "agent_module is required"
+      assert %Ash.Error.Changes.InvalidAttribute{field: :agent_module} = error
     end
 
     test "rejects nil agent_module" do
       {:error, error} = Aikido.AgentServer.Options.new(@base_opts ++ [agent_module: nil])
-      assert error.message =~ "agent_module is required"
+      assert %Ash.Error.Changes.InvalidAttribute{field: :agent_module} = error
     end
 
-    test "rejects module without an initialization action" do
+    test "rejects modules without the agent behaviour" do
       {:error, error} = Aikido.AgentServer.Options.new(@base_opts ++ [agent_module: Enum])
-      assert error.message =~ "must define an :initialize Ash action"
+      assert %Ash.Error.Changes.InvalidAttribute{field: :agent_module} = error
     end
 
     test "rejects non-existent module" do
       {:error, error} =
         Aikido.AgentServer.Options.new(@base_opts ++ [agent_module: NonExistentModule])
 
-      assert error.message =~ "not found"
+      assert %Ash.Error.Changes.InvalidAttribute{field: :agent_module} = error
     end
   end
 

@@ -14,7 +14,6 @@ defmodule AikidoTest.Agent.SchedulesTest do
 
     assert spec == %{
              cron_expression: "* * * * *",
-             action: nil,
              job_id: {:agent_schedule, "agent", :heartbeat},
              signal_type: "heartbeat.tick",
              timezone: "Europe/Vienna",

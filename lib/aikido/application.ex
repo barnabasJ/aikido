@@ -6,29 +6,10 @@ defmodule Aikido.Application do
   def start(_type, _args) do
     Aikido.Telemetry.setup()
 
-    children = []
+    # Built-in dispatch extensions must be registered on a fresh VM, where their
+    # compile-time registration callbacks have not run.
+    Jido.Signal.Ext.Registry.register(Jido.Signal.Ext.Dispatch)
 
-    register_signal_extensions()
-
-    Supervisor.start_link(children, strategy: :one_for_one, name: Aikido.Supervisor)
-  end
-
-  # Ensure critical signal extensions are registered
-  defp register_signal_extensions do
-    extensions = [
-      Jido.Signal.Ext.Trace,
-      Jido.Signal.Ext.Dispatch,
-      Jido.Signal.Ext.Target
-    ]
-
-    for ext <- extensions do
-      Code.ensure_loaded(ext)
-      Jido.Signal.Ext.Registry.register(ext)
-    end
-
-    :ok
-  rescue
-    # Gracefully handle missing modules during compilation or testing
-    _ -> :ok
+    Supervisor.start_link([], strategy: :one_for_one, name: Aikido.Supervisor)
   end
 end

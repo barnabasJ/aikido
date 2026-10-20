@@ -14,8 +14,6 @@ defmodule Aikido.AgentServer.State do
   mailbox is the only queue.
   """
 
-  require Logger
-
   alias Aikido.AgentServer.{ChildInfo, Options, ParentRef}
 
   @type status :: :initializing | :idle | :stopping
@@ -144,8 +142,6 @@ defmodule Aikido.AgentServer.State do
       description: "Max debug events in ring buffer"
   end
 
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
 
   @doc """
@@ -169,7 +165,7 @@ defmodule Aikido.AgentServer.State do
       agent_module: agent_module,
       agent: agent,
       middleware_chain: Keyword.get(extra, :middleware_chain),
-      debug_max_events: Aikido.Observe.Config.debug_max_events(opts.aikido)
+      debug_max_events: Aikido.Telemetry.Config.debug_max_events(opts.aikido)
     })
     |> new()
   end
@@ -199,36 +195,11 @@ defmodule Aikido.AgentServer.State do
   end
 
   @doc """
-  Updates the agent in state.
-  """
-  @spec update_agent(t(), struct()) :: t()
-  def update_agent(%__MODULE__{} = state, agent) do
-    %{state | agent: agent}
-  end
-
-  @doc """
-  Sets the status.
-  """
-  @spec set_status(t(), status()) :: t()
-  def set_status(%__MODULE__{} = state, status)
-      when status in [:initializing, :idle, :stopping] do
-    %{state | status: status}
-  end
-
-  @doc """
   Adds a child to the children map.
   """
   @spec add_child(t(), term(), ChildInfo.t()) :: t()
   def add_child(%__MODULE__{children: children} = state, tag, %ChildInfo{} = child) do
     %{state | children: Map.put(children, tag, child)}
-  end
-
-  @doc """
-  Removes a child by tag.
-  """
-  @spec remove_child(t(), term()) :: t()
-  def remove_child(%__MODULE__{children: children} = state, tag) do
-    %{state | children: Map.delete(children, tag)}
   end
 
   @doc """
@@ -243,14 +214,6 @@ defmodule Aikido.AgentServer.State do
       nil ->
         {nil, state}
     end
-  end
-
-  @doc """
-  Gets a child by tag.
-  """
-  @spec get_child(t(), term()) :: ChildInfo.t() | nil
-  def get_child(%__MODULE__{children: children}, tag) do
-    Map.get(children, tag)
   end
 
   @doc """
@@ -293,13 +256,5 @@ defmodule Aikido.AgentServer.State do
       n when is_integer(n) and n > 0 -> Enum.take(events, n)
       _ -> events
     end
-  end
-
-  @doc """
-  Enables or disables debug mode at runtime.
-  """
-  @spec set_debug(t(), boolean()) :: t()
-  def set_debug(%__MODULE__{} = state, enabled) when is_boolean(enabled) do
-    %{state | debug: enabled}
   end
 end

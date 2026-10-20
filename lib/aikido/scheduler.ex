@@ -141,30 +141,13 @@ defmodule Aikido.Scheduler do
     :ok
   end
 
-  @doc """
-  Checks if a cron job process is still alive.
-  """
-  @spec alive?(pid()) :: boolean()
-  def alive?(pid) when is_pid(pid) do
-    Process.alive?(pid)
-  end
-
   @spec normalize_cron_spec(term()) :: {:ok, cron_spec()} | {:error, term()}
   defp normalize_cron_spec(spec) when is_map(spec) do
     cron_expression = map_get(spec, :cron_expression)
     message = map_get(spec, :message)
     timezone = map_get(spec, :timezone)
 
-    with :ok <- validate_cron_expression_type(cron_expression),
-         {:ok, normalized_timezone} <- validate_timezone_option(timezone),
-         :ok <- validate_durable_message(message) do
-      {:ok,
-       %{
-         cron_expression: cron_expression,
-         message: message,
-         timezone: normalized_timezone
-       }}
-    end
+    validate_and_build_cron_spec(cron_expression, message, timezone)
   end
 
   defp normalize_cron_spec(_), do: {:error, :invalid_spec}

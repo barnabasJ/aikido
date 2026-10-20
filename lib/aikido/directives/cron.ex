@@ -56,7 +56,7 @@ defmodule Aikido.Directives.Cron do
         }
 
   # Pure I/O for cron registration. Validates the expression, spawns
-  # the scheduler job, monitors it, and persists the new spec map.
+  # the scheduler job and monitors it.
   # Returns the data the cascade callback
   # (`maybe_track_cron_registered/2`) needs to install in the runtime
   # maps. It does not mutate `%AgentServer.State{}`; runtime field writes
@@ -89,9 +89,6 @@ defmodule Aikido.Directives.Cron do
     }
   end
 
-  require Logger
-
-  alias Aikido.AgentServer
   alias Aikido.AgentServer.Signal.CronRegistered
 
   @impl true

@@ -74,7 +74,7 @@ defmodule Aikido.Directives.AsyncTask do
   @impl true
   def exec(%AsyncTask{} = directive, input_signal, %State{} = state) do
     agent_pid = self()
-    task_sup = task_supervisor(state)
+    task_sup = Aikido.task_supervisor_name(state.aikido)
 
     tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
@@ -96,11 +96,6 @@ defmodule Aikido.Directives.AsyncTask do
     end
 
     :ok
-  end
-
-  @spec task_supervisor(state :: State.t()) :: module()
-  defp task_supervisor(%State{} = state) do
-    if state.aikido, do: Aikido.task_supervisor_name(state.aikido), else: Aikido.TaskSupervisor
   end
 
   @spec run_and_dispatch(

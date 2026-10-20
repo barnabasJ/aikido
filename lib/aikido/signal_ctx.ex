@@ -100,7 +100,7 @@ defmodule Aikido.SignalCtx do
     Enum.uniq(
       List.wrap(get(signal, :tracer)) ++
         Map.keys(tracer_context(signal)) ++
-        List.wrap(Aikido.Observe.Config.tracer(instance)) ++
+        List.wrap(Aikido.Telemetry.Config.tracer(instance)) ++
         List.wrap(Application.get_env(:ash, :tracer))
     )
   end
