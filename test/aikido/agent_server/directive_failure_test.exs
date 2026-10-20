@@ -68,7 +68,8 @@ defmodule AikidoTest.DirectiveFailure.Agent do
       end
     end
 
-    signal :increment, AikidoTest.DirectiveFailure.Signal, AikidoTest.DirectiveFailure.Increment
+    route AikidoTest.DirectiveFailure.Signal, AikidoTest.DirectiveFailure.Increment,
+      name: :increment
   end
 end
 

@@ -149,9 +149,9 @@ defmodule Aikido.NativeRuntimeScopeTest.Resource do
     end
 
     slice :mounted, Aikido.NativeRuntimeScopeTest.Slice
-    signal :capture, "scope.capture", :capture_scope
-    signal :observe, "scope.observe", :observe_scope
-    signal :spawn, "scope.spawn", :spawn_child
+    route "scope.capture", :capture_scope, name: :capture
+    route "scope.observe", :observe_scope, name: :observe
+    route "scope.spawn", :spawn_child, name: :spawn
     route "scope.result", :observe_scope
   end
 

@@ -10,7 +10,9 @@ defmodule Aikido.Ash.Actions.Signal do
     definition =
       resource
       |> Spark.Dsl.Extension.get_entities([:agent])
-      |> Enum.find(&(match?(%Aikido.Ash.Agent.Signal{}, &1) && &1.name == input.action.name))
+      |> Enum.find(
+        &(match?(%Aikido.Ash.Agent.Route{}, &1) && &1.public? && &1.name == input.action.name)
+      )
 
     arguments = Map.delete(input.arguments, :agent)
 

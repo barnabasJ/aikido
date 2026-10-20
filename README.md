@@ -89,7 +89,9 @@ defmodule MyApp.Counter do
       end
     end
 
-    signal :add, MyApp.Signals.Add, MyApp.Increment
+    route MyApp.Signals.Add, MyApp.Increment do
+      public? true
+    end
   end
 end
 

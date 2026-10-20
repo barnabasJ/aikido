@@ -26,7 +26,7 @@ defmodule AikidoTest.TypedRouteReservedNamesTest do
       definition = definition!(name)
 
       {resource, errors} =
-        resource(:agent, "signal :launch, #{inspect(definition)}, #{inspect(Noop)}")
+        resource(:agent, "route #{inspect(definition)}, #{inspect(Noop)}, public?: false")
 
       assert_reserved(errors, resource, name, :agent)
     end
@@ -73,7 +73,7 @@ defmodule AikidoTest.TypedRouteReservedNamesTest do
       definition = definition!(handler)
 
       assert_raise Spark.Error.DslError, fn ->
-        resource(:agent, "signal :start, #{inspect(definition)}, #{inspect(Noop)}")
+        resource(:agent, "route #{inspect(definition)}, #{inspect(Noop)}, name: :start")
       end
     end
   end
@@ -83,7 +83,7 @@ defmodule AikidoTest.TypedRouteReservedNamesTest do
 
     for name <- [:initialize, :__aikido_initialize_state__] do
       {resource, errors} =
-        resource(:agent, "signal #{inspect(name)}, #{inspect(definition)}, #{inspect(Noop)}")
+        resource(:agent, "route #{inspect(definition)}, #{inspect(Noop)}, name: #{inspect(name)}")
 
       assert Enum.any?(errors, fn
                {^resource, entries} ->
@@ -104,7 +104,7 @@ defmodule AikidoTest.TypedRouteReservedNamesTest do
 
   test "application-owned native action contracts remain available" do
     {resource, errors} =
-      resource(:agent, "route \"app.inspect\", :inspect", """
+      resource(:agent, "route \"app.inspect\", :inspect, public?: false", """
       actions do
         action :inspect, Aikido.Types.ActionResult do
           public? false

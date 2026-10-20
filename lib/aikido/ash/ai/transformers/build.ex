@@ -84,10 +84,11 @@ defmodule Aikido.Ash.AI.Transformers.Build do
 
   defp add_action(dsl, name, arguments) do
     dsl =
-      Transformer.add_entity(dsl, [:agent], %Aikido.Ash.Agent.Signal{
+      Transformer.add_entity(dsl, [:agent], %Aikido.Ash.Agent.Route{
         name: name,
+        public?: true,
         type: "ai.react.#{name}",
-        target: {Aikido.Slices.AiReact, name}
+        action: {Aikido.Slices.AiReact, name}
       })
 
     Builder.add_new_action(dsl, :action, name,

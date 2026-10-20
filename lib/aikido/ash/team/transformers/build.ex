@@ -62,10 +62,11 @@ defmodule Aikido.Ash.Team.Transformers.Build do
 
     dsl =
       Enum.reduce(@commands, dsl, fn command, dsl ->
-        Transformer.add_entity(dsl, [:agent], %Aikido.Ash.Agent.Signal{
+        Transformer.add_entity(dsl, [:agent], %Aikido.Ash.Agent.Route{
           name: if(command == :start, do: :configure_topology, else: command),
+          public?: true,
           type: "aikido.ash.team.#{command}",
-          target: {slice, command}
+          action: {slice, command}
         })
       end)
 

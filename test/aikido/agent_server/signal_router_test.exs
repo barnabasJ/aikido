@@ -25,10 +25,14 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.AgentWithRoutes do
 
   agent do
     name "agent_with_routes"
-    route "agent.action", {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}
+
+    route "agent.action", {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action},
+      public?: false
 
     route "agent.priority",
-          {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}, priority: 10
+          {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action},
+          priority: 10,
+          public?: false
   end
 end
 
@@ -40,7 +44,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.AgentWithConfiguredRoutes do
     name "agent_with_configured_routes"
 
     route "agent.configured",
-          {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}
+          {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}, public?: false
   end
 end
 

@@ -74,10 +74,14 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CronAgent do
     end
 
     route "register_cron",
-          {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :register_cron}
+          {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :register_cron},
+          public?: false
 
-    route "cancel_cron", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cancel_cron}
-    route "cron.tick", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cron_count}
+    route "cancel_cron", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cancel_cron},
+      public?: false
+
+    route "cron.tick", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cron_count},
+      public?: false
   end
 
   actions do
@@ -127,7 +131,8 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.ScheduledCronAgent do
       end
     end
 
-    route "cron.tick", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cron_count}
+    route "cron.tick", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cron_count},
+      public?: false
   end
 
   schedules do

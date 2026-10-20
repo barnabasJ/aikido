@@ -2,13 +2,14 @@ defmodule Aikido.Ash.Agent.Route do
   @moduledoc false
 
   defstruct [
+    :name,
     :type,
     :action,
-    :priority,
     :match,
     :signal_module,
     :implementation,
-    public?: true,
+    public?: nil,
+    priority: 0,
     __spark_metadata__: nil
   ]
 

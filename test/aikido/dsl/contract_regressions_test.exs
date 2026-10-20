@@ -38,11 +38,13 @@ defmodule Aikido.Dsl.ContractRegressionsTest.Counter do
       end
     end
 
-    signal :increase, "contract.increase", :increment
-    signal :increment, "contract.increment", :increment
-    route "contract.internal", :increment
-    route "contract.tuple", {__MODULE__, :increment}
-    route "contract.remote", {Aikido.Dsl.ContractRegressionsTest.RemoteSlice, :increment}
+    route "contract.increase", :increment, name: :increase
+    route "contract.increment", :increment, name: :increment
+    route "contract.internal", :increment, public?: false
+    route "contract.tuple", {__MODULE__, :increment}, public?: false
+
+    route "contract.remote", {Aikido.Dsl.ContractRegressionsTest.RemoteSlice, :increment},
+      public?: false
   end
 
   actions do

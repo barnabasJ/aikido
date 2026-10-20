@@ -27,7 +27,7 @@ defmodule AikidoTest.ScopedAgent do
       end
     end
 
-    signal :observe, "scope.observe", {__MODULE__, :reduce}
+    route "scope.observe", {__MODULE__, :reduce}, name: :observe
   end
 
   actions do

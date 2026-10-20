@@ -22,7 +22,10 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
     team_slice = Transformer.get_persisted(dsl, :aikido_team_slice)
     entities = Transformer.get_entities(dsl, [:agent])
     mounts = Enum.filter(entities, &match?(%Aikido.Ash.Agent.SliceMount{}, &1))
-    declared_signals = Enum.filter(entities, &match?(%Aikido.Ash.Agent.Signal{}, &1))
+
+    declared_signals =
+      Enum.filter(entities, &(match?(%Aikido.Ash.Agent.Route{}, &1) && &1.public?))
+
     {dsl, declared_signals, aliases} = resolve_local_actions(dsl, declared_signals, resource)
     inherited = inherited_signals(mounts, declared_signals)
     signals = declared_signals ++ inherited
@@ -50,11 +53,7 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
           %{route | action: resolve_local_target(route.action, aliases, resource)}
         end
 
-      routes =
-        declared_routes ++
-          for signal <- signals, !mounted_signal?(signal, mounts) do
-            %Aikido.Ash.Agent.Route{type: signal.type, action: signal.target, priority: 0}
-          end
+      routes = Enum.reject(declared_routes, &mounted_signal?(&1, mounts))
 
       accepted = for attribute <- attributes, attribute.writable?, do: attribute.name
 
@@ -86,7 +85,7 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
     {dsl, aliases} =
       Enum.reduce(signals, {dsl, %{}}, fn signal, {dsl, aliases} ->
         local =
-          case signal.target do
+          case signal.action do
             name when is_atom(name) -> name
             {^resource, name} -> name
             _ -> nil
@@ -115,7 +114,7 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
 
     {signals, dsl} =
       Enum.map_reduce(signals, dsl, fn signal, dsl ->
-        resolved = %{signal | target: resolve_local_target(signal.target, aliases, resource)}
+        resolved = %{signal | action: resolve_local_target(signal.action, aliases, resource)}
         {resolved, Transformer.replace_entity(dsl, [:agent], resolved, &(&1 == signal))}
       end)
 
@@ -152,17 +151,18 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
         {resource, name} = Aikido.Ash.Slice.Info.target(mount.module, route.action),
         action = Ash.Resource.Info.action(resource, name),
         match?(%{public?: true}, action),
-        command_name = inherited_name(route, resource, action.name),
+        command_name = route.name || inherited_name(route, resource, action.name),
         !Enum.any?(declared, &(&1.name == command_name)) do
-      %Aikido.Ash.Agent.Signal{
+      %Aikido.Ash.Agent.Route{
         name: command_name,
         type: route.type,
-        target: {resource, action.name},
+        action: {resource, action.name},
         signal_module: route.signal_module,
-        implementation: route.implementation
+        implementation: route.implementation,
+        public?: true
       }
     end
-    |> Enum.uniq_by(&{&1.name, &1.target})
+    |> Enum.uniq_by(&{&1.name, &1.action})
   end
 
   defp inherited_name(%{signal_module: module}, resource, action) when not is_nil(module) do
@@ -184,7 +184,7 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
       |> Spark.Dsl.Extension.get_entities([:slice])
       |> Enum.any?(fn route ->
         route.type == signal.type &&
-          Aikido.Ash.Slice.Info.target(mount.module, route.action) == signal.target
+          Aikido.Ash.Slice.Info.target(mount.module, route.action) == signal.action
       end)
     end)
   end
@@ -348,7 +348,7 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
   defp signal_arguments(_dsl, %{signal_module: module}) when not is_nil(module),
     do: {Aikido.Ash.SignalRoutes.arguments(module), :flat}
 
-  defp signal_arguments(dsl, %{target: {resource, name}}) do
+  defp signal_arguments(dsl, %{action: {resource, name}}) do
     action =
       if resource == Transformer.get_persisted(dsl, :module) do
         Ash.Resource.Info.action(dsl, name)

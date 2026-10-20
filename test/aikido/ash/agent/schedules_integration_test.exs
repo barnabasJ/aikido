@@ -23,7 +23,8 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent do
       end
     end
 
-    route "agent.tick", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick}
+    route "agent.tick", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick},
+      public?: false
   end
 
   schedules do
@@ -52,8 +53,11 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.MultiScheduleAgent do
       end
     end
 
-    route "heartbeat.tick", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick}
-    route "cleanup.run", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick}
+    route "heartbeat.tick", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick},
+      public?: false
+
+    route "cleanup.run", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick},
+      public?: false
   end
 
   schedules do

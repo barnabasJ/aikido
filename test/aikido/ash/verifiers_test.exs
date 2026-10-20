@@ -53,29 +53,45 @@ defmodule AikidoTest.AshVerifiersTest do
     end
   end
 
-  test "public agent signals require concrete types" do
+  test "explicitly public agent routes require concrete types" do
     output =
       compile_resource([Aikido.Ash.Agent], """
       agent do
         name "wildcard"
-        signal :increment, "counter.*", {AikidoTest.AshFixtures.CounterSlice, :increment}
+        route "counter.*", {AikidoTest.AshFixtures.CounterSlice, :increment}, name: :increment, public?: true
       end
       """)
 
-    assert output =~ "Public signals require a concrete type"
+    assert output =~ "Public routes require a concrete type"
   end
 
-  test "duplicate public signal names are checked before declarations are lost" do
+  test "explicitly public wildcard slice routes are rejected" do
+    output =
+      compile_resource(
+        [Aikido.Ash.Slice],
+        """
+        slice do
+          name "wildcard"
+          route "counter.**", {AikidoTest.AshFixtures.CounterSlice, :increment}, public?: true
+        end
+        """,
+        embedded?: true
+      )
+
+    assert output =~ "Public routes require a concrete type"
+  end
+
+  test "duplicate public route names are checked before declarations are lost" do
     output =
       compile_resource([Aikido.Ash.Agent], """
       agent do
         name "duplicate_signals"
-        signal :increment, "counter.one", {AikidoTest.AshFixtures.CounterSlice, :increment}
-        signal :increment, "counter.two", {AikidoTest.AshFixtures.CounterSlice, :increment}
+        route "counter.one", {AikidoTest.AshFixtures.CounterSlice, :increment}, name: :increment
+        route "counter.two", {AikidoTest.AshFixtures.CounterSlice, :increment}, name: :increment
       end
       """)
 
-    assert output =~ "Got duplicate Aikido.Ash.Agent.Signal: increment"
+    assert output =~ "Public route names must be unique: :increment"
   end
 
   test "attributes cannot shadow the agent state path" do

@@ -51,8 +51,6 @@ spark_locals_without_parens = [
   select_by_default?: 1,
   sensitive?: 1,
   signal: 1,
-  signal: 3,
-  signal: 4,
   slice: 2,
   slice: 3,
   sortable?: 1,

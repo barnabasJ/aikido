@@ -235,10 +235,10 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
   test "multiple routes share one canonical public command and retain raw delivery", context do
     %{resource: resource, domain: domain, reference: reference} = context
 
-    assert [%{type: "mounted.first", target: {Counter, :multiple}}] =
+    assert [%{type: "mounted.first", action: {Counter, :multiple}}] =
              resource
              |> Spark.Dsl.Extension.get_entities([:agent])
-             |> Enum.filter(&match?(%Aikido.Ash.Agent.Signal{name: :multiple}, &1))
+             |> Enum.filter(&match?(%Aikido.Ash.Agent.Route{name: :multiple}, &1))
 
     assert {:ok, _} = apply(domain, :counter_multiple, [reference, %{amount: "2"}])
     assert_counts(reference, 2)
@@ -305,7 +305,7 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
               name "conflicting_routes"
               slice :counter, #{inspect(Counter)}
               slice :other, #{inspect(resource)}.Slice
-              #{if override?, do: "signal :local, \"mounted.local\", {#{inspect(Counter)}, :local}", else: ""}
+              #{if override?, do: "route \"mounted.local\", {#{inspect(Counter)}, :local}", else: ""}
             end
           end
           """)
@@ -314,12 +314,12 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
       if override? do
         assert output == ""
 
-        assert [%{target: {Counter, :local}}] =
+        assert [%{action: {Counter, :local}}] =
                  resource
                  |> Spark.Dsl.Extension.get_entities([:agent])
-                 |> Enum.filter(&match?(%Aikido.Ash.Agent.Signal{name: :local}, &1))
+                 |> Enum.filter(&match?(%Aikido.Ash.Agent.Route{name: :local}, &1))
       else
-        assert output =~ "Got duplicate Aikido.Ash.Agent.Signal: local"
+        assert output =~ "Public route names must be unique: :local"
       end
     end
   end

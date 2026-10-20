@@ -15,19 +15,6 @@ defmodule Aikido.Ash.Agent do
   callback, not completion of asynchronous effects or exactly-once delivery.
   """
 
-  defmodule Signal do
-    @moduledoc false
-    defstruct [
-      :name,
-      :type,
-      :target,
-      :signal_module,
-      :implementation,
-      __identifier__: nil,
-      __spark_metadata__: nil
-    ]
-  end
-
   @slice %Spark.Dsl.Entity{
     name: :slice,
     target: Aikido.Ash.Agent.SliceMount,
@@ -37,21 +24,6 @@ defmodule Aikido.Ash.Agent do
       path: [type: :atom, required: true],
       module: [type: :module, required: true],
       options: [type: {:or, [:keyword_list, :map]}, default: []]
-    ]
-  }
-  @signal %Spark.Dsl.Entity{
-    name: :signal,
-    target: Signal,
-    args: [:name, :type, :target],
-    identifier: :name,
-    schema: [
-      name: [type: :atom, required: true],
-      type: [type: :any, required: true],
-      target: [
-        type: :any,
-        required: true,
-        doc: "Native Ash action implementation module, or an explicit native action reference."
-      ]
     ]
   }
   # Reuse Ash's attribute entities so types, constraints and options have exactly
@@ -64,7 +36,15 @@ defmodule Aikido.Ash.Agent do
     schema: [
       type: [type: :any, required: true],
       action: [type: :any, required: true],
-      public?: [type: :boolean, default: true],
+      name: [
+        type: :atom,
+        doc: "Optional action name; inferred from the signal or target by default."
+      ],
+      public?: [
+        type: :boolean,
+        doc:
+          "Expose a domain command; defaults to true for concrete signals and false for patterns."
+      ],
       priority: [type: :integer, default: 0],
       match: [type: {:fun, 1}]
     ]
@@ -102,7 +82,7 @@ defmodule Aikido.Ash.Agent do
       path: [type: :atom, default: :state]
     ],
     sections: [@schema],
-    entities: [@slice, @signal, @route]
+    entities: [@slice, @route]
   }
   use Spark.Dsl.Extension,
     sections: [@agent, @schedules],

@@ -21,9 +21,9 @@ defmodule AikidoTest.AshWholeDataTest.Agent do
       end
     end
 
-    signal :map_payload, "whole.map", :reduce_map
-    signal :term_payload, "whole.term", :reduce_term
-    signal :required_payload, "whole.required", :reduce_required
+    route "whole.map", :reduce_map, name: :map_payload
+    route "whole.term", :reduce_term, name: :term_payload
+    route "whole.required", :reduce_required, name: :required_payload
   end
 
   actions do

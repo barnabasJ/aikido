@@ -22,12 +22,13 @@ defmodule Aikido.Ash.Slice do
   defmodule Route do
     @moduledoc false
     defstruct [
+      :name,
       :type,
       :action,
       :match,
       :signal_module,
       :implementation,
-      public?: true,
+      public?: nil,
       priority: 0,
       __spark_metadata__: nil
     ]
@@ -45,7 +46,15 @@ defmodule Aikido.Ash.Slice do
     schema: [
       type: [type: :any, required: true],
       action: [type: :any, required: true],
-      public?: [type: :boolean, default: true],
+      name: [
+        type: :atom,
+        doc: "Optional action name; inferred from the signal or target by default."
+      ],
+      public?: [
+        type: :boolean,
+        doc:
+          "Expose a mounted domain command; defaults to true for concrete signals and false for patterns."
+      ],
       priority: [type: :integer, default: 0],
       match: [type: {:fun, 1}]
     ]

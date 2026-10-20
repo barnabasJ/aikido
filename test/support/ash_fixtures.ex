@@ -59,8 +59,8 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter do
       end
     end
 
-    signal :add, "generated.add", :reduce_increment
-    signal :with_data, "generated.data", :reduce_data
+    route "generated.add", :reduce_increment, name: :add
+    route "generated.data", :reduce_data, name: :with_data
   end
 
   actions do
@@ -106,8 +106,8 @@ defmodule AikidoTest.AshFixtures.Counter do
       end
     end
 
-    signal :increment, "counter.increment", :reduce_increment
-    signal :add, "counter.add", :reduce_increment
+    route "counter.increment", :reduce_increment, name: :increment
+    route "counter.add", :reduce_increment, name: :add
   end
 
   actions do
@@ -265,7 +265,7 @@ defmodule AikidoTest.AshFixtures.TaskWorker do
       end
     end
 
-    signal :task, "harness.task", :task_echo
+    route "harness.task", :task_echo, name: :task
   end
 
   actions do

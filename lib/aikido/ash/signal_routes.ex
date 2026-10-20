@@ -51,8 +51,11 @@ defmodule Aikido.Ash.SignalRoutes do
 
   defp expand_entity(dsl, section, %{type: types} = entity) when is_list(types) do
     cond do
-      is_struct(entity, Aikido.Ash.Agent.Signal) ->
-        error(section, "Public signals require one signal definition")
+      public?(entity) && not is_nil(entity.name) ->
+        error(
+          section,
+          "Public signal lists infer one command name per signal; declare separate routes to give commands explicit names"
+        )
 
       types == [] ->
         error(section, "A route requires at least one signal definition")
@@ -63,14 +66,16 @@ defmodule Aikido.Ash.SignalRoutes do
       true ->
         with {:ok, definitions} <- definitions(types, section),
              {:ok, dsl, target, implementation} <-
-               handler(dsl, section, definitions, entity.action, Map.get(entity, :public?, true)) do
+               handler(dsl, section, definitions, entity.action, public?(entity)) do
           entries =
             Enum.map(definitions, fn module ->
               Map.merge(entity, %{
                 type: Aikido.Signal.Info.signal_type!(module),
                 action: target,
                 signal_module: module,
-                implementation: implementation
+                implementation: implementation,
+                public?: public?(entity),
+                name: entity.name || handler_name(module)
               })
             end)
 
@@ -81,26 +86,35 @@ defmodule Aikido.Ash.SignalRoutes do
 
   defp expand_entity(dsl, section, %{type: type} = entity)
        when is_struct(entity, Aikido.Ash.Agent.Route) or
-              is_struct(entity, Aikido.Ash.Slice.Route) or
-              is_struct(entity, Aikido.Ash.Agent.Signal) do
-    target = if is_struct(entity, Aikido.Ash.Agent.Signal), do: entity.target, else: entity.action
-
+              is_struct(entity, Aikido.Ash.Slice.Route) do
     with {:ok, definition, type} <- definition(type, section),
          {:ok, dsl, target, implementation} <-
-           handler(dsl, section, definition, target, Map.get(entity, :public?, true)) do
-      entity =
-        Map.merge(entity, %{type: type, signal_module: definition, implementation: implementation})
+           handler(dsl, section, definition, entity.action, public?(entity)) do
+      name = entity.name || route_name(definition, target)
 
-      entity =
-        if is_struct(entity, Aikido.Ash.Agent.Signal),
-          do: %{entity | target: target},
-          else: %{entity | action: target}
+      entity = %{
+        entity
+        | type: type,
+          signal_module: definition,
+          implementation: implementation,
+          action: target,
+          public?: public?(entity),
+          name: name
+      }
 
       {:ok, dsl, [entity]}
     end
   end
 
   defp expand_entity(dsl, _section, entity), do: {:ok, dsl, [entity]}
+
+  defp public?(%{public?: value}) when is_boolean(value), do: value
+  defp public?(%{type: type}) when is_binary(type), do: !String.contains?(type, "*")
+  defp public?(_), do: true
+
+  defp route_name(definition, _) when not is_nil(definition), do: handler_name(definition)
+  defp route_name(_, {_, action}), do: action
+  defp route_name(_, action), do: action
 
   defp definitions(types, section) do
     Enum.reduce_while(types, {:ok, []}, fn type, {:ok, modules} ->
@@ -187,7 +201,7 @@ defmodule Aikido.Ash.SignalRoutes do
         returns: Aikido.Types.ActionResult,
         arguments: [state_argument(dsl, section) | payload],
         run: {implementation, []},
-        public?: public? && section == :slice && not is_nil(definition)
+        public?: public? && section == :slice
       ]
 
       options = if description, do: Keyword.put(options, :description, description), else: options
@@ -238,14 +252,18 @@ defmodule Aikido.Ash.SignalRoutes do
         {:ok, Transformer.add_entity(dsl, [:actions], generated)}
 
       existing ->
-        if Map.take(existing, [:type, :returns, :arguments, :run, :public?]) ==
-             Map.take(generated, [:type, :returns, :arguments, :run, :public?]),
-           do: {:ok, dsl},
-           else:
-             error(
-               section,
-               "Generated handler #{inspect(generated.name)} conflicts with an existing native action"
-             )
+        if Map.take(existing, [:type, :returns, :arguments, :run]) ==
+             Map.take(generated, [:type, :returns, :arguments, :run]) do
+          updated = %{existing | public?: existing.public? || generated.public?}
+
+          {:ok,
+           Transformer.replace_entity(dsl, [:actions], updated, &(&1.name == generated.name))}
+        else
+          error(
+            section,
+            "Generated handler #{inspect(generated.name)} conflicts with an existing native action"
+          )
+        end
     end
   end
 

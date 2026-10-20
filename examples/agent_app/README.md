@@ -101,7 +101,7 @@ block with a description of its role. Agent declarations bind that
 contract directly to an Ash action implementation:
 
 ```elixir
-signal :add, AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Increment
+route AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Increment
 
 route [AgentExamples.Counter.Signals.Increase, AgentExamples.Counter.Signals.Decrease],
       AgentExamples.Counter.Adjust

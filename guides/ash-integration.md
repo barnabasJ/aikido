@@ -115,7 +115,9 @@ defmodule MyApp.Counter do
       end
     end
 
-    signal :add, MyApp.Signals.Add, MyApp.Increment
+    route MyApp.Signals.Add, MyApp.Increment do
+      public? true
+    end
   end
 end
 ```
@@ -180,17 +182,19 @@ standard default unless the application selects another data layer. Selecting
 AshPostgres or another layer does not automatically persist live agent snapshots
 or make process effects transactional; generic actions still use the agent runtime.
 
-The required third argument is the implementation module:
-`signal :add, MyApp.Signals.Add, MyApp.Increment`. The public command and its
+The required second argument is the implementation module:
+`route MyApp.Signals.Add, MyApp.Increment`. The public command and its
 native reducer are generated from the signal's schema. The reducer's state
 argument uses the owning resource's schema, including Ash field constraints.
 Reducer implementations remain pure; return directives for I/O.
 
 Mounting an embedded slice exposes its routed public signals automatically;
 do not repeat them on the agent. Names come from signal definition module names
-converted to snake case. Mark internal typed routes `public?: false`.
+converted to snake case. Override the command name with `name :custom_name` inside
+the route block. Concrete routes are public by default on both agents and slices;
+set `public? false` inside the block to keep a route internal.
 Wildcard routes remain internal observers. Conflicting inherited names fail
-compilation; an explicit agent signal can override an inherited command name.
+compilation; an explicitly named agent route can override an inherited command name.
 
 Explicit native Ash action references remain available for actions whose
 contracts the application owns. Their native argument contracts are preserved,
@@ -397,7 +401,9 @@ defmodule MyApp.CounterSlice do
         public? true
       end
     end
-    route MyApp.Signals.Add, MyApp.Increment
+    route MyApp.Signals.Add, MyApp.Increment do
+      public? true
+    end
   end
 end
 

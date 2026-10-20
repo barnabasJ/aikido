@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Use a single `route` declaration on agents and slices. Concrete routes expose
+  domain commands by default; `public? false` keeps delivery internal. Use `name`
+  to override the inferred command name. Wildcard observers remain internal.
+
 - Give action modules descriptive behavior names and place example actions and
   signal definitions in files matching their module names. Update source panels
   and test fixtures to the same convention.

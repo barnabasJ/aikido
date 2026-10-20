@@ -94,10 +94,10 @@ defmodule AikidoTest.TracePropagation.Pipeline do
       end
     end
 
-    signal :work, "trace.start", :begin_work
-    signal :fail_work, "trace.fail", :fail
-    route "trace.completed", :accept_result
-    route "trace.finished", :finish
+    route "trace.start", :begin_work, name: :work
+    route "trace.fail", :fail, name: :fail_work
+    route "trace.completed", :accept_result, public?: false
+    route "trace.finished", :finish, public?: false
   end
 
   actions do

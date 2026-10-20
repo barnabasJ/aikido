@@ -26,7 +26,8 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.TestAgent do
       end
     end
 
-    route "test.directive", {AikidoTest.AgentServer.DirectiveExecTest.TestAgent, :emit_directive}
+    route "test.directive", {AikidoTest.AgentServer.DirectiveExecTest.TestAgent, :emit_directive},
+      public?: false
   end
 
   actions do
@@ -85,9 +86,11 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent do
     end
 
     route "aikido.agent.stop",
-          {AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent, :stop_on_signal}
+          {AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent, :stop_on_signal},
+          public?: false
 
-    route "test.directive", {AikidoTest.AgentServer.DirectiveExecTest.TestAgent, :emit_directive}
+    route "test.directive", {AikidoTest.AgentServer.DirectiveExecTest.TestAgent, :emit_directive},
+      public?: false
   end
 
   actions do

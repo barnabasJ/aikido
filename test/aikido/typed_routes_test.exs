@@ -231,7 +231,7 @@ defmodule AikidoTest.TypedRoutesTest.CaptureUnion do
 end
 
 defmodule AikidoTest.TypedRoutesTest.Agent do
-  use Aikido.Agent
+  use Aikido.Agent, domain: AikidoTest.TypedRoutesTest.Domain
 
   agent do
     name "typed_agent"
@@ -251,9 +251,10 @@ defmodule AikidoTest.TypedRoutesTest.Agent do
       end
     end
 
-    signal :increment, AikidoTest.TypedRoutesTest.Increment, AikidoTest.TypedRoutesTest.Add
-    signal :store, AikidoTest.TypedRoutesTest.Wrapped, AikidoTest.TypedRoutesTest.Store
-    signal :empty, AikidoTest.TypedRoutesTest.Empty, AikidoTest.TypedRoutesTest.Count
+    route AikidoTest.TypedRoutesTest.Increment, AikidoTest.TypedRoutesTest.Add
+    route AikidoTest.TypedRoutesTest.Wrapped, AikidoTest.TypedRoutesTest.Store, name: :store
+    route AikidoTest.TypedRoutesTest.Empty, AikidoTest.TypedRoutesTest.Count
+    route AikidoTest.TypedRoutesTest.Reset, AikidoTest.TypedRoutesTest.Count, public?: false
 
     route [AikidoTest.TypedRoutesTest.First, AikidoTest.TypedRoutesTest.Second],
           AikidoTest.TypedRoutesTest.CaptureUnion
@@ -272,6 +273,44 @@ defmodule AikidoTest.TypedRoutesTest.Mounted do
   end
 end
 
+defmodule AikidoTest.TypedRoutesTest.PublicSlice do
+  use Aikido.Slice
+
+  slice do
+    name "public_route_slice"
+
+    schema do
+      attribute :count, :integer do
+        description "Counter used to compare public and private route delivery."
+        default 0
+        allow_nil? false
+      end
+    end
+
+    route AikidoTest.TypedRoutesTest.Increment, AikidoTest.TypedRoutesTest.Add
+    route AikidoTest.TypedRoutesTest.Reset, AikidoTest.TypedRoutesTest.Count, public?: false
+  end
+end
+
+defmodule AikidoTest.TypedRoutesTest.PublicMounted do
+  use Aikido.Agent, domain: AikidoTest.TypedRoutesTest.Domain
+
+  agent do
+    name "public_route_mounted"
+    instance AikidoTest.TypedRoutesTest.Instance
+    slice :counter, AikidoTest.TypedRoutesTest.PublicSlice
+  end
+end
+
+defmodule AikidoTest.TypedRoutesTest.Domain do
+  use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+
+  agents do
+    agent :counter, AikidoTest.TypedRoutesTest.PublicMounted
+    agent :direct, AikidoTest.TypedRoutesTest.Agent
+  end
+end
+
 defmodule AikidoTest.TypedRoutesTest do
   use ExUnit.Case, async: false
 
@@ -286,6 +325,80 @@ defmodule AikidoTest.TypedRoutesTest do
     )
 
     :ok
+  end
+
+  test "typed agent routes infer public commands and keep private routes deliverable" do
+    assert Ash.Resource.Info.action(Resource, :increment).public?
+    refute Ash.Resource.Info.action(Resource, :reset).public?
+
+    domain = AikidoTest.TypedRoutesTest.Domain
+    assert function_exported?(domain, :direct_increment, 2)
+    refute function_exported?(domain, :direct_reset, 2)
+    reference = domain.direct_start!(%{})
+    domain.direct_increment!(reference, %{amount: 3})
+
+    assert {:ok, :processed} =
+             Aikido.AgentServer.call(
+               reference.pid,
+               AikidoTest.TypedRoutesTest.Reset.new!(%{value: 100}),
+               fn _ -> {:ok, :processed} end
+             )
+
+    assert %{count: 4} = command!(Resource, :inspect, %{agent: reference})
+  end
+
+  test "slice routes use the same public default and private delivery contract" do
+    slice = AikidoTest.TypedRoutesTest.PublicSlice
+    resource = AikidoTest.TypedRoutesTest.PublicMounted
+    domain = AikidoTest.TypedRoutesTest.Domain
+
+    assert Ash.Resource.Info.action(slice, :increment).public?
+    refute Ash.Resource.Info.action(slice, :reset).public?
+    assert Ash.Resource.Info.action(resource, :increment).public?
+    refute Ash.Resource.Info.action(resource, :reset)
+    assert function_exported?(domain, :counter_increment, 2)
+    refute function_exported?(domain, :counter_reset, 2)
+
+    reference = domain.counter_start!(%{})
+    domain.counter_increment!(reference, %{amount: "3"})
+
+    assert {:ok, :processed} =
+             Aikido.AgentServer.call(
+               reference.pid,
+               AikidoTest.TypedRoutesTest.Reset.new!(%{value: 100}),
+               fn _ -> {:ok, :processed} end
+             )
+
+    assert %{counter: %{count: 4}} = domain.counter_inspect!(reference)
+  end
+
+  test "union routes reject a single public name rather than hiding one branch" do
+    module = Module.concat(__MODULE__, "AliasedUnion#{System.unique_integer([:positive])}")
+
+    assert_raise Spark.Error.DslError, ~r/name/, fn ->
+      Code.compile_string("""
+      defmodule #{inspect(module)} do
+        use Aikido.Slice
+        slice do
+          name "aliased_union"
+          route [AikidoTest.TypedRoutesTest.Increment, AikidoTest.TypedRoutesTest.Reset],
+                AikidoTest.TypedRoutesTest.Change, name: :change_count
+        end
+      end
+      """)
+    end
+  end
+
+  test "route name overrides the public command while retaining its private reducer" do
+    assert Ash.Resource.Info.action(Resource, :store).public?
+
+    assert Ash.Resource.Info.action(Resource, :wrapped).run ==
+             {AikidoTest.TypedRoutesTest.Store, []}
+
+    refute Ash.Resource.Info.action(Resource, :wrapped).public?
+    reference = command!(Resource, :start, %{})
+    command!(Resource, :store, %{agent: reference, data: "named route"})
+    assert %{received: "named route"} = command!(Resource, :inspect, %{agent: reference})
   end
 
   test "typed public declarations generate native reducers and public arguments from one schema" do
@@ -472,7 +585,7 @@ defmodule AikidoTest.TypedRoutesTest do
           use Aikido.Agent
           agent do
             name "invalid"
-            signal :bad, #{definition}, AikidoTest.TypedRoutesTest.Add
+            route #{definition}, AikidoTest.TypedRoutesTest.Add, name: :bad
           end
         end
         """)
@@ -491,7 +604,7 @@ defmodule AikidoTest.TypedRoutesTest do
           use Aikido.Agent
           agent do
             name "invalid_action_target"
-            signal :bad, AikidoTest.TypedRoutesTest.Increment, String
+            route AikidoTest.TypedRoutesTest.Increment, String, name: :bad
           end
         end
         """)

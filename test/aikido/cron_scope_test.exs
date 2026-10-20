@@ -49,9 +49,9 @@ defmodule Aikido.CronScopeTest.Resource do
       end
     end
 
-    route "scope.register", :register
-    route "scope.tick", :observe
-    route "aikido.cron_tick", :observe
+    route "scope.register", :register, public?: false
+    route "scope.tick", :observe, public?: false
+    route "aikido.cron_tick", :observe, public?: false
   end
 
   schedules do

@@ -4,7 +4,7 @@ defmodule Aikido.Dsl.ExtensionComposeTest.MultiHost do
 
   agent do
     name "multi_host"
-    signal :ensure, "memory.ensure", {Aikido.Slices.Memory, :ensure}
+    route "memory.ensure", {Aikido.Slices.Memory, :ensure}, name: :ensure
     slice :short_term, Aikido.Slices.Memory
     slice :who, Aikido.Slices.Identity
     slice :history, Aikido.Slices.Thread
@@ -17,7 +17,7 @@ defmodule Aikido.Dsl.ExtensionComposeTest.HostNoBlocks do
 
   agent do
     name "host_no_blocks"
-    signal :ensure, "memory.ensure", {Aikido.Slices.Memory, :ensure}
+    route "memory.ensure", {Aikido.Slices.Memory, :ensure}, name: :ensure
     slice :memory, Aikido.Slices.Memory
     slice :identity, Aikido.Slices.Identity
   end

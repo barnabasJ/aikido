@@ -449,7 +449,7 @@ defmodule AikidoTest.AshTest do
     assert output =~ "Duplicate slice paths"
   end
 
-  test "signal declarations require a positional target" do
+  test "route declarations require a positional target" do
     output =
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
         assert_raise CompileError, fn ->
@@ -459,27 +459,27 @@ defmodule AikidoTest.AshTest do
 
             agent do
               name "unrouted"
-              signal :missing, "missing.route"
+              route "missing.route"
             end
           end
           """)
         end
       end)
 
-    assert output =~ "signal/2"
+    assert output =~ "route/1"
   end
 
-  test "mounted slices expose public actions once without agent signal declarations" do
+  test "mounted slices expose public actions once without duplicate agent routes" do
     resource = AikidoTest.AshFixtures.Composed
 
     [signal] =
       Enum.filter(
         Spark.Dsl.Extension.get_entities(resource, [:agent]),
-        &match?(%Aikido.Ash.Agent.Signal{}, &1)
+        &match?(%Aikido.Ash.Agent.Route{}, &1)
       )
 
     assert signal.name == :increment
-    assert signal.target == {AikidoTest.AshFixtures.CounterSlice, :increment}
+    assert signal.action == {AikidoTest.AshFixtures.CounterSlice, :increment}
     refute Ash.Resource.Info.action(resource, :internal)
     refute Ash.Resource.Info.action(resource, :tick)
     refute function_exported?(AikidoTest.AshFixtures.Domain, :composed_internal, 1)
@@ -488,7 +488,7 @@ defmodule AikidoTest.AshTest do
              []
 
     assert Aikido.Ash.Agent.Info.slice_paths_for_action(resource)[
-             signal.target
+             signal.action
            ] == [:counter]
 
     reference = AikidoTest.AshFixtures.Domain.composed_start!(%{})

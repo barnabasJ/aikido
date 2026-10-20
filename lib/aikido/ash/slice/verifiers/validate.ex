@@ -13,6 +13,9 @@ defmodule Aikido.Ash.Slice.Verifiers.Validate do
     reserved_handler = Enum.find([:create, :update], &Map.has_key?(generated, &1))
 
     cond do
+      Enum.any?(routes, &(&1.public? && String.contains?(&1.type, "*"))) ->
+        error("Public routes require a concrete type; mark wildcard routes public? false")
+
       reserved_handler ->
         error(
           "Generated reducer action #{inspect(reserved_handler)} is reserved for native slice initialization actions; use a different signal definition or implementation name"
