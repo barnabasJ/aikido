@@ -134,7 +134,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
     end
   end
 
-  describe("pre-built struct with agent_module option") do
+  describe("module activation with initialized state") do
     test("uses explicit agent_module for action routing", %{aikido: aikido}) do
       agent = AikidoTest.TestAgents.Counter.initialize!(%{id: "prebuilt-struct-test"})
       agent = %{agent | state: put_in(agent.state, [:domain, :counter], 50)}

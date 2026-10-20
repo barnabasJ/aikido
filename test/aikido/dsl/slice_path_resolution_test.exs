@@ -130,7 +130,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
   end
 
   describe("explicit slice ownership") do
-    test "EscapeAction writes to the counter slice that declares its route" do
+    test "the tagging action writes to the counter slice that declares its route" do
       agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.initialize!()
 
       {:ok, %{agent: agent}, _dirs} =

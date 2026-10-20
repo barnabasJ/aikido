@@ -76,17 +76,14 @@ end
 
 defmodule AikidoTest.AgentServer.CronTickDeliveryTest do
   @moduledoc """
-  Regression test for issue #136: Directives.Cron executor silently fails
-  because cast(agent_id, signal) rejects string IDs via resolve_server/1.
-
-  These tests verify that cron ticks actually reach the agent and update state,
-  not just that jobs register successfully.
+  Verifies scheduled cron signals reach the owning agent and update its state,
+  alongside job registration and explicit server-reference validation.
   """
   use AikidoTest.Case, async: false
   @moduletag :integration
   @moduletag capture_log: true
 
-  describe("cron tick delivery (issue #136 regression)") do
+  describe("cron tick delivery") do
     test("cron tick actually delivers signal and updates agent state", %{aikido: aikido}) do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(

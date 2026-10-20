@@ -36,7 +36,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
     end
 
     test "uses default source" do
-      data = %{delay_ms: 1000, signal_type: "ping", payload: %{}, source: "/scheduler"}
+      data = %{delay_ms: 1000, signal_type: "ping", payload: %{}}
 
       {:ok, %Aikido.Types.ActionResult{state: _result, directives: [directive]}} =
         then(sig("schedule_signal", data), fn signal ->
@@ -78,7 +78,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
     end
 
     test "uses default timeout_id" do
-      data = %{timeout_ms: 5000, timeout_id: :default, signal_type: "agent.timeout"}
+      data = %{timeout_ms: 5000, signal_type: "agent.timeout"}
 
       {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(sig("schedule_timeout", data), fn signal ->

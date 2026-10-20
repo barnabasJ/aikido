@@ -993,13 +993,6 @@ defmodule AikidoTest.AgentServerTest do
           name "counter_agent"
           path :domain
 
-          schema do
-            attribute :drain_count, :integer do
-              description "Number of queued messages processed during shutdown."
-              default 0
-            end
-          end
-
           route "slow", {AikidoTest.AgentServerTest.CounterAgent, :slow}
         end
 
