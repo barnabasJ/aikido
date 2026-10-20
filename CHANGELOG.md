@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Bind every ReAct signal directly to its own documented native action
+  implementation, retaining shared pure preparation, scope and completion helpers.
+
 - Carry native caller scope and trace ancestry through live dynamic cron ticks,
   including wrapped scalar messages. Keep inherited credentials out of durable
   cron definitions; agent reactivation does not restore implicit caller context.

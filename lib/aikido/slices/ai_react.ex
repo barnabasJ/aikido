@@ -350,41 +350,41 @@ defmodule Aikido.Slices.AiReact do
       end
     end
 
-    route Aikido.Slices.AiReact.Signals.HandoffCompleted, Aikido.Slices.AiReact.Implementation,
+    route Aikido.Slices.AiReact.Signals.HandoffCompleted,
+          Aikido.Slices.AiReact.Actions.HandoffCompleted, public?: false
+
+    route Aikido.Slices.AiReact.Signals.HandoffFailed,
+          Aikido.Slices.AiReact.Actions.HandoffFailed, public?: false
+
+    route Aikido.Slices.AiReact.Signals.ToolsReady, Aikido.Slices.AiReact.Actions.ToolsReady,
       public?: false
 
-    route Aikido.Slices.AiReact.Signals.HandoffFailed, Aikido.Slices.AiReact.Implementation,
+    route Aikido.Slices.AiReact.Signals.Ask, Aikido.Slices.AiReact.Actions.Ask
+    route Aikido.Slices.AiReact.Signals.Message, Aikido.Slices.AiReact.Actions.Message
+    route Aikido.Slices.AiReact.Signals.Deliver, Aikido.Slices.AiReact.Actions.Deliver
+    route Aikido.Slices.AiReact.Signals.Handoff, Aikido.Slices.AiReact.Actions.Handoff
+
+    route Aikido.Slices.Todo.Signals.TodoChanged, Aikido.Slices.AiReact.Actions.TodoChanged,
       public?: false
 
-    route Aikido.Slices.AiReact.Signals.ToolsReady, Aikido.Slices.AiReact.Implementation,
+    route Aikido.Slices.AiReact.Signals.Stream, Aikido.Slices.AiReact.Actions.Stream,
       public?: false
 
-    route Aikido.Slices.AiReact.Signals.Ask, Aikido.Slices.AiReact.Implementation
-    route Aikido.Slices.AiReact.Signals.Message, Aikido.Slices.AiReact.Implementation
-    route Aikido.Slices.AiReact.Signals.Deliver, Aikido.Slices.AiReact.Implementation
-    route Aikido.Slices.AiReact.Signals.Handoff, Aikido.Slices.AiReact.Implementation
-
-    route Aikido.Slices.Todo.Signals.TodoChanged, Aikido.Slices.AiReact.Implementation,
+    route Aikido.Slices.AiReact.Signals.LlmTurn, Aikido.Slices.AiReact.Actions.LlmTurn,
       public?: false
 
-    route Aikido.Slices.AiReact.Signals.Stream, Aikido.Slices.AiReact.Implementation,
+    route Aikido.Slices.AiReact.Signals.ToolResult, Aikido.Slices.AiReact.Actions.ToolResult,
       public?: false
 
-    route Aikido.Slices.AiReact.Signals.LlmTurn, Aikido.Slices.AiReact.Implementation,
+    route Aikido.Slices.AiReact.Signals.Failed, Aikido.Slices.AiReact.Actions.Failed,
       public?: false
 
-    route Aikido.Slices.AiReact.Signals.ToolResult, Aikido.Slices.AiReact.Implementation,
-      public?: false
+    route Aikido.Slices.AiReact.Signals.Cancel, Aikido.Slices.AiReact.Actions.Cancel
 
-    route Aikido.Slices.AiReact.Signals.Failed, Aikido.Slices.AiReact.Implementation,
-      public?: false
+    route Aikido.Slices.AiReact.Signals.HookCompleted,
+          Aikido.Slices.AiReact.Actions.HookCompleted, public?: false
 
-    route Aikido.Slices.AiReact.Signals.Cancel, Aikido.Slices.AiReact.Implementation
-
-    route Aikido.Slices.AiReact.Signals.HookCompleted, Aikido.Slices.AiReact.Implementation,
-      public?: false
-
-    route Aikido.Slices.AiReact.Signals.HookContext, Aikido.Slices.AiReact.Implementation,
+    route Aikido.Slices.AiReact.Signals.HookContext, Aikido.Slices.AiReact.Actions.HookContext,
       public?: false
   end
 

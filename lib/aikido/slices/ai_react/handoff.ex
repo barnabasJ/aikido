@@ -2,7 +2,6 @@ defmodule Aikido.Slices.AiReact.Handoff do
   @moduledoc "Model-written context handoff at clean ReAct turn boundaries."
   alias Aikido.Slices.AiReact.Directives.LLMCall
   alias ReqLLM.Context
-  alias Aikido.Slices.AiReact.Context, as: Conversation
 
   @doc "Instructions used unless the application supplies handoff_prompt."
   def instructions do
@@ -60,116 +59,7 @@ defmodule Aikido.Slices.AiReact.Handoff do
   def plan(error), do: error
 
   @doc false
-  def complete(state, data) do
-    if active?(state, data) do
-      response = data.turn
-      turn = ReqLLM.Response.classify(response)
-
-      cond do
-        turn.type != :final_answer || String.trim(turn.text) == "" ->
-          fail(state, Map.put(data, :reason, :empty_or_invalid_document))
-
-        turn.finish_reason == :length ->
-          fail(state, Map.put(data, :reason, :truncated_document))
-
-        true ->
-          document = String.trim(turn.text)
-          system = Enum.filter(state.context.messages, &(&1.role == :system))
-          context = Context.new(system)
-
-          context =
-            Context.append(
-              context,
-              Context.user("""
-              You are taking over mid-run. Your predecessor left this handoff:
-
-              #{document}
-
-              Continue from the next action.\
-              """)
-            )
-
-          context =
-            Enum.reduce(state.queued_messages, context, fn text, context ->
-              Context.append(context, Context.user(text))
-            end)
-
-          replacement = Conversation.replace_context(state, context)
-          tokens = replacement.estimated_tokens
-          options = state.options
-
-          if tokens >= options.context_max_tokens do
-            fail(state, Map.put(data, :reason, :document_exceeds_context_limit))
-          else
-            usage =
-              Map.merge(state.usage, ReqLLM.Response.usage(response) || %{}, fn _, old, new ->
-                if is_number(old) && is_number(new), do: old + new, else: new
-              end)
-
-            state =
-              Map.merge(replacement, %{
-                context: context,
-                handoff_pending: nil,
-                last_handoff: %{
-                  document: document,
-                  before_tokens: current_tokens(state),
-                  after_tokens: tokens,
-                  id: data.handoff_id
-                },
-                last_input_tokens: nil,
-                queued_messages: [],
-                streaming_text: "",
-                streaming_thinking: "",
-                usage: usage
-              })
-
-            effect = %LLMCall{
-              mode: :resume,
-              options: state.options,
-              iteration: state.iteration + 1,
-              model: state.model,
-              client: state.client,
-              context: context,
-              request_id: state.request_id,
-              llm_opts: state.llm_opts
-            }
-
-            Aikido.Slices.AiReact.Hooks.transition(
-              Aikido.Types.ActionResult.new(state: state, directives: [effect]),
-              :after_model,
-              %{handoff: true}
-            )
-          end
-      end
-    else
-      Aikido.Types.ActionResult.new(state: state)
-    end
-  end
-
-  @doc false
-  def fail(state, data) do
-    if active?(state, data) do
-      state =
-        Map.merge(state, %{
-          status: :failed,
-          error: {:context_handoff_failed, data.reason},
-          handoff_pending: nil,
-          hooks_pending: %{}
-        })
-
-      Aikido.Slices.AiReact.Hooks.transition(
-        Aikido.Types.ActionResult.new(state: state),
-        :run_failed,
-        %{
-          reason: state.error
-        }
-      )
-    else
-      Aikido.Types.ActionResult.new(state: state)
-    end
-  end
-
-  defp active?(state, data),
+  def active?(state, data),
     do:
       state.status == :running && state.request_id == data.request_id &&
         not is_nil(Map.get(state, :handoff_pending)) && state.handoff_pending == data.handoff_id

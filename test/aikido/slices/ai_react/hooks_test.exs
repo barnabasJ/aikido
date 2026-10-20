@@ -70,7 +70,7 @@ defmodule Aikido.HooksTest do
   end
 
   defp complete(state, effect, result) do
-    Aikido.Slices.AiReact.Hooks.completed(state, %{
+    Aikido.Slices.AiReact.Actions.HookCompleted.reduce(state, %{
       token: effect.token,
       request_id: effect.request_id,
       name: effect.hook.name,
@@ -213,12 +213,12 @@ defmodule Aikido.HooksTest do
     state = state([])
 
     {:ok, %{state: unchanged}} =
-      Aikido.Slices.AiReact.Hooks.context(state, %{request_id: "older", text: "late"})
+      Aikido.Slices.AiReact.Actions.HookContext.reduce(state, %{request_id: "older", text: "late"})
 
     assert unchanged == state
 
     {:ok, %{state: unchanged}} =
-      Aikido.Slices.AiReact.Hooks.completed(state, %{
+      Aikido.Slices.AiReact.Actions.HookCompleted.reduce(state, %{
         request_id: "older",
         token: 1,
         name: "old",
@@ -363,7 +363,7 @@ defmodule Aikido.HooksTest do
     state = state([hook("return nil", mode: :async, event: :after_tool)])
 
     {:ok, %{state: queued}} =
-      Aikido.Slices.AiReact.Hooks.context(state, %{
+      Aikido.Slices.AiReact.Actions.HookContext.reduce(state, %{
         request_id: "run",
         text: "later evidence",
         name: "observer"
