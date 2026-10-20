@@ -163,7 +163,14 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
     }) do
       error = Aikido.Error.validation_error("Test error")
       directive = %Aikido.Directives.Error{error: error, context: :test}
-      assert :ok = Aikido.Directive.exec(directive, input_signal, state)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert :ok = Aikido.Directive.exec(directive, input_signal, state)
+        end)
+
+      assert log =~ "Agent #{state.id} [test]"
+      assert log =~ "Test error"
     end
   end
 

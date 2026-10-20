@@ -332,11 +332,19 @@ defmodule AikidoTest.SchedulerTest do
       tick_gate = {__MODULE__, make_ref()}
       owner_tag = make_ref()
       :persistent_term.put(tick_gate, false)
+      original_database = Application.fetch_env(:aikido, :time_zone_database)
+      observer_key = {AikidoTest.Support.FailingTimeZoneDatabase, :observer}
+      :persistent_term.put(observer_key, self())
       Application.put_env(:aikido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
 
       on_exit(fn ->
         :persistent_term.erase(tick_gate)
-        Application.put_env(:aikido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
+        :persistent_term.erase(observer_key)
+
+        case original_database do
+          {:ok, database} -> Application.put_env(:aikido, :time_zone_database, database)
+          :error -> Application.delete_env(:aikido, :time_zone_database)
+        end
       end)
 
       capture_log(fn ->
@@ -360,6 +368,7 @@ defmodule AikidoTest.SchedulerTest do
             end
           end)
 
+        on_exit(fn -> send(owner, :stop) end)
         assert_receive {:job_started, ^owner_tag, ^owner, job_pid}, 1000
         assert Process.alive?(owner)
         assert Process.alive?(job_pid)
@@ -370,6 +379,15 @@ defmodule AikidoTest.SchedulerTest do
           AikidoTest.Support.FailingTimeZoneDatabase
         )
 
+        send(job_pid, :tick)
+        assert_receive {:time_zone_resolution_failed, ^job_pid}, 5_000
+        failed_state = :sys.get_state(job_pid)
+        assert failed_state.retrying?
+
+        for {_ref, worker} <- failed_state.callback_workers do
+          AikidoTest.LifecycleWait.await_down(worker)
+        end
+
         assert Process.alive?(owner)
         assert Process.alive?(job_pid)
         :persistent_term.put(tick_gate, true)
@@ -378,6 +396,7 @@ defmodule AikidoTest.SchedulerTest do
         assert is_pid(worker_pid)
         refute worker_pid == job_pid
         assert Process.alive?(job_pid)
+        refute :sys.get_state(job_pid).retrying?
         send(owner, :stop)
       end)
     end

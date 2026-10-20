@@ -126,9 +126,33 @@ defmodule Aikido.TeamDeliveryTest do
         once: true
       )
 
+    {:ok, failed} =
+      Aikido.AgentServer.subscribe(
+        team.pid,
+        "**",
+        fn runtime ->
+          case runtime.agent.state.team.tasks["lost"] do
+            %{status: :failed} = task -> {:ok, task}
+            _ -> :skip
+          end
+        end,
+        once: true
+      )
+
+    Domain.delivery_assign_task!(team, %{
+      member: :worker,
+      task_id: "lost",
+      payload: %{text: "wait", llm_opts: [observer: self()]}
+    })
+
+    assert_receive {:team_model, model, _}, 5_000
     Process.exit(first, :kill)
+    assert_receive {:aikido_subscription, ^failed, %{result: {:ok, task}}}, 5_000
+    assert task.result == :member_exited
+    assert task.member == :worker
     assert_receive {:aikido_subscription, ^replaced, %{result: {:ok, second}}}, 5_000
     refute first == second
+    AikidoTest.LifecycleWait.await_down(model)
   end
 
   test "queued worker jobs preserve each caller scope", _ctx do

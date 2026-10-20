@@ -1,33 +1,3 @@
-defmodule AikidoTest.AgentServerTest.EmitTestAction.Implementation do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(_input, _opts, _context) do
-    signal =
-      struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test")
-
-    Aikido.Types.ActionResult.new(
-      state: %{},
-      directives: [%Aikido.Directives.Emit{signal: signal}]
-    )
-  end
-end
-
-defmodule AikidoTest.AgentServerTest.ScheduleTestAction.Implementation do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(_input, _opts, _context) do
-    scheduled_signal =
-      struct!(Jido.Signal, id: nil, type: "scheduled.ping", data: %{}, source: "/test")
-
-    Aikido.Types.ActionResult.new(
-      state: %{},
-      directives: [%Aikido.Directives.Schedule{delay_ms: 50, message: scheduled_signal}]
-    )
-  end
-end
-
 defmodule AikidoTest.AgentServerTest.StopTestAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
@@ -36,20 +6,6 @@ defmodule AikidoTest.AgentServerTest.StopTestAction.Implementation do
     Aikido.Types.ActionResult.new(
       state: %{},
       directives: [%Aikido.Directives.Stop{reason: :normal}]
-    )
-  end
-end
-
-defmodule AikidoTest.AgentServerTest.ErrorTestAction.Implementation do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(_input, _opts, _context) do
-    error = Aikido.Error.validation_error("Test error", %{field: :test})
-
-    Aikido.Types.ActionResult.new(
-      state: %{},
-      directives: [%Aikido.Directives.Error{error: error, context: :test}]
     )
   end
 end
@@ -70,32 +26,14 @@ defmodule AikidoTest.AgentServerTest.TestAgent do
     route "increment", {AikidoTest.TestActions, :increment}
     route "decrement", {AikidoTest.TestActions, :decrement}
     route "record", {AikidoTest.TestActions, :record}
-    route "emit_test", {AikidoTest.AgentServerTest.TestAgent, :emit_test}
-    route "schedule_test", {AikidoTest.AgentServerTest.TestAgent, :schedule_test}
     route "stop_test", {AikidoTest.AgentServerTest.TestAgent, :stop_test}
-    route "error_test", {AikidoTest.AgentServerTest.TestAgent, :error_test}
     route "noop", {AikidoTest.TestActions, :optional_input}
   end
 
   actions do
-    action :emit_test, Aikido.Types.ActionResult do
-      argument :state, :term
-      run AikidoTest.AgentServerTest.EmitTestAction.Implementation
-    end
-
-    action :schedule_test, Aikido.Types.ActionResult do
-      argument :state, :term
-      run AikidoTest.AgentServerTest.ScheduleTestAction.Implementation
-    end
-
     action :stop_test, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.AgentServerTest.StopTestAction.Implementation
-    end
-
-    action :error_test, Aikido.Types.ActionResult do
-      argument :state, :term
-      run AikidoTest.AgentServerTest.ErrorTestAction.Implementation
     end
   end
 end
@@ -581,60 +519,6 @@ defmodule AikidoTest.AgentServerTest do
   end
 
   describe("directive execution") do
-    @tag :capture_log
-    test("Emit directive is processed", %{aikido: aikido}) do
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
-
-      signal = Jido.Signal.new!("emit_test", %{}, source: "/test")
-      {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-
-      await_state_value(pid, fn s ->
-        if s.status == :idle do
-          true
-        end
-      end)
-
-      GenServer.stop(pid)
-    end
-
-    test("Error directive is processed", %{aikido: aikido}) do
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
-
-      signal = Jido.Signal.new!("error_test", %{}, source: "/test")
-      {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-
-      await_state_value(pid, fn s ->
-        if s.status == :idle do
-          true
-        end
-      end)
-
-      GenServer.stop(pid)
-    end
-
-    test("Schedule directive schedules a delayed signal", %{aikido: aikido}) do
-      {:ok, pid} =
-        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
-
-      signal = Jido.Signal.new!("schedule_test", %{}, source: "/test")
-      {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-
-      await_state_value(
-        pid,
-        fn s ->
-          if s.status == :idle do
-            true
-          end
-        end,
-        timeout: 200
-      )
-
-      assert Process.alive?(pid)
-      GenServer.stop(pid)
-    end
-
     test("Stop directive stops the server", %{aikido: aikido}) do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
