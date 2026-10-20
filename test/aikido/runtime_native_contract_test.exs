@@ -140,7 +140,7 @@ defmodule Aikido.RuntimeNativeContractTest do
                    :ok =
                      Aikido.Directive.exec(
                        %Aikido.Directives.AdoptChild{child: child, tag: :worker},
-                       nil,
+                       Jido.Signal.new!("adopt", %{}),
                        runtime
                      )
 

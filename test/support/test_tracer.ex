@@ -9,9 +9,12 @@ defmodule AikidoTest.Support.TestTracer do
 
   @impl true
   def start_span(type, name) do
+    parent = get_span_context()
     ref = make_ref()
+    Process.put({__MODULE__, :parents}, [parent | Process.get({__MODULE__, :parents}, [])])
     Process.put({__MODULE__, :span}, ref)
-    Agent.update(__MODULE__, &[{:start, ref, type, name} | &1])
+    pid = self()
+    Agent.update(__MODULE__, &[{:start, ref, type, name}, {:parent, ref, parent, pid} | &1])
     :ok
   end
 
@@ -19,7 +22,9 @@ defmodule AikidoTest.Support.TestTracer do
   def stop_span do
     ref = get_span_context()
     Agent.update(__MODULE__, &[{:stop, ref} | &1])
-    :ok
+    [parent | parents] = Process.get({__MODULE__, :parents})
+    Process.put({__MODULE__, :parents}, parents)
+    set_span_context(parent)
   end
 
   @impl true

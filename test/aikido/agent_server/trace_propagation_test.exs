@@ -1,200 +1,261 @@
-defmodule AikidoTest.AgentServer.TracePropagationTest.EmitAction.Implementation do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(_input, _opts, _context) do
-    signal =
-      struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{value: 42}, source: "/test")
+defmodule AikidoTest.TracePropagation.Work do
+  require Ash.Tracer
 
-    Aikido.ActionResult.new(state: %{}, directives: [%Aikido.Directives.Emit{signal: signal}])
+  def run(amount) do
+    Ash.Tracer.span :custom, "test.async_work", AikidoTest.Support.TestTracer do
+      {:ok, %{value: amount * 2}}
+    end
   end
 end
 
-defmodule AikidoTest.AgentServer.TracePropagationTest.TracedAgent do
-  @moduledoc false
-  use Aikido.Agent
+defmodule AikidoTest.TracePropagation.Reducer do
+  use Ash.Resource.Actions.Implementation
+
+  def run(%{action: %{name: :begin_work}} = input, _, _) do
+    Aikido.ActionResult.new(
+      state: %{input.arguments.state | status: :working},
+      directives: [
+        %Aikido.Directives.AsyncTask{
+          work: {AikidoTest.TracePropagation.Work, :run, [input.arguments.amount]},
+          success_type: "trace.completed"
+        }
+      ]
+    )
+  end
+
+  def run(%{action: %{name: :accept_result}} = input, _, _) do
+    value = input.arguments.result.value
+
+    Aikido.ActionResult.new(
+      state: %{input.arguments.state | status: :finishing},
+      directives: [
+        %Aikido.Directives.Schedule{
+          delay_ms: 0,
+          message:
+            struct!(Jido.Signal,
+              id: nil,
+              type: "trace.finished",
+              data: %{value: value},
+              source: "/test"
+            )
+        }
+      ]
+    )
+  end
+
+  def run(%{action: %{name: :finish}} = input, _, _) do
+    Aikido.ActionResult.new(
+      state: %{input.arguments.state | status: :completed, value: input.arguments.value}
+    )
+  end
+
+  def run(%{action: %{name: :fail}} = _input, _, _) do
+    raise "trace failure"
+  end
+end
+
+defmodule AikidoTest.TracePropagation.Pipeline do
+  use Ash.Resource,
+    domain: AikidoTest.TracePropagation.Domain,
+    extensions: [Aikido.Ash.Agent]
 
   agent do
-    name "traced_agent"
-    path :domain
+    name "trace_pipeline"
+    instance AikidoTest.TracePropagation.Instance
 
     schema do
-      attribute :counter, :integer, default: 0
-      attribute :received_signals, {:array, :term}, default: []
+      attribute :status, :atom, default: :idle
+      attribute :value, :integer, default: 0
     end
 
-    route "increment", {AikidoTest.TestActions, :increment}
-    route "emit", {AikidoTest.AgentServer.TracePropagationTest.TracedAgent, :emit}
+    signal :work, "trace.start", :begin_work
+    signal :fail_work, "trace.fail", :fail
+    route "trace.completed", :accept_result
+    route "trace.finished", :finish
   end
 
   actions do
-    action :emit, Aikido.ActionResult do
+    action :begin_work, Aikido.ActionResult do
       argument :state, :term
-      run AikidoTest.AgentServer.TracePropagationTest.EmitAction.Implementation
+      argument :amount, :integer, allow_nil?: false
+      run AikidoTest.TracePropagation.Reducer
     end
+
+    action :accept_result, Aikido.ActionResult do
+      argument :state, :term
+      argument :result, :map, allow_nil?: false
+      run AikidoTest.TracePropagation.Reducer
+    end
+
+    action :finish, Aikido.ActionResult do
+      argument :state, :term
+      argument :value, :integer, allow_nil?: false
+      run AikidoTest.TracePropagation.Reducer
+    end
+
+    action :fail, Aikido.ActionResult do
+      argument :state, :term
+      run AikidoTest.TracePropagation.Reducer
+    end
+  end
+end
+
+defmodule AikidoTest.TracePropagation.Domain do
+  use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+
+  agents do
+    agent :pipeline, AikidoTest.TracePropagation.Pipeline
   end
 end
 
 defmodule AikidoTest.AgentServer.TracePropagationTest do
-  use AikidoTest.Case, async: false
+  use ExUnit.Case, async: false
+  require Ash.Tracer
 
-  describe("signal ingress tracing") do
-    test("signal without trace gets root trace added", context) do
-      test_pid = self()
-      handler_id = "trace-ingress-test-#{:erlang.unique_integer()}"
+  alias AikidoTest.TracePropagation.Domain
+  alias AikidoTest.Support.TestTracer
 
-      :telemetry.attach(
-        handler_id,
-        [:aikido, :agent_server, :signal, :start],
-        fn _event, _measurements, metadata, _config -> send(test_pid, {:telemetry, metadata}) end,
-        nil
-      )
-
-      {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TracePropagationTest.TracedAgent,
-          aikido: context.aikido
-        )
-
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
-      assert Aikido.Tracing.Trace.get(signal) == nil
-      {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-      assert_receive {:telemetry, metadata}, 1000
-      assert is_binary(metadata[:aikido_trace_id])
-      assert is_binary(metadata[:aikido_span_id])
-      :telemetry.detach(handler_id)
-      GenServer.stop(pid)
-    end
-
-    test("signal with existing trace preserves trace_id", context) do
-      test_pid = self()
-      handler_id = "trace-preserve-test-#{:erlang.unique_integer()}"
-
-      :telemetry.attach(
-        handler_id,
-        [:aikido, :agent_server, :signal, :start],
-        fn _event, _measurements, metadata, _config -> send(test_pid, {:telemetry, metadata}) end,
-        nil
-      )
-
-      {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TracePropagationTest.TracedAgent,
-          aikido: context.aikido
-        )
-
-      ctx = Aikido.Tracing.Trace.new_root()
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
-      {:ok, traced_signal} = Aikido.Tracing.Trace.put(signal, ctx)
-      {:ok, _agent} = Aikido.AgentServer.call(pid, traced_signal, fn s -> {:ok, s.agent} end)
-      assert_receive {:telemetry, metadata}, 1000
-      assert metadata[:aikido_trace_id] == ctx.trace_id
-      assert metadata[:aikido_span_id] == ctx.span_id
-      :telemetry.detach(handler_id)
-      GenServer.stop(pid)
-    end
+  setup do
+    start_supervised!(TestTracer)
+    instance = AikidoTest.TracePropagation.Instance
+    start_supervised!({Aikido, name: instance, durable: AikidoTest.Case.durable_options()})
+    reference = Domain.pipeline_start!(%{id: "traced"})
+    :ok = Aikido.AgentServer.await_ready(reference.pid)
+    %{reference: reference}
   end
 
-  describe("directive trace propagation") do
-    test("emit directive adds child trace to emitted signal", context) do
-      test_pid = self()
-      handler_id = "trace-emit-test-#{:erlang.unique_integer()}"
+  test "one native Ash trace connects the external action, async effect, result signals and final state",
+       %{reference: reference} do
+    previous = TestTracer.get_span_context()
 
-      :telemetry.attach(
-        handler_id,
-        [:aikido, :agent_server, :directive, :start],
-        fn _event, _measurements, metadata, _config ->
-          if metadata[:directive_type] == "Emit" do
-            send(test_pid, {:telemetry, metadata})
-          end
-        end,
-        nil
+    Ash.Tracer.span :custom, "test.external_caller", TestTracer do
+      caller = TestTracer.get_span_context()
+
+      assert {:ok, sub} =
+               Aikido.AgentServer.subscribe(
+                 reference.pid,
+                 "trace.finished",
+                 fn runtime ->
+                   {:ok, runtime.agent.state.state}
+                 end,
+                 once: true
+               )
+
+      assert %{status: :processed} =
+               Domain.pipeline_work!(reference, %{amount: 21}, tracer: TestTracer)
+
+      assert TestTracer.get_span_context() == caller
+
+      assert_receive {:aikido_subscription, ^sub,
+                      %{result: {:ok, %{status: :completed, value: 42}}}},
+                     5_000
+
+      # A mailbox barrier ensures the finishing signal's span has closed.
+      assert {:ok, :ready} = Aikido.AgentServer.state(reference.pid, fn _ -> {:ok, :ready} end)
+    end
+
+    assert TestTracer.get_span_context() == previous
+    spans = spans()
+    root = only(spans, &(&1.name == "test.external_caller"))
+    external = only(spans, &(&1.type == :action && &1.metadata[:action] == :work))
+    first = only(spans, &(&1.type == {:custom, :aikido_signal} && &1.name == "trace.start"))
+    reducer = only(spans, &(&1.type == :action && &1.metadata[:action] == :begin_work))
+
+    async_directive =
+      only(
+        spans,
+        &(&1.type == {:custom, :aikido_directive} && &1.name == "Aikido.Directives.AsyncTask")
       )
 
-      {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TracePropagationTest.TracedAgent,
-          aikido: context.aikido
-        )
+    async = only(spans, &(&1.type == {:custom, :aikido_async_task}))
+    work = only(spans, &(&1.name == "test.async_work"))
 
-      ctx = Aikido.Tracing.Trace.new_root()
-      signal = Jido.Signal.new!("emit", %{}, source: "/test")
-      {:ok, traced_signal} = Aikido.Tracing.Trace.put(signal, ctx)
-      {:ok, _agent} = Aikido.AgentServer.call(pid, traced_signal, fn s -> {:ok, s.agent} end)
-      assert_receive {:telemetry, metadata}, 1000
-      assert metadata[:aikido_trace_id] == ctx.trace_id
-      :telemetry.detach(handler_id)
-      GenServer.stop(pid)
-    end
+    result =
+      only(spans, &(&1.type == {:custom, :aikido_signal} && &1.name == "trace.completed"))
+
+    accept = only(spans, &(&1.type == :action && &1.metadata[:action] == :accept_result))
+
+    schedule =
+      only(
+        spans,
+        &(&1.type == {:custom, :aikido_directive} && &1.name == "Aikido.Directives.Schedule")
+      )
+
+    finished = only(spans, &(&1.type == {:custom, :aikido_signal} && &1.name == "trace.finished"))
+    final_action = only(spans, &(&1.type == :action && &1.metadata[:action] == :finish))
+
+    assert external.parent == root.id
+    assert first.parent == external.id
+    assert reducer.parent == first.id
+    assert async_directive.parent == first.id
+    assert async.parent == async_directive.id
+    assert work.parent == async.id
+    assert result.parent == async.id
+    assert accept.parent == result.id
+    assert schedule.parent == result.id
+    assert finished.parent == schedule.id
+    assert final_action.parent == finished.id
+    assert first.pid == reference.pid
+    assert reducer.pid == reference.pid
+    assert async.pid != reference.pid
+    assert work.pid == async.pid
+    assert result.pid == reference.pid
+    assert final_action.pid == reference.pid
+    AikidoTest.LifecycleWait.await_down(async.pid)
+    assert Enum.all?(spans(), & &1.stopped?)
+    assert is_binary(first.metadata.signal_id)
+    assert is_binary(result.metadata.signal_id)
+    refute first.metadata.signal_id == result.metadata.signal_id
   end
 
-  describe("telemetry trace metadata") do
-    test("signal telemetry includes all trace fields", context) do
-      test_pid = self()
-      handler_id = "trace-metadata-test-#{:erlang.unique_integer()}"
-
-      :telemetry.attach(
-        handler_id,
-        [:aikido, :agent_server, :signal, :start],
-        fn _event, _measurements, metadata, _config -> send(test_pid, {:telemetry, metadata}) end,
-        nil
-      )
-
-      {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TracePropagationTest.TracedAgent,
-          aikido: context.aikido
-        )
-
-      parent_ctx = Aikido.Tracing.Trace.new_root()
-      child_ctx = Aikido.Tracing.Trace.child_of(parent_ctx, "parent-signal-id")
-      signal = Jido.Signal.new!("increment", %{}, source: "/test")
-      {:ok, traced_signal} = Aikido.Tracing.Trace.put(signal, child_ctx)
-      {:ok, _agent} = Aikido.AgentServer.call(pid, traced_signal, fn s -> {:ok, s.agent} end)
-      assert_receive {:telemetry, metadata}, 1000
-      assert metadata[:aikido_trace_id] == parent_ctx.trace_id
-      assert metadata[:aikido_span_id] == child_ctx.span_id
-      assert metadata[:aikido_parent_span_id] == parent_ctx.span_id
-      assert metadata[:aikido_causation_id] == "parent-signal-id"
-      :telemetry.detach(handler_id)
-      GenServer.stop(pid)
+  @tag capture_log: true
+  test "a failed turn restores native context and does not parent the next untraced call", %{
+    reference: reference
+  } do
+    Ash.Tracer.span :custom, "test.failed_caller", TestTracer do
+      caller = TestTracer.get_span_context()
+      assert {:error, _} = Domain.pipeline_fail_work(reference, %{}, tracer: TestTracer)
+      assert TestTracer.get_span_context() == caller
     end
 
-    test("directive telemetry includes trace fields", context) do
-      {:ok, pid} =
-        Aikido.AgentServer.start_link(
-          agent_module: AikidoTest.AgentServer.TracePropagationTest.TracedAgent,
-          aikido: context.aikido
-        )
+    signal = Jido.Signal.new!("trace.fail", %{}) |> Aikido.SignalCtx.put(:tracer, TestTracer)
 
-      test_pid = self()
-      handler_id = "trace-directive-metadata-#{:erlang.unique_integer()}"
+    assert {:error, _} =
+             Aikido.AgentServer.call(reference.pid, signal, fn _ -> {:ok, :unused} end)
 
-      :telemetry.attach(
-        handler_id,
-        [:aikido, :agent_server, :directive, :start],
-        fn _event, _measurements, metadata, _config -> send(test_pid, {:telemetry, metadata}) end,
-        nil
-      )
+    failures =
+      Enum.filter(spans(), &(&1.type == {:custom, :aikido_signal} && &1.name == "trace.fail"))
 
-      ctx = Aikido.Tracing.Trace.new_root()
-      signal = Jido.Signal.new!("emit", %{}, source: "/test")
-      {:ok, traced_signal} = Aikido.Tracing.Trace.put(signal, ctx)
-      {:ok, _agent} = Aikido.AgentServer.call(pid, traced_signal, fn s -> {:ok, s.agent} end)
-      metadata = wait_for_trace(ctx.trace_id)
-      assert metadata[:aikido_trace_id] == ctx.trace_id
-      assert metadata[:aikido_span_id] == ctx.span_id
-      :telemetry.detach(handler_id)
-      GenServer.stop(pid)
-    end
+    assert length(failures) == 2
+    assert Enum.count(failures, &is_nil(&1.parent)) == 1
+    assert TestTracer.get_span_context() == nil
+  end
 
-    defp wait_for_trace(trace_id) do
-      receive do
-        {:telemetry, %{aikido_trace_id: ^trace_id} = metadata} -> metadata
-        {:telemetry, _other} -> wait_for_trace(trace_id)
-      after
-        1000 -> flunk("did not receive directive telemetry for trace #{trace_id}")
-      end
+  defp only(spans, predicate) do
+    assert [span] = Enum.filter(spans, predicate)
+    span
+  end
+
+  defp spans do
+    events = TestTracer.get_spans()
+
+    for {:start, id, type, name} <- events do
+      {:parent, ^id, parent, pid} = Enum.find(events, &match?({:parent, ^id, _, _}, &1))
+
+      metadata =
+        for {:metadata, ^id, _, metadata} <- Enum.reverse(events), reduce: %{} do
+          acc -> Map.merge(acc, metadata)
+        end
+
+      %{
+        id: id,
+        type: type,
+        name: name,
+        parent: parent,
+        pid: pid,
+        metadata: metadata,
+        stopped?: {:stop, id} in events
+      }
     end
   end
 end

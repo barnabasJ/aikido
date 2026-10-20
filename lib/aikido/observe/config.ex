@@ -266,5 +266,9 @@ defmodule Aikido.Observe.Config do
     if Spark.implements_behaviour?(module, Ash.Tracer), do: module
   end
 
+  defp normalize_tracer(modules) when is_list(modules) do
+    Enum.filter(modules, &Spark.implements_behaviour?(&1, Ash.Tracer))
+  end
+
   defp normalize_tracer(_), do: nil
 end

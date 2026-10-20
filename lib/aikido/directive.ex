@@ -30,6 +30,8 @@ defmodule Aikido.Directive do
   as signals. Never wait for an agent reply inside a directive callback.
   """
 
+  require Ash.Tracer
+
   @callback exec(struct(), Jido.Signal.t(), Aikido.AgentServer.State.t()) ::
               :ok | {:stop, term()}
 
@@ -75,5 +77,17 @@ defmodule Aikido.Directive do
   @doc "Execute a directive through its module's behaviour callback."
   @spec exec(struct(), Jido.Signal.t(), Aikido.AgentServer.State.t()) ::
           :ok | {:stop, term()}
-  def exec(%module{} = directive, signal, runtime), do: module.exec(directive, signal, runtime)
+  def exec(%module{} = directive, signal, runtime) do
+    tracers = Aikido.SignalCtx.tracers(signal, Map.get(runtime, :aikido))
+
+    Ash.Tracer.span {:custom, :aikido_directive}, inspect(module), tracers do
+      Ash.Tracer.set_metadata(tracers, {:custom, :aikido_directive}, %{
+        signal_id: signal.id,
+        signal_type: signal.type,
+        agent_id: runtime.id
+      })
+
+      module.exec(directive, signal, runtime)
+    end
+  end
 end

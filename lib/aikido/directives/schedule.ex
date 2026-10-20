@@ -22,7 +22,6 @@ defmodule Aikido.Directives.Schedule do
   end
 
   alias Aikido.AgentServer.Signal.Scheduled
-  alias Aikido.Tracing.Context, as: TraceContext
 
   @impl true
   def exec(%{delay_ms: delay, message: message}, input_signal, state) do
@@ -43,13 +42,7 @@ defmodule Aikido.Directives.Schedule do
       |> Aikido.Directive.materialize_signal()
       |> Aikido.SignalCtx.inherit(input_signal)
 
-    traced_signal =
-      case TraceContext.propagate_to(signal, input_signal.id) do
-        {:ok, s} -> s
-        {:error, _} -> signal
-      end
-
-    Process.send_after(self(), {:scheduled_signal, traced_signal}, delay)
+    Process.send_after(self(), {:scheduled_signal, signal}, delay)
     :ok
   end
 end

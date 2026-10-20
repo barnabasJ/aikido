@@ -97,7 +97,7 @@ defmodule Aikido.Directives.Cron do
   @impl true
   def exec(
         %{cron: cron_expr, message: message, job_id: logical_id, timezone: tz},
-        _input_signal,
+        input_signal,
         state
       ) do
     message =
@@ -120,7 +120,7 @@ defmodule Aikido.Directives.Cron do
             source: "/agent/#{state.id}"
           )
 
-        _ = AgentServer.cast(self(), signal)
+        _ = AgentServer.cast(self(), Aikido.SignalCtx.inherit(signal, input_signal))
 
         Logger.debug(
           "AgentServer #{state.id} registered cron job #{inspect(io_result.job_id)}: #{cron_expr}"

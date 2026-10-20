@@ -56,6 +56,28 @@ policies for application access control.
 See [teams](teams.md), [multi-tenancy](multi-tenancy.md),
 and the runnable `examples/agent_app` application.
 
+## Native Ash tracing
+
+Pass `tracer: MyApp.Tracer` to a domain action, or configure Ash's `:tracer`
+setting. Aikido also accepts a tracer or list of tracers through its
+observability configuration. Tracers implement `Ash.Tracer`.
+
+Signal envelopes carry the opaque context returned by
+`Ash.ProcessHelpers.get_context_for_transfer/1`. The runtime installs it with
+`transfer_context/1` for the current turn and restores the previous context
+when the turn finishes, including on failure. Aikido does not generate its own
+trace IDs or span IDs.
+
+Native Ash action spans connect to custom signal, directive and asynchronous
+work spans. AsyncTask results, AI setup/model/tool results, emitted signals and
+delayed signals preserve that ancestry. Retries create individual attempt spans.
+Signal IDs and types remain metadata on spans and telemetry events.
+
+The connection lasts across process boundaries even after the initiating call
+has returned. Snapshot recovery starts new work; it does not resume an active
+span from a terminated process. Custom directives that start their own processes
+must transfer Ash context into those processes too, or use `AsyncTask`.
+
 ## Lua lifecycle hooks
 
 AI agents and teams accept `hooks` at startup. `Aikido.AI.ask/3` also accepts a

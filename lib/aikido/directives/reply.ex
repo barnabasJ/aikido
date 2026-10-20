@@ -86,7 +86,7 @@ defmodule Aikido.Directives.Reply do
 
     case Signal.new(type, data, subject: input.id) do
       {:ok, reply_signal} ->
-        _ = Dispatch.dispatch(reply_signal, input.jido_dispatch)
+        _ = Dispatch.dispatch(Aikido.SignalCtx.inherit(reply_signal, input), input.jido_dispatch)
         :ok
 
       {:error, reason} ->

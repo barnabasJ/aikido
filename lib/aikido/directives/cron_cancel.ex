@@ -24,13 +24,13 @@ defmodule Aikido.Directives.CronCancel do
   alias Aikido.AgentServer.State
 
   @impl true
-  def exec(%{job_id: logical_id}, _input_signal, %State{} = state) do
+  def exec(%{job_id: logical_id}, input_signal, %State{} = state) do
     pid = Map.get(state.cron_jobs, logical_id)
     monitor_ref = Map.get(state.cron_monitors, logical_id)
 
     cancel_io(pid, monitor_ref)
 
-    emit_cancellation(state, logical_id, pid, monitor_ref)
+    emit_cancellation(state, logical_id, pid, monitor_ref, input_signal)
 
     :ok
   end
@@ -47,7 +47,7 @@ defmodule Aikido.Directives.CronCancel do
     :ok
   end
 
-  defp emit_cancellation(%State{} = state, logical_id, pid, monitor_ref) do
+  defp emit_cancellation(%State{} = state, logical_id, pid, monitor_ref, input_signal) do
     signal =
       CronCancelled.new!(
         %{
@@ -58,7 +58,7 @@ defmodule Aikido.Directives.CronCancel do
         source: "/agent/#{state.id}"
       )
 
-    _ = AgentServer.cast(self(), signal)
+    _ = AgentServer.cast(self(), Aikido.SignalCtx.inherit(signal, input_signal))
 
     Logger.debug("AgentServer #{state.id} cancelled cron job #{inspect(logical_id)}")
 

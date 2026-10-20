@@ -43,7 +43,7 @@ defmodule Aikido.Telemetry do
   ## Structured Output
 
   All log entries include structured metadata for filtering and correlation:
-  - `trace_id`, `span_id` - For distributed tracing
+  - Signal IDs and types identify the work; Ash tracers supply span ancestry.
   - `agent_id`, `agent_module` - Agent identification
   - `signal_type`, `directive_count`, `directive_types` - What happened
   - `duration` - Formatted timing (e.g., "12.3ms")
@@ -216,8 +216,6 @@ defmodule Aikido.Telemetry do
         "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
         "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:aikido_trace_id],
-      span_id: metadata[:aikido_span_id],
       stacktrace: metadata[:stacktrace]
     )
   end
@@ -272,8 +270,6 @@ defmodule Aikido.Telemetry do
         "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
         "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:aikido_trace_id],
-      span_id: metadata[:aikido_span_id],
       stacktrace: metadata[:stacktrace]
     )
   end
@@ -340,8 +336,7 @@ defmodule Aikido.Telemetry do
           "duration=#{Formatter.format_duration(duration)}"
       end,
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:aikido_trace_id],
-      span_id: metadata[:aikido_span_id]
+      signal_id: metadata[:signal_id]
     )
   end
 
@@ -353,8 +348,7 @@ defmodule Aikido.Telemetry do
           "duration=#{Formatter.format_duration(duration)}"
       end,
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:aikido_trace_id],
-      span_id: metadata[:aikido_span_id]
+      signal_id: metadata[:signal_id]
     )
   end
 

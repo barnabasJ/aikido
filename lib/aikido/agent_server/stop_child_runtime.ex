@@ -5,7 +5,6 @@ defmodule Aikido.AgentServer.StopChildRuntime do
 
   alias Aikido.AgentServer.State
   alias Jido.Signal
-  alias Aikido.Tracing.Context, as: TraceContext
 
   @spec exec(term(), term(), Signal.t(), State.t()) :: :ok
   def exec(tag, reason, %Signal{} = input_signal, %State{} = state) do
@@ -26,13 +25,9 @@ defmodule Aikido.AgentServer.StopChildRuntime do
             source: "/agent/#{state.id}"
           )
 
-        traced_signal =
-          case TraceContext.propagate_to(stop_signal, input_signal.id) do
-            {:ok, signal} -> signal
-            {:error, _} -> stop_signal
-          end
+        stop_signal = Aikido.SignalCtx.inherit(stop_signal, input_signal)
 
-        _ = Aikido.AgentServer.cast(pid, traced_signal)
+        _ = Aikido.AgentServer.cast(pid, stop_signal)
 
         :ok
     end

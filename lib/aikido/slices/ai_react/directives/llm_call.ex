@@ -20,6 +20,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   """
 
   use Aikido.Directive
+  require Ash.Tracer
 
   typed_struct do
     field :mode, :atom,
@@ -53,15 +54,22 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     task_sup = Aikido.task_supervisor_name(state.aikido)
     source = "/agent/#{state.id}"
 
+    tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
+    transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
+
     {:ok, _pid} =
       Task.Supervisor.start_child(task_sup, fn ->
-        run_and_dispatch(
-          directive,
-          agent_pid,
-          source,
-          Aikido.SignalCtx.ctx(input_signal),
-          task_sup
-        )
+        Ash.ProcessHelpers.transfer_context(transfer)
+
+        Ash.Tracer.span {:custom, :aikido_model_call}, "aikido_model_call", tracers do
+          run_and_dispatch(
+            directive,
+            agent_pid,
+            source,
+            Aikido.SignalCtx.ctx(input_signal),
+            task_sup
+          )
+        end
       end)
 
     :ok
@@ -111,6 +119,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
             d.client.generate_text(d.model, messages, llm_opts)
           end
         end,
+        tracer: scope[:tracer],
         timeout: options.model_timeout_ms,
         progress_timeout:
           if(options.streaming && d.mode != :handoff,

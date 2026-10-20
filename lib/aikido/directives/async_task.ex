@@ -66,8 +66,8 @@ defmodule Aikido.Directives.AsyncTask do
   alias Aikido.AgentServer.State
   alias Aikido.Directives.AsyncTask
   alias Jido.Signal
-  alias Aikido.Tracing.Context, as: TraceContext
 
+  require Ash.Tracer
   require Logger
 
   @spec exec(directive :: AsyncTask.t(), input_signal :: Signal.t(), state :: State.t()) :: :ok
@@ -76,8 +76,15 @@ defmodule Aikido.Directives.AsyncTask do
     agent_pid = self()
     task_sup = task_supervisor(state)
 
+    tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
+    transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
+
     case Task.Supervisor.start_child(task_sup, fn ->
-           run_and_dispatch(directive, input_signal, state, agent_pid)
+           Ash.ProcessHelpers.transfer_context(transfer)
+
+           Ash.Tracer.span {:custom, :aikido_async_task}, "aikido.async_task", tracers do
+             run_and_dispatch(directive, input_signal, state, agent_pid)
+           end
          end) do
       {:ok, _pid} ->
         :ok
@@ -227,18 +234,11 @@ defmodule Aikido.Directives.AsyncTask do
 
   defp dispatch_signals(signals, %Signal{} = input_signal, target, %State{} = state)
        when is_list(signals) do
-    Enum.each(signals, fn signal -> safe_cast(target, trace(signal, input_signal), state) end)
+    Enum.each(signals, fn signal ->
+      safe_cast(target, Aikido.SignalCtx.inherit(signal, input_signal), state)
+    end)
+
     :ok
-  end
-
-  @spec trace(signal :: Signal.t(), input_signal :: Signal.t()) :: Signal.t()
-  defp trace(%Signal{} = signal, %Signal{} = input_signal) do
-    signal = Aikido.SignalCtx.inherit(signal, input_signal)
-
-    case TraceContext.propagate_to(signal, input_signal.id) do
-      {:ok, traced} -> traced
-      {:error, _reason} -> signal
-    end
   end
 
   @spec safe_cast(target :: GenServer.server(), signal :: Signal.t(), state :: State.t()) :: :ok

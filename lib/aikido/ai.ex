@@ -95,7 +95,7 @@ defmodule Aikido.AI do
           {:ok, String.t()} | {:error, term()}
   def ask(pid, query, opts \\ []) when is_binary(query) and is_list(opts) do
     request_id = mint_request_id()
-    signal = build_ask_signal(query, request_id, opts)
+    signal = build_ask_signal(query, request_id, opts) |> Aikido.SignalCtx.capture_tracing()
     launch(pid, signal, request_id)
   end
 
@@ -118,7 +118,7 @@ defmodule Aikido.AI do
   def ask_sync(pid, query, opts \\ []) when is_binary(query) and is_list(opts) do
     timeout = Keyword.get(opts, :timeout, @default_await_timeout)
     request_id = mint_request_id()
-    signal = build_ask_signal(query, request_id, opts)
+    signal = build_ask_signal(query, request_id, opts) |> Aikido.SignalCtx.capture_tracing()
 
     selector = fn runtime ->
       ai = runtime.agent.state.ai
@@ -132,7 +132,8 @@ defmodule Aikido.AI do
     end
 
     Aikido.AgentServer.call_until(pid, fn -> launch(pid, signal, request_id) end, "**", selector,
-      timeout: timeout
+      timeout: timeout,
+      tracer: Aikido.SignalCtx.tracers(signal)
     )
   end
 

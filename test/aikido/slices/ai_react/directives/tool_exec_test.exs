@@ -111,6 +111,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
 
   test "completion signals carry native Ash scope and only shared application context",
        %{aikido: aikido} do
+    start_supervised!(AikidoTest.Support.TestTracer)
     agent = spawn_agent_stub(self())
 
     input =

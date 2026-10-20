@@ -44,8 +44,6 @@ defmodule Aikido.Directives.Emit do
       description: "Dispatch config: {adapter, opts} or list"
   end
 
-  alias Aikido.Tracing.Context, as: TraceContext
-
   require Logger
 
   @impl true
@@ -57,30 +55,27 @@ defmodule Aikido.Directives.Emit do
       |> Aikido.Directive.materialize_signal()
       |> Aikido.SignalCtx.inherit(input_signal)
 
-    traced_signal =
-      case TraceContext.propagate_to(signal, input_signal.id) do
-        {:ok, s} -> s
-        {:error, _} -> signal
-      end
-
-    dispatch_signal(traced_signal, cfg, state)
+    dispatch_signal(signal, cfg, state)
 
     :ok
   end
 
-  defp dispatch_signal(traced_signal, nil, _state) do
-    send(self(), {:signal, traced_signal})
+  defp dispatch_signal(signal, nil, _state) do
+    send(self(), {:signal, signal})
   end
 
-  defp dispatch_signal(traced_signal, cfg, state) do
+  defp dispatch_signal(signal, cfg, state) do
     if Code.ensure_loaded?(Jido.Signal.Dispatch) do
       task_sup =
         if state.aikido,
           do: Aikido.task_supervisor_name(state.aikido),
           else: Aikido.TaskSupervisor
 
+      transfer = Aikido.SignalCtx.tracer_context(signal)
+
       Task.Supervisor.start_child(task_sup, fn ->
-        Jido.Signal.Dispatch.dispatch(traced_signal, cfg)
+        Ash.ProcessHelpers.transfer_context(transfer)
+        Jido.Signal.Dispatch.dispatch(signal, cfg)
       end)
     else
       Logger.warning("Jido.Signal.Dispatch not available, skipping emit")

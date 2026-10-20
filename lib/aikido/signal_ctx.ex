@@ -3,8 +3,10 @@ defmodule Aikido.SignalCtx do
   Per-signal runtime context helpers built on `Jido.Signal`'s `extensions` field.
 
   `signal.extensions[:aikido_ctx]` is the canonical location for runtime context
-  (user, trace, tenant, parent, partition, agent_id) that flows alongside a
+  (user, tenant, parent, partition, agent_id) that flows alongside a
   signal through middleware, actions, and emitted child directives.
+
+  Native Ash tracer contexts travel separately in `:ash_tracer_context`.
 
   `Jido.Signal` lives in the `:jido_signal` dependency, so these helpers live
   here rather than on the struct itself.
@@ -12,11 +14,11 @@ defmodule Aikido.SignalCtx do
   ## Example
 
       iex> sig = Jido.Signal.new!(%{type: "work.start", data: %{}})
-      iex> sig = Aikido.SignalCtx.put(sig, :trace_id, "t-1")
-      iex> Aikido.SignalCtx.get(sig, :trace_id)
-      "t-1"
+      iex> sig = Aikido.SignalCtx.put(sig, :workflow_id, "step-1")
+      iex> Aikido.SignalCtx.get(sig, :workflow_id)
+      "step-1"
       iex> Aikido.SignalCtx.ctx(sig)
-      %{trace_id: "t-1"}
+      %{workflow_id: "step-1"}
   """
 
   alias Jido.Signal
@@ -81,7 +83,43 @@ defmodule Aikido.SignalCtx do
   def inherit(%Signal{} = target, %Signal{} = source) do
     src = ctx(source)
     dst = ctx(target)
-    put_ctx(target, Map.merge(src, dst))
+    context = Map.merge(tracer_context(source), tracer_context(target))
+
+    extensions = Map.put(extensions(target), @ctx_key, Map.merge(src, dst))
+
+    extensions =
+      if context == %{}, do: extensions, else: Map.put(extensions, :ash_tracer_context, context)
+
+    target
+    |> put_extensions(extensions)
+    |> capture_tracing()
+  end
+
+  @doc "Ash tracers participating in this signal, including configured defaults."
+  def tracers(signal, instance \\ nil) do
+    Enum.uniq(
+      List.wrap(get(signal, :tracer)) ++
+        Map.keys(tracer_context(signal)) ++
+        List.wrap(Aikido.Observe.Config.tracer(instance)) ++
+        List.wrap(Application.get_env(:ash, :tracer))
+    )
+  end
+
+  @doc "The opaque contexts captured by Ash for transfer to the receiving process."
+  def tracer_context(%Signal{} = signal),
+    do: Map.get(extensions(signal), :ash_tracer_context, %{})
+
+  @doc "Capture native Ash span context before sending or scheduling a signal."
+  def capture_tracing(%Signal{} = signal) do
+    context = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers(signal))
+    # Forwarded envelopes retain their parent when the forwarding process has
+    # no active span. Effects executed in a span capture that newer parent.
+    context = Map.reject(context, fn {_tracer, value} -> is_nil(value) end)
+    context = Map.merge(tracer_context(signal), context)
+
+    if context == %{},
+      do: signal,
+      else: put_extensions(signal, Map.put(extensions(signal), :ash_tracer_context, context))
   end
 
   @doc "Return the input signal's timestamp in milliseconds, or zero without an envelope."

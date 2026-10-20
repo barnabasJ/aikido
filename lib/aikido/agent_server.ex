@@ -173,6 +173,7 @@ defmodule Aikido.AgentServer do
   triggering signal.
   """
   @behaviour GenServer
+  require Ash.Tracer
   require Logger
 
   alias Aikido.AgentServer.{
@@ -205,8 +206,6 @@ defmodule Aikido.AgentServer do
   alias Jido.Signal
   alias Jido.Signal.Router
   alias Aikido.Telemetry.Formatter
-  alias Aikido.Tracing.Context, as: TraceContext
-  alias Aikido.Tracing.Trace
   @type server :: pid() | atom() | {:via, module(), term()} | String.t()
   @cron_restart_base_ms 500
   @cron_restart_max_ms 30000
@@ -279,7 +278,11 @@ defmodule Aikido.AgentServer do
     timeout = Keyword.get(opts, :timeout, Defaults.agent_server_call_timeout_ms())
 
     with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, {:signal_with_selector, signal, selector}, timeout)
+      GenServer.call(
+        pid,
+        {:signal_with_selector, Aikido.SignalCtx.capture_tracing(signal), selector},
+        timeout
+      )
     end
   end
 
@@ -310,8 +313,21 @@ defmodule Aikido.AgentServer do
     caller = self()
     request = make_ref()
 
+    tracers =
+      if is_struct(command, Signal),
+        do: Aikido.SignalCtx.tracers(command),
+        else:
+          Enum.uniq(
+            List.wrap(Keyword.get(opts, :tracer)) ++
+              List.wrap(Application.get_env(:ash, :tracer)) ++
+              List.wrap(Aikido.Observe.Config.tracer())
+          )
+
+    transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
+
     {waiter, monitor} =
       spawn_monitor(fn ->
+        Ash.ProcessHelpers.transfer_context(transfer)
         result = wait_for_command_result(server, command, pattern, selector, timeout)
         send(caller, {request, result})
       end)
@@ -398,7 +414,7 @@ defmodule Aikido.AgentServer do
   @spec cast(server(), Signal.t()) :: :ok | {:error, term()}
   def cast(server, %Signal{} = signal) do
     with {:ok, pid} <- resolve_server(server) do
-      GenServer.cast(pid, {:signal, signal})
+      GenServer.cast(pid, {:signal, Aikido.SignalCtx.capture_tracing(signal)})
     end
   end
 
@@ -940,27 +956,19 @@ defmodule Aikido.AgentServer do
   end
 
   defp lifecycle_starting_signal(%State{} = state) do
-    LifecycleStarting.new!(%{}, source: "/agent/#{state.id}") |> with_root_trace()
+    LifecycleStarting.new!(%{}, source: "/agent/#{state.id}")
   end
 
   defp lifecycle_ready_signal(%State{} = state) do
-    LifecycleReady.new!(%{}, source: "/agent/#{state.id}") |> with_root_trace()
+    LifecycleReady.new!(%{}, source: "/agent/#{state.id}")
   end
 
   defp lifecycle_stopping_signal(%State{} = state, reason) do
-    LifecycleStopping.new!(%{reason: reason}, source: "/agent/#{state.id}") |> with_root_trace()
+    LifecycleStopping.new!(%{reason: reason}, source: "/agent/#{state.id}")
   end
 
   defp partition_assigned_signal(%State{} = state) do
     PartitionAssigned.new!(%{partition: state.partition}, source: "/agent/#{state.id}")
-    |> with_root_trace()
-  end
-
-  defp with_root_trace(%Signal{} = signal) do
-    case Trace.put(signal, Trace.new_root()) do
-      {:ok, s} -> s
-      {:error, _} -> signal
-    end
   end
 
   @impl true
@@ -989,10 +997,8 @@ defmodule Aikido.AgentServer do
   @impl true
   def handle_call({:signal_with_selector, %Signal{} = signal, selector}, _from, state)
       when is_function(selector, 1) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
-
     try do
-      case process_signal(state, traced_signal) do
+      case process_signal(state, signal) do
         {:ok, new_state, _directives} ->
           {:reply, invoke_call_selector(selector, new_state), new_state}
 
@@ -1016,8 +1022,6 @@ defmodule Aikido.AgentServer do
 
         # Return a clean error to the caller; agent stays alive.
         {:reply, {:error, reason}, state}
-    after
-      TraceContext.clear()
     end
   end
 
@@ -1144,16 +1148,10 @@ defmodule Aikido.AgentServer do
   end
 
   def handle_cast({:signal, %Signal{} = signal}, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
-
-    try do
-      case process_signal(state, traced_signal) do
-        {:ok, new_state, _directives} -> {:noreply, new_state}
-        {:error, committed_state, _reason} -> {:noreply, committed_state}
-        {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
-      end
-    after
-      TraceContext.clear()
+    case process_signal(state, signal) do
+      {:ok, new_state, _directives} -> {:noreply, new_state}
+      {:error, committed_state, _reason} -> {:noreply, committed_state}
+      {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
     end
   end
 
@@ -1163,16 +1161,10 @@ defmodule Aikido.AgentServer do
 
   @impl true
   def handle_info({:scheduled_signal, %Signal{} = signal}, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
-
-    try do
-      case process_signal(state, traced_signal) do
-        {:ok, new_state, _directives} -> {:noreply, new_state}
-        {:error, committed_state, _reason} -> {:noreply, committed_state}
-        {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
-      end
-    after
-      TraceContext.clear()
+    case process_signal(state, signal) do
+      {:ok, new_state, _directives} -> {:noreply, new_state}
+      {:error, committed_state, _reason} -> {:noreply, committed_state}
+      {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
     end
   end
 
@@ -1228,16 +1220,10 @@ defmodule Aikido.AgentServer do
   end
 
   def handle_info({:signal, %Signal{} = signal}, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
-
-    try do
-      case process_signal(state, traced_signal) do
-        {:ok, new_state, _directives} -> {:noreply, new_state}
-        {:error, committed_state, _reason} -> {:noreply, committed_state}
-        {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
-      end
-    after
-      TraceContext.clear()
+    case process_signal(state, signal) do
+      {:ok, new_state, _directives} -> {:noreply, new_state}
+      {:error, committed_state, _reason} -> {:noreply, committed_state}
+      {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
     end
   end
 
@@ -1301,6 +1287,32 @@ defmodule Aikido.AgentServer do
   @spec process_signal(State.t(), Signal.t()) ::
           {:ok, State.t(), [struct()]} | {:error, State.t(), term()} | {:stop, term(), State.t()}
   defp process_signal(%State{} = state, %Signal{} = signal) do
+    with_signal_span(state, signal, &do_process_signal(state, &1))
+  end
+
+  defp with_signal_span(state, signal, fun) do
+    tracers = Aikido.SignalCtx.tracers(signal, state.aikido)
+    previous = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
+    incoming = Map.new(tracers, &{&1, Map.get(Aikido.SignalCtx.tracer_context(signal), &1)})
+    Ash.ProcessHelpers.transfer_context(incoming)
+    signal = if tracers == [], do: signal, else: Aikido.SignalCtx.put(signal, :tracer, tracers)
+
+    try do
+      Ash.Tracer.span {:custom, :aikido_signal}, signal.type, tracers do
+        Ash.Tracer.set_metadata(
+          tracers,
+          {:custom, :aikido_signal},
+          build_signal_metadata(state, signal)
+        )
+
+        fun.(signal)
+      end
+    after
+      Ash.ProcessHelpers.transfer_context(previous)
+    end
+  end
+
+  defp do_process_signal(%State{} = state, %Signal{} = signal) do
     start_time = System.monotonic_time()
     metadata = build_signal_metadata(state, signal)
 
@@ -1400,21 +1412,21 @@ defmodule Aikido.AgentServer do
   # Like the user-signal path, subscribers fire after the outermost
   # middleware unwinds and directives have executed.
   defp emit_through_chain(%State{} = state, %Signal{} = signal) do
-    case run_chain(signal, state) do
-      {:ok, new_state, directives} ->
-        executed_state =
-          case execute_directives(directives, signal, new_state) do
-            {:ok, s} -> s
-            {:stop, _reason, s} -> s
-          end
+    with_signal_span(state, signal, fn signal ->
+      case run_chain(signal, state) do
+        {:ok, next, directives} ->
+          executed =
+            case execute_directives(directives, signal, next) do
+              {:ok, state} -> state
+              {:stop, _reason, state} -> state
+            end
 
-        fire_subscribers(executed_state, signal)
+          fire_subscribers(executed, signal)
 
-      {:error, new_state, _reason} ->
-        # state has middleware mutations committed; no directives to run on
-        # the error branch. Fire subscribers against the updated state.
-        fire_subscribers(new_state, signal)
-    end
+        {:error, next, _reason} ->
+          fire_subscribers(next, signal)
+      end
+    end)
   end
 
   defp build_signal_ctx(%Signal{} = signal, %State{} = state) do
@@ -1456,14 +1468,7 @@ defmodule Aikido.AgentServer do
   end
 
   def execute_directives([directive | rest], signal, state) do
-    TraceContext.set_from_signal(signal)
-
-    result =
-      try do
-        exec_directive_with_telemetry(directive, signal, state)
-      after
-        TraceContext.clear()
-      end
+    result = exec_directive_with_telemetry(directive, signal, state)
 
     case result do
       :ok ->
@@ -1476,16 +1481,14 @@ defmodule Aikido.AgentServer do
   end
 
   defp build_signal_metadata(state, signal) do
-    trace_metadata = TraceContext.to_telemetry_metadata()
-
     %{
       agent_id: state.id,
       agent_module: state.agent_module,
       signal_type: signal.type,
+      signal_id: signal.id,
       aikido_instance: state.aikido,
       aikido_partition: state.partition
     }
-    |> Map.merge(trace_metadata)
   end
 
   defp signal_stop_metadata_for({:ok, _state, directives}) when is_list(directives) do
@@ -2280,13 +2283,7 @@ defmodule Aikido.AgentServer do
         source: "/agent/#{state.id}"
       )
 
-    traced_child_started =
-      case Trace.put(child_started, Trace.new_root()) do
-        {:ok, s} -> s
-        {:error, _} -> child_started
-      end
-
-    _ = cast(parent.pid, traced_child_started)
+    _ = cast(parent.pid, child_started)
     :ok
   end
 
@@ -2337,13 +2334,7 @@ defmodule Aikido.AgentServer do
         source: "/agent/#{orphaned_state.id}"
       )
 
-    traced_signal =
-      case Trace.put(signal, Trace.new_root()) do
-        {:ok, s} -> s
-        {:error, _} -> signal
-      end
-
-    case process_signal(orphaned_state, traced_signal) do
+    case process_signal(orphaned_state, signal) do
       {:ok, new_state, _directives} -> {:noreply, new_state}
       {:error, committed_state, _reason} -> {:noreply, committed_state}
       {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
@@ -2384,13 +2375,7 @@ defmodule Aikido.AgentServer do
   # collapsed to a state return — synthetic signals shouldn't terminate
   # the agent on their own.
   defp dispatch_synthetic_signal(signal, %State{} = state) do
-    traced_signal =
-      case Trace.put(signal, Trace.new_root()) do
-        {:ok, s} -> s
-        {:error, _} -> signal
-      end
-
-    case process_signal(state, traced_signal) do
+    case process_signal(state, signal) do
       {:ok, new_state, _directives} -> new_state
       {:error, committed_state, _reason} -> committed_state
       {:stop, _reason, new_state} -> new_state
@@ -2415,13 +2400,7 @@ defmodule Aikido.AgentServer do
         if team_pid != self(), do: cast(team_pid, signal)
       end
 
-      traced_signal =
-        case Trace.put(signal, Trace.new_root()) do
-          {:ok, s} -> s
-          {:error, _} -> signal
-        end
-
-      case process_signal(state, traced_signal) do
+      case process_signal(state, signal) do
         {:ok, new_state, _directives} -> {:noreply, new_state}
         {:error, committed_state, _reason} -> {:noreply, committed_state}
         {:stop, reason, new_state} -> {:stop, reason, State.set_status(new_state, :stopping)}
@@ -2464,8 +2443,6 @@ defmodule Aikido.AgentServer do
         signal_type: signal.type
       })
 
-    trace_metadata = TraceContext.to_telemetry_metadata()
-
     metadata =
       %{
         agent_id: state.id,
@@ -2476,7 +2453,6 @@ defmodule Aikido.AgentServer do
         aikido_instance: state.aikido,
         aikido_partition: state.partition
       }
-      |> Map.merge(trace_metadata)
 
     emit_telemetry(
       [:aikido, :agent_server, :directive, :start],

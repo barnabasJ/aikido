@@ -302,7 +302,6 @@ defmodule AikidoTest.ObserveTest do
 
   describe("emit_event/3") do
     setup do
-      Aikido.Tracing.Context.clear()
       test_pid = self()
       handler_id = "emit-event-handler-#{System.unique_integer()}"
 
@@ -316,7 +315,6 @@ defmodule AikidoTest.ObserveTest do
       )
 
       on_exit(fn ->
-        Aikido.Tracing.Context.clear()
         :telemetry.detach(handler_id)
       end)
 
@@ -337,27 +335,10 @@ defmodule AikidoTest.ObserveTest do
                       %{request_id: "req-1"}}
     end
 
-    test "enriches metadata with active trace context" do
-      signal = Jido.Signal.new!("trace.source", %{}, source: "/test")
-      {_traced_signal, trace} = Aikido.Tracing.Context.ensure_from_signal(signal)
-      Aikido.Observe.emit_event([:aikido, :test, :domain, :event], %{count: 1}, %{phase: :tool})
-      assert_receive {:telemetry_event, [:aikido, :test, :domain, :event], %{count: 1}, metadata}
-      assert metadata.phase == :tool
-      assert metadata.aikido_trace_id == trace.trace_id
-      assert metadata.aikido_span_id == trace.span_id
-    end
-
-    test "caller metadata overrides correlation metadata keys" do
-      signal = Jido.Signal.new!("trace.override", %{}, source: "/test")
-      {_traced_signal, trace} = Aikido.Tracing.Context.ensure_from_signal(signal)
-
-      Aikido.Observe.emit_event([:aikido, :test, :domain, :event], %{}, %{
-        aikido_trace_id: "custom-trace"
-      })
-
-      assert_receive {:telemetry_event, [:aikido, :test, :domain, :event], %{}, metadata}
-      assert metadata.aikido_trace_id == "custom-trace"
-      assert metadata.aikido_span_id == trace.span_id
+    test "keeps application metadata without adding a separate trace identity" do
+      metadata = %{workflow_id: "step-1", phase: :tool}
+      Aikido.Observe.emit_event([:aikido, :test, :domain, :event], %{count: 1}, metadata)
+      assert_receive {:telemetry_event, [:aikido, :test, :domain, :event], %{count: 1}, ^metadata}
     end
   end
 

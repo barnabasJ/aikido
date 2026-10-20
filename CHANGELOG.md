@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Use native Ash tracer contexts across signal, directive and asynchronous task
+  boundaries. Remove Aikido's separate trace IDs and process-dictionary tracing;
+  preserve span ancestry through AI work and result signals, and restore context
+  after each turn. Add a full external-action-to-final-state tracing test.
+
 - Align test fixtures with native Ash action implementations and DurableServer
   supervision. Remove unused resources, adapter options and duplicate schema
   wrapper tests; consolidate FSM coverage and run the full suite without default

@@ -3,6 +3,8 @@ defmodule Aikido.AI.Execution do
   # Runs inside an I/O task, never inside directive execution or an action.
   # The inner task performs one bounded attempt. This owner handles cancellation,
   # deadlines and cleanup; it never writes agent state.
+  require Ash.Tracer
+
   def run(owner, request_id, supervisor, work, opts) do
     selector = fn runtime ->
       if Enum.any?(runtime.agent.state, fn
@@ -38,12 +40,17 @@ defmodule Aikido.AI.Execution do
     parent = self()
     key = make_ref()
 
+    transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: opts[:tracer])
+
     task =
       Task.Supervisor.async_nolink(supervisor, fn ->
+        Ash.ProcessHelpers.transfer_context(transfer)
         notify = fn event -> send(parent, {key, event}) end
 
         try do
-          work.(notify, number)
+          Ash.Tracer.span {:custom, :aikido_attempt}, "aikido.attempt.#{number}", opts[:tracer] do
+            work.(notify, number)
+          end
         rescue
           error -> {:error, error}
         catch

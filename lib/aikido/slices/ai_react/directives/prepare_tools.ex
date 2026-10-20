@@ -38,6 +38,7 @@ defmodule Aikido.Slices.AiReact.Directives.PrepareTools do
 
               {:ok, prepared}
             end,
+            tracer: scope[:tracer],
             timeout: options.model_timeout_ms
           )
 

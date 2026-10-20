@@ -23,9 +23,9 @@ defmodule Aikido.Observe.SpanCtx do
 
     field :metadata, :map, allow_nil?: false, description: "Event metadata"
 
-    field :tracer_module, :atom,
+    field :tracer_module, :term,
       allow_nil?: true,
-      description: "Pinned tracer module for this span"
+      description: "Pinned Ash tracer module or modules for this span"
 
     field :tracer_ctx, :term, allow_nil?: true, description: "Tracer-specific context"
   end

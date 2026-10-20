@@ -62,7 +62,17 @@ defmodule Aikido.DirectiveTest do
     assert result.directives == [directive]
     refute_received {:notified, _}
 
-    assert :ok = Aikido.Directive.exec(directive, nil, nil)
+    signal = Jido.Signal.new!("notify", %{})
+
+    runtime =
+      Aikido.AgentServer.State.new!(
+        id: "notify-test",
+        aikido: Aikido.Default,
+        agent_module: AikidoTest.TestAgents.Minimal,
+        agent: AikidoTest.TestAgents.Minimal.initialize!()
+      )
+
+    assert :ok = Aikido.Directive.exec(directive, signal, runtime)
     assert_received {:notified, 2}
   end
 

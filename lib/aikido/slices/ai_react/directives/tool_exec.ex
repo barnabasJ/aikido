@@ -14,6 +14,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   """
 
   use Aikido.Directive
+  require Ash.Tracer
 
   typed_struct do
     field :options, :term, default: %{}
@@ -61,9 +62,16 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         DeepMerge.deep_merge(directive.tool_context[:context] || %{}, inherited[:context] || %{})
       )
 
+    tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
+    transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
+
     {:ok, _pid} =
       Task.Supervisor.start_child(task_sup, fn ->
-        run_and_dispatch(directive, agent_pid, source, context, task_sup)
+        Ash.ProcessHelpers.transfer_context(transfer)
+
+        Ash.Tracer.span {:custom, :aikido_tool_call}, "aikido_tool_call", tracers do
+          run_and_dispatch(directive, agent_pid, source, context, task_sup)
+        end
       end)
 
     :ok
@@ -78,6 +86,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         d.request_id,
         supervisor,
         fn _notify, _attempt -> run_tool(d.tool_call, d.registry, context) end,
+        tracer: context[:tracer],
         timeout: options.tool_timeout_ms,
         retries: options.tool_max_retries,
         backoff: options.retry_backoff_ms

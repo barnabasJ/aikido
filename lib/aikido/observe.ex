@@ -9,21 +9,12 @@ defmodule Aikido.Observe do
 
   - Automatic telemetry event emission (start/stop/exception)
   - Duration measurement for all spans (nanoseconds)
-  - Automatic correlation ID enrichment from `Aikido.Tracing.Context`
   - Pluggable tracer callbacks via `Ash.Tracer`
   - Threshold-based logging via `Aikido.Observe.Log`
 
-  ## Correlation Tracing Integration
-
-  When `Aikido.Tracing.Context` has an active trace context (set via signal processing),
-  all spans automatically include correlation metadata:
-
-  - `:aikido_trace_id` - shared trace identifier across the call chain
-  - `:aikido_span_id` - unique span identifier for the current signal
-  - `:aikido_parent_span_id` - parent span that triggered this signal
-  - `:aikido_causation_id` - signal ID that caused this signal
-
-  This connects timed telemetry spans with signal causation tracking automatically.
+  Ash owns span context and ancestry. Signal and task boundaries use
+  `Ash.ProcessHelpers` to transfer the configured tracers' opaque contexts.
+  Signal IDs and types remain ordinary telemetry/span metadata.
 
   ## Configuration
 
@@ -86,7 +77,6 @@ defmodule Aikido.Observe do
   alias Aikido.Observe.Config, as: ObserveConfig
   alias Aikido.Observe.Log
   alias Aikido.Observe.SpanCtx
-  alias Aikido.Tracing.Context, as: TracingContext
 
   @type event_prefix :: [atom()]
   @type metadata :: map()
@@ -119,8 +109,8 @@ defmodule Aikido.Observe do
   def with_span(event_prefix, metadata, fun)
       when is_list(event_prefix) and is_map(metadata) and is_function(fun, 0) do
     span = start_span(event_prefix, metadata)
-    previous = Ash.Tracer.get_span_context(span.tracer_module)
-    Ash.Tracer.set_span_context(span.tracer_module, span.tracer_ctx)
+    previous = Ash.ProcessHelpers.get_context_for_transfer(tracer: span.tracer_module)
+    Ash.ProcessHelpers.transfer_context(span.tracer_ctx)
 
     try do
       result = fun.()
@@ -131,7 +121,7 @@ defmodule Aikido.Observe do
         finish_span_error(span, kind, reason, __STACKTRACE__)
         :erlang.raise(kind, reason, __STACKTRACE__)
     after
-      Ash.Tracer.set_span_context(span.tracer_module, previous)
+      Ash.ProcessHelpers.transfer_context(previous)
     end
   end
 
@@ -162,14 +152,18 @@ defmodule Aikido.Observe do
   @spec start_span(event_prefix(), metadata()) :: span_ctx()
   def start_span(event_prefix, metadata) when is_list(event_prefix) and is_map(metadata) do
     span = init_span_ctx(event_prefix, metadata)
-    previous = Ash.Tracer.get_span_context(span.tracer_module)
+    previous = Ash.ProcessHelpers.get_context_for_transfer(tracer: span.tracer_module)
 
     try do
       Ash.Tracer.start_span(span.tracer_module, {:custom, :aikido}, Enum.join(event_prefix, "."))
       Ash.Tracer.set_metadata(span.tracer_module, {:custom, :aikido}, span.metadata)
-      %{span | tracer_ctx: Ash.Tracer.get_span_context(span.tracer_module)}
+
+      %{
+        span
+        | tracer_ctx: Ash.ProcessHelpers.get_context_for_transfer(tracer: span.tracer_module)
+      }
     after
-      Ash.Tracer.set_span_context(span.tracer_module, previous)
+      Ash.ProcessHelpers.transfer_context(previous)
     end
   end
 
@@ -251,8 +245,7 @@ defmodule Aikido.Observe do
   Unlike `emit_debug_event/3`, this helper does not check debug configuration.
   It is intended for domain-level events that should always be emitted.
 
-  Trace correlation metadata from `Aikido.Tracing.Context` is merged in automatically
-  when present.
+  Metadata is passed through unchanged; native Ash spans carry trace ancestry.
 
   ## Parameters
 
@@ -273,7 +266,7 @@ defmodule Aikido.Observe do
 
   def emit_event(event_prefix, measurements, metadata)
       when is_list(event_prefix) and is_map(measurements) and is_map(metadata) do
-    :telemetry.execute(event_prefix, measurements, enrich_with_correlation(metadata))
+    :telemetry.execute(event_prefix, measurements, metadata)
     :ok
   end
 
@@ -379,7 +372,6 @@ defmodule Aikido.Observe do
   end
 
   defp init_span_ctx(event_prefix, metadata) do
-    metadata = enrich_with_correlation(metadata)
     tracer_module = tracer(metadata)
     start_time = System.monotonic_time(:nanosecond)
     start_system_time = System.system_time(:nanosecond)
@@ -431,33 +423,26 @@ defmodule Aikido.Observe do
   end
 
   defp with_tracer_context(span, fun) do
-    previous = Ash.Tracer.get_span_context(span.tracer_module)
-    Ash.Tracer.set_span_context(span.tracer_module, span.tracer_ctx)
+    previous = Ash.ProcessHelpers.get_context_for_transfer(tracer: span.tracer_module)
+    Ash.ProcessHelpers.transfer_context(span.tracer_ctx)
 
     try do
       fun.()
     after
-      Ash.Tracer.set_span_context(span.tracer_module, previous)
+      Ash.ProcessHelpers.transfer_context(previous)
     end
   end
 
   defp tracer(metadata) when is_map(metadata) do
     instance = Map.get(metadata, :aikido_instance)
-    ObserveConfig.tracer(instance)
-  end
 
-  defp enrich_with_correlation(metadata) do
-    case correlation_metadata() do
-      empty when empty == %{} -> metadata
-      correlation -> Map.merge(correlation, metadata)
-    end
-  end
-
-  defp correlation_metadata do
-    if Code.ensure_loaded?(TracingContext) do
-      TracingContext.to_telemetry_metadata()
-    else
-      %{}
+    case Enum.uniq(
+           List.wrap(ObserveConfig.tracer(instance)) ++
+             List.wrap(Application.get_env(:ash, :tracer))
+         ) do
+      [] -> nil
+      [tracer] -> tracer
+      tracers -> tracers
     end
   end
 end
