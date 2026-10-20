@@ -21,6 +21,10 @@ defmodule Aikido.Ash.Transformers.Team do
   def before?(_), do: false
 
   def transform(dsl) do
+    if Aikido.Ash.Agent in Spark.extensions(dsl), do: expand(dsl), else: {:ok, dsl}
+  end
+
+  defp expand(dsl) do
     entities = Transformer.get_entities(dsl, [:team])
     members = Enum.filter(entities, &match?(%Aikido.Ash.Team.Member{}, &1))
     workers = Enum.filter(entities, &match?(%Aikido.Ash.Team.Worker{}, &1))
@@ -29,50 +33,18 @@ defmodule Aikido.Ash.Transformers.Team do
     definitions = Map.new(members, &{&1.name, Map.from_struct(&1)})
     raw = Transformer.get_option(dsl, [:team], :topology, %{})
 
-    with :ok <- validate(dsl, entities, members, workers, raw),
-         {:ok, topology} <-
-           Aikido.Ash.Team.Topology.build(Map.merge(raw, definitions), instance, limit) do
-      config = %{
-        resource: Transformer.get_persisted(dsl, :module),
-        instance: instance,
-        inherit: Transformer.get_option(dsl, [:team], :inherit, []),
-        state_path: Transformer.get_option(dsl, [:agent], :path, :state),
-        topology: topology,
-        max_members: limit,
-        timeout: Transformer.get_option(dsl, [:team], :operation_timeout, 5_000),
-        workers: Map.new(workers, &{&1.name, Map.from_struct(&1)})
-      }
+    config = %{
+      resource: Transformer.get_persisted(dsl, :module),
+      instance: instance,
+      inherit: Transformer.get_option(dsl, [:team], :inherit, []),
+      state_path: Transformer.get_option(dsl, [:agent], :path, :state),
+      topology: %Aikido.Ash.Team.Topology{nodes: Map.merge(raw, definitions)},
+      max_members: limit,
+      timeout: Transformer.get_option(dsl, [:team], :operation_timeout, 5_000),
+      workers: Map.new(workers, &{&1.name, Map.from_struct(&1)})
+    }
 
-      build(dsl, config)
-    else
-      {:error, reason} -> error("Invalid team: #{inspect(reason)}")
-    end
-  end
-
-  defp validate(dsl, entities, members, workers, raw) do
-    names = Enum.map(members, & &1.name)
-    worker_names = Enum.map(workers, & &1.name)
-    instance = Transformer.get_option(dsl, [:agent], :instance)
-
-    cond do
-      Aikido.Ash.Agent not in Spark.extensions(dsl) ->
-        {:error, "requires the Aikido.Ash.Agent extension"}
-
-      names != Enum.uniq(names) ->
-        {:error, "Team member names must be unique"}
-
-      worker_names != Enum.uniq(worker_names) ->
-        {:error, "Worker names must be unique"}
-
-      Enum.any?(names, &Map.has_key?(raw, &1)) ->
-        {:error, "Duplicate topology member"}
-
-      Enum.any?(entities, &(Aikido.Ash.Runtime.option(&1.resource, :instance) != instance)) ->
-        {:error, "All team members must use the team's Aikido instance"}
-
-      true ->
-        :ok
-    end
+    build(dsl, config)
   end
 
   defp build(dsl, config) do
@@ -157,6 +129,4 @@ defmodule Aikido.Ash.Transformers.Team do
         Keyword.merge([name: name, type: Ash.Type.get_type(type), public?: true], opts)
       )
 
-  defp error(message),
-    do: {:error, Spark.Error.DslError.exception(message: message, path: [:team])}
 end

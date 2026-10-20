@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Validate team declarations and topology with a Spark verifier after compilation;
+  the team transformer only assembles configuration and generates actions.
+
 - Remove unused plugin-action metadata, reserved slice aliases and path-override
   handling, ignored route options, unused timeout defaults and path-conflict
   exceptions, unused action formatting and schema identity wrappers. Use native

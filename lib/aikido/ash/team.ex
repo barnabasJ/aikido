@@ -80,7 +80,10 @@ defmodule Aikido.Ash.Team do
       operation_timeout: [type: :pos_integer, default: 5_000]
     ]
   }
-  use Spark.Dsl.Extension, sections: [@team], transformers: [Aikido.Ash.Transformers.Team]
+  use Spark.Dsl.Extension,
+    sections: [@team],
+    transformers: [Aikido.Ash.Transformers.Team],
+    verifiers: [Aikido.Ash.Verifiers.Team]
 
   @doc false
   def start(resource, pid, topology, context \\ %{}) do
