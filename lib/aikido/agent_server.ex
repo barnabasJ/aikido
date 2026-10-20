@@ -2346,7 +2346,9 @@ defmodule Aikido.AgentServer do
 
     {tag, state} = State.remove_child_by_pid(state, pid)
 
-    if tag do
+    if is_nil(tag) do
+      {:noreply, state}
+    else
       Logger.debug("AgentServer #{state.id} child #{inspect(tag)} exited: #{inspect(reason)}")
 
       signal =
@@ -2363,8 +2365,6 @@ defmodule Aikido.AgentServer do
         {:error, committed_state, _reason} -> {:noreply, committed_state}
         {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
       end
-    else
-      {:noreply, state}
     end
   end
 

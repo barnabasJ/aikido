@@ -67,7 +67,7 @@ defmodule Aikido.Directives.Cron do
   @spec register_io(State.t(), term(), term(), term() | nil, term() | nil) ::
           {:ok, io_result()} | {:error, term()}
   def register_io(%State{} = state, cron_expr, message, logical_id, tz) do
-    logical_id = logical_id || make_ref()
+    logical_id = if is_nil(logical_id), do: make_ref(), else: logical_id
 
     with {:ok, cron_spec} <- Aikido.Scheduler.validate_and_build_cron_spec(cron_expr, message, tz),
          runtime_spec =

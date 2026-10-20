@@ -81,6 +81,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent do
 
     route "cancel_cron", {AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent, :cancel_cron}
     route "cron.batch", :cron_batch
+    route "cron.native", {Aikido.AgentServer.RuntimeActions, :schedule_cron}
     route "cron.tick", {AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent, :cron_count}
   end
 
@@ -122,6 +123,51 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
   import ExUnit.CaptureLog
   @moduletag :integration
   @moduletag capture_log: true
+
+  for route <- ["register_cron", "cron.native"] do
+    test "false cron IDs support replacement and cancellation through #{route}", context do
+      pid = start_server(context, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent)
+
+      register = fn cron ->
+        Aikido.AgentServer.call_until(
+          pid,
+          signal(unquote(route), %{job_id: false, cron: cron, signal_type: "cron.tick"}),
+          "aikido.agent.cron.registered",
+          &{:ok, {&1.cron_jobs, &1.cron_specs}}
+        )
+      end
+
+      assert {:ok, {%{false => first}, %{false => %{cron_expression: "@hourly"}}}} =
+               register.("@hourly")
+
+      first_monitor = Process.monitor(first)
+
+      assert {:ok, {%{false => replacement}, %{false => %{cron_expression: "@daily"}}}} =
+               register.("@daily")
+
+      refute first == replacement
+
+      assert {:ok, {[false], [false]}} =
+               Aikido.AgentServer.state(
+                 pid,
+                 &{:ok, {Map.keys(&1.cron_jobs), Map.keys(&1.cron_specs)}}
+               )
+
+      assert_receive {:DOWN, ^first_monitor, :process, ^first, _}
+      assert Process.alive?(replacement)
+      replacement_monitor = Process.monitor(replacement)
+
+      assert {:ok, {%{}, %{}}} =
+               Aikido.AgentServer.call_until(
+                 pid,
+                 signal("cancel_cron", %{job_id: false}),
+                 "aikido.agent.cron.cancelled",
+                 &{:ok, {&1.cron_jobs, &1.cron_specs}}
+               )
+
+      assert_receive {:DOWN, ^replacement_monitor, :process, ^replacement, _}
+    end
+  end
 
   for replacement? <- [false, true] do
     test "ordered batch cancellation preserves replacement=#{replacement?}", context do

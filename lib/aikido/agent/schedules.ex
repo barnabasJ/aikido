@@ -12,7 +12,9 @@ defmodule Aikido.Agent.Schedules do
     Enum.map(schedules, fn schedule ->
       %{
         cron_expression: schedule.cron,
-        job_id: {:agent_schedule, agent_name, schedule.job_id || schedule.signal_type},
+        job_id:
+          {:agent_schedule, agent_name,
+           if(is_nil(schedule.job_id), do: schedule.signal_type, else: schedule.job_id)},
         signal_type: schedule.signal_type,
         timezone: schedule.timezone || "Etc/UTC",
         data: schedule.data

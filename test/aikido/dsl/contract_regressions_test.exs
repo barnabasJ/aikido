@@ -258,6 +258,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
 
   test "agent schedules reject collisions between defaults and explicit IDs" do
     for declarations <- [
+          "schedule \"@yearly\", \"first\", job_id: false\nschedule \"@monthly\", \"second\", job_id: false",
           "schedule \"@yearly\", \"tick\"\nschedule \"@monthly\", \"tick\"",
           "schedule \"@yearly\", \"first\", job_id: :same\nschedule \"@monthly\", \"second\", job_id: :same",
           "schedule \"@yearly\", \"tick\"\nschedule \"@monthly\", \"second\", job_id: \"tick\""
@@ -283,7 +284,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
     end
   end
 
-  test "agent schedules retain distinct explicit IDs for the same signal" do
+  test "agent schedules distinguish explicit, false and omitted IDs for the same signal" do
     module = Module.concat(__MODULE__, "DistinctSchedule#{System.unique_integer([:positive])}")
 
     Code.compile_string("""
@@ -296,18 +297,22 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
       schedules do
         schedule "@yearly", "tick", job_id: :first
         schedule "@monthly", "tick", job_id: :second
+        schedule "@weekly", "tick", job_id: false
+        schedule "@daily", "tick"
       end
     end
     """)
 
     assert Enum.map(Aikido.Dsl.Agent.Info.schedules(module), & &1.job_id) == [
              {:agent_schedule, "distinct_schedules", :first},
-             {:agent_schedule, "distinct_schedules", :second}
+             {:agent_schedule, "distinct_schedules", :second},
+             {:agent_schedule, "distinct_schedules", false},
+             {:agent_schedule, "distinct_schedules", "tick"}
            ]
 
     reference = module |> Ash.ActionInput.for_action(:start, %{}) |> Ash.run_action!()
     assert {:ok, jobs} = Aikido.AgentServer.state(reference.pid, &{:ok, &1.cron_jobs})
-    assert map_size(jobs) == 2
+    assert map_size(jobs) == 4
     assert Enum.all?(Map.values(jobs), &Process.alive?/1)
   end
 end

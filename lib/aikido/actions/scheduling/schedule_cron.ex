@@ -11,11 +11,7 @@ defmodule Aikido.Actions.Scheduling.ScheduleCron do
     signal = struct!(Jido.Signal, id: nil, type: type, data: payload, source: "/cron")
 
     opts =
-      if job_id do
-        [job_id: job_id]
-      else
-        []
-      end
+      if is_nil(job_id), do: [], else: [job_id: job_id]
 
     opts =
       if tz do
