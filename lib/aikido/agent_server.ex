@@ -895,8 +895,8 @@ defmodule Aikido.AgentServer do
     }
 
     if cancel? and is_pid(pid) and Process.alive?(pid) do
-      Aikido.Directives.CronCancel.exec(
-        %Aikido.Directives.CronCancel{job_id: logical_id},
+      Aikido.Directives.CronCancel.shutdown_io(
+        logical_id,
         opts[:input_signal] || Jido.Signal.new!("aikido.agent.cron.cancel", %{job_id: logical_id}),
         state
       )
@@ -1352,6 +1352,7 @@ defmodule Aikido.AgentServer do
       |> State.record_debug_event(:signal_received, %{type: signal.type, id: signal.id})
       |> maybe_track_child_started(signal)
       |> maybe_track_cron_registered(signal)
+      |> maybe_cancel_cron(signal)
 
     emit_telemetry(
       [:aikido, :agent_server, :signal, :start],
@@ -1486,8 +1487,8 @@ defmodule Aikido.AgentServer do
   # propagates as `{:stop, reason, state}` to the GenServer.
   #
   # The directive contract has no state slot in its return value:
-  # directives mutate no state. This runtime loop records debug events and
-  # retires cron cancellation ownership before I/O; cascade callbacks install
+  # directives mutate no state. This runtime loop records debug events.
+  # Cascade callbacks retire cron ownership before shutdown and install
   # runtime results received through subsequent signals.
   @spec execute_directives([struct()], Signal.t(), State.t()) ::
           {:ok, State.t()} | {:stop, term(), State.t()}
@@ -1504,27 +1505,15 @@ defmodule Aikido.AgentServer do
         signal_type: signal.type
       })
 
-    # Retire ownership before asynchronous shutdown can deliver its DOWN.
-    # The descriptor still receives the old snapshot to address that incarnation.
-    next_state =
-      case directive do
-        %Aikido.Directives.CronCancel{job_id: job_id} ->
-          {_pid, next} = untrack_cron_job(state, job_id, drop_runtime_spec?: true)
-          next
-
-        _ ->
-          state
-      end
-
     result = exec_directive_with_telemetry(directive, signal, state)
 
     case result do
       :ok ->
-        execute_directives(rest, signal, next_state)
+        execute_directives(rest, signal, state)
 
       {:stop, reason} ->
-        warn_if_normal_stop(reason, directive, next_state)
-        {:stop, reason, next_state}
+        warn_if_normal_stop(reason, directive, state)
+        {:stop, reason, state}
     end
   end
 
@@ -1622,6 +1611,17 @@ defmodule Aikido.AgentServer do
   end
 
   defp maybe_track_cron_registered(state, _signal), do: state
+
+  defp maybe_cancel_cron(
+         state,
+         %Signal{type: "aikido.agent.cron.cancel.requested", data: %{job_id: job_id}} = signal
+       ) do
+    {_pid, next} = untrack_cron_job(state, job_id, drop_runtime_spec?: true)
+    Directives.CronCancel.shutdown_io(job_id, signal, state)
+    next
+  end
+
+  defp maybe_cancel_cron(state, _signal), do: state
 
   # ---------------------------------------------------------------------------
   # Internal: subscriber dispatch

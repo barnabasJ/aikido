@@ -58,6 +58,13 @@ IDs rather than reading the clock or generating random IDs. Direct calls without
 an input signal use timestamp zero. Mounted slice resources apply their native
 attribute defaults during initialization.
 
+`CronCancel` queues an ordered runtime request, so it also cancels a registration
+returned earlier in the same directive batch. The runtime retires that job's
+ownership and saved definition before supervised shutdown. Cancellation completes
+with `aikido.agent.cron.cancelled`; subscribe before triggering it when completion
+matters. A subsequent replacement keeps its own process and definition even if
+shutdown of the previous process finishes later.
+
 `SpawnAgent` starts durable child agents and snapshots their current logical parent. Teams add desired topology,
 dependencies, ownership, lazy activation, dynamic worker templates, and task
 receipts. A team resource can itself be a member or a worker template.

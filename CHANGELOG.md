@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Process logical cron cancellation in registration order before retiring ownership
+  and starting supervised shutdown. Replacement cleanup targets the captured old
+  process directly, so late shutdown cannot cancel a newly registered job.
+
 - Exclude provider-executed builtin tools from interruption repair while keeping
   canonical conversation content and provider metadata intact. Repair only missing
   application tool results across subsequent asks and restoration.

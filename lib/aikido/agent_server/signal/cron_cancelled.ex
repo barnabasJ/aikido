@@ -3,7 +3,7 @@ defmodule Aikido.AgentServer.Signal.CronCancelled do
   Completion of an intentional cron scheduler shutdown.
 
   The runtime retires the cancelled job's monitor, timers and saved definition
-  before the shutdown task starts. This signal reports completion and never
+  when the ordered cancellation request is processed, before the shutdown task starts. This signal reports completion and never
   removes current ownership, so a late acknowledgment cannot affect a replacement.
 
   `aikido.agent.cron.died` instead reports an unintentional tracked process exit.

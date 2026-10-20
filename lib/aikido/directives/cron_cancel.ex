@@ -2,7 +2,8 @@ defmodule Aikido.Directives.CronCancel do
   @moduledoc """
   Cancel a recurring cron job in supervised work without blocking the agent.
 
-  The runtime retires job ownership before executing this descriptor. Shutdown
+  The descriptor queues an ordered cancellation request. The runtime retires
+  ownership when that request is processed, before starting shutdown. Shutdown
   completion publishes `aikido.agent.cron.cancelled`; it cannot remove a newer
   job registered under the same ID.
   """
@@ -16,6 +17,17 @@ defmodule Aikido.Directives.CronCancel do
 
   @impl true
   def exec(%{job_id: logical_id}, input_signal, state) do
+    request =
+      Aikido.AgentServer.Signal.CronCancelRequested.new!(%{job_id: logical_id},
+        source: "/agent/#{state.id}"
+      )
+
+    Aikido.AgentServer.cast(self(), Aikido.SignalCtx.inherit(request, input_signal))
+    :ok
+  end
+
+  @doc false
+  def shutdown_io(logical_id, input_signal, state) do
     pid = Map.get(state.cron_jobs, logical_id)
 
     task = %Aikido.Directives.AsyncTask{

@@ -48,6 +48,21 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction.Implementa
   end
 end
 
+defmodule AikidoTest.AgentServer.CronIntegrationTest.CronBatch do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _opts, _context) do
+    directives =
+      Enum.map(input.arguments.operations, fn
+        :cancel -> Aikido.Directives.cron_cancel(:ordered)
+        cron -> Aikido.Directives.cron(cron, :tick, job_id: :ordered)
+      end)
+
+    Aikido.Types.ActionResult.new(state: input.arguments.state, directives: directives)
+  end
+end
+
 defmodule AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent do
   @moduledoc false
   use Aikido.Agent
@@ -65,10 +80,17 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent do
           {AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent, :register_cron}
 
     route "cancel_cron", {AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent, :cancel_cron}
+    route "cron.batch", :cron_batch
     route "cron.tick", {AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent, :cron_count}
   end
 
   actions do
+    action :cron_batch, Aikido.Types.ActionResult do
+      argument :state, :term
+      argument :operations, {:array, :term}, allow_nil?: false
+      run AikidoTest.AgentServer.CronIntegrationTest.CronBatch
+    end
+
     action :cron_count, Aikido.Types.ActionResult do
       argument :state, :term
       argument :data, :map, allow_nil?: false, default: %{}
@@ -101,6 +123,102 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
   @moduletag :integration
   @moduletag capture_log: true
 
+  for replacement? <- [false, true] do
+    test "ordered batch cancellation preserves replacement=#{replacement?}", context do
+      pid = start_server(context, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent)
+
+      {:ok, registered} =
+        Aikido.AgentServer.subscribe(pid, "aikido.agent.cron.registered", fn runtime ->
+          {:ok, runtime.cron_jobs.ordered}
+        end)
+
+      {:ok, cancelled} =
+        Aikido.AgentServer.subscribe(pid, "aikido.agent.cron.cancelled", &{:ok, &1.cron_jobs},
+          once: true
+        )
+
+      operations =
+        if unquote(replacement?), do: ["@hourly", :cancel, "@daily"], else: ["@hourly", :cancel]
+
+      assert :ok = Aikido.AgentServer.cast(pid, signal("cron.batch", %{operations: operations}))
+      assert_receive {:aikido_subscription, ^registered, %{result: {:ok, first}}}
+      monitor = Process.monitor(first)
+      assert_receive {:aikido_subscription, ^cancelled, _}
+      assert_receive {:DOWN, ^monitor, :process, ^first, _}
+
+      if unquote(replacement?) do
+        assert_receive {:aikido_subscription, ^registered, %{result: {:ok, replacement}}}
+        refute replacement == first
+        assert Process.alive?(replacement)
+
+        assert {:ok, {^replacement, "@daily"}} =
+                 Aikido.AgentServer.state(
+                   pid,
+                   &{:ok, {&1.cron_jobs.ordered, &1.cron_specs.ordered.cron_expression}}
+                 )
+      else
+        assert {:ok, {0, 0, 0, 0}} =
+                 Aikido.AgentServer.state(
+                   pid,
+                   &{:ok,
+                    {map_size(&1.cron_jobs), map_size(&1.cron_specs), map_size(&1.cron_monitors),
+                     map_size(&1.cron_runtime_specs)}}
+                 )
+
+        {:ok, id} = Aikido.AgentServer.state(pid, &{:ok, &1.id})
+        monitor = Process.monitor(pid)
+        assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(context.aikido), pid)
+        assert_receive {:DOWN, ^monitor, :process, ^pid, _}
+
+        restored =
+          start_server(context, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent, id: id)
+
+        assert :ok = Aikido.AgentServer.await_ready(restored)
+
+        assert {:ok, {%{}, %{}}} =
+                 Aikido.AgentServer.state(restored, &{:ok, {&1.cron_jobs, &1.cron_specs}})
+      end
+    end
+  end
+
+  test "queued cancellation follows registration even when its command was already waiting",
+       context do
+    pid = start_server(context, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent)
+
+    {:ok, registered} =
+      Aikido.AgentServer.subscribe(
+        pid,
+        "aikido.agent.cron.registered",
+        &{:ok, &1.cron_jobs.queued},
+        once: true
+      )
+
+    {:ok, cancelled} =
+      Aikido.AgentServer.subscribe(pid, "aikido.agent.cron.cancelled", &{:ok, &1.cron_specs},
+        once: true
+      )
+
+    :ok = :sys.suspend(pid)
+
+    try do
+      :ok =
+        Aikido.AgentServer.cast(pid, signal("register_cron", %{job_id: :queued, cron: "@hourly"}))
+
+      :ok = Aikido.AgentServer.cast(pid, signal("cancel_cron", %{job_id: :queued}))
+    after
+      :sys.resume(pid)
+    end
+
+    assert_receive {:aikido_subscription, ^registered, %{result: {:ok, job}}}
+    monitor = Process.monitor(job)
+    assert_receive {:aikido_subscription, ^cancelled, %{result: {:ok, specs}}}
+    refute Map.has_key?(specs, :queued)
+    assert_receive {:DOWN, ^monitor, :process, ^job, _}
+
+    assert {:ok, {%{}, %{}}} =
+             Aikido.AgentServer.state(pid, &{:ok, {&1.cron_jobs, &1.cron_specs}})
+  end
+
   test "cancelling a suspended job stays responsive and cannot remove a replacement", context do
     pid = start_server(context, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent)
     first = register_job(pid, :reused)
@@ -127,12 +245,15 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
         once: true
       )
 
-    assert {:ok, false} =
+    assert {:ok, _} =
              Aikido.AgentServer.call(
                pid,
                signal("cancel_cron", %{job_id: :reused}),
                &{:ok, Map.has_key?(&1.cron_jobs, :reused)}
              )
+
+    assert {:ok, false} =
+             Aikido.AgentServer.state(pid, &{:ok, Map.has_key?(&1.cron_jobs, :reused)})
 
     # The old scheduler is still blocked, but the next native command completes.
     second = register_job(pid, :reused)
@@ -253,7 +374,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
     assert Process.alive?(replacement.pid)
     replacement_monitor = Process.monitor(replacement.pid)
 
-    assert {:ok, false} =
+    assert {:ok, _} =
              Aikido.AgentServer.call(
                pid,
                signal("cancel_cron", %{job_id: :limited}),
