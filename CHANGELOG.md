@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Remove the outdated installer and agent generator, their templates and tests,
+  and the direct Igniter dependency. Start the default runtime with `Aikido`, or
+  define a custom runtime module with `use Aikido, otp_app: :my_app`.
+
 - Run AgentServer directly on the original Ash resource. Remove generated
   companion resources and resource/runtime mappings. Initialize typed state
   through native Ash changesets without writing the configured data layer.

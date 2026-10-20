@@ -22,6 +22,19 @@ Start the default runtime in your supervision tree:
 children = [Aikido]
 ```
 
+If you need a separate named runtime, define its module yourself:
+
+```elixir
+defmodule MyApp.Aikido do
+  use Aikido, otp_app: :my_app
+end
+
+# In your supervision tree:
+children = [MyApp.Aikido]
+```
+
+Set `instance MyApp.Aikido` in the agent block for agents using that runtime.
+
 ## An agent and its public interface
 
 Define native Ash actions directly on an agent or on a mounted slice. Runtime

@@ -10,7 +10,11 @@ defmodule Aikido do
 
   ## Quick Start
 
-  Create a Aikido supervisor in your application:
+  Add the default runtime to your supervision tree:
+
+      children = [Aikido]
+
+  For a separate named runtime, define your own supervisor module:
 
       defmodule MyApp.Aikido do
         use Aikido, otp_app: :my_app
@@ -59,7 +63,10 @@ defmodule Aikido do
   """
 
   @doc """
-  Creates a Aikido supervisor module.
+  Sets up an optional named Aikido supervisor module.
+
+  The default runtime only needs `Aikido` in your supervision tree. Use this
+  macro when your application needs its own runtime module.
 
   ## Options
 
