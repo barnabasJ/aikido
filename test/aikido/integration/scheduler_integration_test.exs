@@ -121,7 +121,13 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       assert Process.alive?(pid)
 
       assert_receive {:time_zone_resolution_failed, ^job_pid}, 5000
-      assert :sys.get_state(job_pid).retrying?
+      job_state = :sys.get_state(job_pid)
+      assert job_state.retrying?
+
+      # A tick still dispatches its callback when rescheduling fails.
+      for {_ref, worker} <- job_state.callback_workers do
+        AikidoTest.LifecycleWait.await_down(worker)
+      end
 
       {:ok, %{heartbeat_pid: heartbeat_pid, baseline: baseline}} =
         Aikido.AgentServer.state(pid, fn s ->
