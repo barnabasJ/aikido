@@ -58,6 +58,24 @@ defmodule AikidoTest.SliceTest.SchemaAgent do
   end
 end
 
+defmodule AikidoTest.SliceTest.RequiredConfigSlice do
+  @moduledoc false
+  use Aikido.Slice
+
+  slice do
+    name "required_config"
+    otp_app :aikido
+
+    config_schema do
+      attribute :attempts, :integer, allow_nil?: false, constraints: [min: 1]
+      attribute :label, :string, default: {__MODULE__, :default_label, []}
+      attribute :optional, :string
+    end
+  end
+
+  def default_label, do: "worker"
+end
+
 defmodule AikidoTest.SliceTest do
   use ExUnit.Case, async: true
 
@@ -107,8 +125,75 @@ defmodule AikidoTest.SliceTest do
 
       assert Ash.Type.ash_type?(Aikido.Dsl.Slice.Info.schema(AikidoTest.SliceTest.FullSlice))
 
-      {resource, action} = Aikido.Dsl.Slice.Info.config_schema(AikidoTest.SliceTest.FullSlice)
-      assert Ash.Resource.Info.action(resource, action).type == :action
+      assert [%Ash.Resource.Attribute{name: :enabled}] =
+               Aikido.Dsl.Slice.Info.config_schema(AikidoTest.SliceTest.FullSlice)
+
+      refute Ash.Resource.Info.action(AikidoTest.SliceTest.FullSlice, :__aikido_config__)
+    end
+  end
+
+  describe "configuration casting" do
+    test "applies defaults without executing an action" do
+      assert {:ok, %{enabled: true}} =
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice)
+    end
+
+    test "casts supplied values and applies defaults to nil" do
+      assert {:ok, %{enabled: false}} =
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{
+                 "enabled" => "false"
+               })
+
+      assert {:ok, %{enabled: true}} =
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{enabled: nil})
+    end
+
+    test "rejects invalid typed values" do
+      assert {:error, _error} =
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{
+                 enabled: "not-a-boolean"
+               })
+    end
+
+    test "enforces required fields and Ash constraints" do
+      assert {:error, %Ash.Error.Changes.InvalidAttribute{field: :attempts}} =
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.RequiredConfigSlice)
+
+      assert {:error, %Ash.Error.Changes.InvalidAttribute{field: :attempts}} =
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.RequiredConfigSlice, %{
+                 attempts: 0
+               })
+
+      assert {:ok, %{attempts: 2, label: "worker", optional: nil}} =
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.RequiredConfigSlice, %{
+                 attempts: "2"
+               })
+    end
+
+    test "mount overrides take precedence over application configuration" do
+      resource = AikidoTest.SliceTest.RequiredConfigSlice
+      previous = Application.fetch_env(:aikido, resource)
+      Application.put_env(:aikido, resource, attempts: 3, label: "application")
+
+      on_exit(fn ->
+        case previous do
+          {:ok, value} -> Application.put_env(:aikido, resource, value)
+          :error -> Application.delete_env(:aikido, resource)
+        end
+      end)
+
+      assert {:ok, %{attempts: 3, label: "application"}} =
+               Aikido.Slice.Config.resolve_config(resource)
+
+      assert {:ok, %{attempts: 5, label: "application"}} =
+               Aikido.Slice.Config.resolve_config(resource, %{attempts: 5})
+    end
+
+    test "preserves unstructured configuration for a slice without a config schema" do
+      assert {:ok, %{custom: "value"}} =
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.MinimalSlice, %{
+                 custom: "value"
+               })
     end
   end
 

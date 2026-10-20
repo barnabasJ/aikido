@@ -4,7 +4,7 @@ defmodule Aikido.Dsl.Slice.Info do
   alias Spark.Dsl.Extension
 
   def schema(resource), do: resource
-  def config_schema(resource), do: Extension.get_opt(resource, [:slice], :config_schema)
+  def config_schema(resource), do: Extension.get_entities(resource, [:slice, :config_schema])
 
   def signal_routes(resource) do
     resource

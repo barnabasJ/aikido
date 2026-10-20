@@ -7,18 +7,11 @@ defmodule Aikido.Slice.Config do
   2. Application environment config (`Application.get_env(otp_app, slice_module)`)
   3. Default values from the slice's config_schema (lowest priority)
   """
-  use Ash.Resource.Actions.Implementation
-
-  # The private config action casts arguments and applies defaults before this
-  # callback returns the resolved values to the mount configuration resolver.
-  @doc false
-  @impl true
-  def run(input, _opts, _context), do: {:ok, input.arguments}
 
   @doc """
   Resolves configuration for a slice module by merging app env with overrides.
   """
-  @spec resolve_config(module(), map()) :: {:ok, map()} | {:error, list()}
+  @spec resolve_config(module(), map()) :: {:ok, map()} | {:error, term()}
   def resolve_config(slice_module, overrides \\ %{}) do
     base_config = get_app_env_config(slice_module)
     merged_config = Map.merge(base_config, overrides)
@@ -59,20 +52,34 @@ defmodule Aikido.Slice.Config do
   defp normalize_to_map(_), do: %{}
 
   defp validate_config(slice_module, config) do
-    config_schema = Aikido.Dsl.Slice.Info.config_schema(slice_module)
+    case Aikido.Dsl.Slice.Info.config_schema(slice_module) do
+      [] ->
+        {:ok, config}
 
-    if config_schema do
-      {resource, action} = config_schema
+      fields ->
+        values =
+          Map.new(fields, fn field ->
+            value = Map.get(config, field.name, Map.get(config, to_string(field.name)))
+            {field.name, if(is_nil(value), do: default(field.default), else: value)}
+          end)
 
-      case resource |> Ash.ActionInput.for_action(action, config) |> Ash.run_action() do
-        {:ok, values} ->
+        constraints =
+          Enum.map(fields, fn field ->
+            {field.name, Map.to_list(Map.take(field, [:type, :constraints, :allow_nil?]))}
+          end)
+
+        with {:ok, constraints} <- Ash.Type.init(:map, fields: constraints),
+             {:ok, values} <- Ash.Type.cast_input(:map, values, constraints),
+             {:ok, values} <- Ash.Type.apply_constraints(:map, values, constraints) do
           {:ok, values}
-
-        {:error, errors} ->
-          {:error, errors}
-      end
-    else
-      {:ok, config}
+        else
+          {:error, errors} ->
+            Ash.Type.CompositeTypeHelpers.convert_errors_to_invalid_attributes(errors)
+        end
     end
   end
+
+  defp default(fun) when is_function(fun, 0), do: fun.()
+  defp default({module, function, args}), do: apply(module, function, args)
+  defp default(value), do: value
 end

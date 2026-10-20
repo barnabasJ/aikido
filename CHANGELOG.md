@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Cast slice configuration directly with Ash's constrained map type after
+  resolving defaults and overrides. Read config declarations from Spark entities;
+  remove the generated config action and its passthrough implementation.
+
 - Forward native Ash resource options through `use Aikido.Agent` and
   `use Aikido.Slice`, preserving caller domains, authorizers and extensions.
   Keep ordinary domain-inclusion validation enabled, remove redundant overrides

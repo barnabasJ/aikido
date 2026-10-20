@@ -373,10 +373,12 @@ callbacks with `Ash.Resource.Actions.Implementation` modules and reference them
 with `run MyApp.Implementation` on the owning resource.
 
 Agent and slice `schema do` declarations become attributes on their existing
-Ash resources. Slice configuration is cast
-through a private native generic action on the same resource, including argument
-defaults and constraints. No generated schema modules are needed. Native
-Ash constructors and changesets handle defaults, casting, and validation;
+Ash resources. Slice configuration declarations remain Spark entities. Resolution
+merges application configuration and mount overrides, applies declared defaults,
+and casts a constrained map directly with `Ash.Type`. Only declared fields are
+returned when a config schema exists; no config action or schema module is
+generated. Native Ash constructors and changesets handle state defaults, casting,
+and validation;
 Ash/Splode errors retain their field paths and nested causes.
 
 AI tool callbacks receive the process-backed resource in trusted
