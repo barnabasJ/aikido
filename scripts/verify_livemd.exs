@@ -19,7 +19,11 @@ defmodule LivemdVerifier do
     initial_env = %{__ENV__ | module: nil, function: nil}
 
     Enum.reduce(cells, {[], initial_env}, fn {idx, code}, {binding, env} ->
-      IO.puts("\n=== cell #{idx} ===")
+      IO.write("""
+
+      === cell #{idx} ===
+      """)
+
       IO.puts(snippet(code))
 
       cond do
@@ -34,14 +38,21 @@ defmodule LivemdVerifier do
             {new_binding, new_env}
           rescue
             e ->
-              IO.puts(:stderr, "\n!! cell #{idx} raised:")
+              IO.write(:stderr, """
+
+              !! cell #{idx} raised:
+              """)
+
               IO.puts(:stderr, Exception.format(:error, e, __STACKTRACE__))
               System.halt(1)
           end
       end
     end)
 
-    IO.puts("\nOK — all cells evaluated without raising")
+    IO.write("""
+
+    OK — all cells evaluated without raising
+    """)
   end
 
   defp extract_cells(content) do
@@ -77,7 +88,10 @@ defmodule LivemdVerifier do
     |> String.split("\n")
     |> Enum.take(3)
     |> Enum.join("\n")
-    |> Kernel.<>("\n... (#{length(String.split(code, "\n"))} lines)")
+    |> Kernel.<>("""
+
+    ... (#{length(String.split(code, "\n"))} lines)\
+    """)
   end
 end
 

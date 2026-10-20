@@ -80,10 +80,13 @@ defmodule Aikido.AI.Handoff do
           context =
             Context.append(
               context,
-              Context.user(
-                "You are taking over mid-run. Your predecessor left this handoff:\n\n" <>
-                  document <> "\n\nContinue from the next action."
-              )
+              Context.user("""
+              You are taking over mid-run. Your predecessor left this handoff:
+
+              #{document}
+
+              Continue from the next action.\
+              """)
             )
 
           context =

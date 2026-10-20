@@ -11,7 +11,11 @@ settings =
     else: [warmup: 2, time: 5, memory_time: 1, reduction_time: 1]
 
 for suite <- if(selected == [], do: Enum.sort(Map.keys(suites)), else: Enum.uniq(selected)) do
-  IO.puts("\nAikido benchmark: #{suite}")
+  IO.write("""
+
+  Aikido benchmark: #{suite}
+  """)
+
   Code.require_file(Path.join(__DIR__, "#{suite}.exs"))
   module = Map.fetch!(suites, suite)
   module.run(settings)

@@ -380,6 +380,9 @@ defmodule Aikido.HooksTest do
       |> hd()
       |> Map.fetch!(:text)
 
-    assert text == "[Hook context: observer]\nlater evidence"
+    assert text == """
+           [Hook context: observer]
+           later evidence\
+           """
   end
 end

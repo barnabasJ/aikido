@@ -420,9 +420,16 @@ defmodule AikidoTest.AshTest do
     output =
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
         assert_raise CompileError, fn ->
-          Code.compile_string(
-            "defmodule AikidoTest.MissingSignalTarget do\n  use Ash.Resource, extensions: [Aikido.Ash.Agent]\n\n  agent do\n    name \"unrouted\"\n    signal :missing, \"missing.route\"\n  end\nend\n"
-          )
+          Code.compile_string("""
+          defmodule AikidoTest.MissingSignalTarget do
+            use Ash.Resource, extensions: [Aikido.Ash.Agent]
+
+            agent do
+              name "unrouted"
+              signal :missing, "missing.route"
+            end
+          end
+          """)
         end
       end)
 

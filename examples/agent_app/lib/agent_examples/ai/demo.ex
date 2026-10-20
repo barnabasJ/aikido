@@ -25,7 +25,12 @@ defmodule AgentExamples.AI.Demo do
       ),
       fn team ->
         {:ok, answer} = AI.ask(team, "orchestrate: Signals carry results")
-        IO.puts("Orchestrator:\n#{answer}")
+
+        IO.write("""
+        Orchestrator:
+        #{answer}
+        """)
+
         team = Aikido.Ash.inspect!(AgentExamples.ResearchTeam, team.id)
         IO.inspect(Map.keys(team.team.members), label: "Fixed and dynamic workers")
         IO.inspect(team.team.topology.nodes["analyst-helper"].owner, label: "Helper's owner")

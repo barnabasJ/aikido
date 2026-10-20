@@ -152,7 +152,10 @@ defmodule Aikido.Hooks do
       Enum.reduce(Map.get(state, :hook_context, []), state, fn entry, state ->
         Aikido.AI.Context.append_message(
           state,
-          ReqLLM.Context.user("[Hook context: #{entry.name}]\n#{entry.text}")
+          ReqLLM.Context.user("""
+          [Hook context: #{entry.name}]
+          #{entry.text}\
+          """)
         )
       end)
 

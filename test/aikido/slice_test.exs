@@ -64,9 +64,14 @@ defmodule AikidoTest.SliceTest do
   describe("compile-time validation") do
     test "raises CompileError when name is missing" do
       assert_raise Spark.Error.DslError, ~r/required :name option/, fn ->
-        Code.compile_string(
-          "defmodule AikidoTest.SliceTest.NoName do\n  use Aikido.Slice\n\n  slice do\n  end\nend\n"
-        )
+        Code.compile_string("""
+        defmodule AikidoTest.SliceTest.NoName do
+          use Aikido.Slice
+
+          slice do
+          end
+        end
+        """)
       end
     end
   end
