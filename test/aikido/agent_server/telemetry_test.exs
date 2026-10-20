@@ -75,8 +75,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
         [:aikido, :agent_server, :signal, :exception],
         [:aikido, :agent_server, :directive, :start],
         [:aikido, :agent_server, :directive, :stop],
-        [:aikido, :agent_server, :directive, :exception],
-        [:aikido, :agent_server, :queue, :overflow]
+        [:aikido, :agent_server, :directive, :exception]
       ],
       fn event, measurements, metadata, _config ->
         send(test_pid, {:telemetry_event, event, measurements, metadata})

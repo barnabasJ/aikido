@@ -10,10 +10,6 @@ end
 defmodule AikidoTest.AgentServer.LifecycleSignalsTest do
   use AikidoTest.Case, async: false
 
-  setup ctx do
-    {:ok, ctx}
-  end
-
   describe("await_ready/2") do
     test("returns :ok after the agent emits aikido.agent.lifecycle.ready", %{aikido: aikido}) do
       {:ok, pid} =
