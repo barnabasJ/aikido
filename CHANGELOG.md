@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Split Identity, Memory, Thread and Todo callbacks into dedicated native action
+  implementations while preserving their owning resource contracts.
+
 - Give each team lifecycle, member and task action a dedicated implementation;
   remove the signal-type dispatcher and retain shared pure operation mechanics.
 

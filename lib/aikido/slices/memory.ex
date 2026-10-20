@@ -15,18 +15,18 @@ defmodule Aikido.Slices.Memory do
   `Aikido.Slices.Memory`:
 
       # ensure / put / update / delete
-      route Aikido.Slices.Memory.Signals.Ensure, Aikido.Slices.Memory.Implementation
-      route Aikido.Slices.Memory.Signals.PutSpace, Aikido.Slices.Memory.Implementation
-      route Aikido.Slices.Memory.Signals.UpdateSpace, Aikido.Slices.Memory.Implementation
-      route Aikido.Slices.Memory.Signals.EnsureSpace, Aikido.Slices.Memory.Implementation
-      route Aikido.Slices.Memory.Signals.DeleteSpace, Aikido.Slices.Memory.Implementation
+      route Aikido.Slices.Memory.Signals.Ensure, Aikido.Slices.Memory.Actions.Ensure
+      route Aikido.Slices.Memory.Signals.PutSpace, Aikido.Slices.Memory.Actions.PutSpace
+      route Aikido.Slices.Memory.Signals.UpdateSpace, Aikido.Slices.Memory.Actions.UpdateSpace
+      route Aikido.Slices.Memory.Signals.EnsureSpace, Aikido.Slices.Memory.Actions.EnsureSpace
+      route Aikido.Slices.Memory.Signals.DeleteSpace, Aikido.Slices.Memory.Actions.DeleteSpace
 
       # map space ops
-      route Aikido.Slices.Memory.Signals.PutInSpace, Aikido.Slices.Memory.Implementation
-      route Aikido.Slices.Memory.Signals.DeleteFromSpace, Aikido.Slices.Memory.Implementation
+      route Aikido.Slices.Memory.Signals.PutInSpace, Aikido.Slices.Memory.Actions.PutInSpace
+      route Aikido.Slices.Memory.Signals.DeleteFromSpace, Aikido.Slices.Memory.Actions.DeleteFromSpace
 
       # list space ops
-      route Aikido.Slices.Memory.Signals.AppendToSpace, Aikido.Slices.Memory.Implementation
+      route Aikido.Slices.Memory.Signals.AppendToSpace, Aikido.Slices.Memory.Actions.AppendToSpace
 
   Mount with `slice :memory, Aikido.Slices.Memory` inside an agent resource.
 
@@ -95,14 +95,17 @@ defmodule Aikido.Slices.Memory do
       end
     end
 
-    route Aikido.Slices.Memory.Signals.Ensure, Aikido.Slices.Memory.Implementation
-    route Aikido.Slices.Memory.Signals.PutSpace, Aikido.Slices.Memory.Implementation
-    route Aikido.Slices.Memory.Signals.UpdateSpace, Aikido.Slices.Memory.Implementation
-    route Aikido.Slices.Memory.Signals.EnsureSpace, Aikido.Slices.Memory.Implementation
-    route Aikido.Slices.Memory.Signals.DeleteSpace, Aikido.Slices.Memory.Implementation
-    route Aikido.Slices.Memory.Signals.PutInSpace, Aikido.Slices.Memory.Implementation
-    route Aikido.Slices.Memory.Signals.DeleteFromSpace, Aikido.Slices.Memory.Implementation
-    route Aikido.Slices.Memory.Signals.AppendToSpace, Aikido.Slices.Memory.Implementation
+    route Aikido.Slices.Memory.Signals.Ensure, Aikido.Slices.Memory.Actions.Ensure
+    route Aikido.Slices.Memory.Signals.PutSpace, Aikido.Slices.Memory.Actions.PutSpace
+    route Aikido.Slices.Memory.Signals.UpdateSpace, Aikido.Slices.Memory.Actions.UpdateSpace
+    route Aikido.Slices.Memory.Signals.EnsureSpace, Aikido.Slices.Memory.Actions.EnsureSpace
+    route Aikido.Slices.Memory.Signals.DeleteSpace, Aikido.Slices.Memory.Actions.DeleteSpace
+    route Aikido.Slices.Memory.Signals.PutInSpace, Aikido.Slices.Memory.Actions.PutInSpace
+
+    route Aikido.Slices.Memory.Signals.DeleteFromSpace,
+          Aikido.Slices.Memory.Actions.DeleteFromSpace
+
+    route Aikido.Slices.Memory.Signals.AppendToSpace, Aikido.Slices.Memory.Actions.AppendToSpace
   end
 
   alias Aikido.Slices.Memory.Space

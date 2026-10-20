@@ -11,9 +11,9 @@ defmodule Aikido.Slices.Thread do
 
   ## Routes
 
-      route Aikido.Slices.Thread.Signals.Ensure, Aikido.Slices.Thread.Implementation
-      route Aikido.Slices.Thread.Signals.Append, Aikido.Slices.Thread.Implementation
-      route Aikido.Slices.Thread.Signals.Clear, Aikido.Slices.Thread.Implementation
+      route Aikido.Slices.Thread.Signals.Ensure, Aikido.Slices.Thread.Actions.Ensure
+      route Aikido.Slices.Thread.Signals.Append, Aikido.Slices.Thread.Actions.Append
+      route Aikido.Slices.Thread.Signals.Clear, Aikido.Slices.Thread.Actions.Clear
 
   ## Persistence
 
@@ -84,9 +84,9 @@ defmodule Aikido.Slices.Thread do
       end
     end
 
-    route Aikido.Slices.Thread.Signals.Ensure, Aikido.Slices.Thread.Implementation
-    route Aikido.Slices.Thread.Signals.Append, Aikido.Slices.Thread.Implementation
-    route Aikido.Slices.Thread.Signals.Clear, Aikido.Slices.Thread.Implementation
+    route Aikido.Slices.Thread.Signals.Ensure, Aikido.Slices.Thread.Actions.Ensure
+    route Aikido.Slices.Thread.Signals.Append, Aikido.Slices.Thread.Actions.Append
+    route Aikido.Slices.Thread.Signals.Clear, Aikido.Slices.Thread.Actions.Clear
   end
 
   alias Aikido.Slices.Thread.Entry
