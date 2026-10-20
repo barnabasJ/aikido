@@ -32,19 +32,28 @@ defmodule Aikido.Ash.Team do
       initial_state: %{},
       activation: :eager,
       depends_on: [],
+      __identifier__: nil,
       __spark_metadata__: nil
     ]
   end
 
   defmodule Worker do
     @moduledoc false
-    defstruct [:name, :resource, max_members: 8, initial_state: %{}, __spark_metadata__: nil]
+    defstruct [
+      :name,
+      :resource,
+      max_members: 8,
+      initial_state: %{},
+      __identifier__: nil,
+      __spark_metadata__: nil
+    ]
   end
 
   @member %Spark.Dsl.Entity{
     name: :member,
     target: Member,
     args: [:name, :resource],
+    identifier: :name,
     schema: [
       name: [type: :atom, required: true],
       resource: [type: :module, required: true],
@@ -58,6 +67,7 @@ defmodule Aikido.Ash.Team do
     name: :worker,
     target: Worker,
     args: [:name, :resource],
+    identifier: :name,
     schema: [
       name: [type: :atom, required: true],
       resource: [type: :module, required: true],

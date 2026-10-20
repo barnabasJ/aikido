@@ -66,6 +66,18 @@ defmodule Aikido.DirectiveTest do
     assert_received {:notified, 2}
   end
 
+  test "raw directive fields are validated before effects can execute" do
+    invalid = %Notify{recipient: self(), count: 0}
+    assert {:error, _} = Aikido.ActionResult.new(state: %{}, directives: [invalid])
+    refute_received {:notified, _}
+
+    assert {:error, _} =
+             Aikido.ActionResult.new(
+               state: %{},
+               directives: [%Aikido.Directives.Schedule{delay_ms: -1, message: :tick}]
+             )
+  end
+
   test "ordinary typed structs and arbitrary values are rejected" do
     for value <- [OtherStruct.new!(count: 1), %{}, :unknown, nil] do
       assert {:error, _} = Aikido.Types.Directive.cast_input(value, [])

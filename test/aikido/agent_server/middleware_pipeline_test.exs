@@ -20,27 +20,9 @@ defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction.Implementa
   end
 end
 
-defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :inspect, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction.Implementation,
-           action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.MiddlewareAgent do
   @moduledoc false
-  use Aikido.Agent,
-    middleware: [
-      {AikidoTest.AgentServer.MiddlewarePipelineTest.TaggingMiddleware, %{tag: :outer}},
-      {AikidoTest.AgentServer.MiddlewarePipelineTest.TaggingMiddleware, %{tag: :inner}}
-    ]
+  use Aikido.Agent
 
   agent do
     name "middleware_pipeline_agent"
@@ -49,10 +31,23 @@ defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.MiddlewareAgent do
     schema do
       attribute :last_tags, {:array, :term}, default: []
     end
+
+    route "inspect",
+          {AikidoTest.AgentServer.MiddlewarePipelineTest.MiddlewareAgent, :reduce_inspect}
+
+    middleware [
+      {AikidoTest.AgentServer.MiddlewarePipelineTest.TaggingMiddleware, %{tag: :outer}},
+      {AikidoTest.AgentServer.MiddlewarePipelineTest.TaggingMiddleware, %{tag: :inner}}
+    ]
   end
 
-  signal_routes do
-    route "inspect", AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction
+  actions do
+    action :reduce_inspect, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction.Implementation,
+           action: :run}
+    end
   end
 end
 

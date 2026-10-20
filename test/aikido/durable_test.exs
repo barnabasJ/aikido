@@ -1,3 +1,12 @@
+defmodule AikidoTest.DurableTest.ThreadAgent do
+  use Aikido.Agent
+
+  agent do
+    name "durable_thread"
+    slice :thread, Aikido.Slices.Thread
+  end
+end
+
 defmodule AikidoTest.DurableTest.CodecSlice do
   use Aikido.Slice
 
@@ -29,9 +38,7 @@ defmodule AikidoTest.DurableTest.CodecAgent do
       attribute :value, :integer, default: 5
       attribute :credential, :string
     end
-  end
 
-  slices do
     slice :codec, AikidoTest.DurableTest.CodecSlice
   end
 
@@ -87,8 +94,6 @@ defmodule AikidoTest.DurableTest do
     assert length(Enum.uniq(pids)) == 1
     assert %DurableServer{} = :sys.get_state(hd(pids))
     assert Aikido.Durable.lookup(pool, "shared") == {:ok, hd(pids)}
-    assert Aikido.Durable.stats(pool) == %{count: 1, keys: ["shared"]}
-    assert Aikido.Durable.agent_module(pool) == {:ok, AikidoTest.TestAgents.Counter}
   end
 
   test("partitioned identities are independent", %{pool: pool}) do
@@ -156,7 +161,10 @@ defmodule AikidoTest.DurableTest do
   end
 
   test "thread history survives durable stop and activation", %{pool: pool} do
-    {:ok, first} = Aikido.Durable.ensure_started(pool, "thread-history")
+    {:ok, first} =
+      Aikido.Durable.ensure_started(pool, "thread-history",
+        agent: AikidoTest.DurableTest.ThreadAgent
+      )
 
     {:ok, thread} =
       Aikido.AgentServer.call(
@@ -169,7 +177,12 @@ defmodule AikidoTest.DurableTest do
 
     assert length(thread.entries) == 1
     assert :ok = Aikido.Durable.stop(pool, "thread-history")
-    {:ok, second} = Aikido.Durable.ensure_started(pool, "thread-history")
+
+    {:ok, second} =
+      Aikido.Durable.ensure_started(pool, "thread-history",
+        agent: AikidoTest.DurableTest.ThreadAgent
+      )
+
     assert {:ok, ^thread} = Aikido.AgentServer.state(second, &{:ok, &1.agent.state.thread})
 
     assert {:ok, %{entries: entries, rev: 2}} =
@@ -199,6 +212,7 @@ defmodule AikidoTest.DurableTest do
     refute Process.alive?(old_job)
 
     :ok = SchedulerIntegrationHarness.cancel_cron(second, :annual)
+
     AikidoTest.AgentWait.await_state_value(second, fn state ->
       !Map.has_key?(state.cron_specs, :annual)
     end)
@@ -206,6 +220,7 @@ defmodule AikidoTest.DurableTest do
     :ok = Aikido.Durable.stop(pool, "scheduled")
     {:ok, third} = Aikido.Durable.ensure_started(pool, "scheduled", opts)
     assert :ok = Aikido.AgentServer.await_ready(third)
+
     assert {:ok, {%{}, %{}}} =
              Aikido.AgentServer.state(third, &{:ok, {&1.cron_jobs, &1.cron_specs}})
   end
@@ -289,7 +304,6 @@ defmodule AikidoTest.DurableTest do
        ]}
     )
 
-    nil
     team = snapshot_result(AikidoTest.AshFixtures.Domain.dynamic_start!(%{id: "durable-team"}))
 
     team =

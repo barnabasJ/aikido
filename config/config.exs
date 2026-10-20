@@ -4,16 +4,14 @@ config :ash, default_string_length_count: :codepoints
 
 config :spark, :formatter,
   remove_parens?: true,
-  "Aikido.Agent": [type: Ash.Resource, extensions: [Aikido.Dsl.Agent]],
-  "Aikido.Slice": [type: Ash.Resource, extensions: [Aikido.Dsl.Slice]],
+  "Aikido.Agent": [type: Ash.Resource, extensions: [Aikido.Ash.Agent]],
+  "Aikido.Slice": [type: Ash.Resource, extensions: [Aikido.Ash.Slice]],
   "Ash.Resource": [
     extensions: [Aikido.Ash.Agent, Aikido.Ash.Slice, Aikido.Ash.Team, Aikido.Ash.AI]
   ],
   "Ash.Domain": [extensions: [Aikido.Ash.Domain]],
   "Aikido.Directive": [],
   "Ash.TypedStruct": []
-
-config :aikido, default: Aikido.DefaultInstance
 
 # Default scheduler time zone database
 config :aikido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase

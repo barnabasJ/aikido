@@ -39,7 +39,7 @@ defmodule Aikido.Ash.Slice do
     args: [:type, :action],
     schema: [
       type: [type: :string, required: true],
-      action: [type: :atom, required: true],
+      action: [type: :any, required: true],
       priority: [type: :integer, default: 0],
       match: [type: {:fun, 1}]
     ]
@@ -50,7 +50,11 @@ defmodule Aikido.Ash.Slice do
       Aikido.Dsl.Schema.attribute_section(),
       Aikido.Dsl.Schema.attribute_section(:config_schema)
     ],
-    schema: Enum.find(Aikido.Dsl.Slice.sections(), &(&1.name == :slice)).schema,
+    schema: [
+      name: [type: :string, required: true],
+      description: [type: :string],
+      otp_app: [type: :atom]
+    ],
     entities: [@route]
   }
   @schedule %Spark.Dsl.Entity{
@@ -59,7 +63,7 @@ defmodule Aikido.Ash.Slice do
     args: [:cron, :action],
     schema: [
       cron: [type: :string, required: true],
-      action: [type: :atom, required: true],
+      action: [type: :any, required: true],
       data: [type: :map, default: %{}],
       tz: [type: :string],
       signal: [type: :string]

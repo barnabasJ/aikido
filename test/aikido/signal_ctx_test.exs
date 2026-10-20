@@ -81,34 +81,38 @@ defmodule AikidoTest.SignalCtxTest do
   end
 
   describe("context delivery into native actions") do
-    (
-      nil
-      nil
-    )
-
     test "native action receives the signal context" do
       {:ok, sig} = Jido.Signal.new("trace_probe", %{}, source: "/test")
 
       sig =
         sig |> Aikido.SignalCtx.put(:trace_id, "abc-123") |> Aikido.SignalCtx.put(:user, "alice")
 
-      assert {:ok, %{trace_id: "abc-123", user: "alice"}, []} =
-               AikidoTest.NativeAction.run(
-                 AikidoTest.SignalCtxTest.TraceProbe,
-                 sig,
-                 %{},
-                 Aikido.SignalCtx.ctx(sig)
-               )
+      assert {:ok,
+              %Aikido.ActionResult{state: %{trace_id: "abc-123", user: "alice"}, directives: []}} =
+               then(sig, fn signal ->
+                 AikidoTest.SignalCtxTest.TraceProbe
+                 |> Ash.ActionInput.for_action(
+                   :trace_probe,
+                   Map.put(signal.data || %{}, :state, %{}),
+                   context: %{aikido: Map.put(Aikido.SignalCtx.ctx(sig), :signal, signal)},
+                   skip_unknown_inputs: [:*]
+                 )
+                 |> Ash.run_action()
+               end)
     end
 
     test "without an explicit signal, ctx defaults to %{}" do
-      assert {:ok, %{trace_id: nil, user: nil}, []} =
-               AikidoTest.NativeAction.run(
-                 AikidoTest.SignalCtxTest.TraceProbe,
-                 struct!(Jido.Signal, id: nil, type: "test", source: "/test"),
-                 %{},
-                 %{}
-               )
+      assert {:ok, %Aikido.ActionResult{state: %{trace_id: nil, user: nil}, directives: []}} =
+               then(struct!(Jido.Signal, id: nil, type: "test", source: "/test"), fn signal ->
+                 AikidoTest.SignalCtxTest.TraceProbe
+                 |> Ash.ActionInput.for_action(
+                   :trace_probe,
+                   Map.put(signal.data || %{}, :state, %{}),
+                   context: %{aikido: Map.put(%{}, :signal, signal)},
+                   skip_unknown_inputs: [:*]
+                 )
+                 |> Ash.run_action()
+               end)
     end
   end
 end

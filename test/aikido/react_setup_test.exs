@@ -1,11 +1,8 @@
 defmodule Aikido.ReactSetupTest.Agent do
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "react_setup"
-  end
-
-  slices do
     slice :ai, Aikido.Slices.AiReact
   end
 end

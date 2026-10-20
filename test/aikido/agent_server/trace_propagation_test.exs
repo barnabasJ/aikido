@@ -10,18 +10,6 @@ defmodule AikidoTest.AgentServer.TracePropagationTest.EmitAction.Implementation 
   end
 end
 
-defmodule AikidoTest.AgentServer.TracePropagationTest.EmitAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :emit, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServer.TracePropagationTest.EmitAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServer.TracePropagationTest.TracedAgent do
   @moduledoc false
   use Aikido.Agent
@@ -34,11 +22,16 @@ defmodule AikidoTest.AgentServer.TracePropagationTest.TracedAgent do
       attribute :counter, :integer, default: 0
       attribute :received_signals, {:array, :term}, default: []
     end
+
+    route "increment", {AikidoTest.TestActions, :increment}
+    route "emit", {AikidoTest.AgentServer.TracePropagationTest.TracedAgent, :emit}
   end
 
-  signal_routes do
-    route "increment", AikidoTest.TestActions.IncrementAction
-    route "emit", AikidoTest.AgentServer.TracePropagationTest.EmitAction
+  actions do
+    action :emit, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.AgentServer.TracePropagationTest.EmitAction.Implementation, action: :run}
+    end
   end
 end
 

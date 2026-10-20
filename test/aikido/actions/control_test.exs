@@ -9,25 +9,29 @@ defmodule AikidoTest.Actions.ControlTest do
 
   describe("Cancel") do
     test "sets status to failed with cancelled error" do
-      {:ok, result, []} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :cancel},
-          sig("cancel", %{reason: :cancelled}),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: []}} =
+        then(sig("cancel", %{reason: :cancelled}), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:cancel, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{status: :failed, error: {:cancelled, :cancelled}}
     end
 
     test "includes custom cancellation reason" do
-      {:ok, result, []} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :cancel},
-          sig("cancel", %{reason: :user_requested}),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: []}} =
+        then(sig("cancel", %{reason: :user_requested}), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:cancel, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{status: :failed, error: {:cancelled, :user_requested}}
     end
@@ -35,13 +39,15 @@ defmodule AikidoTest.Actions.ControlTest do
 
   describe("Noop") do
     test "returns empty state change" do
-      {:ok, result, []} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :noop},
-          sig("noop"),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: []}} =
+        then(sig("noop"), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:noop, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{}
     end
@@ -52,13 +58,15 @@ defmodule AikidoTest.Actions.ControlTest do
       target = self()
       data = %{target_pid: target, signal_type: nil, payload: nil, source: nil}
 
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :forward},
-          sig("forward", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("forward", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:forward, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{forwarded_to: target}
       assert %Directives.Emit{} = directive
@@ -70,13 +78,15 @@ defmodule AikidoTest.Actions.ControlTest do
       target = self()
       data = %{target_pid: target, signal_type: "custom.signal", payload: nil, source: nil}
 
-      {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :forward},
-          sig("forward", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+        then(sig("forward", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:forward, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert directive.signal.type == "custom.signal"
     end
@@ -85,13 +95,15 @@ defmodule AikidoTest.Actions.ControlTest do
       target = self()
       data = %{target_pid: target, signal_type: "test", payload: %{key: "value"}, source: nil}
 
-      {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :forward},
-          sig("forward", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+        then(sig("forward", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:forward, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert directive.signal.data == %{key: "value"}
     end
@@ -106,13 +118,15 @@ defmodule AikidoTest.Actions.ControlTest do
         source: "/broadcast"
       }
 
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :broadcast},
-          sig("broadcast", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("broadcast", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:broadcast, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{broadcast_to: "workers"}
       assert %Directives.Emit{} = directive
@@ -132,13 +146,15 @@ defmodule AikidoTest.Actions.ControlTest do
           data: %{signal_type: "response", payload: %{answer: 42}, reply_to: reply_pid}
         })
 
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :reply},
-          input,
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(input, fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:reply, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{replied_to: reply_pid}
       assert %Directives.Emit{} = directive
@@ -154,13 +170,15 @@ defmodule AikidoTest.Actions.ControlTest do
           data: %{signal_type: "response", payload: %{}}
         })
 
-      {:ok, result, []} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :reply},
-          input,
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: []}} =
+        then(input, fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:reply, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{replied_to: nil, warning: "No reply_to found in signal"}
     end
@@ -173,13 +191,15 @@ defmodule AikidoTest.Actions.ControlTest do
           data: %{signal_type: "response", payload: %{}}
         })
 
-      {:ok, result, []} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :reply},
-          input,
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: []}} =
+        then(input, fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:reply, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{replied_to: nil, warning: "No reply_to found in signal"}
     end

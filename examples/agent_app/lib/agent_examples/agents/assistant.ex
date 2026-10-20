@@ -1,5 +1,5 @@
 defmodule AgentExamples.Assistant do
-  @moduledoc "A standalone assistant with the same create/ask/cancel interface as a team."
+  @moduledoc "A standalone assistant with the same start/ask/cancel interface as a team."
   use Ash.Resource,
     domain: AgentExamples.Agents,
     extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]

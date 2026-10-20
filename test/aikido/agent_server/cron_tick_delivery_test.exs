@@ -17,27 +17,12 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction.Implementa
   end
 end
 
-defmodule AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :tick_count, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction.Implementation,
-           action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    params =
-      Map.merge(input.context.aikido.signal.data || %{}, Map.delete(input.arguments, :state))
+    params = Map.delete(input.arguments, :state)
 
     slice = input.arguments.state
     cron_expr = Map.get(params, :cron)
@@ -48,20 +33,6 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction.Impleme
 
     directive = Aikido.Directives.cron(cron_expr, tick_signal, job_id: job_id)
     Aikido.ActionResult.new(state: slice, directives: [directive])
-  end
-end
-
-defmodule AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :register_cron, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction.Implementation,
-           action: :run}
-    end
   end
 end
 
@@ -76,11 +47,29 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent do
     schema do
       attribute :tick_count, :integer, default: 0
     end
+
+    route "register_cron",
+          {AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent, :register_cron}
+
+    route "cron.tick", {AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent, :tick_count}
   end
 
-  signal_routes do
-    route "register_cron", AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction
-    route "cron.tick", AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction
+  actions do
+    action :tick_count, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction.Implementation,
+           action: :run}
+    end
+
+    action :register_cron, Aikido.ActionResult do
+      argument :state, :term
+      argument :cron, :string, allow_nil?: false
+      argument :job_id, :term
+
+      run {AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction.Implementation,
+           action: :run}
+    end
   end
 end
 

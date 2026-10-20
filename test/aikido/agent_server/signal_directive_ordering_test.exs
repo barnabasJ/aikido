@@ -14,20 +14,6 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Impleme
   end
 end
 
-defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :step1, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Implementation,
-           action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
@@ -36,20 +22,6 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyActio
     slice = input.arguments.state
     slice = slice || %{}
     Aikido.ActionResult.new(state: Map.put(slice, :step1_followup_ran, true), directives: [])
-  end
-end
-
-defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :set_followup_key, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction.Implementation,
-           action: :run}
-    end
   end
 end
 
@@ -69,20 +41,6 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Impleme
   end
 end
 
-defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :step2, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Implementation,
-           action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent do
   @moduledoc false
   use Aikido.Agent
@@ -96,15 +54,36 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent do
       attribute :step1_followup_ran, :boolean, default: false
       attribute :step2_saw_action_ran, :boolean, default: false
     end
-  end
 
-  signal_routes do
-    route "step1", AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action
+    route "step1", {AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent, :step1}
 
     route "step1.followup",
-          AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction
+          {AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent, :set_followup_key}
 
-    route "step2", AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action
+    route "step2", {AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent, :step2}
+  end
+
+  actions do
+    action :step1, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Implementation,
+           action: :run}
+    end
+
+    action :set_followup_key, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction.Implementation,
+           action: :run}
+    end
+
+    action :step2, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Implementation,
+           action: :run}
+    end
   end
 end
 

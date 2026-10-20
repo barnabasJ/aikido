@@ -1,72 +1,14 @@
 defmodule Aikido.Slice do
-  @moduledoc """
-  A Slice is a declarative bundle of agent-state schema, actions, signal
-  routes and schedules.
+  @moduledoc "A convenience host for an embedded Ash resource using `Aikido.Ash.Slice`."
 
-  The mounting agent assigns its key in `agent.state`. Native Ash actions
-  receive the slice in `input.arguments.state` and return `Aikido.ActionResult`.
-  `use Aikido.Slice` creates an embedded Ash resource host; schema declarations
-  become attributes on that resource.
+  defmacro __using__(opts) do
+    Keyword.validate!(opts, [])
 
-  Cross-cutting behaviour (auditing, persistence, retries, transformation)
-  belongs in `Aikido.Middleware`, not here. The Slice / Middleware split is the
-  hard line between "what an agent does" (slices + actions) and "what
-  happens around each signal" (middleware).
-
-  ## Example
-
-      defmodule MyApp.ChatSlice do
-        use Aikido.Slice
-
-        slice do
-          name "chat"
-          schema do
-            attribute :messages, {:array, :term}, default: []
-          end
-        end
-
-        signal_routes do
-          route "chat.send", {__MODULE__, :send_message}
-        end
-
-        actions do
-          action :send_message, Aikido.ActionResult do
-            argument :state, :term
-            argument :message, :string, allow_nil?: false
-            run MyApp.Chat.SendMessage
-          end
-        end
-      end
-
-  ## Sections
-
-  - `slice do … end` — slice identity (`name`, `description`,
-    `otp_app`, `schema`, `config_schema`).
-  - `signal_routes do … end` — `route "type", {Resource, :action}, opts` entries.
-  - `schedules do … end` — `schedule "cron", {Resource, :action}, data: %{...}` entries.
-
-  Declare reducers in the native `actions do … end` section. Implement them
-  with `Ash.Resource.Actions.Implementation` and return directives for I/O.
-  """
-
-  defmacro __using__(_opts) do
     quote do
       use Ash.Resource,
         data_layer: :embedded,
         validate_domain_inclusion?: false,
-        extensions: [Aikido.Dsl.Slice]
-    end
-  end
-
-  @doc false
-  @spec validate_slice_name(String.t(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
-  def validate_slice_name(name, _opts \\ []) do
-    case Aikido.Util.validate_name(name, []) do
-      {:error, %{message: message}} when is_binary(message) ->
-        {:error, message}
-
-      _ ->
-        {:ok, name}
+        extensions: [Aikido.Ash.Slice]
     end
   end
 end

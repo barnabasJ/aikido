@@ -180,71 +180,13 @@ defmodule Aikido.AI.ContextTest do
     end
   end
 
-  # --- Message Grouping Tests ---
-
-  describe "group_messages/1" do
-    test "empty messages returns empty groups" do
-      assert Conversation.group_messages([]) == []
-    end
-
-    test "standalone messages form individual groups" do
-      messages = [
-        user_msg("hi"),
-        assistant_msg("hello"),
-        user_msg("bye")
-      ]
-
-      groups = Conversation.group_messages(messages)
-
-      assert [_, _, _] = groups
-      assert Enum.all?(groups, &match?([_], &1))
-
-      [[first], [second], [third]] = groups
-      assert hd(first.content).text == "hi"
-      assert hd(second.content).text == "hello"
-      assert hd(third.content).text == "bye"
-    end
-
-    test "assistant with tool_calls grouped with tool results" do
-      tc = [make_tool_call("tc1", "execute")]
-
-      messages = [
-        user_msg("do something"),
-        assistant_msg("ok", tool_calls: tc),
-        tool_msg("tc1", "execute", "done"),
-        assistant_msg("finished")
-      ]
-
-      groups = Conversation.group_messages(messages)
-
-      assert [_, _, _] = groups
-
-      # First group: user message
-      assert match?([_], Enum.at(groups, 0))
-
-      # Second group: assistant + tool result
-      group2 = Enum.at(groups, 1)
-      assert [_, _] = group2
-      assert hd(group2).role == :assistant
-      assert List.last(group2).role == :tool
-
-      # Third group: standalone assistant
-      assert match?([_], Enum.at(groups, 2))
-    end
-
-    test "multiple tool calls grouped together" do
-      tc = [make_tool_call("tc1", "read"), make_tool_call("tc2", "write")]
-
-      messages = [
-        assistant_msg("running", tool_calls: tc),
-        tool_msg("tc1", "read", "content"),
-        tool_msg("tc2", "write", "ok")
-      ]
-
-      groups = Conversation.group_messages(messages)
-
-      assert [_] = groups
-      assert match?([_, _, _], hd(groups))
-    end
+  test "interruption repair preserves recorded results and closes only missing calls" do
+    calls = [make_tool_call("first", "lookup"), make_tool_call("second", "lookup")]
+    completed = tool_msg("first", "lookup", "known result")
+    original = Context.new([assistant_msg("Checking", tool_calls: calls), completed])
+    repaired = Conversation.close_tool_calls(original)
+    assert Enum.take(repaired.messages, 2) == original.messages
+    assert List.last(repaired.messages).tool_call_id == "second"
+    assert Conversation.close_tool_calls(repaired) == repaired
   end
 end

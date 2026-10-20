@@ -5,7 +5,7 @@ defmodule Aikido.Slice.Instance do
 
   ## Fields
 
-  - `module` - The slice module (`use Aikido.Slice`)
+  - `module` - The embedded Ash resource extended by `Aikido.Ash.Slice`
   - `config` - Resolved config map (validated through configuration contract if
     declared by the slice; otherwise stored verbatim)
   - `path` - The agent-declared mount path
@@ -22,8 +22,6 @@ defmodule Aikido.Slice.Instance do
     field :config, :map, allow_nil?: false, default: %{}, description: "Resolved configuration"
     field :path, :atom, allow_nil?: false, description: "The slice key in agent.state"
   end
-
-  defoverridable new!: 1
 
   @type t :: %__MODULE__{}
 
@@ -69,6 +67,12 @@ defmodule Aikido.Slice.Instance do
     |> SliceInfo.signal_routes()
     |> Enum.map(&normalize_route/1)
   end
+
+  defp normalize_route({path, match, target, priority}) when is_function(match, 1),
+    do: {path, match, target, priority}
+
+  defp normalize_route({path, match, target}) when is_function(match, 1),
+    do: {path, match, target, -10}
 
   defp normalize_route({path, target}), do: {path, target, []}
   defp normalize_route({path, target, opts}) when is_list(opts), do: {path, target, opts}

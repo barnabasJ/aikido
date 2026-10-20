@@ -29,9 +29,9 @@ defmodule Aikido.Signal.Call do
       {:ok, reply} = Aikido.Signal.Call.call(agent_pid, query)
 
       # Action handling "my.agent.ping"
-      def run(_signal, slice, _opts, ctx) do
-        emit = Aikido.Signal.Call.reply(ctx.signal, "my.agent.ping.reply", %{ok: true})
-        {:ok, %{}, List.wrap(emit)}
+      def run(input, _opts, _context) do
+        emit = Aikido.Signal.Call.reply(input.context.aikido.signal, "my.agent.ping.reply", %{ok: true})
+        Aikido.ActionResult.new(state: input.arguments.state, directives: List.wrap(emit))
       end
 
   ## Why not `Aikido.AgentServer.call/4`?
@@ -41,7 +41,7 @@ defmodule Aikido.Signal.Call do
   decides what crosses the boundary. `Signal.Call.call/3` flips the
   control: the *action* decides what crosses the boundary — useful when
   the answer is an aggregation of server-side internals (running pids,
-  registry lookups, etc.) that the caller can't formulate as a selector
+  logical process lookups, etc.) that the caller can't formulate as a selector
   over `%State{}`. Both still coexist.
 
   ## Options
@@ -124,7 +124,7 @@ defmodule Aikido.Signal.Call do
   not sent by `call/3` and the caller isn't expecting an answer). That
   lets action code be flexible:
 
-      case Aikido.Signal.Call.reply(ctx.signal, "my.reply", %{value: 42}) do
+      case Aikido.Signal.Call.reply(input.context.aikido.signal, "my.reply", %{value: 42}) do
         nil -> {:ok, %{}, []}
         emit -> {:ok, %{}, [emit]}
       end
@@ -147,9 +147,8 @@ defmodule Aikido.Signal.Call do
   with the full `%AgentServer.State{}`.
 
   Use this when the action knows a query came in but doesn't itself have
-  the server-level information needed to answer it — e.g. running pids
-  resolved through a Registry. The directive executor has access to
-  `%State{}` by protocol, so introspection code belongs there.
+  the server-level information needed to answer it — e.g. the current child-process map. The directive executor has access to
+  `%State{}` through its callback, so introspection code belongs there.
 
   `build_mfa` must resolve to `apply(m, f, [state | extra_args]) -> {:ok, map} | {:error, term}`.
 
@@ -161,16 +160,16 @@ defmodule Aikido.Signal.Call do
   ## Example
 
       # Action
-      def run(_signal, slice, _opts, ctx) do
+      def run(input, _opts, _context) do
         directive =
           Call.reply_from_state(
-            ctx.signal,
+            input.context.aikido.signal,
             "aikido.agent.query.children.reply",
             "aikido.agent.query.children.error",
             {Aikido.AgentServer.Queries, :build_children_reply, []}
           )
 
-        {:ok, %{}, List.wrap(directive)}
+        Aikido.ActionResult.new(state: input.arguments.state, directives: List.wrap(directive))
       end
 
       # Builder — sees the full %State{}

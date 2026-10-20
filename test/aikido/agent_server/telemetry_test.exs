@@ -8,18 +8,6 @@ defmodule AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementatio
   end
 end
 
-defmodule AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :emit_directive, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
@@ -29,20 +17,6 @@ defmodule AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implement
       state: %{},
       directives: [%Aikido.Directives.Schedule{delay_ms: 100, message: :tick}]
     )
-  end
-end
-
-defmodule AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :schedule_directive, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implementation,
-           action: :run}
-    end
   end
 end
 
@@ -57,12 +31,26 @@ defmodule AikidoTest.AgentServer.TelemetryTest.TelemetryAgent do
     schema do
       attribute :counter, :integer, default: 0
     end
+
+    route "increment", {AikidoTest.TestActions, :increment}
+    route "emit_directive", {AikidoTest.AgentServer.TelemetryTest.TelemetryAgent, :emit_directive}
+
+    route "schedule_directive",
+          {AikidoTest.AgentServer.TelemetryTest.TelemetryAgent, :schedule_directive}
   end
 
-  signal_routes do
-    route "increment", AikidoTest.TestActions.IncrementAction
-    route "emit_directive", AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction
-    route "schedule_directive", AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction
+  actions do
+    action :emit_directive, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementation, action: :run}
+    end
+
+    action :schedule_directive, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implementation,
+           action: :run}
+    end
   end
 end
 

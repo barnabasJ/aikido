@@ -10,18 +10,6 @@ defmodule AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation do
   end
 end
 
-defmodule AikidoTest.Agent.SignalHandlingTest.EmitTestAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :emit_test, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent do
   @moduledoc false
   use Aikido.Agent
@@ -34,13 +22,18 @@ defmodule AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent do
       attribute :counter, :integer, default: 0
       attribute :messages, {:array, :term}, default: []
     end
+
+    route "increment", {AikidoTest.TestActions, :increment}
+    route "decrement", {AikidoTest.TestActions, :decrement}
+    route "record", {AikidoTest.TestActions, :record}
+    route "emit_test", {AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent, :emit_test}
   end
 
-  signal_routes do
-    route "increment", AikidoTest.TestActions.IncrementAction
-    route "decrement", AikidoTest.TestActions.DecrementAction
-    route "record", AikidoTest.TestActions.RecordAction
-    route "emit_test", AikidoTest.Agent.SignalHandlingTest.EmitTestAction
+  actions do
+    action :emit_test, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation, action: :run}
+    end
   end
 end
 
@@ -148,11 +141,20 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
     test "native action references update state" do
       agent = AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent.initialize!()
 
-      {:ok, updated, _directives} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
-          agent,
-          {AikidoTest.TestActions.IncrementAction, %{amount: 5}}
+      {:ok, %{agent: updated}, _directives} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{AikidoTest.TestActions, :increment}, %{amount: 5}}]
         )
 
       assert updated.state.domain.counter == 5

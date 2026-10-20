@@ -8,11 +8,26 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.CounterSlice do
     schema do
       attribute :count, :integer, allow_nil?: false, default: 0
     end
+
+    route "counter.bump", {Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :bump}
+    route "counter.escape", {Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :escape}
   end
 
-  signal_routes do
-    route "counter.bump", Aikido.Dsl.SlicePathResolutionTest.BumpAction
-    route "counter.escape", Aikido.Dsl.SlicePathResolutionTest.EscapeAction
+  actions do
+    action :bump, Aikido.ActionResult do
+      argument :state, :term
+      run {Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation, action: :run}
+    end
+
+    action :escape, Aikido.ActionResult do
+      argument :state, :term
+      run {Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation, action: :run}
+    end
+
+    action :unbound, Aikido.ActionResult do
+      argument :state, :term
+      run {Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation, action: :run}
+    end
   end
 end
 
@@ -22,19 +37,11 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation do
   @impl true
   def run(input, _opts, _context) do
     slice = input.arguments.state
-    Aikido.ActionResult.new(state: %{slice | count: (slice[:count] || 0) + 1}, directives: [])
-  end
-end
 
-defmodule Aikido.Dsl.SlicePathResolutionTest.BumpAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :bump, Aikido.ActionResult do
-      argument :state, :term
-      run {Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation, action: :run}
-    end
+    Aikido.ActionResult.new(
+      state: %{slice | count: (Map.get(slice, :count) || 0) + 1},
+      directives: []
+    )
   end
 end
 
@@ -48,18 +55,6 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation do
   end
 end
 
-defmodule Aikido.Dsl.SlicePathResolutionTest.EscapeAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :escape, Aikido.ActionResult do
-      argument :state, :term
-      run {Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
@@ -70,21 +65,9 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation do
   end
 end
 
-defmodule Aikido.Dsl.SlicePathResolutionTest.UnboundAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :unbound, Aikido.ActionResult do
-      argument :state, :term
-      run {Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent do
   @moduledoc false
-  use Aikido.Agent, default_slices: false
+  use Aikido.Agent
 
   agent do
     name "resolution_agent"
@@ -93,9 +76,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent do
     schema do
       attribute :last_action, :atom, default: nil
     end
-  end
 
-  slices do
     slice :counter, Aikido.Dsl.SlicePathResolutionTest.CounterSlice
   end
 end
@@ -125,22 +106,31 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
   describe("slice that routes to the action wins") do
     test "BumpAction (in CounterSlice's signal_routes) writes to :counter, not :domain" do
       agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.initialize!()
-      assert agent.state.counter == %{count: 0}
+      assert %{count: 0} = agent.state.counter
 
-      {:ok, agent, _dirs} =
-        AikidoTest.NativeAction.apply(
-          Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent,
-          agent,
-          Aikido.Dsl.SlicePathResolutionTest.BumpAction
+      {:ok, %{agent: agent}, _dirs} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :bump}, %{}}]
         )
 
-      assert agent.state.counter == %{count: 1}
+      assert %{count: 1} = agent.state.counter
       assert agent.state.domain == %{last_action: nil}
     end
 
     test "BumpAction has no `path :foo` of its own — resolution comes from the slice mount" do
       assert Map.get(
-               Aikido.ActionRef.definition(Aikido.Dsl.SlicePathResolutionTest.BumpAction),
+               Ash.Resource.Info.action(Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :bump),
                :path
              ) == nil
     end
@@ -150,14 +140,23 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
     test "EscapeAction writes to the counter slice that declares its route" do
       agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.initialize!()
 
-      {:ok, agent, _dirs} =
-        AikidoTest.NativeAction.apply(
-          Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent,
-          agent,
-          Aikido.Dsl.SlicePathResolutionTest.EscapeAction
+      {:ok, %{agent: agent}, _dirs} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :escape}, %{}}]
         )
 
-      assert agent.state.counter[:tagged] == true
+      assert Map.get(agent.state.counter, :tagged) == true
       assert agent.state.domain == %{last_action: nil}
     end
 
@@ -167,7 +166,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
           Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent
         )
 
-      assert paths[Aikido.Dsl.SlicePathResolutionTest.EscapeAction] == [:counter]
+      assert paths[{Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :escape}] == [:counter]
     end
   end
 
@@ -175,15 +174,24 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
     test "UnboundAction (no slice routes, no own path) writes to the agent's :domain slice" do
       agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.initialize!()
 
-      {:ok, agent, _dirs} =
-        AikidoTest.NativeAction.apply(
-          Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent,
-          agent,
-          Aikido.Dsl.SlicePathResolutionTest.UnboundAction
+      {:ok, %{agent: agent}, _dirs} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :unbound}, %{}}]
         )
 
       assert agent.state.domain[:stamped] == true
-      assert agent.state.counter == %{count: 0}
+      assert %{count: 0} = agent.state.counter
     end
   end
 
@@ -195,9 +203,13 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
         )
 
       assert is_map(table)
-      assert Map.get(table, Aikido.Dsl.SlicePathResolutionTest.BumpAction) == [:counter]
-      assert table[Aikido.Dsl.SlicePathResolutionTest.EscapeAction] == [:counter]
-      refute Map.has_key?(table, Aikido.Dsl.SlicePathResolutionTest.UnboundAction)
+
+      assert Map.get(table, {Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :bump}) == [
+               :counter
+             ]
+
+      assert table[{Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :escape}] == [:counter]
+      refute Map.has_key?(table, {Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :unbound})
     end
   end
 end

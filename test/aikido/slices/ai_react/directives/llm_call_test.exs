@@ -9,7 +9,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
   import Aikido.AI.Test.ResponseFixtures
 
   alias Aikido.Slices.AiReact.Directives.LLMCall
-  alias Aikido.Slices.AiReact.Turn
+
   alias ReqLLM.Context
 
   setup :set_mimic_global
@@ -95,7 +95,8 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
 
     assert signal.type == "ai.react.llm.completed"
     assert signal.data.request_id == "req_1"
-    assert %Turn{type: :final_answer, text: "ok"} = signal.data.turn
+    assert %ReqLLM.Response{} = signal.data.turn
+    assert ReqLLM.Response.text(signal.data.turn) == "ok"
   end
 
   test "casts ai.react.failed when ReqLLM returns an error", %{aikido: aikido} do

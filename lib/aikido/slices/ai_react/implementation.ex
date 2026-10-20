@@ -370,7 +370,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
   end
 
   defp decide(input, [action: :llm_turn], _context) do
-    turn = input.arguments[:turn]
+    response = input.arguments[:turn]
+    turn = ReqLLM.Response.classify(response)
     request_id = input.arguments[:request_id]
     slice = input.arguments.state
 
@@ -384,17 +385,20 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
       true ->
         usage =
-          Map.merge(Map.get(slice, :usage, %{}), turn.usage || %{}, fn _key, old, new ->
+          Map.merge(Map.get(slice, :usage, %{}), ReqLLM.Response.usage(response) || %{}, fn _key,
+                                                                                            old,
+                                                                                            new ->
             if is_number(old) && is_number(new), do: old + new, else: new
           end)
 
         llm_turn_handle_turn(
+          response,
           turn,
           Map.merge(slice, %{
             usage: usage,
-            last_input_tokens: Aikido.AI.Handoff.input_tokens(turn.usage),
+            last_input_tokens: Aikido.AI.Handoff.input_tokens(ReqLLM.Response.usage(response)),
             streaming_text: turn.text || "",
-            streaming_thinking: turn.thinking_content || "",
+            streaming_thinking: turn.thinking || "",
             stream_attempt: 0
           })
         )
@@ -573,8 +577,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
     current != request_id
   end
 
-  defp llm_turn_handle_turn(%Aikido.Slices.AiReact.Turn{type: :final_answer, text: text}, slice) do
-    slice = Conversation.append_message(slice, ReqLLM.Context.assistant(text || ""))
+  defp llm_turn_handle_turn(response, %{type: :final_answer, text: text}, slice) do
+    slice = Conversation.append_message(slice, response.message)
     new_context = slice.context
 
     new_slice = %{
@@ -620,16 +624,15 @@ defmodule Aikido.Slices.AiReact.Implementation do
   end
 
   defp llm_turn_handle_turn(
-         %Aikido.Slices.AiReact.Turn{type: :tool_calls, tool_calls: tool_calls, text: text},
+         response,
+         %{type: :tool_calls, tool_calls: tool_calls},
          slice
        ) do
     iteration = slice.iteration + 1
 
-    msg_calls =
-      Enum.map(tool_calls, fn tc -> %{id: tc.id, name: tc.name, arguments: tc.arguments} end)
+    msg_calls = Enum.reject(tool_calls, &ReqLLM.ToolCall.flagged_builtin?/1)
 
-    assistant_msg = ReqLLM.Context.assistant(text || "", tool_calls: msg_calls)
-    slice = Conversation.append_message(slice, assistant_msg)
+    slice = Conversation.append_message(slice, response.message)
     new_context = slice.context
 
     if iteration >= slice.max_iterations do

@@ -8,10 +8,8 @@ defmodule AikidoTest.SliceTest.MinimalSlice do
     schema do
       attribute :value, :term, allow_nil?: true
     end
-  end
 
-  signal_routes do
-    route "minimal.noop", AikidoTest.PluginTestAction
+    route "minimal.noop", {AikidoTest.TestActions, :plugin_test_action}
   end
 end
 
@@ -30,10 +28,8 @@ defmodule AikidoTest.SliceTest.FullSlice do
     config_schema do
       attribute :enabled, :boolean, allow_nil?: false, default: true
     end
-  end
 
-  signal_routes do
-    route "send", AikidoTest.PluginTestAction
+    route "send", {AikidoTest.TestActions, :plugin_test_action}
   end
 end
 
@@ -47,22 +43,17 @@ defmodule AikidoTest.SliceTest.SchemaSlice do
     schema do
       attribute :counter, :integer, allow_nil?: false, default: 0
     end
-  end
 
-  signal_routes do
-    route "schema.noop", AikidoTest.PluginTestAction
+    route "schema.noop", {AikidoTest.TestActions, :plugin_test_action}
   end
 end
 
 defmodule AikidoTest.SliceTest.SchemaAgent do
   @moduledoc false
-  use Aikido.Agent, default_slices: false
+  use Aikido.Agent
 
   agent do
     name "schema_agent"
-  end
-
-  slices do
     slice :schema, AikidoTest.SliceTest.SchemaSlice
   end
 end
@@ -78,21 +69,9 @@ defmodule AikidoTest.SliceTest do
         )
       end
     end
-
-    test "raises CompileError on invalid name" do
-      assert_raise Spark.Error.DslError, fn ->
-        Code.compile_string(
-          "defmodule AikidoTest.SliceTest.BadName do\n  use Aikido.Slice\n\n  slice do\n    name \"has spaces\"\n  end\nend\n"
-        )
-      end
-    end
   end
 
   describe("accessors") do
-    nil
-    nil
-    nil
-
     test "minimal slice exposes name and path via Info" do
       assert Map.get(
                Aikido.Dsl.Slice.Info.slice_options(AikidoTest.SliceTest.MinimalSlice),
@@ -100,11 +79,11 @@ defmodule AikidoTest.SliceTest do
              ) == "minimal"
 
       assert Aikido.Dsl.Slice.Info.actions(AikidoTest.SliceTest.MinimalSlice) == [
-               AikidoTest.PluginTestAction
+               {AikidoTest.TestActions, :plugin_test_action}
              ]
 
       assert Aikido.Dsl.Slice.Info.signal_routes(AikidoTest.SliceTest.MinimalSlice) == [
-               {"minimal.noop", AikidoTest.PluginTestAction}
+               {"minimal.noop", {AikidoTest.TestActions, :plugin_test_action}}
              ]
     end
 
@@ -118,42 +97,35 @@ defmodule AikidoTest.SliceTest do
              ) == "A test slice"
 
       assert Aikido.Dsl.Slice.Info.signal_routes(AikidoTest.SliceTest.FullSlice) == [
-               {"send", AikidoTest.PluginTestAction}
+               {"send", {AikidoTest.TestActions, :plugin_test_action}}
              ]
 
       assert Ash.Type.ash_type?(Aikido.Dsl.Slice.Info.schema(AikidoTest.SliceTest.FullSlice))
 
-      assert Aikido.ActionRef.valid?(
-               Aikido.Dsl.Slice.Info.config_schema(AikidoTest.SliceTest.FullSlice)
-             )
+      {resource, action} = Aikido.Dsl.Slice.Info.config_schema(AikidoTest.SliceTest.FullSlice)
+      assert Ash.Resource.Info.action(resource, action).type == :action
     end
   end
 
   describe("schema defaults") do
-    nil
-    nil
-
-    test "Agent.new/1 seeds slice state from the schema's defaults" do
+    test "initialization applies native slice defaults" do
       agent = AikidoTest.SliceTest.SchemaAgent.initialize!()
-      assert agent.state.schema == %{counter: 0}
+      assert %{counter: 0} = agent.state.schema
     end
 
     test "per-agent config merges into the slice on top of defaults" do
       defmodule Elixir.AikidoTest.SliceTest.SchemaAgentConfigured do
         @moduledoc false
-        use Aikido.Agent, default_slices: false
+        use Aikido.Agent
 
         agent do
           name "schema_agent_configured"
-        end
-
-        slices do
           slice :schema, AikidoTest.SliceTest.SchemaSlice, options: [counter: 42]
         end
       end
 
       agent = AikidoTest.SliceTest.SchemaAgentConfigured.initialize!()
-      assert agent.state.schema == %{counter: 42}
+      assert %{counter: 42} = agent.state.schema
     end
   end
 end

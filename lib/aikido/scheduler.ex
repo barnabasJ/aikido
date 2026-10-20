@@ -24,19 +24,6 @@ defmodule Aikido.Scheduler do
   @type cron_specs :: %{optional(term()) => cron_spec()}
   @type invalid_cron_spec :: {term(), term(), term()}
 
-  @doc """
-  Build a normalized durable cron spec map.
-  """
-  @spec build_cron_spec(String.t(), term(), String.t() | nil) :: cron_spec()
-  def build_cron_spec(cron_expression, message, timezone \\ nil)
-      when is_binary(cron_expression) and (is_nil(timezone) or is_binary(timezone)) do
-    %{
-      cron_expression: cron_expression,
-      message: message,
-      timezone: normalize_timezone_value(timezone)
-    }
-  end
-
   @doc false
   @spec validate_and_build_cron_spec(term(), term(), term()) ::
           {:ok, cron_spec()} | {:error, term()}
@@ -221,10 +208,6 @@ defmodule Aikido.Scheduler do
   defp validate_timezone_option(""), do: {:ok, @default_timezone}
   defp validate_timezone_option(timezone) when is_binary(timezone), do: {:ok, timezone}
   defp validate_timezone_option(_timezone), do: {:error, {:invalid_timezone, :invalid_type}}
-
-  defp normalize_timezone_value(nil), do: @default_timezone
-  defp normalize_timezone_value(""), do: @default_timezone
-  defp normalize_timezone_value(timezone) when is_binary(timezone), do: timezone
 
   defp durable_term?(term)
        when is_pid(term) or is_reference(term) or is_port(term) or is_function(term),

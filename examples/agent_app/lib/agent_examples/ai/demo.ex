@@ -20,7 +20,7 @@ defmodule AgentExamples.AI.Demo do
       Agents.research_team_start!(
         AI.offline(%{
           tool_context: %{context: %{stamp_label: "research"}},
-          tools: AI.Tools.for_assistant() ++ AI.Tools.from_ash_ai()
+          tools: AI.Tools.for_assistant() ++ AI.Tools.for_lua()
         })
       ),
       fn team ->
@@ -53,7 +53,7 @@ defmodule AgentExamples.AI.Demo do
     configuration = %{
       model: %{provider: provider, id: id},
       tool_context: %{context: %{stamp_label: "live"}},
-      tools: AI.Tools.for_assistant() ++ AI.Tools.from_ash_ai()
+      tools: AI.Tools.for_assistant() ++ AI.Tools.for_lua()
     }
 
     with_resource(Agents.research_team_start!(configuration), fn team ->

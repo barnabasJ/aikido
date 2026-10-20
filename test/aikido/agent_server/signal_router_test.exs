@@ -7,36 +7,12 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.TestAction.Implementation do
   end
 end
 
-defmodule AikidoTest.AgentServer.SignalRouterTest.TestAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :test_action, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServer.SignalRouterTest.TestAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServer.SignalRouterTest.AnotherAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
     Aikido.ActionResult.new(state: %{}, directives: [])
-  end
-end
-
-defmodule AikidoTest.AgentServer.SignalRouterTest.AnotherAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :another_action, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServer.SignalRouterTest.AnotherAction.Implementation, action: :run}
-    end
   end
 end
 
@@ -49,11 +25,23 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes do
 
     schema do
     end
+
+    route "slice.custom", {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}
+
+    route "slice.priority",
+          {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}, priority: -20
   end
 
-  signal_routes do
-    route "slice.custom", AikidoTest.AgentServer.SignalRouterTest.TestAction
-    route "slice.priority", AikidoTest.AgentServer.SignalRouterTest.TestAction, priority: -20
+  actions do
+    action :test_action, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.AgentServer.SignalRouterTest.TestAction.Implementation, action: :run}
+    end
+
+    action :another_action, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.AgentServer.SignalRouterTest.AnotherAction.Implementation, action: :run}
+    end
   end
 end
 
@@ -63,11 +51,10 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.AgentWithRoutes do
 
   agent do
     name "agent_with_routes"
-  end
+    route "agent.action", {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}
 
-  signal_routes do
-    route "agent.action", AikidoTest.AgentServer.SignalRouterTest.TestAction
-    route "agent.priority", AikidoTest.AgentServer.SignalRouterTest.TestAction, priority: 10
+    route "agent.priority",
+          {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}, priority: 10
   end
 end
 
@@ -77,10 +64,9 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.AgentWithConfiguredRoutes do
 
   agent do
     name "agent_with_configured_routes"
-  end
 
-  signal_routes do
-    route "agent.configured", AikidoTest.AgentServer.SignalRouterTest.TestAction
+    route "agent.configured",
+          {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}
   end
 end
 
@@ -99,9 +85,6 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.AgentWithSlices do
 
   agent do
     name "agent_with_slices"
-  end
-
-  slices do
     slice :router_slice, AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes
   end
 end
@@ -110,8 +93,6 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
   use ExUnit.Case, async: true
 
   defp build_state(agent_module) do
-    {:ok, lifecycle} = Aikido.AgentServer.State.Lifecycle.new([])
-
     %Aikido.AgentServer.State{
       id: "router-test-#{System.unique_integer([:positive])}",
       agent_module: agent_module,
@@ -125,8 +106,6 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
       partition: nil,
       default_dispatch: nil,
       middleware_chain: nil,
-      registry: Aikido.Registry,
-      spawn_fun: nil,
       cron_jobs: %{},
       cron_monitors: %{},
       cron_monitor_refs: %{},
@@ -136,11 +115,8 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
       cron_specs: %{},
       cron_runtime_specs: %{},
       skip_schedules: false,
-      error_count: 0,
-      metrics: %{},
       signal_subscribers: %{},
       ready_waiters: %{},
-      lifecycle: lifecycle,
       debug: false,
       debug_events: [],
       debug_max_events: 500
@@ -154,7 +130,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
           build_state(AikidoTest.AgentServer.SignalRouterTest.AgentWithConfiguredRoutes)
         )
 
-      assert {:ok, [AikidoTest.AgentServer.SignalRouterTest.TestAction]} =
+      assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
                Jido.Signal.Router.route(router, signal("agent.configured"))
     end
 
@@ -164,10 +140,10 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
           build_state(AikidoTest.AgentServer.SignalRouterTest.AgentWithRoutes)
         )
 
-      assert {:ok, [AikidoTest.AgentServer.SignalRouterTest.TestAction]} =
+      assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
                Jido.Signal.Router.route(router, signal("agent.action"))
 
-      assert {:ok, [AikidoTest.AgentServer.SignalRouterTest.TestAction]} =
+      assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
                Jido.Signal.Router.route(router, signal("agent.priority"))
     end
 
@@ -188,10 +164,10 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
           build_state(AikidoTest.AgentServer.SignalRouterTest.AgentWithSlices)
         )
 
-      assert {:ok, [AikidoTest.AgentServer.SignalRouterTest.TestAction]} =
+      assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
                Jido.Signal.Router.route(router, signal("slice.custom"))
 
-      assert {:ok, [AikidoTest.AgentServer.SignalRouterTest.TestAction]} =
+      assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
                Jido.Signal.Router.route(router, signal("slice.priority"))
     end
 

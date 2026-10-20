@@ -2,7 +2,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   @moduledoc """
   Side-effect directive: makes one call to `ReqLLM.Generation.generate_text/3`.
 
-  Emitted by `Aikido.Slices.AiReact.Ask` (first turn) and `Aikido.Slices.AiReact.ToolResult`
+  Emitted by the slice's `:ask` action (first turn) and `:tool_result` action
   (subsequent turns, once all tool results in a batch have come back).
   The executor spawns a Task under the agent's task supervisor — the Task
   is the *only* place a blocking ReqLLM call lives, so the agent process
@@ -10,7 +10,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
 
   Outcomes are reported back as signals to the originating agent:
 
-    * `"ai.react.llm.completed"` with `%{turn: %Aikido.Slices.AiReact.Turn{}, request_id: id}`
+    * `"ai.react.llm.completed"` with `%{turn: %ReqLLM.Response{}, request_id: id}`
       on success.
     * `"ai.react.failed"` with `%{reason: term, request_id: id}` on
       transport / API error.
@@ -36,6 +36,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     field :tools, {:array, :term}, allow_nil?: false, default: []
 
     field :request_id, :string, allow_nil?: false
+
     field :llm_opts, {:array, :tuple},
       constraints: [items: [fields: [key: [type: :atom], value: [type: :term]]]],
       default: []
@@ -44,7 +45,6 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   alias Aikido.AgentServer
   alias Jido.Signal
   alias Aikido.Slices.AiReact.Directives.LLMCall
-  alias Aikido.Slices.AiReact.Turn
   alias ReqLLM.Context
 
   @impl true
@@ -127,7 +127,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
           data =
             handoff_data(
               %{
-                turn: Turn.from_response(response),
+                turn: response,
                 request_id: d.request_id,
                 iteration: d.iteration
               },

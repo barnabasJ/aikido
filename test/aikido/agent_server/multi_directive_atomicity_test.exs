@@ -13,20 +13,6 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysActi
   end
 end
 
-defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :set_multiple, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysAction.Implementation,
-           action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
@@ -43,20 +29,6 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Imple
     }
 
     Aikido.ActionResult.new(state: Map.merge(slice, observation), directives: [])
-  end
-end
-
-defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :observe, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Implementation,
-           action: :run}
-    end
   end
 end
 
@@ -78,13 +50,27 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent do
       attribute :saw_b, :boolean, default: false
       attribute :saw_c, :boolean, default: false
     end
+
+    route "set_multiple",
+          {AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent, :set_multiple}
+
+    route "observe", {AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent, :observe}
   end
 
-  signal_routes do
-    route "set_multiple",
-          AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysAction
+  actions do
+    action :set_multiple, Aikido.ActionResult do
+      argument :state, :term
 
-    route "observe", AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction
+      run {AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysAction.Implementation,
+           action: :run}
+    end
+
+    action :observe, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Implementation,
+           action: :run}
+    end
   end
 end
 

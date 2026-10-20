@@ -33,7 +33,7 @@ defmodule Aikido.Ash.Runtime do
     runtime_options =
       input.context
       |> Map.get(:aikido_runtime_options, [])
-      |> Keyword.take([:parent, :partition, :on_parent_death, :restart])
+      |> Keyword.take([:parent, :partition, :on_parent_death, :restart?])
       |> Keyword.merge(id: record.id, initial_state: initial_state(resource, record))
 
     safe(fn ->
@@ -145,7 +145,7 @@ defmodule Aikido.Ash.Runtime do
   defp delete_process(resource, pid) when is_pid(pid) do
     with {:ok, {pool, key, partition}} <-
            AgentServer.state(pid, fn runtime ->
-             {:ok, {runtime.lifecycle.pool, runtime.lifecycle.pool_key, runtime.partition}}
+             {:ok, {runtime.durable_server, runtime.durable_key, runtime.partition}}
            end) do
       if pool do
         Aikido.Durable.delete(pool, key,

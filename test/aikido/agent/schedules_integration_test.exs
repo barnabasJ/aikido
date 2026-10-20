@@ -9,17 +9,6 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.TickAction.Implementation do
   end
 end
 
-defmodule AikidoTest.Agent.SchedulesIntegrationTest.TickAction do
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :tick, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.Agent.SchedulesIntegrationTest.TickAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent do
   use Aikido.Agent
 
@@ -30,14 +19,19 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent do
     schema do
       attribute :tick_count, :integer, default: 0
     end
+
+    route "agent.tick", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick}
   end
 
   schedules do
     schedule "* * * * * * *", "agent.tick", job_id: :tick
   end
 
-  signal_routes do
-    route "agent.tick", AikidoTest.Agent.SchedulesIntegrationTest.TickAction
+  actions do
+    action :tick, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.Agent.SchedulesIntegrationTest.TickAction.Implementation, action: :run}
+    end
   end
 end
 
@@ -51,16 +45,14 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.MultiScheduleAgent do
     schema do
       attribute :tick_count, :integer, default: 0
     end
+
+    route "heartbeat.tick", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick}
+    route "cleanup.run", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick}
   end
 
   schedules do
     schedule "* * * * *", "heartbeat.tick", job_id: :heartbeat
     schedule "@daily", "cleanup.run", job_id: :cleanup, timezone: "America/New_York"
-  end
-
-  signal_routes do
-    route "heartbeat.tick", AikidoTest.Agent.SchedulesIntegrationTest.TickAction
-    route "cleanup.run", AikidoTest.Agent.SchedulesIntegrationTest.TickAction
   end
 end
 

@@ -3,8 +3,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementat
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    params =
-      Map.merge(input.context.aikido.signal.data || %{}, Map.delete(input.arguments, :state))
+    params = input.arguments.data
 
     slice = input.arguments.state
     count = Map.get(slice, :tick_count, 0)
@@ -17,51 +16,23 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementat
   end
 end
 
-defmodule AikidoTest.AgentServer.CronIntegrationTest.CronCountAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :cron_count, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementation,
-           action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    params =
-      Map.merge(input.context.aikido.signal.data || %{}, Map.delete(input.arguments, :state))
+    params = Map.delete(input.arguments, :state)
 
     cron_expr = Map.get(params, :cron)
     job_id = Map.get(params, :job_id)
 
     message =
-      Map.get(params, :message, struct!(Jido.Signal, id: nil, type: "cron.tick", source: "/test"))
+      Map.get(params, :message) ||
+        struct!(Jido.Signal, id: nil, type: "cron.tick", source: "/test")
 
     timezone = Map.get(params, :timezone)
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
     Aikido.ActionResult.new(state: %{}, directives: [directive])
-  end
-end
-
-defmodule AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :register_cron, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implementation,
-           action: :run}
-    end
   end
 end
 
@@ -71,26 +42,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction.Implementa
   @impl true
   def run(input, _opts, _context) do
     job_id =
-      case Map.fetch(input.arguments, :job_id) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:job_id]
-      end
+      input.arguments.job_id
 
     Aikido.ActionResult.new(state: %{}, directives: [Aikido.Directives.cron_cancel(job_id)])
-  end
-end
-
-defmodule AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :cancel_cron, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction.Implementation,
-           action: :run}
-    end
   end
 end
 
@@ -106,12 +60,41 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent do
       attribute :tick_count, :integer, default: 0
       attribute :ticks, {:array, :term}, default: []
     end
+
+    route "register_cron",
+          {AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent, :register_cron}
+
+    route "cancel_cron", {AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent, :cancel_cron}
+    route "cron.tick", {AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent, :cron_count}
   end
 
-  signal_routes do
-    route "register_cron", AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction
-    route "cancel_cron", AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction
-    route "cron.tick", AikidoTest.AgentServer.CronIntegrationTest.CronCountAction
+  actions do
+    action :cron_count, Aikido.ActionResult do
+      argument :state, :term
+      argument :data, :map, allow_nil?: false, default: %{}
+
+      run {AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementation,
+           action: :run}
+    end
+
+    action :register_cron, Aikido.ActionResult do
+      argument :state, :term
+      argument :cron, :string, allow_nil?: false
+      argument :job_id, :term
+      argument :message, :term
+      argument :timezone, :string
+
+      run {AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implementation,
+           action: :run}
+    end
+
+    action :cancel_cron, Aikido.ActionResult do
+      argument :state, :term
+      argument :job_id, :term, allow_nil?: false
+
+      run {AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction.Implementation,
+           action: :run}
+    end
   end
 end
 
@@ -269,7 +252,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       GenServer.stop(pid)
     end
 
-    test("invalid dynamic cron input logs and preserves the agent", %{aikido: aikido}) do
+    test("invalid dynamic cron input is rejected and preserves the agent", %{aikido: aikido}) do
       {:ok, pid} =
         Aikido.AgentServer.start_link(
           agent_module: AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
@@ -284,22 +267,17 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
           data: %{job_id: :invalid_type, cron: 123}
         })
 
-      log =
-        capture_log(fn ->
-          assert {:ok, _agent} =
-                   Aikido.AgentServer.call(pid, register_signal, fn s -> {:ok, s.agent} end)
+      assert {:error, %Ash.Error.Invalid{}} =
+               Aikido.AgentServer.call(pid, register_signal, fn s -> {:ok, s.agent} end)
 
-          {:ok, %{cron_jobs: cron_jobs, cron_specs: cron_specs}} =
-            Aikido.AgentServer.state(pid, fn s ->
-              {:ok, %{cron_jobs: s.cron_jobs, cron_specs: s.cron_specs}}
-            end)
-
-          refute Map.has_key?(cron_jobs, :invalid_type)
-          refute Map.has_key?(cron_specs, :invalid_type)
+      {:ok, %{cron_jobs: cron_jobs, cron_specs: cron_specs}} =
+        Aikido.AgentServer.state(pid, fn s ->
+          {:ok, %{cron_jobs: s.cron_jobs, cron_specs: s.cron_specs}}
         end)
 
+      refute Map.has_key?(cron_jobs, :invalid_type)
+      refute Map.has_key?(cron_specs, :invalid_type)
       assert Process.alive?(pid)
-      assert log =~ "failed to register cron job :invalid_type"
       GenServer.stop(pid)
     end
 

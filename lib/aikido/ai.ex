@@ -27,26 +27,20 @@ defmodule Aikido.AI do
   ## Example
 
       defmodule MyApp.SupportAgent do
-        use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+        use Ash.Resource, extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
 
         agent do
           name "support"
         end
-
-        react do
-          model "anthropic:claude-haiku-4-5-20251001"
-          tools [:lookup_order, :refund_order]
-          tool_options [otp_app: :my_app]
-          system_prompt "You are a support agent."
-          max_iterations 5
-        end
-
-        slices do
-          slice :ai, Aikido.Slices.AiReact
-        end
       end
 
-      {:ok, pid}  = Aikido.AgentServer.start_link(agent_module: MyApp.SupportAgent)
+      {:ok, reference} = Aikido.Ash.start(MyApp.SupportAgent, %{
+        model: "anthropic:claude-haiku-4-5-20251001",
+        tools: [:lookup_order, :refund_order],
+        tool_options: [otp_app: :my_app],
+        system_prompt: "You are a support agent."
+      })
+      pid = reference.pid
       {:ok, text} = Aikido.AI.ask_sync(pid, "Refund order 42, the customer asked.")
 
   Per-call overrides:
@@ -126,16 +120,20 @@ defmodule Aikido.AI do
     request_id = mint_request_id()
     signal = build_ask_signal(query, request_id, opts)
 
-    with {:ok, sub_ref} <- subscribe_for_terminal(pid, request_id) do
-      case launch(pid, signal, request_id) do
-        {:ok, ^request_id} ->
-          await_terminal(sub_ref, pid, timeout)
+    selector = fn runtime ->
+      ai = runtime.agent.state.ai
 
-        {:error, _} = err ->
-          _ = Aikido.AgentServer.unsubscribe(pid, sub_ref)
-          err
+      cond do
+        ai.request_id != request_id -> :skip
+        ai.status == :completed -> {:ok, ai.result}
+        ai.status == :failed -> {:error, ai.error}
+        true -> :skip
       end
     end
+
+    Aikido.AgentServer.call_until(pid, fn -> launch(pid, signal, request_id) end, "**", selector,
+      timeout: timeout
+    )
   end
 
   @doc "Cancel the active run; its model and tool tasks observe the terminal transition."
@@ -153,7 +151,7 @@ defmodule Aikido.AI do
     end)
   end
 
-  defp mint_request_id, do: "req_" <> Aikido.Util.generate_id()
+  defp mint_request_id, do: "req_" <> Ash.UUIDv7.generate()
 
   defp build_ask_signal(query, request_id, opts) do
     data = %{
@@ -192,34 +190,5 @@ defmodule Aikido.AI do
       {:ok, ^request_id} = ok -> ok
       {:error, _} = err -> err
     end
-  end
-
-  defp await_terminal(sub_ref, pid, timeout) do
-    receive do
-      {:aikido_subscription, ^sub_ref, %{result: {:ok, %{status: :completed, text: text}}}} ->
-        {:ok, text}
-
-      {:aikido_subscription, ^sub_ref, %{result: {:ok, %{status: :failed, error: error}}}} ->
-        {:error, error}
-    after
-      timeout ->
-        _ = Aikido.AgentServer.unsubscribe(pid, sub_ref)
-        {:error, :timeout}
-    end
-  end
-
-  defp subscribe_for_terminal(pid, request_id) do
-    selector = fn state ->
-      ai = state.agent.state.ai
-
-      cond do
-        ai.request_id != request_id -> :skip
-        ai.status == :completed -> {:ok, %{status: :completed, text: ai.result}}
-        ai.status == :failed -> {:ok, %{status: :failed, error: ai.error}}
-        true -> :skip
-      end
-    end
-
-    Aikido.AgentServer.subscribe(pid, "**", selector, once: true)
   end
 end

@@ -58,20 +58,8 @@ defmodule Aikido.Slice.Config do
       {resource, action} = config_schema
 
       case resource |> Ash.ActionInput.for_action(action, config) |> Ash.run_action() do
-        {:ok, validated} ->
-          values = validated
-
-          case Spark.Dsl.Extension.get_opt(slice_module, [:slice], :config_transform) do
-            nil ->
-              {:ok, values}
-
-            {module, function, args} ->
-              case apply(module, function, [values, [] | args]) do
-                {:ok, _} = result -> result
-                {:error, _} = error -> error
-                result -> {:ok, result}
-              end
-          end
+        {:ok, values} ->
+          {:ok, values}
 
         {:error, errors} ->
           {:error, errors}

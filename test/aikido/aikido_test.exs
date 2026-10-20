@@ -4,34 +4,6 @@ defmodule AikidoTest.AikidoTest do
   alias Aikido.AgentServer
   alias AikidoTest.TestAgents.Minimal
 
-  describe "scheduler_name/1" do
-    test "returns scheduler name for aikido instance" do
-      assert Aikido.scheduler_name(MyApp.Aikido) == MyApp.Aikido.Scheduler
-    end
-
-    test "works with nested module names" do
-      assert Aikido.scheduler_name(MyApp.Sub.Aikido) == MyApp.Sub.Aikido.Scheduler
-    end
-  end
-
-  describe "agent_pool_name/2" do
-    test "returns pool name for aikido instance and pool" do
-      # Module.concat keeps the atom as-is (lowercase) when joining
-      result = Aikido.agent_pool_name(MyApp.Aikido, :workers)
-      assert result == :"Elixir.MyApp.Aikido.AgentPool.workers"
-    end
-
-    test "works with different pool names" do
-      result = Aikido.agent_pool_name(MyApp.Aikido, :processors)
-      assert result == :"Elixir.MyApp.Aikido.AgentPool.processors"
-    end
-
-    test "works with nested module names" do
-      result = Aikido.agent_pool_name(MyApp.Sub.Aikido, :pool)
-      assert result == :"Elixir.MyApp.Sub.Aikido.AgentPool.pool"
-    end
-  end
-
   describe "generate_id/0" do
     test "generates a unique identifier" do
       id1 = Aikido.generate_id()

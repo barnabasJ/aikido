@@ -99,14 +99,27 @@ defmodule AgentExamples.NativeLuaToolsTest.Client do
 
     if last.role == :user do
       {:ok,
-       %Aikido.Slices.AiReact.Turn{
-         type: :tool_calls,
-         tool_calls: [
-           %{id: "lua", name: "scoped_lua", arguments: %{"input" => %{"script" => text}}}
-         ]
-       }}
+       struct!(ReqLLM.Response,
+         id: "scripted",
+         model: "offline",
+         context: ReqLLM.Context.new(),
+         message:
+           ReqLLM.Context.assistant("",
+             tool_calls: [
+               %{id: "lua", name: "scoped_lua", arguments: %{"input" => %{"script" => text}}}
+             ]
+           ),
+         finish_reason: :tool_calls
+       )}
     else
-      {:ok, %Aikido.Slices.AiReact.Turn{type: :final_answer, text: text}}
+      {:ok,
+       struct!(ReqLLM.Response,
+         id: "scripted",
+         model: "offline",
+         context: ReqLLM.Context.new(),
+         message: ReqLLM.Context.assistant(text, tool_calls: []),
+         finish_reason: :stop
+       )}
     end
   end
 end

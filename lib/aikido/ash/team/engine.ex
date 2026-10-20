@@ -6,22 +6,50 @@ defmodule Aikido.Ash.Team.Engine do
 
   def handle(signal, state, context, config) do
     case signal.type do
-      "aikido.ash.team.started" -> started(signal.data, state, context, config)
-      "aikido.ash.team.stopped" -> stopped(signal.data, state, context, config)
-      "aikido.ash.team.failed" -> failed(signal.data, state, context)
-      "aikido.ash.team.exited" -> exited(signal.data, state, context, config)
-      "aikido.ash.team.timeout" -> timeout(signal.data, state, context)
-      "aikido.agent.child.started" -> {:ok, state, []}
-      "aikido.agent.child.exit" -> {:ok, state, []}
-      "aikido.ash.team.send" -> send_message(signal.data, state)
-      "aikido.ash.team.broadcast" -> broadcast(signal.data, state)
-      "aikido.ash.team.assign_task" -> request_task(signal, state, context, config)
-      "aikido.ash.team.task.completed" -> task_result(signal.data, state, :completed, context)
-      "aikido.ash.team.task.failed" -> task_result(signal.data, state, :failed, context)
-      "aikido.ash.team.task.timeout" -> task_timeout(signal.data, state, context)
-      "aikido.ash.team.operation.completed" -> {:ok, state, []}
-      "aikido.ash.team.cleanup" -> {:ok, state, []}
-      _ -> command(signal, state, context, config)
+      "aikido.ash.team.started" ->
+        started(signal.data, state, context, config)
+
+      "aikido.ash.team.stopped" ->
+        stopped(signal.data, state, context, config)
+
+      "aikido.ash.team.failed" ->
+        failed(signal.data, state, context)
+
+      "aikido.ash.team.timeout" ->
+        timeout(signal.data, state, context)
+
+      "aikido.agent.child.started" ->
+        {:ok, state, []}
+
+      "aikido.agent.child.exit" ->
+        exited(Map.put(signal.data, :member, signal.data.tag), state, context, config)
+
+      "aikido.ash.team.send" ->
+        send_message(signal.data, state)
+
+      "aikido.ash.team.broadcast" ->
+        broadcast(signal.data, state)
+
+      "aikido.ash.team.assign_task" ->
+        request_task(signal, state, context, config)
+
+      "aikido.ash.team.task.completed" ->
+        task_result(signal.data, state, :completed, context)
+
+      "aikido.ash.team.task.failed" ->
+        task_result(signal.data, state, :failed, context)
+
+      "aikido.ash.team.task.timeout" ->
+        task_timeout(signal.data, state, context)
+
+      "aikido.ash.team.operation.completed" ->
+        {:ok, state, []}
+
+      "aikido.ash.team.cleanup" ->
+        {:ok, state, []}
+
+      _ ->
+        command(signal, state, context, config)
     end
   end
 
@@ -98,9 +126,10 @@ defmodule Aikido.Ash.Team.Engine do
         end
 
       "reconcile" ->
-        {:ok, state.topology, [],
-         Enum.reject(Topology.eager(state.topology), &Map.has_key?(state.paused, &1)),
-         state.paused}
+        requested = Enum.uniq(Topology.eager(state.topology) ++ Map.get(data, :members, []))
+
+        {:ok, state.topology, Map.get(data, :replace, []),
+         Enum.reject(requested, &Map.has_key?(state.paused, &1)), state.paused}
 
       "add_member" ->
         with {:ok, spec} <- member_spec(data, state, config),
@@ -282,7 +311,8 @@ defmodule Aikido.Ash.Team.Engine do
                  Map.take(Map.get(context.agent.state, config.state_path, %{}), config.inherit),
                  spec.initial_state
                ),
-               parent
+               parent,
+               context
              ]},
             success_type: "aikido.ash.team.started",
             error_type: "aikido.ash.team.failed",
@@ -303,15 +333,19 @@ defmodule Aikido.Ash.Team.Engine do
 
       state = update_in(state.operation.started, &(&1 ++ [name]))
 
-      watch =
-        Directives.async_task({Aikido.Ash.Team.Runtime, :watch_member, [pid, context.agent_pid]},
-          success_type: "aikido.ash.team.exited",
-          error_type: "aikido.ash.team.exited",
-          payload: %{member: name, pid: pid, incarnation: id}
-        )
+      case state.failures[name] do
+        %{pid: ^pid, reason: reason} ->
+          state = %{
+            state
+            | members: Map.delete(state.members, name),
+              incarnations: Map.delete(state.incarnations, name)
+          }
 
-      {:ok, next, directives} = advance(state, context, config)
-      {:ok, next, [watch | directives]}
+          failed(%{operation_id: id, reason: {:member_exited, name, reason}}, state, context)
+
+        _ ->
+          advance(state, context, config)
+      end
     else
       # A timed-out activation must not leave an untracked worker running.
       effects =
@@ -376,51 +410,71 @@ defmodule Aikido.Ash.Team.Engine do
     do: failed(%{operation_id: id, reason: :timeout}, state, context)
 
   defp exited(%{member: name, pid: pid} = data, state, context, _config) do
-    if Map.get(state.members, name) == pid do
-      tasks =
-        Map.new(state.tasks, fn {id, task} ->
-          {id,
-           if(task.member == name && task.status == :dispatched,
-             do: %{task | status: :failed, result: :member_exited},
-             else: task
-           )}
-        end)
+    reason = Map.get(data, :result, Map.get(data, :reason))
 
-      previous = state
+    cond do
+      Map.get(state.members, name) == pid ->
+        affected = owned_members(state.topology.nodes, [name])
+        previous = state
 
-      state = %{
-        state
-        | members: Map.delete(state.members, name),
-          incarnations: Map.delete(state.incarnations, name),
-          failures: Map.put(state.failures, name, Map.get(data, :result, Map.get(data, :reason))),
-          tasks: tasks
-      }
+        tasks =
+          Map.new(state.tasks, fn {id, task} ->
+            {id,
+             if(task.member in affected and task.status == :dispatched,
+               do: %{task | status: :failed, result: :member_exited},
+               else: task
+             )}
+          end)
 
-      notifications =
-        for {id, task} <- tasks,
-            task.status == :failed && previous.tasks[id].status == :dispatched,
-            effect <- notify(task, state, context),
-            do: effect
+        state = %{
+          state
+          | members: Map.delete(state.members, name),
+            incarnations: Map.delete(state.incarnations, name),
+            failures: Map.put(state.failures, name, %{pid: pid, reason: reason}),
+            tasks: tasks
+        }
 
-      reconcile =
-        if Map.has_key?(state.topology.nodes, name) && !Map.has_key?(state.paused, name) &&
-             state.operation.status != :running,
-           do: [
-             Directives.emit(
-               struct!(Signal,
-                 id: nil,
-                 type: "aikido.ash.team.ensure_member",
-                 data: %{member: name},
-                 source: "/aikido"
-               )
-             )
-           ],
-           else: []
+        notifications =
+          for {id, task} <- tasks,
+              task.status == :failed and previous.tasks[id].status == :dispatched,
+              effect <- notify(task, state, context),
+              do: effect
 
-      {:ok, state, notifications ++ reconcile}
-    else
-      {:ok, state, []}
+        # The owner may have died before it could forward its descendants' exits.
+        # Stop retained descendant PIDs before rebuilding this owned subtree.
+        reconcile =
+          if Map.has_key?(state.topology.nodes, name) and
+               not Map.has_key?(state.paused, name) and state.operation.status != :running do
+            [
+              Directives.emit(
+                struct!(Signal,
+                  id: nil,
+                  type: "aikido.ash.team.reconcile",
+                  data: %{members: affected, replace: affected -- [name]},
+                  source: "/aikido"
+                )
+              )
+            ]
+          else
+            []
+          end
+
+        {:ok, state, notifications ++ reconcile}
+
+      state.operation.status == :running and state.operation.awaiting == {:start, name} ->
+        # Startup completion and process DOWN come from different senders. Retain
+        # the exiting PID so a late completion cannot install an already-dead member.
+        {:ok, %{state | failures: Map.put(state.failures, name, %{pid: pid, reason: reason})}, []}
+
+      true ->
+        {:ok, state, []}
     end
+  end
+
+  defp owned_members(nodes, names) do
+    children = for {name, spec} <- nodes, spec.owner in names, do: name
+    next = Enum.uniq(names ++ children)
+    if length(next) == length(names), do: next, else: owned_members(nodes, next)
   end
 
   defp send_message(data, state) do

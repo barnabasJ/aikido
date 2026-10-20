@@ -68,24 +68,6 @@ defmodule Aikido.AI.Context do
     content_tokens + tool_calls_tokens + name_tokens + id_tokens + @entry_overhead_tokens
   end
 
-  @doc """
-  Group context messages into atomic units.
-
-  An assistant message with non-empty `tool_calls` is grouped with the
-  subsequent `:tool` messages whose `tool_call_id` matches one of the
-  assistant's tool call ids. Standalone messages (user, system, assistant
-  without tool_calls) form their own single-message groups.
-
-  Input messages are chronological (oldest first); the returned list of groups
-  is also chronological — the newest group is last.
-  """
-  @spec group_messages(messages :: [Message.t()]) :: [[Message.t()]]
-  def group_messages(messages) when is_list(messages) do
-    messages
-    |> do_group_messages([])
-    |> Enum.reverse()
-  end
-
   defp estimate_string_tokens(nil), do: 0
 
   defp estimate_string_tokens(text) when is_binary(text),
@@ -137,72 +119,21 @@ defmodule Aikido.AI.Context do
   defp args_to_json(args) when is_binary(args), do: args
   defp args_to_json(args), do: Jason.encode!(args)
 
-  # Tool-call id extraction across the shapes we may encounter
-  defp tool_call_id(%ToolCall{id: id}), do: id
-  defp tool_call_id(%{id: id}) when is_binary(id), do: id
-  defp tool_call_id(%{"id" => id}) when is_binary(id), do: id
-  defp tool_call_id(_), do: nil
-
-  # Group messages into atomic units. Input is chronological (oldest first);
-  # accumulator collects groups newest-first and is reversed by the caller.
-  defp do_group_messages([], acc), do: acc
-
-  defp do_group_messages([%Message{role: :assistant, tool_calls: tc} = message | rest], acc)
-       when is_list(tc) and tc != [] do
-    tool_call_ids =
-      tc
-      |> Enum.map(&tool_call_id/1)
-      |> Enum.reject(&is_nil/1)
-      |> MapSet.new()
-
-    {tool_results, remaining} =
-      Enum.split_while(rest, fn
-        %Message{role: :tool, tool_call_id: id} -> MapSet.member?(tool_call_ids, id)
-        _ -> false
-      end)
-
-    group = [message | tool_results]
-    do_group_messages(remaining, [group | acc])
-  end
-
-  defp do_group_messages([message | rest], acc) do
-    do_group_messages(rest, [[message] | acc])
+  @doc "Close an interrupted final tool batch so the next user turn has valid history."
+  def close_tool_calls(context) do
+    context.messages
+    |> AshAi.ToolLoop.pending_tool_calls()
+    |> Enum.reduce(context, fn call, context ->
+      Context.append(
+        context,
+        Context.tool_result(
+          call.id,
+          call.name,
+          Jason.encode!(%{error: "interrupted before a result was recorded"})
+        )
+      )
+    end)
   end
 
   defp data_value(data, key), do: Map.get(data, key, Map.get(data, to_string(key)))
-
-  @doc "Close an interrupted final tool batch so the next user turn has valid history."
-  def close_tool_calls(context) do
-    case context.messages |> group_messages() |> List.last() do
-      [%Message{role: :assistant, tool_calls: calls} | results]
-      when is_list(calls) and calls != [] ->
-        answered = MapSet.new(Enum.map(results, & &1.tool_call_id))
-
-        Enum.reduce(calls, context, fn call, context ->
-          id = tool_call_id(call)
-
-          if MapSet.member?(answered, id) do
-            context
-          else
-            name =
-              case call do
-                %ToolCall{function: function} -> function.name
-                map -> data_value(map, :name)
-              end
-
-            Context.append(
-              context,
-              Context.tool_result(
-                id,
-                name,
-                Jason.encode!(%{error: "interrupted before a result was recorded"})
-              )
-            )
-          end
-        end)
-
-      _ ->
-        context
-    end
-  end
 end

@@ -1,11 +1,8 @@
 defmodule Aikido.ReactFeaturesTest.Agent do
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "react_features"
-  end
-
-  slices do
     slice :ai, Aikido.Slices.AiReact
   end
 end
@@ -183,10 +180,17 @@ defmodule Aikido.ReactFeaturesTest do
     task = Task.async(fn -> Aikido.AI.ask_sync(pid, "use tool", opts) end)
     assert_receive {:model, worker, _}, 2_000
 
-    turn = %Aikido.Slices.AiReact.Turn{
-      type: :tool_calls,
-      tool_calls: [%{id: "one", name: "test_wait", arguments: %{}}]
-    }
+    turn =
+      struct!(ReqLLM.Response,
+        id: "scripted",
+        model: "offline",
+        context: ReqLLM.Context.new(),
+        message:
+          ReqLLM.Context.assistant("",
+            tool_calls: [%{id: "one", name: "test_wait", arguments: %{}}]
+          ),
+        finish_reason: :tool_calls
+      )
 
     send(worker, {:answer, {:ok, turn}})
     assert_receive {:tool_running, tool_worker}, 2_000

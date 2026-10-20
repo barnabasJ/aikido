@@ -1,25 +1,19 @@
 defmodule Aikido.Dsl.ExtensionPathOverrideTest.HostWithMemoryOverride do
   @moduledoc false
-  use Aikido.Agent, default_slices: false
+  use Aikido.Agent
 
   agent do
     name "host_memory_override"
-  end
-
-  slices do
     slice :short_term, Aikido.Slices.Memory
   end
 end
 
 defmodule Aikido.Dsl.ExtensionPathOverrideTest.HostWithoutMemoryOverride do
   @moduledoc false
-  use Aikido.Agent, default_slices: false
+  use Aikido.Agent
 
   agent do
     name "host_memory_default"
-  end
-
-  slices do
     slice :memory, Aikido.Slices.Memory
   end
 end
@@ -58,6 +52,5 @@ defmodule Aikido.Dsl.ExtensionPathOverrideTest do
       assert instance.path == :short_term
       assert instance.module == Aikido.Slices.Memory
     end
-
   end
 end

@@ -1,48 +1,6 @@
 defmodule Aikido.Dsl.Transformers.Attributes do
   @moduledoc false
-  use Spark.Dsl.Transformer
   alias Spark.Dsl.Transformer
-
-  def before?(_), do: true
-
-  def transform(dsl) do
-    module = Transformer.get_persisted(dsl, :module)
-    section = Enum.find([:agent, :slice], &Map.has_key?(dsl, [&1]))
-
-    declared = Transformer.get_entities(dsl, [section, :schema])
-
-    dsl = Enum.reduce(declared, dsl, &Transformer.add_entity(&2, [:attributes], &1))
-
-    accepted =
-      dsl
-      |> Ash.Resource.Info.attributes()
-      |> Enum.filter(& &1.writable?)
-      |> Enum.map(& &1.name)
-
-    {:ok, dsl} =
-      Ash.Resource.Builder.add_new_action(dsl, :create, :create,
-        primary?: true,
-        accept: accepted
-      )
-
-    {:ok, dsl} =
-      Ash.Resource.Builder.add_new_action(dsl, :update, :update,
-        primary?: true,
-        accept: accepted
-      )
-
-    resource = module
-
-    dsl =
-      if Map.has_key?(dsl, [section, :schema]),
-        do: Transformer.set_option(dsl, [section], :schema, resource),
-        else: dsl
-
-    dsl = configure(dsl, section, module)
-    names = Enum.map(declared, & &1.name)
-
-    {:ok, Transformer.persist(dsl, :aikido_state_fields, names)}
-  end
 
   def configure(dsl, section, module) do
     fields = Transformer.get_entities(dsl, [section, :config_schema])
@@ -54,7 +12,7 @@ defmodule Aikido.Dsl.Transformers.Attributes do
         Enum.map(fields, fn field ->
           opts =
             field
-            |> Map.take([:allow_nil?, :constraints, :default, :description])
+            |> Map.take([:allow_nil?, :constraints, :default, :description, :sensitive?])
             |> Enum.reject(fn {_key, value} -> is_nil(value) end)
 
           {:ok, argument} =

@@ -8,9 +8,10 @@ defmodule AgentExamples.HandoffTest do
       ReqLLM.Context.user(Aikido.AI.Handoff.instructions())
     ]
 
-    assert {:ok, %Aikido.Slices.AiReact.Turn{type: :final_answer, text: document}} =
+    assert {:ok, response} =
              AgentExamples.AI.StreamingClient.generate_text("offline", messages, tools: [])
 
+    document = ReqLLM.Response.text(response)
     assert document =~ "Offline handoff demonstration"
     assert document =~ "Next action:"
   end

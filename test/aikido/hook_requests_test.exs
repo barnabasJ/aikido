@@ -1,12 +1,9 @@
 defmodule Aikido.HookRequestsTest.Agent do
   @moduledoc false
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "hook_requests_test"
-  end
-
-  slices do
     slice :ai, Aikido.Slices.AiReact
   end
 end
@@ -17,7 +14,15 @@ defmodule Aikido.HookRequestsTest.Client do
 
   def generate_text(_model, messages, _opts) do
     text = messages |> Enum.flat_map(& &1.content) |> Enum.map_join("\n", & &1.text)
-    {:ok, %Aikido.Slices.AiReact.Turn{type: :final_answer, text: text}}
+
+    {:ok,
+     struct!(ReqLLM.Response,
+       id: "scripted",
+       model: "offline",
+       context: ReqLLM.Context.new(),
+       message: ReqLLM.Context.assistant(text, tool_calls: []),
+       finish_reason: :stop
+     )}
   end
 end
 

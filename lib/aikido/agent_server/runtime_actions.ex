@@ -85,10 +85,9 @@ defmodule Aikido.AgentServer.RuntimeActions do
       argument :initial_state, :map, description: "Initial state for child", default: %{}
       argument :meta, :map, description: "Metadata to pass to child", default: %{}
 
-      argument :restart, :atom,
-        description: "Restart policy for the child",
-        default: :transient,
-        constraints: [one_of: Aikido.Directives.valid_restart_policies()]
+      argument :restart?, :boolean,
+        description: "Automatically recover the child after a crash",
+        default: true
 
       description "Spawn a child agent with hierarchy tracking"
       run Aikido.Actions.Lifecycle.SpawnChild

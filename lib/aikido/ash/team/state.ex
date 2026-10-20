@@ -48,7 +48,6 @@ defmodule Aikido.Ash.Team.State do
     route "aikido.ash.team.started", :started
     route "aikido.ash.team.stopped", :stopped
     route "aikido.ash.team.failed", :failed
-    route "aikido.ash.team.exited", :exited
     route "aikido.ash.team.timeout", :timeout
     route "aikido.ash.team.operation.completed", :operation_completed
     route "aikido.ash.team.task.completed", :task_completed
@@ -144,13 +143,6 @@ defmodule Aikido.Ash.Team.State do
     end
 
     action :failed, Aikido.ActionResult do
-      public? false
-      argument :state, :term, allow_nil?: false
-      argument :data, :map, default: %{}
-      run Aikido.Ash.Team.Action
-    end
-
-    action :exited, Aikido.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}

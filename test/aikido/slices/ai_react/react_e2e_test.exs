@@ -1,78 +1,63 @@
 defmodule Aikido.Slices.AiReactE2ETest.NoToolsAgent do
   @moduledoc false
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "react_e2e_no_tools"
-  end
 
-  slices do
-    slice :ai, Aikido.Slices.AiReact
-  end
-
-  react do
-    model %{
-      provider: :openai,
-      id: "google/gemma-4-26b-a4b",
-      base_url: "http://localhost:1234/v1"
-    }
-
-    tools []
-    max_iterations 3
-    max_tokens 256
-    llm_opts api_key: "lm-studio"
+    slice :ai, Aikido.Slices.AiReact,
+      options: [
+        model: %{
+          provider: :openai,
+          id: "google/gemma-4-26b-a4b",
+          base_url: "http://localhost:1234/v1"
+        },
+        tools: [],
+        max_iterations: 3,
+        llm_opts: [max_tokens: 256, api_key: "lm-studio"]
+      ]
   end
 end
 
 defmodule Aikido.Slices.AiReactE2ETest.EchoAgent do
   @moduledoc false
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "react_e2e_echo"
-  end
 
-  slices do
-    slice :ai, Aikido.Slices.AiReact
-  end
-
-  react do
-    model %{
-      provider: :openai,
-      id: "google/gemma-4-26b-a4b",
-      base_url: "http://localhost:1234/v1"
-    }
-
-    tools [:test_echo]
-    max_iterations 5
-    max_tokens 256
-    llm_opts api_key: "lm-studio"
+    slice :ai, Aikido.Slices.AiReact,
+      options: [
+        model: %{
+          provider: :openai,
+          id: "google/gemma-4-26b-a4b",
+          base_url: "http://localhost:1234/v1"
+        },
+        tools: [:test_echo],
+        max_iterations: 5,
+        llm_opts: [max_tokens: 256, api_key: "lm-studio"]
+      ]
   end
 end
 
 defmodule Aikido.Slices.AiReactE2ETest.AddAgent do
   @moduledoc false
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "react_e2e_add"
-  end
 
-  slices do
-    slice :ai, Aikido.Slices.AiReact
-  end
-
-  react do
-    model %{
-      provider: :openai,
-      id: "google/gemma-4-26b-a4b",
-      base_url: "http://localhost:1234/v1"
-    }
-
-    tools [:test_add]
-    max_iterations 5
-    max_tokens 256
-    llm_opts api_key: "lm-studio"
+    slice :ai, Aikido.Slices.AiReact,
+      options: [
+        model: %{
+          provider: :openai,
+          id: "google/gemma-4-26b-a4b",
+          base_url: "http://localhost:1234/v1"
+        },
+        tools: [:test_add],
+        max_iterations: 5,
+        llm_opts: [max_tokens: 256, api_key: "lm-studio"]
+      ]
   end
 end
 

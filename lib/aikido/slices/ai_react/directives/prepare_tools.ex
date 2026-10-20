@@ -5,9 +5,11 @@ defmodule Aikido.Slices.AiReact.Directives.PrepareTools do
   typed_struct do
     field :options, :term, default: %{}
     field :tools, {:array, :atom}, default: [], allow_nil?: false
+
     field :tool_options, {:array, :tuple},
       constraints: [items: [fields: [key: [type: :atom], value: [type: :term]]]],
       default: []
+
     field :request_id, :string, allow_nil?: false
   end
 

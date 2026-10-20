@@ -4,28 +4,10 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveActi
   @impl true
   def run(input, _opts, _context) do
     directive =
-      case Map.fetch(input.arguments, :directive) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:directive]
-      end
+      input.arguments.directive
 
     slice = input.arguments.state
     Aikido.ActionResult.new(state: slice || %{}, directives: [directive])
-  end
-end
-
-defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :emit_directive, Aikido.ActionResult do
-      argument :state, :term
-      argument :directive, :term, allow_nil?: false
-
-      run {AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveAction.Implementation,
-           action: :run}
-    end
   end
 end
 
@@ -40,11 +22,19 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.HarnessAgent do
     schema do
       attribute :observed, :term, default: nil
     end
+
+    route "test.directive",
+          {AikidoTest.AgentServer.DirectiveStrictSeparationTest.HarnessAgent, :emit_directive}
   end
 
-  signal_routes do
-    route "test.directive",
-          AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveAction
+  actions do
+    action :emit_directive, Aikido.ActionResult do
+      argument :state, :term
+      argument :directive, :term, allow_nil?: false
+
+      run {AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveAction.Implementation,
+           action: :run}
+    end
   end
 end
 

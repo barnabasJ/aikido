@@ -56,9 +56,6 @@ defmodule AikidoTest.MiddlewareTest do
   use ExUnit.Case, async: true
 
   describe("use Aikido.Middleware") do
-    nil
-    nil
-
     test "middleware modules implement the behaviour" do
       assert function_exported?(AikidoTest.MiddlewareTest.PassThrough, :on_signal, 4)
       assert function_exported?(AikidoTest.MiddlewareTest.Tagging, :on_signal, 4)
@@ -95,9 +92,6 @@ defmodule AikidoTest.MiddlewareTest do
   end
 
   describe("next-passing chain composition") do
-    nil
-    nil
-
     test "middleware composes outside-in" do
       sig = %Jido.Signal{type: "x", source: "/test", id: "1"}
       base = fn _sig, ctx -> {:ok, ctx, []} end
@@ -113,8 +107,6 @@ defmodule AikidoTest.MiddlewareTest do
   end
 
   describe("tagged-tuple chain semantics") do
-    nil
-
     test "middleware that swallows {:error, _, _} returns {:ok, ctx, []}" do
       sig = %Jido.Signal{type: "x", source: "/test", id: "1"}
       base = fn _sig, ctx -> {:error, ctx, :boom} end

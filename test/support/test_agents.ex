@@ -29,14 +29,12 @@ defmodule AikidoTest.TestAgents.Counter do
       attribute :counter, :integer, default: 0
       attribute :messages, {:array, :term}, default: []
     end
-  end
 
-  signal_routes do
-    route "increment", AikidoTest.TestActions.IncrementAction
-    route "decrement", AikidoTest.TestActions.DecrementAction
-    route "record", AikidoTest.TestActions.RecordAction
-    route "slow", AikidoTest.TestActions.SlowAction
-    route "fail", AikidoTest.TestActions.FailingAction
+    route "increment", {AikidoTest.TestActions, :increment}
+    route "decrement", {AikidoTest.TestActions, :decrement}
+    route "record", {AikidoTest.TestActions, :record}
+    route "slow", {AikidoTest.TestActions, :slow}
+    route "fail", {AikidoTest.TestActions, :failing}
   end
 end
 
@@ -81,11 +79,9 @@ defmodule AikidoTest.TestAgents.TestSliceWithRoutes do
     schema do
       attribute :value, :term, allow_nil?: true
     end
-  end
 
-  signal_routes do
-    route "post", AikidoTest.PluginTestAction
-    route "list", AikidoTest.PluginTestAction
+    route "post", {AikidoTest.TestActions, :plugin_test_action}
+    route "list", {AikidoTest.TestActions, :plugin_test_action}
   end
 end
 
@@ -99,22 +95,17 @@ defmodule AikidoTest.TestAgents.TestSliceWithPriority do
     schema do
       attribute :value, :term, allow_nil?: true
     end
-  end
 
-  signal_routes do
-    route "action", AikidoTest.PluginTestAction, priority: 5
+    route "action", {AikidoTest.TestActions, :plugin_test_action}, priority: 5
   end
 end
 
 defmodule AikidoTest.TestAgents.AgentWithSliceRoutes do
   @moduledoc false
-  use Aikido.Agent, default_slices: false
+  use Aikido.Agent
 
   agent do
     name "agent_with_slice_routes"
-  end
-
-  slices do
     slice :test_routes, AikidoTest.TestAgents.TestSliceWithRoutes
   end
 end
@@ -123,6 +114,6 @@ defmodule AikidoTest.TestAgents do
   @moduledoc """
   Shared test agents for Aikido test suite.
   """
-  Code.ensure_compiled!(AikidoTest.PluginTestAction)
-  Code.ensure_compiled!(AikidoTest.TestActions.IncrementAction)
+  Code.ensure_compiled!(AikidoTest.TestActions)
+  Code.ensure_compiled!(AikidoTest.TestActions)
 end

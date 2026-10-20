@@ -1,8 +1,8 @@
 defmodule Aikido.Slices.Thread.EntryNormalizer do
   @moduledoc """
-  Shared entry normalization for thread and storage append paths.
+  Contextual entry preparation for thread appends.
 
-  Ensures all adapters apply the same defaults and attribute extraction for
+  Supplies sequence, timestamp and ID before native Ash validation for
   `%Aikido.Slices.Thread.Entry{}` structs and plain maps.
   """
 
@@ -17,30 +17,20 @@ defmodule Aikido.Slices.Thread.EntryNormalizer do
   @spec normalize(entry_input(), non_neg_integer(), integer(), opts()) :: Entry.t()
   def normalize(entry, seq, now, opts \\ [])
 
-  def normalize(%Entry{} = entry, seq, now, opts) do
-    id_generator = Keyword.get(opts, :id_generator, &generate_entry_id/0)
-
-    %Entry{
-      id: entry.id || generate_id(id_generator, seq),
-      seq: seq,
-      at: entry.at || now,
-      kind: entry.kind || :note,
-      payload: entry.payload || %{},
-      refs: entry.refs || %{}
-    }
-  end
+  def normalize(%Entry{} = entry, seq, now, opts),
+    do: normalize(Map.from_struct(entry), seq, now, opts)
 
   def normalize(attrs, seq, now, opts) when is_map(attrs) do
     id_generator = Keyword.get(opts, :id_generator, &generate_entry_id/0)
 
-    %Entry{
+    Entry.new!(
       id: fetch_entry_attr(attrs, :id, fn -> generate_id(id_generator, seq) end),
       seq: seq,
       at: fetch_entry_attr(attrs, :at, fn -> now end),
       kind: fetch_entry_attr(attrs, :kind, fn -> :note end),
       payload: fetch_entry_attr(attrs, :payload, fn -> %{} end),
       refs: fetch_entry_attr(attrs, :refs, fn -> %{} end)
-    }
+    )
   end
 
   @doc """
@@ -66,6 +56,6 @@ defmodule Aikido.Slices.Thread.EntryNormalizer do
   defp generate_id(generator, _seq), do: generator.()
 
   defp generate_entry_id do
-    "entry_" <> Aikido.Util.generate_id()
+    "entry_" <> Ash.UUIDv7.generate()
   end
 end

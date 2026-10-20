@@ -26,8 +26,6 @@ defmodule AikidoTest.AgentServer.OptionsTest do
       assert opts.agent_module == AikidoTest.AgentServer.OptionsTest.ValidAgent
       assert is_binary(opts.id)
       assert opts.initial_state == %{}
-      assert opts.registry == :"Elixir.test_aikido.Registry"
-      assert opts.register_global == true
       assert opts.on_parent_death == :stop
     end
 
@@ -54,38 +52,6 @@ defmodule AikidoTest.AgentServer.OptionsTest do
       assert opts.initial_state == %{foo: :bar}
     end
 
-    test "registry is derived from aikido instance" do
-      {:ok, opts} =
-        Aikido.AgentServer.Options.new(
-          @base_opts ++ [agent_module: AikidoTest.AgentServer.OptionsTest.ValidAgent]
-        )
-
-      assert opts.registry == :"Elixir.test_aikido.Registry"
-    end
-
-    test "explicit registry is preserved when provided" do
-      {:ok, opts} =
-        Aikido.AgentServer.Options.new(
-          @base_opts ++
-            [
-              agent_module: AikidoTest.AgentServer.OptionsTest.ValidAgent,
-              registry: AikidoTest.CustomRegistry
-            ]
-        )
-
-      assert opts.registry == AikidoTest.CustomRegistry
-    end
-
-    test "allows disabling global registration" do
-      {:ok, opts} =
-        Aikido.AgentServer.Options.new(
-          @base_opts ++
-            [agent_module: AikidoTest.AgentServer.OptionsTest.ValidAgent, register_global: false]
-        )
-
-      assert opts.register_global == false
-    end
-
     test "creates options with default_dispatch" do
       {:ok, opts} =
         Aikido.AgentServer.Options.new(
@@ -110,18 +76,6 @@ defmodule AikidoTest.AgentServer.OptionsTest do
         )
 
       assert opts.on_parent_death == :continue
-    end
-
-    test "creates options with spawn_fun" do
-      spawn_fun = fn _ -> {:ok, self()} end
-
-      {:ok, opts} =
-        Aikido.AgentServer.Options.new(
-          @base_opts ++
-            [agent_module: AikidoTest.AgentServer.OptionsTest.ValidAgent, spawn_fun: spawn_fun]
-        )
-
-      assert opts.spawn_fun == spawn_fun
     end
   end
 

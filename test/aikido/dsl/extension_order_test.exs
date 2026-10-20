@@ -27,42 +27,36 @@ end
 
 defmodule Aikido.Dsl.ExtensionOrderTest.HostOrderTest do
   @moduledoc false
-  use Aikido.Agent,
-    middleware: [
-      Aikido.Dsl.ExtensionOrderTest.MiddlewareA,
-      Aikido.Dsl.ExtensionOrderTest.MiddlewareB,
-      Aikido.Dsl.ExtensionOrderTest.MiddlewareC
-    ],
-    default_slices: false
+  use Aikido.Agent
 
   agent do
     name "host_order_test"
+
+    middleware [
+      Aikido.Dsl.ExtensionOrderTest.MiddlewareA,
+      Aikido.Dsl.ExtensionOrderTest.MiddlewareB,
+      Aikido.Dsl.ExtensionOrderTest.MiddlewareC
+    ]
   end
 end
 
 defmodule Aikido.Dsl.ExtensionOrderTest.HostReverseOrder do
   @moduledoc false
-  use Aikido.Agent,
-    middleware: [
-      Aikido.Dsl.ExtensionOrderTest.MiddlewareC,
-      Aikido.Dsl.ExtensionOrderTest.MiddlewareB,
-      Aikido.Dsl.ExtensionOrderTest.MiddlewareA
-    ],
-    default_slices: false
+  use Aikido.Agent
 
   agent do
     name "host_reverse_order"
+
+    middleware [
+      Aikido.Dsl.ExtensionOrderTest.MiddlewareC,
+      Aikido.Dsl.ExtensionOrderTest.MiddlewareB,
+      Aikido.Dsl.ExtensionOrderTest.MiddlewareA
+    ]
   end
 end
 
 defmodule Aikido.Dsl.ExtensionOrderTest do
-  @moduledoc """
-  Verifies that the `extensions: […]` registration order is preserved
-  when classifying entries into plugins / slices / middleware. The
-  middleware-chain order is significant for the `on_signal/4`
-  pipeline, so the test asserts the host's middleware list mirrors
-  declaration order.
-  """
+  @moduledoc "Native agent middleware follows its declaration order."
   use ExUnit.Case, async: true
 
   describe("middleware-chain order preservation") do

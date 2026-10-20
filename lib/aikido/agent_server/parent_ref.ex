@@ -38,43 +38,5 @@ defmodule Aikido.AgentServer.ParentRef do
       description: "Arbitrary metadata from parent"
   end
 
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
-
-  @doc """
-  Creates a new ParentRef from a map of attributes.
-
-  Returns `{:ok, parent_ref}` or `{:error, reason}`.
-  """
-  @spec new(map()) :: {:ok, t()} | {:error, term()}
-  def new(attrs) when is_map(attrs) do
-    super(attrs)
-  end
-
-  def new(_), do: {:error, Aikido.Error.validation_error("ParentRef requires a map")}
-
-  @doc """
-  Creates a new ParentRef from a map, raising on error.
-  """
-  @spec new!(map()) :: t()
-  def new!(attrs) do
-    case new(attrs) do
-      {:ok, parent_ref} ->
-        parent_ref
-
-      {:error, reason} ->
-        raise Aikido.Error.validation_error("Invalid ParentRef", details: reason)
-    end
-  end
-
-  @doc """
-  Validates that a value is a valid ParentRef.
-  """
-  @spec validate(term()) :: {:ok, t()} | {:error, term()}
-  def validate(%__MODULE__{} = parent_ref), do: {:ok, parent_ref}
-  def validate(attrs) when is_map(attrs), do: new(attrs)
-
-  def validate(_),
-    do: {:error, Aikido.Error.validation_error("Expected a ParentRef struct or map")}
 end

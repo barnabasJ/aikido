@@ -1,7 +1,7 @@
 defmodule Aikido.Dsl.Agent.SliceMount do
   @moduledoc false
 
-  defstruct [:path, :module, :options, __spark_metadata__: nil]
+  defstruct [:path, :module, :options, __identifier__: nil, __spark_metadata__: nil]
 
   @type t :: %__MODULE__{
           path: atom(),

@@ -14,11 +14,7 @@ defmodule Aikido.Dsl.Agent.Verifiers.UniquePaths do
     own_path = Verifier.get_option(dsl_state, [:agent], :path)
     slice_paths = Verifier.get_persisted(dsl_state, :slice_paths) || []
 
-    all_paths =
-      [own_path | slice_paths]
-      |> Enum.reject(&is_nil/1)
-
-    duplicates = all_paths -- Enum.uniq(all_paths)
+    duplicates = if own_path in slice_paths, do: [own_path], else: []
 
     if duplicates == [] do
       :ok

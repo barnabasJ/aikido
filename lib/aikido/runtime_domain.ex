@@ -3,6 +3,7 @@ defmodule Aikido.RuntimeDomain do
   use Ash.Domain, validate_config_inclusion?: false
 
   resources do
+    allow_unregistered? true
     resource Aikido.AgentServer.RuntimeActions
   end
 end

@@ -29,17 +29,8 @@ defmodule Aikido.Directives.Spawn do
 
   @impl true
   def exec(%{child_spec: child_spec, tag: tag}, _input_signal, state) do
-    result =
-      if is_function(state.spawn_fun, 1) do
-        state.spawn_fun.(child_spec)
-      else
-        agent_sup =
-          if state.aikido,
-            do: Aikido.process_supervisor_name(state.aikido),
-            else: Aikido.process_supervisor_name(Aikido.Default)
-
-        DynamicSupervisor.start_child(agent_sup, child_spec)
-      end
+    agent_sup = Aikido.process_supervisor_name(state.aikido)
+    result = DynamicSupervisor.start_child(agent_sup, child_spec)
 
     case result do
       {:ok, pid} ->

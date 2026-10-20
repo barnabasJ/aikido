@@ -14,20 +14,6 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implem
   end
 end
 
-defmodule AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :slice_tick, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implementation,
-           action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice do
   @moduledoc false
   use Aikido.Slice
@@ -36,11 +22,23 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice do
     name "scheduler_integration_slice"
 
     schema do
+      attribute :tick_count, :integer, default: 0
+      attribute :ticks, {:array, :term}, default: []
     end
   end
 
   schedules do
-    schedule "* * * * * * *", AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction
+    schedule "* * * * * * *",
+             {AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice, :slice_tick}
+  end
+
+  actions do
+    action :slice_tick, Aikido.ActionResult do
+      argument :state, :term
+
+      run {AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implementation,
+           action: :run}
+    end
   end
 end
 
@@ -56,9 +54,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest.SliceScheduledAgent do
       attribute :tick_count, :integer, default: 0
       attribute :ticks, {:array, :term}, default: []
     end
-  end
 
-  slices do
     slice :scheduler_integration_slice,
           AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice
   end
@@ -82,7 +78,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
 
   defp slice_job_id do
     {:slice_schedule, :scheduler_integration_slice,
-     AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction}
+     {AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice, :slice_tick}}
   end
 
   describe("runtime scheduler failures") do
@@ -314,9 +310,9 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       AikidoTest.AgentWait.await_state_value(
         pid,
         fn state ->
-          domain = state.agent.state.domain
+          slice = state.agent.state.scheduler_integration_slice
 
-          if domain.tick_count >= 1 and Enum.any?(domain.ticks, &(&1[:source] == :slice_schedule)),
+          if slice.tick_count >= 1 and Enum.any?(slice.ticks, &(&1[:source] == :slice_schedule)),
             do: true
         end,
         timeout: 5000

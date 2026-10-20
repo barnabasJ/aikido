@@ -28,7 +28,6 @@ defmodule AikidoTest.Case do
   The module also provides helper functions:
 
   - `start_test_agent/2` - Starts an agent under the test's Aikido instance
-  - `test_registry/1` - Returns the registry name for the test's Aikido instance
   - `unique_id/1` - Generates a unique ID with optional prefix
   - `signal/3` - Creates a test signal with sensible defaults
   - `start_server/3` - Starts an agent server with automatic cleanup
@@ -46,27 +45,6 @@ defmodule AikidoTest.Case do
       """
       def start_test_agent(context, agent, opts \\ []) do
         Aikido.start_agent(context.aikido, agent, opts)
-      end
-
-      @doc """
-      Returns the registry for this test's Aikido instance.
-      """
-      def test_registry(context) do
-        Aikido.registry_name(context.aikido)
-      end
-
-      @doc """
-      Returns the task supervisor for this test's Aikido instance.
-      """
-      def test_task_supervisor(context) do
-        Aikido.task_supervisor_name(context.aikido)
-      end
-
-      @doc """
-      Returns the agent supervisor for this test's Aikido instance.
-      """
-      def test_agent_supervisor(context) do
-        Aikido.durable_supervisor_name(context.aikido)
       end
     end
   end

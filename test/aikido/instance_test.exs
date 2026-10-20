@@ -2,10 +2,6 @@ defmodule AikidoTest.InstanceTest.TestInstance do
   use Aikido, otp_app: :aikido_test_instance
 end
 
-defmodule AikidoTest.InstanceTest.OverrideInstance do
-  use Aikido, otp_app: :aikido_test_instance, default_slices: %{thread: false}
-end
-
 defmodule AikidoTest.InstanceTest do
   use ExUnit.Case, async: false
 
@@ -78,19 +74,6 @@ defmodule AikidoTest.InstanceTest do
       assert Aikido.Observe.Config.telemetry_log_level(instance) == :warning
       assert Aikido.Observe.Config.observe_log_level(instance) == :debug
     end
-
-    test "default slice resolution applies DSL overrides to application defaults" do
-      instance = AikidoTest.InstanceTest.OverrideInstance
-
-      Application.put_env(:aikido_test_instance, instance,
-        default_slices: [thread: Aikido.Slices.Thread, memory: Aikido.Slices.Memory]
-      )
-
-      on_exit(fn -> Application.delete_env(:aikido_test_instance, instance) end)
-
-      assert Aikido.Agent.DefaultSlices.for_instance(instance) == [memory: Aikido.Slices.Memory]
-    end
-
   end
 
   describe("instance lifecycle") do
@@ -105,12 +88,6 @@ defmodule AikidoTest.InstanceTest do
       {:ok, _pid} = AikidoTest.InstanceTest.TestInstance.start_link()
       task_sup = Aikido.task_supervisor_name(AikidoTest.InstanceTest.TestInstance)
       assert Process.whereis(task_sup) != nil
-    end
-
-    test "starts Registry as child" do
-      {:ok, _pid} = AikidoTest.InstanceTest.TestInstance.start_link()
-      reg = Aikido.registry_name(AikidoTest.InstanceTest.TestInstance)
-      assert Process.whereis(reg) != nil
     end
 
     test "starts the native DurableServer supervisor" do

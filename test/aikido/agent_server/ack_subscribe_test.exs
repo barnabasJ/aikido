@@ -4,25 +4,10 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation do
   @impl true
   def run(input, _opts, _context) do
     v =
-      case Map.fetch(input.arguments, :value) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:value]
-      end
+      input.arguments.value
 
     slice = input.arguments.state
     Aikido.ActionResult.new(state: %{slice | value: v, status: :written}, directives: [])
-  end
-end
-
-defmodule AikidoTest.AgentServer.AckSubscribeTest.WriteAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :write, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation, action: :run}
-    end
   end
 end
 
@@ -32,18 +17,6 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.FailingAction.Implementation d
   @impl true
   def run(_input, _opts, _context) do
     {:error, :intentional_action_failure}
-  end
-end
-
-defmodule AikidoTest.AgentServer.AckSubscribeTest.FailingAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :fail, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServer.AckSubscribeTest.FailingAction.Implementation, action: :run}
-    end
   end
 end
 
@@ -59,92 +32,22 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.TestAgent do
       attribute :value, :integer, default: 0
       attribute :status, :atom, default: :idle
     end
+
+    route "write", {AikidoTest.AgentServer.AckSubscribeTest.TestAgent, :write}
+    route "fail", {AikidoTest.AgentServer.AckSubscribeTest.TestAgent, :fail}
   end
-
-  signal_routes do
-    route "write", AikidoTest.AgentServer.AckSubscribeTest.WriteAction
-    route "fail", AikidoTest.AgentServer.AckSubscribeTest.FailingAction
-  end
-end
-
-defmodule AikidoTest.AgentServer.AckSubscribeTest.FlakyAction.Implementation do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(input, _opts, _context) do
-    signal = input.context.aikido.signal
-    succeed_after = signal.data.succeed_after
-    slice = input.arguments.state
-    n = signal.data.attempt
-
-    if n >= succeed_after do
-      Aikido.ActionResult.new(
-        state: %{slice | value: succeed_after, status: :written},
-        directives: []
-      )
-    else
-      {:error, :transient}
-    end
-  end
-end
-
-defmodule AikidoTest.AgentServer.AckSubscribeTest.FlakyAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
   actions do
-    action :flaky, Aikido.ActionResult do
+    action :write, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServer.AckSubscribeTest.FlakyAction.Implementation, action: :run}
+      argument :value, :integer, allow_nil?: false
+      run {AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation, action: :run}
     end
-  end
 
-  @counter_key {__MODULE__, :counter}
-  def reset(name) do
-    :persistent_term.put({@counter_key, name}, :counters.new(1, []))
-  end
-
-  def attempts(name) do
-    :counters.get(:persistent_term.get({@counter_key, name}), 1)
-  end
-end
-
-defmodule AikidoTest.AgentServer.AckSubscribeTest.AttemptContext do
-  @moduledoc false
-  use Aikido.Middleware
-
-  @impl true
-  def on_signal(%{type: "flaky"} = signal, ctx, _opts, next) do
-    key = {{AikidoTest.AgentServer.AckSubscribeTest.FlakyAction, :counter}, signal.data.name}
-    counter = :persistent_term.get(key)
-    :counters.add(counter, 1, 1)
-    signal = %{signal | data: Map.put(signal.data, :attempt, :counters.get(counter, 1))}
-    next.(signal, ctx)
-  end
-
-  def on_signal(signal, ctx, _opts, next), do: next.(signal, ctx)
-end
-
-defmodule AikidoTest.AgentServer.AckSubscribeTest.RetryingAgent do
-  @moduledoc false
-  use Aikido.Agent,
-    middleware: [
-      {Aikido.Middlewares.Retry, %{max_attempts: 3, pattern: "flaky"}},
-      AikidoTest.AgentServer.AckSubscribeTest.AttemptContext
-    ]
-
-  agent do
-    name "retrying_agent"
-    path :app
-
-    schema do
-      attribute :value, :integer, default: 0
-      attribute :status, :atom, default: :idle
+    action :fail, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.AgentServer.AckSubscribeTest.FailingAction.Implementation, action: :run}
     end
-  end
-
-  signal_routes do
-    route "flaky", AikidoTest.AgentServer.AckSubscribeTest.FlakyAction
   end
 end
 
@@ -324,53 +227,6 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
       :ok = Aikido.AgentServer.cast(pid, signal("fail"))
       assert_receive :subscriber_ran, 1000
       :ok = Aikido.AgentServer.unsubscribe(pid, ref)
-    end
-
-    test(
-      "Retry middleware re-invokes next on {:error, _}; selector fires once with the eventual success",
-      %{aikido: aikido}
-    ) do
-      pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.RetryingAgent)
-      :ok = Aikido.AgentServer.await_ready(pid)
-      key = {:flaky, System.unique_integer([:positive])}
-      AikidoTest.AgentServer.AckSubscribeTest.FlakyAction.reset(key)
-
-      result =
-        Aikido.AgentServer.call(
-          pid,
-          signal("flaky", %{name: key, succeed_after: 3}),
-          fn %Aikido.AgentServer.State{agent: agent} ->
-            case agent.state.app.status do
-              :written -> {:ok, agent.state.app.value}
-              _ -> {:error, :not_yet}
-            end
-          end,
-          timeout: 2000
-        )
-
-      assert {:ok, 3} = result
-      assert AikidoTest.AgentServer.AckSubscribeTest.FlakyAction.attempts(key) == 3
-    end
-
-    test(
-      "Retry middleware exhausts max_attempts; caller receives the final {:error, _}",
-      %{aikido: aikido}
-    ) do
-      pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.RetryingAgent)
-      :ok = Aikido.AgentServer.await_ready(pid)
-      key = {:flaky, System.unique_integer([:positive])}
-      AikidoTest.AgentServer.AckSubscribeTest.FlakyAction.reset(key)
-
-      result =
-        Aikido.AgentServer.call(
-          pid,
-          signal("flaky", %{name: key, succeed_after: 9999}),
-          fn _state -> {:ok, :should_be_skipped} end,
-          timeout: 2000
-        )
-
-      assert {:error, %Ash.Error.Unknown{}} = result
-      assert AikidoTest.AgentServer.AckSubscribeTest.FlakyAction.attempts(key) >= 3
     end
 
     test(

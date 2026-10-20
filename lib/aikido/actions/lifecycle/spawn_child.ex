@@ -7,7 +7,7 @@ defmodule Aikido.Actions.Lifecycle.SpawnChild do
     tag = input.arguments[:tag]
     state = input.arguments[:initial_state]
     meta = input.arguments[:meta]
-    restart = input.arguments[:restart]
+    restart? = input.arguments[:restart?]
 
     opts =
       if state == %{} do
@@ -16,7 +16,9 @@ defmodule Aikido.Actions.Lifecycle.SpawnChild do
         %{initial_state: state}
       end
 
-    directive = Aikido.Directives.spawn_agent(mod, tag, opts: opts, meta: meta, restart: restart)
+    directive =
+      Aikido.Directives.spawn_agent(mod, tag, opts: opts, meta: meta, restart?: restart?)
+
     Aikido.ActionResult.new(state: %{spawning: tag}, directives: [directive])
   end
 end

@@ -66,30 +66,13 @@ defmodule Aikido.AgentServer.SignalRouter do
     routes ++ normalize_routes(builtin, @slice_default_priority - 10)
   end
 
-  # Collects routes for the agent. Users may override `signal_routes/1`
-  # on their `use Aikido.Agent` module to compute routes from a runtime
-  # `ctx`; otherwise the default is the `signal_routes do …` section
-  # the agent declared.
-  defp add_agent_routes(routes, %State{
-         agent_module: agent_module,
-         aikido: aikido_instance,
-         partition: partition
-       }) do
-    ctx = %{agent_module: agent_module, aikido_instance: aikido_instance, partition: partition}
-
-    agent_routes =
-      if function_exported?(agent_module, :signal_routes, 1) do
-        agent_module.signal_routes(ctx)
-      else
-        Aikido.Dsl.Agent.Info.signal_routes(agent_module)
-      end
-
-    normalized = normalize_routes(agent_routes, @agent_default_priority)
-    routes ++ normalized
+  defp add_agent_routes(routes, %State{agent_module: agent_module}) do
+    agent_routes = Aikido.Dsl.Agent.Info.signal_routes(agent_module)
+    routes ++ normalize_routes(agent_routes, @agent_default_priority)
   end
 
   # Collects routes from slices via the agent's pre-expanded `routes/1`
-  # table — the slice DSL's `signal_routes do … end` block is the
+  # table — the slice's declared routes are the
   # single source of truth for slice routes. Already normalized with
   # priority by the agent transformer pipeline.
   defp add_slice_routes(routes, %State{agent_module: agent_module}) do

@@ -1,12 +1,9 @@
 defmodule Aikido.HooksTest.Agent do
   @moduledoc false
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "hook_test"
-  end
-
-  slices do
     slice :ai, Aikido.Slices.AiReact
   end
 end
@@ -18,15 +15,29 @@ defmodule Aikido.HooksTest.Client do
   def generate_text(model, messages, _opts) do
     if model == "tools" && not Enum.any?(messages, &(&1.role == :tool)) do
       {:ok,
-       %Aikido.Slices.AiReact.Turn{
-         type: :tool_calls,
-         tool_calls: [
-           %{id: "sum", name: "test_add", arguments: %{"input" => %{"a" => 2, "b" => 3}}}
-         ]
-       }}
+       struct!(ReqLLM.Response,
+         id: "scripted",
+         model: "offline",
+         context: ReqLLM.Context.new(),
+         message:
+           ReqLLM.Context.assistant("",
+             tool_calls: [
+               %{id: "sum", name: "test_add", arguments: %{"input" => %{"a" => 2, "b" => 3}}}
+             ]
+           ),
+         finish_reason: :tool_calls
+       )}
     else
       text = messages |> Enum.flat_map(& &1.content) |> Enum.map_join("\n", &(&1.text || ""))
-      {:ok, %Aikido.Slices.AiReact.Turn{type: :final_answer, text: text}}
+
+      {:ok,
+       struct!(ReqLLM.Response,
+         id: "scripted",
+         model: "offline",
+         context: ReqLLM.Context.new(),
+         message: ReqLLM.Context.assistant(text, tool_calls: []),
+         finish_reason: :stop
+       )}
     end
   end
 end
@@ -243,8 +254,15 @@ defmodule Aikido.HooksTest do
 
     signal = Jido.Signal.new!("ai.react.cancel", %{request_id: "run"})
 
-    {:ok, cancelled, []} =
-      AikidoTest.NativeAction.run({Aikido.Slices.AiReact, :cancel}, signal, waiting, %{})
+    {:ok, %Aikido.ActionResult{state: cancelled, directives: []}} =
+      then(signal, fn signal ->
+        Aikido.Slices.AiReact
+        |> Ash.ActionInput.for_action(:cancel, Map.put(signal.data || %{}, :state, waiting),
+          context: %{aikido: Map.put(%{}, :signal, signal)},
+          skip_unknown_inputs: [:*]
+        )
+        |> Ash.run_action()
+      end)
 
     assert cancelled.status == :failed
 
@@ -304,11 +322,26 @@ defmodule Aikido.HooksTest do
     assert waiting.status == :running
     assert waiting.hook_terminal == :completed
 
-    turn = %Aikido.Slices.AiReact.Turn{type: :final_answer, text: "late"}
+    turn =
+      struct!(ReqLLM.Response,
+        id: "scripted",
+        model: "offline",
+        context: ReqLLM.Context.new(),
+        message: ReqLLM.Context.assistant("late", tool_calls: []),
+        finish_reason: :stop
+      )
+
     signal = Jido.Signal.new!("ai.react.llm.completed", %{request_id: "run", turn: turn})
 
-    {:ok, unchanged, []} =
-      AikidoTest.NativeAction.run({Aikido.Slices.AiReact, :llm_turn}, signal, waiting, %{})
+    {:ok, %Aikido.ActionResult{state: unchanged, directives: []}} =
+      then(signal, fn signal ->
+        Aikido.Slices.AiReact
+        |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, waiting),
+          context: %{aikido: Map.put(%{}, :signal, signal)},
+          skip_unknown_inputs: [:*]
+        )
+        |> Ash.run_action()
+      end)
 
     assert unchanged == waiting
 

@@ -31,7 +31,6 @@ defmodule Aikido.Directives do
   - `Aikido.Directives.Spawn` — spawn a generic BEAM child process (fire-and-forget, no tracking)
   - `Aikido.Directives.AsyncTask` — run supervised async work and report success/error as signals
   - `Aikido.Directives.SpawnAgent` — spawn a child Aikido agent with hierarchy tracking
-  - `Aikido.Directives.SpawnManagedAgent` — spawn an agent via `Aikido.Durable`
   - `Aikido.Directives.AdoptChild` — attach an orphaned child to current parent
   - `Aikido.Directives.StopChild` — request a tracked child agent to stop gracefully
   - `Aikido.Directives.Schedule` — schedule a delayed message
@@ -101,51 +100,6 @@ defmodule Aikido.Directives do
           | Stop.t()
           | Cron.t()
           | CronCancel.t()
-
-  @typedoc "Restart policy for spawned AgentServer children."
-  @type restart_policy :: :permanent | :temporary | :transient
-
-  @restart_policies [:permanent, :temporary, :transient]
-  @unsupported_spawn_agent_opts [
-    :pool,
-    :pool_key
-  ]
-
-  @doc false
-  @spec valid_restart_policies() :: [restart_policy()]
-  def valid_restart_policies, do: @restart_policies
-
-  @doc false
-  @spec validate_restart_policy(term(), keyword()) :: :ok | {:error, String.t()}
-  def validate_restart_policy(restart, _opts \\ [])
-
-  def validate_restart_policy(restart, _opts) when restart in @restart_policies, do: :ok
-
-  def validate_restart_policy(restart, _opts) do
-    {:error, "restart must be one of #{inspect(@restart_policies)}, got: #{inspect(restart)}"}
-  end
-
-  @doc false
-  @spec validate_spawn_agent_opts(term()) :: :ok | {:error, String.t()}
-  def validate_spawn_agent_opts(opts) when is_map(opts) do
-    unsupported_opts =
-      @unsupported_spawn_agent_opts
-      |> Enum.filter(&Map.has_key?(opts, &1))
-      |> Enum.sort()
-
-    case unsupported_opts do
-      [] ->
-        :ok
-
-      opts ->
-        {:error,
-         "SpawnAgent does not support lifecycle/persistence opts #{inspect(opts)}; use Aikido.Durable for storage-backed lifecycle"}
-    end
-  end
-
-  def validate_spawn_agent_opts(opts) do
-    {:error, "SpawnAgent opts must be a map, got: #{inspect(opts)}"}
-  end
 
   # ============================================================================
   # Helper Constructors
@@ -238,64 +192,24 @@ defmodule Aikido.Directives do
 
   - `:opts` - Additional options for the child AgentServer (map)
     - Supports child startup options like `:id`, `:initial_state`, and `:on_parent_death`
-    - Does not support Durable lifecycle options like `:pool`, or `:pool_key`
+    - Does not support Durable lifecycle options like `:durable_server` or `:durable_key`
   - `:meta` - Metadata to pass to the child via parent reference (map)
-  - `:restart` - Child restart policy under supervision (default: `:transient`)
+  - `:restart?` - Let DurableServer automatically recover a failed child (default: `true`)
 
   ## Examples
 
       Directives.spawn_agent(MyWorkerAgent, :worker_1)
       Directives.spawn_agent(MyWorkerAgent, :processor, opts: %{initial_state: %{batch_size: 100}})
       Directives.spawn_agent(MyWorkerAgent, :handler, meta: %{assigned_topic: "events"})
-      Directives.spawn_agent(MyWorkerAgent, :durable, restart: :permanent)
+      Directives.spawn_agent(MyWorkerAgent, :durable, restart?: true)
   """
   @spec spawn_agent(term(), term(), keyword()) :: SpawnAgent.t()
   def spawn_agent(agent, tag, options \\ []) do
     opts = Keyword.get(options, :opts, %{})
     meta = Keyword.get(options, :meta, %{})
-    restart = Keyword.get(options, :restart, :transient)
+    restart? = Keyword.get(options, :restart?, true)
 
-    case validate_restart_policy(restart) do
-      :ok ->
-        case validate_spawn_agent_opts(opts) do
-          :ok ->
-            %SpawnAgent{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart}
-
-          {:error, message} ->
-            raise Aikido.Error.validation_error(message, field: :opts)
-        end
-
-      {:error, message} ->
-        raise Aikido.Error.validation_error(message, field: :restart)
-    end
-  end
-
-  @doc """
-  Creates a SpawnManagedAgent directive for spawning an agent via Durable.
-
-  ## Options
-
-  - `:initial_state` - Initial state map (default: `%{}`)
-  - `:agent_opts` - Extra AgentServer options (default: `[]`)
-
-  ## Examples
-
-      Directives.spawn_managed_agent(:threads, "thread-123", :worker)
-      Directives.spawn_managed_agent(:threads, "thread-123", :worker,
-        initial_state: %{thread_id: "thread-123"},
-        agent_opts: [parent: %{pid: self(), id: "parent-1", tag: :worker}]
-      )
-  """
-  @spec spawn_managed_agent(atom(), String.t(), term(), keyword()) ::
-          Aikido.Directives.SpawnManagedAgent.t()
-  def spawn_managed_agent(namespace, key, tag, options \\ []) do
-    %Aikido.Directives.SpawnManagedAgent{
-      namespace: namespace,
-      key: key,
-      tag: tag,
-      initial_state: Keyword.get(options, :initial_state, %{}),
-      agent_opts: Keyword.get(options, :agent_opts, [])
-    }
+    SpawnAgent.new!(agent: agent, tag: tag, opts: opts, meta: meta, restart?: restart?)
   end
 
   @doc """

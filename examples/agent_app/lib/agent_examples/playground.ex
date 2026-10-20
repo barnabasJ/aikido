@@ -363,7 +363,7 @@ defmodule AgentExamples.Playground do
         end)
 
       tools = AI.Tools.for_assistant()
-      tools = if options["lua"] == "true", do: tools ++ AI.Tools.from_ash_ai(), else: tools
+      tools = if options["lua"] == "true", do: tools ++ AI.Tools.for_lua(), else: tools
 
       tools =
         if example.kind == :ai_team && options["lua"] != "true" do

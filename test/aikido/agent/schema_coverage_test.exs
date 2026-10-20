@@ -27,7 +27,7 @@ defmodule AikidoTest.Agent.SchemaCoverageTest.ResourceDefaults do
   use Ash.Resource, data_layer: :embedded
 
   attributes do
-    attribute :token, :string, default: &Aikido.Util.generate_id/0, public?: true
+    attribute :token, :string, default: &Ash.UUIDv7.generate/0, public?: true
     attribute :time, :integer, default: {System, :system_time, [:millisecond]}, public?: true
   end
 
@@ -100,8 +100,7 @@ defmodule AikidoTest.Agent.SchemaCoverageTest do
              |> Ash.run_action()
 
     assert Aikido.Error.splode_error?(error)
-    assert Aikido.Error.from_term(error) === error
-    assert Aikido.Error.to_map(error).type == :validation_error
+    assert Ash.Error.to_error_class(error) == error
   end
 
   test "state contracts remain native typed structs" do

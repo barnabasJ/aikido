@@ -8,15 +8,19 @@ defmodule AikidoTest.AshVerifiersTest do
 
   test "slices require the embedded data layer" do
     output =
-      compile_resource([Aikido.Ash.Slice], """
-      attributes do
-        uuid_primary_key :id
-      end
+      compile_resource(
+        [Aikido.Ash.Slice],
+        """
+        attributes do
+          uuid_primary_key :id
+        end
 
-      slice do
-        name "not_embedded"
-      end
-      """, embedded?: false)
+        slice do
+          name "not_embedded"
+        end
+        """,
+        embedded?: false
+      )
 
     assert output =~ "Aikido.Ash.Slice requires data_layer: :embedded"
   end
@@ -24,20 +28,24 @@ defmodule AikidoTest.AshVerifiersTest do
   test "slice routes and schedules require reducer action contracts" do
     for declaration <- [~s(route "invalid.run", :invalid), ~s(schedule "* * * * *", :invalid)] do
       output =
-        compile_resource([Aikido.Ash.Slice], """
-        slice do
-          name "invalid_reducer"
-          #{if String.starts_with?(declaration, "route"), do: declaration}
-        end
-
-        #{if String.starts_with?(declaration, "schedule"), do: "schedules do #{declaration} end"}
-
-        actions do
-          action :invalid, :map do
-            run Aikido.Config
+        compile_resource(
+          [Aikido.Ash.Slice],
+          """
+          slice do
+            name "invalid_reducer"
+            #{if String.starts_with?(declaration, "route"), do: declaration}
           end
-        end
-        """, embedded?: true)
+
+          #{if String.starts_with?(declaration, "schedule"), do: "schedules do #{declaration} end"}
+
+          actions do
+            action :invalid, :map do
+              run Aikido.Config
+            end
+          end
+          """,
+          embedded?: true
+        )
 
       assert output =~ "Slice routes require generic Ash actions with a :state argument"
     end
@@ -65,7 +73,7 @@ defmodule AikidoTest.AshVerifiersTest do
       end
       """)
 
-    assert output =~ "Agent signal action names must be unique"
+    assert output =~ "Got duplicate Aikido.Ash.Agent.Signal: increment"
   end
 
   test "attributes cannot shadow the agent state path" do
@@ -125,20 +133,21 @@ defmodule AikidoTest.AshVerifiersTest do
   end
 
   test "Ash enforces uniqueness across schema and resource attributes" do
-    error = assert_raise Spark.Error.DslError, fn ->
-      compile_resource([Aikido.Ash.Agent], """
-      agent do
-        name "duplicate_fields"
-        schema do
-          attribute :count, :integer, default: 0
+    error =
+      assert_raise Spark.Error.DslError, fn ->
+        compile_resource([Aikido.Ash.Agent], """
+        agent do
+          name "duplicate_fields"
+          schema do
+            attribute :count, :integer, default: 0
+          end
         end
-      end
 
-      attributes do
-        attribute :count, :integer, default: 1
+        attributes do
+          attribute :count, :integer, default: 1
+        end
+        """)
       end
-      """)
-    end
 
     assert error.message =~ "fields"
     assert error.message =~ "count"
@@ -147,17 +156,18 @@ defmodule AikidoTest.AshVerifiersTest do
   test "domains reject resources without the agent extension" do
     module = Module.concat(__MODULE__, "Domain#{System.unique_integer([:positive])}")
 
-    output = ExUnit.CaptureIO.capture_io(:stderr, fn ->
-      Code.compile_string("""
-      defmodule #{inspect(module)} do
-        use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+    output =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        Code.compile_string("""
+        defmodule #{inspect(module)} do
+          use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
 
-        agents do
-          agent :slice, AikidoTest.AshFixtures.CounterSlice
+          agents do
+            agent :slice, AikidoTest.AshFixtures.CounterSlice
+          end
         end
-      end
-      """)
-    end)
+        """)
+      end)
 
     assert output =~ "Domain agents must use the Aikido.Ash.Agent extension"
   end

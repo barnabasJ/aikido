@@ -13,12 +13,6 @@ defmodule Aikido.Dsl.InstanceTest do
     assert Spark.Dsl.is?(TestInstance, Aikido.Dsl.Instance.Host)
     options = Info.instance_options(TestInstance)
     assert options.otp_app == :aikido
-
-    slices = Aikido.Agent.DefaultSlices.for_instance(TestInstance)
-    modules = Enum.map(slices, &Aikido.Agent.DefaultSlices.module_of/1)
-    assert Aikido.Slices.Memory in modules
-    assert Aikido.Slices.Identity in modules
-    assert Aikido.Slices.Thread in modules
   end
 
   test "shared config merges overrides and supervision defaults" do

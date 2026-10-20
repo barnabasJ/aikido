@@ -12,7 +12,7 @@ defmodule Aikido.AgentServer do
   - One DurableServer process per supervised agent
   - Signals process inline inside the triggering handler; the Erlang
     mailbox is the only queue
-  - Registry-based naming via `Aikido.Registry`
+  - DurableServer cluster-aware naming by logical ID
   - Logical parent-child hierarchy via state tracking + monitors
 
   Aikido's parent-child hierarchy is **logical**, not OTP supervisory ancestry.
@@ -25,15 +25,13 @@ defmodule Aikido.AgentServer do
   - `start/1` - Start under DurableServer
   - `start_link/1` - Start linked to caller
   - `call/4` - Synchronous signal processing with selector projection
-  - `cast/3` - Asynchronous signal processing
+  - `cast/2` - Asynchronous signal processing
   - `state/3` - Synchronous selector-driven state read (no signal pipeline)
-  - `whereis/1` - Registry lookup by ID (default registry)
-  - `whereis/2` - Registry lookup by ID (specific registry)
 
   ## Signal Flow
 
   ```
-  Signal → AgentServer.call/4 (or cast/3)
+  Signal → AgentServer.call/4 (or cast/2)
         → middleware chain (`on_signal/4` wrap)
             → routing → Ash.run_action → {agent, directives}
         → Directives executed inline via Aikido.Directive behaviour
@@ -42,18 +40,16 @@ defmodule Aikido.AgentServer do
   ```
 
   Signal routing is owned by AgentServer, not the Agent. Slices and the
-  agent itself can define `signal_routes/1` to map signal types to action
-  modules. Unmatched signals fall back to `{signal.type, signal.data}` as
-  the action.
+  agent itself declare routes in their Spark DSL to map signal types to action
+  references. Unmatched signals are rejected; `aikido.agent.stop` has a built-in fallback.
 
   ## Options
 
-  - `:aikido` - Aikido instance name for registry scoping (default: `Aikido`)
+  - `:aikido` - Aikido instance name for DurableServer scoping (default: `Aikido.Default`)
   - `:agent_module` - Agent module (required). The agent struct is always
     initialized through its native Ash `:initialize` action.
   - `:id` - Instance ID (auto-generated if not provided)
   - `:initial_state` - Initial state map for agent
-  - `:registry` - Registry module (default: `Aikido.Registry`)
   - `:default_dispatch` - Default dispatch config for Emit directives (fallback: current agent pid)
   - `:middleware` - List of `module()` or `{module(), opts_map}` middleware appended at runtime
   - `:parent` - Parent reference for hierarchy
@@ -61,7 +57,6 @@ defmodule Aikido.AgentServer do
     - `:stop` - stop the child
     - `:continue` - keep running and become orphaned
     - `:emit_orphan` - become orphaned and process `aikido.agent.orphaned`
-  - `:spawn_fun` - Custom function for spawning children
   - `:debug` - Enable debug mode with event buffer (default: `false`)
 
   ## Examples
@@ -177,7 +172,7 @@ defmodule Aikido.AgentServer do
   that re-invokes `next` produces exactly one return/notification per
   triggering signal.
   """
-  use GenServer
+  @behaviour GenServer
   require Logger
 
   alias Aikido.AgentServer.{
@@ -193,7 +188,6 @@ defmodule Aikido.AgentServer do
   alias Aikido.Directives
 
   alias Aikido.AgentServer.Signal.{
-    ChildAdopted,
     ChildExit,
     ChildStarted,
     CronDied,
@@ -234,54 +228,13 @@ defmodule Aikido.AgentServer do
     Aikido.start_agent(Keyword.get(opts, :aikido, Aikido.Default), agent, opts)
   end
 
-  @doc """
-  Starts an AgentServer linked to the calling process.
-
-  ## Options
-
-  See module documentation for full list of options.
-
-  ## Examples
-
-      {:ok, pid} = Aikido.AgentServer.start_link(agent: MyAgent)
-      {:ok, pid} = Aikido.AgentServer.start_link(agent: MyAgent, id: "custom-123")
-      {:ok, pid} = Aikido.AgentServer.start_link(aikido: MyApp.Aikido, agent: MyAgent)
-  """
+  @doc "Activates through DurableServer and links the agent to the calling process."
   @spec start_link(keyword() | map()) :: GenServer.on_start()
   def start_link(opts) when is_list(opts) or is_map(opts) do
-    # Extract GenServer options (like :name) from agent opts
-    {genserver_opts, agent_opts} = extract_genserver_opts(opts)
-    GenServer.start_link(__MODULE__, agent_opts, genserver_opts)
-  end
-
-  defp extract_genserver_opts(opts) when is_list(opts) do
-    case Keyword.pop(opts, :name) do
-      {nil, agent_opts} -> {[], agent_opts}
-      {name, agent_opts} -> {[name: name], agent_opts}
+    with {:ok, pid} <- start(opts) do
+      Process.link(pid)
+      {:ok, pid}
     end
-  end
-
-  defp extract_genserver_opts(opts) when is_map(opts) do
-    case Map.pop(opts, :name) do
-      {nil, agent_opts} -> {[], agent_opts}
-      {name, agent_opts} -> {[name: name], agent_opts}
-    end
-  end
-
-  @doc """
-  Returns a child_spec for supervision.
-  """
-  @spec child_spec(keyword() | map()) :: Supervisor.child_spec()
-  def child_spec(opts) do
-    id = opts[:id] || __MODULE__
-
-    %{
-      id: id,
-      start: {__MODULE__, :start_link, [opts]},
-      shutdown: Defaults.agent_server_shutdown_timeout_ms(),
-      restart: :permanent,
-      type: :worker
-    }
   end
 
   @typedoc "Selector for `call/4` and `state/3`. Receives the full\n`%AgentServer.State{}`; the slice the user cares about lives at\n`state.agent.state` (or under the agent's declared `path/0`). Must\nreturn a tagged `{:ok, _}` or `{:error, _}` tuple.\n\nSelectors run synchronously in the agent process. A raising selector is\ncaught and surfaces to the caller as\n`{:error, {:selector_raised, exception, stacktrace}}`.\n\nNo `:skip` return — the caller is blocking, so \"skip\" has no meaning.\nUse `subscribe/4` for the ambient pattern that supports `:skip`.\n"
@@ -297,7 +250,7 @@ defmodule Aikido.AgentServer do
   return is delivered to the caller. On chain error, the selector is
   **not** invoked — the chain's error is delivered verbatim.
 
-  Retry middleware that re-invokes `next` does not fire the selector
+  Middleware that re-invokes `next` does not fire the selector
   multiple times — it fires once per outermost return.
 
   ## Options
@@ -341,18 +294,25 @@ defmodule Aikido.AgentServer do
   an accepted command. Waiting uses an isolated process so late subscription
   replies cannot leak into the caller's mailbox. This is an external-client
   convenience; do not wait for agent workflows inside directive execution.
+
+  The command may be a signal or a zero-arity function returning `{:ok, receipt}`,
+  `:ok`, or `{:error, reason}`. Use a function to dispatch through a public Ash
+  action with its policies and caller scope. It runs in the isolated waiter after
+  subscription registration.
   """
-  @spec call_until(server(), Signal.t(), String.t(), subscribe_selector(), keyword()) ::
+  @type dispatch_command :: Signal.t() | (-> :ok | {:ok, term()} | {:error, term()})
+  @spec call_until(server(), dispatch_command(), String.t(), subscribe_selector(), keyword()) ::
           {:ok, term()} | {:error, term()}
-  def call_until(server, %Signal{} = signal, pattern, selector, opts \\ [])
-      when is_binary(pattern) and is_function(selector, 1) do
+  def call_until(server, command, pattern, selector, opts \\ [])
+      when (is_struct(command, Signal) or is_function(command, 0)) and is_binary(pattern) and
+             is_function(selector, 1) do
     timeout = Keyword.get(opts, :timeout, Defaults.agent_server_call_timeout_ms())
     caller = self()
     request = make_ref()
 
     {waiter, monitor} =
       spawn_monitor(fn ->
-        result = wait_for_command_result(server, signal, pattern, selector, timeout)
+        result = wait_for_command_result(server, command, pattern, selector, timeout)
         send(caller, {request, result})
       end)
 
@@ -381,13 +341,13 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  defp wait_for_command_result(server, signal, pattern, selector, timeout) do
+  defp wait_for_command_result(server, command, pattern, selector, timeout) do
     with {:ok, pid} <- resolve_server(server),
          {:ok, ref} <- subscribe(pid, pattern, selector, once: true) do
       monitor = Process.monitor(pid)
 
       try do
-        with {:ok, :accepted} <- call(pid, signal, fn _ -> {:ok, :accepted} end, timeout: timeout) do
+        with :ok <- dispatch_command(pid, command, timeout) do
           receive do
             {:aikido_subscription, ^ref, %{result: result}} -> result
             {:DOWN, ^monitor, :process, ^pid, reason} -> {:error, {:server_stopped, reason}}
@@ -405,30 +365,39 @@ defmodule Aikido.AgentServer do
     :exit, reason -> {:error, {:server_stopped, reason}}
   end
 
+  defp dispatch_command(pid, %Signal{} = signal, timeout) do
+    case call(pid, signal, fn _ -> {:ok, :accepted} end, timeout: timeout) do
+      {:ok, :accepted} -> :ok
+      {:error, _} = error -> error
+    end
+  end
+
+  defp dispatch_command(_pid, command, _timeout) when is_function(command, 0) do
+    case command.() do
+      :ok -> :ok
+      {:ok, _receipt} -> :ok
+      {:error, _} = error -> error
+    end
+  end
+
   @doc """
   Asynchronously sends a signal for processing.
 
   Returns immediately. The signal is processed in the background.
 
-  ## Options
-
-  Options are accepted but currently unused.
-
   ## Returns
 
   * `:ok` - Signal queued successfully
-  * `{:error, :not_found}` - Server not found via registry
+  * `{:error, :not_found}` - Server not found
   * `{:error, :invalid_server}` - Unsupported server reference
 
   ## Examples
 
       :ok = Aikido.AgentServer.cast(pid, signal)
-      :ok = Aikido.AgentServer.cast(pid, signal, [])
   """
-  @spec cast(server(), Signal.t(), keyword()) :: :ok | {:error, term()}
-  def cast(server, %Signal{} = signal, opts \\ []) when is_list(opts) do
+  @spec cast(server(), Signal.t()) :: :ok | {:error, term()}
+  def cast(server, %Signal{} = signal) do
     with {:ok, pid} <- resolve_server(server) do
-      _ = opts
       GenServer.cast(pid, {:signal, signal})
     end
   end
@@ -697,49 +666,6 @@ defmodule Aikido.AgentServer do
   end
 
   @doc """
-  Looks up an agent by ID in a specific registry.
-
-  Returns the pid if found, nil otherwise.
-
-  ## Examples
-
-      pid = Aikido.AgentServer.whereis(MyApp.Aikido.Registry, "agent-123")
-      # => #PID<0.123.0>
-  """
-  @spec whereis(module(), String.t()) :: pid() | nil
-  def whereis(registry, id) when is_atom(registry) and is_binary(id) do
-    whereis(registry, id, [])
-  end
-
-  @spec whereis(module(), String.t(), keyword()) :: pid() | nil
-  def whereis(registry, id, opts) when is_atom(registry) and is_binary(id) and is_list(opts) do
-    key = Aikido.partition_key(id, Keyword.get(opts, :partition))
-
-    case Registry.lookup(registry, key) do
-      [{pid, _}] -> pid
-      [] -> nil
-    end
-  end
-
-  @doc """
-  Returns a via tuple for Registry-based naming.
-
-  ## Examples
-
-      name = Aikido.AgentServer.via_tuple("agent-id", MyApp.Aikido.Registry)
-      GenServer.call(name, :get_state)
-  """
-  @spec via_tuple(String.t(), module()) :: {:via, Registry, {module(), term()}}
-  def via_tuple(id, registry) when is_binary(id) and is_atom(registry) do
-    via_tuple(id, registry, [])
-  end
-
-  @spec via_tuple(String.t(), module(), keyword()) :: {:via, Registry, {module(), term()}}
-  def via_tuple(id, registry, opts) when is_binary(id) and is_atom(registry) and is_list(opts) do
-    {:via, Registry, {registry, Aikido.partition_key(id, Keyword.get(opts, :partition))}}
-  end
-
-  @doc """
   Check if the agent server process is alive.
   """
   @spec alive?(server()) :: boolean()
@@ -794,13 +720,22 @@ defmodule Aikido.AgentServer do
   @spec adopt_child(server(), pid() | String.t(), term(), map()) ::
           {:ok, pid()} | {:error, term()}
   def adopt_child(server, child, tag, meta \\ %{}) do
-    with {:ok, pid} <- resolve_server(server) do
-      try do
-        GenServer.call(pid, {:adopt_child, child, tag, meta})
-      catch
-        :exit, {:noproc, _} -> {:error, :not_found}
-        :exit, {:timeout, _} -> {:error, :timeout}
-        :exit, reason -> {:error, reason}
+    with {:ok, parent_pid} <- resolve_server(server),
+         {:ok, runtime} <- state(parent_pid, &{:ok, &1}),
+         :ok <- ensure_adopt_tag_available(runtime, tag),
+         {:ok, child_pid} <- resolve_adopt_child(child, runtime),
+         true <- child_pid != parent_pid || {:error, :cannot_adopt_self} do
+      parent_ref =
+        ParentRef.new!(%{
+          pid: parent_pid,
+          id: runtime.id,
+          partition: runtime.partition,
+          tag: tag,
+          meta: meta
+        })
+
+      with {:ok, _binding} <- adopt_parent(child_pid, parent_ref) do
+        await_child(parent_pid, tag)
       end
     end
   end
@@ -824,26 +759,6 @@ defmodule Aikido.AgentServer do
   end
 
   # ---------------------------------------------------------------------------
-  @doc false
-  @spec register_dynamic_cron_runtime(State.t(), term(), term(), term(), term()) ::
-          {:ok, State.t()} | {:error, term(), State.t()}
-  def register_dynamic_cron_runtime(
-        %State{} = state,
-        logical_id,
-        cron_expr,
-        message,
-        timezone
-      ) do
-    case validate_dynamic_cron_input(cron_expr, timezone) do
-      :ok ->
-        runtime_spec = CronRuntimeSpec.dynamic(cron_expr, message, timezone)
-        register_runtime_cron_job(state, logical_id, runtime_spec)
-
-      {:error, reason} ->
-        {:error, reason, state}
-    end
-  end
-
   @doc false
   @spec start_runtime_cron_job(State.t(), term(), CronRuntimeSpec.t()) ::
           {:ok, pid()} | {:error, term()}
@@ -1003,8 +918,7 @@ defmodule Aikido.AgentServer do
          chain = build_middleware_chain(agent_module, options),
          agent = restored_agent || build_agent(agent_module, options),
          {:ok, state} <-
-           State.from_options(options, agent_module, agent, middleware_chain: chain),
-         :ok <- maybe_register_global(options, state) do
+           State.from_options(options, agent_module, agent, middleware_chain: chain) do
       state = maybe_monitor_parent(state)
 
       # Lifecycle observers see restored domain state before schedules start.
@@ -1046,18 +960,6 @@ defmodule Aikido.AgentServer do
     case Trace.put(signal, Trace.new_root()) do
       {:ok, s} -> s
       {:error, _} -> signal
-    end
-  end
-
-  defp maybe_register_global(%Options{register_global: false}, _state) do
-    :ok
-  end
-
-  defp maybe_register_global(%Options{register_global: true}, state) do
-    case Registry.register(state.registry, Aikido.partition_key(state.id, state.partition), %{}) do
-      {:ok, _} -> :ok
-      {:error, {:already_registered, pid}} when pid == self() -> :ok
-      {:error, _reason} = error -> error
     end
   end
 
@@ -1177,84 +1079,13 @@ defmodule Aikido.AgentServer do
   end
 
   def handle_call({:adopt_parent, %ParentRef{} = parent_ref}, _from, %State{} = state) do
-    cond do
-      not is_nil(state.parent) ->
-        {:reply, {:error, :already_attached}, state}
-
-      not is_pid(parent_ref.pid) ->
-        {:reply, {:error, :invalid_parent}, state}
-
-      true ->
-        new_state =
-          state
-          |> State.attach_parent(parent_ref)
-          |> maybe_monitor_parent()
-          |> State.record_debug_event(:parent_adopted, %{
-            parent_id: parent_ref.id,
-            tag: parent_ref.tag
-          })
-
-        # Runtime adoption converges on the same observable signal as
-        # boot-time adoption (`handle_continue(:post_init, ...)`). This
-        # lets slices/signal_routes react to "a new child is now mine"
-        # without needing a separate hook for `AdoptChild` directives.
-        notify_parent_of_startup(new_state)
-
+    case attach_parent(state, parent_ref) do
+      {:ok, next} ->
         {:reply,
-         {:ok,
-          %{
-            id: new_state.id,
-            agent_module: new_state.agent_module,
-            partition: new_state.partition
-          }}, new_state}
-    end
-  end
+         {:ok, %{id: next.id, agent_module: next.agent_module, partition: next.partition}}, next}
 
-  def handle_call({:adopt_child, child, tag, meta}, _from, %State{} = state) do
-    with :ok <- ensure_adopt_tag_available(state, tag),
-         {:ok, child_pid} <- resolve_adopt_child(child, state),
-         :ok <- ensure_adopt_not_self(child_pid),
-         {:ok, child_runtime} <- perform_child_adoption(child_pid, tag, meta, state) do
-      child_info =
-        ChildInfo.new!(%{
-          pid: child_pid,
-          ref: Process.monitor(child_pid),
-          module: child_runtime.agent_module,
-          id: child_runtime.id,
-          partition: child_runtime.partition,
-          tag: tag,
-          meta: meta
-        })
-
-      # Synthesize a `aikido.agent.child.adopted` after the state mutation
-      # so subscribers can observe the post-adoption state through subscriptions.
-      # `notify_parent_of_startup`
-      # on the child side will also cast `aikido.agent.child.started` back
-      # to us asynchronously — that signal observes the same registration
-      # but with a later, race-prone delivery; this synthesized signal is
-      # the synchronous, parent-side announcement.
-      signal =
-        ChildAdopted.new!(
-          %{
-            tag: tag,
-            pid: child_pid,
-            child_id: child_runtime.id,
-            child_module: child_runtime.agent_module,
-            child_partition: child_runtime.partition,
-            meta: meta || %{}
-          },
-          source: "/agent/#{state.id}"
-        )
-
-      new_state =
-        state
-        |> State.add_child(tag, child_info)
-        |> State.record_debug_event(:child_adopted, %{child_id: child_runtime.id, tag: tag})
-        |> then(&dispatch_synthetic_signal(signal, &1))
-
-      {:reply, {:ok, child_pid}, new_state}
-    else
-      {:error, reason} -> {:reply, {:error, reason}, state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
@@ -1275,6 +1106,17 @@ defmodule Aikido.AgentServer do
   end
 
   @impl true
+  def handle_cast({:adopt_parent, %ParentRef{} = parent_ref}, %State{} = state) do
+    case attach_parent(state, parent_ref) do
+      {:ok, next} ->
+        {:noreply, next}
+
+      {:error, reason} ->
+        Logger.warning("Agent #{state.id} could not attach parent: #{inspect(reason)}")
+        {:noreply, state}
+    end
+  end
+
   def handle_cast({:unsubscribe, sub_ref}, %State{} = state) when is_reference(sub_ref) do
     case Map.pop(state.signal_subscribers, sub_ref) do
       {nil, _} ->
@@ -1488,7 +1330,7 @@ defmodule Aikido.AgentServer do
         {:ok, new_state, directives} ->
           case execute_directives(directives, signal, new_state) do
             {:ok, executed_state} ->
-              executed_state = fire_post_signal_hooks(executed_state, signal)
+              executed_state = fire_subscribers(executed_state, signal)
               {:ok, executed_state, directives}
 
             {:stop, reason, executed_state} ->
@@ -1501,7 +1343,7 @@ defmodule Aikido.AgentServer do
           # Chain returned an error. `new_state` already has any
           # middleware-staged mutations committed; no directives to run on
           # this branch. Subscribers still observe the resulting state.
-          new_state = fire_post_signal_hooks(new_state, signal)
+          new_state = fire_subscribers(new_state, signal)
           {:error, new_state, reason}
       end
     catch
@@ -1566,12 +1408,12 @@ defmodule Aikido.AgentServer do
             {:stop, _reason, s} -> s
           end
 
-        fire_post_signal_hooks(executed_state, signal)
+        fire_subscribers(executed_state, signal)
 
       {:error, new_state, _reason} ->
         # state has middleware mutations committed; no directives to run on
         # the error branch. Fire subscribers against the updated state.
-        fire_post_signal_hooks(new_state, signal)
+        fire_subscribers(new_state, signal)
     end
   end
 
@@ -1816,11 +1658,6 @@ defmodule Aikido.AgentServer do
   # table to fire alongside subscribers.
   # ---------------------------------------------------------------------------
 
-  @spec fire_post_signal_hooks(State.t(), Signal.t()) :: State.t()
-  defp fire_post_signal_hooks(%State{} = state, %Signal{} = signal) do
-    fire_subscribers(state, signal)
-  end
-
   defp fire_subscribers(%State{signal_subscribers: subs} = state, _signal)
        when map_size(subs) == 0 do
     state
@@ -1933,14 +1770,6 @@ defmodule Aikido.AgentServer do
     {{resource, action}, data}
   end
 
-  defp target_to_action(mod, %Signal{data: data}) when is_atom(mod) do
-    {mod, data}
-  end
-
-  defp target_to_action({mod, params}, _signal) when is_atom(mod) and is_map(params) do
-    {mod, params}
-  end
-
   # ---------------------------------------------------------------------------
   # Internal: Middleware Chain Composition
   # ---------------------------------------------------------------------------
@@ -2038,7 +1867,7 @@ defmodule Aikido.AgentServer do
   end
 
   defp run_action(reference, params, signal, ctx, path) do
-    {resource, name} = Aikido.ActionRef.normalize(reference)
+    {resource, name} = reference
     definition = Ash.Resource.Info.action(resource, name)
     state = Map.get(ctx.agent.state, path, %{})
 
@@ -2065,6 +1894,7 @@ defmodule Aikido.AgentServer do
     )
     |> Ash.run_action(options)
     |> case do
+      {:ok, %Aikido.ActionResult{} = result} -> Aikido.ActionResult.new(Map.from_struct(result))
       {:ok, result} -> Aikido.ActionResult.new(result)
       error -> error
     end
@@ -2199,7 +2029,13 @@ defmodule Aikido.AgentServer do
       timezone: timezone
     } = schedule_spec
 
-    runtime_spec = CronRuntimeSpec.schedule(cron_expr, signal_type, timezone)
+    runtime_spec =
+      CronRuntimeSpec.schedule(
+        cron_expr,
+        signal_type,
+        timezone,
+        Map.get(schedule_spec, :data, %{})
+      )
 
     case register_runtime_cron_job(state, job_id, runtime_spec) do
       {:ok, new_state} ->
@@ -2212,19 +2048,6 @@ defmodule Aikido.AgentServer do
       {:error, _reason, failed_state} ->
         failed_state
     end
-  end
-
-  defp validate_dynamic_cron_input(cron_expr, _timezone) when not is_binary(cron_expr) do
-    {:error, :invalid_cron_expression}
-  end
-
-  defp validate_dynamic_cron_input(_cron_expr, timezone)
-       when not (is_nil(timezone) or is_binary(timezone)) do
-    {:error, :invalid_timezone}
-  end
-
-  defp validate_dynamic_cron_input(_cron_expr, _timezone) do
-    :ok
   end
 
   defp handle_cron_job_down(state, logical_id, pid, reason) do
@@ -2345,7 +2168,7 @@ defmodule Aikido.AgentServer do
   @doc """
   Resolves a server reference to a pid.
 
-  Accepts the same reference types as `cast/3` and `call/4` — a pid, a
+  Accepts the same reference types as `cast/2` and `call/4` — a pid, a
   registered atom, or a `{:via, ...}` tuple. Returns `{:error, :not_found}`
   when a registered name doesn't currently point at a process; does not
   check process liveness for direct pids (`is_pid/1` alone is enough to
@@ -2378,8 +2201,8 @@ defmodule Aikido.AgentServer do
     {:error,
      {
        :invalid_server,
-       # String IDs require explicit registry lookup via Aikido.whereis/2
-       "String IDs require explicit registry lookup. Use Aikido.whereis(MyApp.Aikido, \"#{id}\", partition: ...) first or pass the pid directly."
+       # String IDs require an explicit Aikido instance lookup via Aikido.whereis/2
+       "String IDs require an explicit Aikido instance lookup. Use Aikido.whereis(MyApp.Aikido, \"#{id}\", partition: ...) first or pass the pid directly."
      }}
   end
 
@@ -2417,25 +2240,19 @@ defmodule Aikido.AgentServer do
     {:error, {:invalid_child, child}}
   end
 
-  defp ensure_adopt_not_self(pid) when pid == self() do
-    {:error, :cannot_adopt_self}
-  end
+  defp attach_parent(state, parent_ref) do
+    cond do
+      not is_nil(state.parent) ->
+        {:error, :already_attached}
 
-  defp ensure_adopt_not_self(_pid) do
-    :ok
-  end
+      not is_pid(parent_ref.pid) or parent_ref.pid == self() ->
+        {:error, :invalid_parent}
 
-  defp perform_child_adoption(child_pid, tag, meta, state) do
-    parent_ref =
-      ParentRef.new!(%{
-        pid: self(),
-        id: state.id,
-        partition: state.partition,
-        tag: tag,
-        meta: meta
-      })
-
-    adopt_parent(child_pid, parent_ref)
+      true ->
+        next = state |> State.attach_parent(parent_ref) |> maybe_monitor_parent()
+        notify_parent_of_startup(next)
+        {:ok, next}
+    end
   end
 
   defp maybe_monitor_parent(%State{parent: %ParentRef{pid: pid}} = state) when is_pid(pid) do
@@ -2581,6 +2398,9 @@ defmodule Aikido.AgentServer do
   end
 
   defp handle_child_down(%State{} = state, pid, reason) do
+    child =
+      Enum.find_value(state.children, fn {_tag, child} -> if child.pid == pid, do: child end)
+
     {tag, state} = State.remove_child_by_pid(state, pid)
 
     if tag do
@@ -2590,6 +2410,10 @@ defmodule Aikido.AgentServer do
         ChildExit.new!(%{tag: tag, pid: pid, reason: reason},
           source: "/agent/#{state.id}"
         )
+
+      if team_pid = child.meta[:team_pid] do
+        if team_pid != self(), do: cast(team_pid, signal)
+      end
 
       traced_signal =
         case Trace.put(signal, Trace.new_root()) do
@@ -2610,25 +2434,7 @@ defmodule Aikido.AgentServer do
   # Wraps parent-down reasons so OTP treats them as clean shutdowns.
   # OTP only considers :normal, :shutdown, and {:shutdown, term} as "normal" exits.
   # All other reasons get logged as errors by the default GenServer logger.
-  defp wrap_parent_down_reason(:normal) do
-    {:shutdown, {:parent_down, :normal}}
-  end
-
-  defp wrap_parent_down_reason(:noproc) do
-    {:shutdown, {:parent_down, :noproc}}
-  end
-
-  defp wrap_parent_down_reason(:shutdown) do
-    {:shutdown, {:parent_down, :shutdown}}
-  end
-
-  defp wrap_parent_down_reason({:shutdown, _} = r) do
-    {:shutdown, {:parent_down, r}}
-  end
-
-  defp wrap_parent_down_reason(reason) do
-    {:shutdown, {:parent_down, reason}}
-  end
+  defp wrap_parent_down_reason(reason), do: {:shutdown, {:parent_down, reason}}
 
   defp transition_to_orphan(%State{parent: %ParentRef{} = former_parent} = state, reason) do
     orphaned_state =

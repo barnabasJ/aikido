@@ -9,10 +9,8 @@ defmodule AikidoTest.AgentServerCoverageTest.SimpleTestAgent do
     schema do
       attribute :counter, :integer, default: 0
     end
-  end
 
-  signal_routes do
-    route "increment", AikidoTest.TestActions.IncrementAction
+    route "increment", {AikidoTest.TestActions, :increment}
   end
 end
 
@@ -22,10 +20,7 @@ defmodule AikidoTest.AgentServerCoverageTest.ManyDirectivesAction.Implementation
   @impl true
   def run(input, _opts, _context) do
     count =
-      case Map.fetch(input.arguments, :count) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:count]
-      end
+      input.arguments.count
 
     directives =
       for i <- 1..count do
@@ -44,19 +39,6 @@ defmodule AikidoTest.AgentServerCoverageTest.ManyDirectivesAction.Implementation
   end
 end
 
-defmodule AikidoTest.AgentServerCoverageTest.ManyDirectivesAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :many_directives, Aikido.ActionResult do
-      argument :state, :term
-      argument :count, :integer, default: 10
-      run {AikidoTest.AgentServerCoverageTest.ManyDirectivesAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServerCoverageTest.ManyDirectivesAgent do
   @moduledoc false
   use Aikido.Agent
@@ -69,10 +51,17 @@ defmodule AikidoTest.AgentServerCoverageTest.ManyDirectivesAgent do
       attribute :counter, :integer, default: 0
       attribute :directive_count, :integer, default: 0
     end
+
+    route "many_directives",
+          {AikidoTest.AgentServerCoverageTest.ManyDirectivesAgent, :many_directives}
   end
 
-  signal_routes do
-    route "many_directives", AikidoTest.AgentServerCoverageTest.ManyDirectivesAction
+  actions do
+    action :many_directives, Aikido.ActionResult do
+      argument :state, :term
+      argument :count, :integer, default: 10
+      run {AikidoTest.AgentServerCoverageTest.ManyDirectivesAction.Implementation, action: :run}
+    end
   end
 end
 
@@ -82,18 +71,6 @@ defmodule AikidoTest.AgentServerCoverageTest.CompleteAction.Implementation do
   @impl true
   def run(_input, _opts, _context) do
     Aikido.ActionResult.new(state: %{status: :completed, last_answer: "done!"}, directives: [])
-  end
-end
-
-defmodule AikidoTest.AgentServerCoverageTest.CompleteAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :complete, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServerCoverageTest.CompleteAction.Implementation, action: :run}
-    end
   end
 end
 
@@ -109,48 +86,20 @@ defmodule AikidoTest.AgentServerCoverageTest.FailAction.Implementation do
   end
 end
 
-defmodule AikidoTest.AgentServerCoverageTest.FailAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :fail, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServerCoverageTest.FailAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServerCoverageTest.DelayCompleteAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
     delay =
-      case Map.fetch(input.arguments, :delay_ms) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:delay_ms]
-      end
+      input.arguments.delay_ms
 
-    AikidoTest.TestActions.SlowAction.work(delay)
+    AikidoTest.TestActions.SlowAction.Implementation.work(delay)
 
     Aikido.ActionResult.new(
       state: %{status: :completed, last_answer: "delayed done!"},
       directives: []
     )
-  end
-end
-
-defmodule AikidoTest.AgentServerCoverageTest.DelayCompleteAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :delay_complete, Aikido.ActionResult do
-      argument :state, :term
-      argument :delay_ms, :integer, default: 50
-      run {AikidoTest.AgentServerCoverageTest.DelayCompleteAction.Implementation, action: :run}
-    end
   end
 end
 
@@ -167,12 +116,28 @@ defmodule AikidoTest.AgentServerCoverageTest.CompletionAgent do
       attribute :last_answer, :term, default: nil
       attribute :error, :term, default: nil
     end
+
+    route "complete", {AikidoTest.AgentServerCoverageTest.CompletionAgent, :complete}
+    route "fail", {AikidoTest.AgentServerCoverageTest.CompletionAgent, :fail}
+    route "delay_complete", {AikidoTest.AgentServerCoverageTest.CompletionAgent, :delay_complete}
   end
 
-  signal_routes do
-    route "complete", AikidoTest.AgentServerCoverageTest.CompleteAction
-    route "fail", AikidoTest.AgentServerCoverageTest.FailAction
-    route "delay_complete", AikidoTest.AgentServerCoverageTest.DelayCompleteAction
+  actions do
+    action :complete, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.AgentServerCoverageTest.CompleteAction.Implementation, action: :run}
+    end
+
+    action :fail, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.AgentServerCoverageTest.FailAction.Implementation, action: :run}
+    end
+
+    action :delay_complete, Aikido.ActionResult do
+      argument :state, :term
+      argument :delay_ms, :integer, default: 50
+      run {AikidoTest.AgentServerCoverageTest.DelayCompleteAction.Implementation, action: :run}
+    end
   end
 end
 
@@ -193,7 +158,11 @@ defmodule AikidoTest.AgentServerCoverageTest do
 
   describe("resolve_server with {:via, ...}") do
     test("via tuple that resolves to nil returns error", %{aikido: aikido}) do
-      nonexistent_via = {:via, Registry, {Aikido.registry_name(aikido), "nonexistent-via-agent"}}
+      start_supervised!({Registry, keys: :unique, name: Module.concat(aikido, ExternalRegistry)})
+
+      nonexistent_via =
+        {:via, Registry, {Module.concat(aikido, ExternalRegistry), "nonexistent-via-agent"}}
+
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
 
       assert {:error, :not_found} =
@@ -213,7 +182,17 @@ defmodule AikidoTest.AgentServerCoverageTest do
           aikido: aikido
         )
 
-      via = {:via, Registry, {Aikido.registry_name(aikido), "via-test-exists"}}
+      registry = Module.concat(aikido, ExternalRegistry)
+      start_supervised!({Registry, keys: :unique, name: registry})
+      pid = Aikido.whereis(aikido, "via-test-exists")
+
+      {:ok, :registered} =
+        Aikido.AgentServer.state(pid, fn _ ->
+          Registry.register(registry, "via-test-exists", nil)
+          {:ok, :registered}
+        end)
+
+      via = {:via, Registry, {Module.concat(aikido, ExternalRegistry), "via-test-exists"}}
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(via, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
@@ -227,7 +206,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
       assert {:error, {:invalid_server, message}} =
                Aikido.AgentServer.call("some-string-id", signal, fn s -> {:ok, s.agent} end)
 
-      assert message =~ "String IDs require explicit registry lookup"
+      assert message =~ "String IDs require an explicit Aikido instance lookup"
       assert message =~ "some-string-id"
     end
 
@@ -333,7 +312,8 @@ defmodule AikidoTest.AgentServerCoverageTest do
 
   describe("alive? with various server types") do
     test("alive? returns false for via tuple that doesn't exist", %{aikido: aikido}) do
-      via = {:via, Registry, {Aikido.registry_name(aikido), "nonexistent-alive-test"}}
+      start_supervised!({Registry, keys: :unique, name: Module.concat(aikido, ExternalRegistry)})
+      via = {:via, Registry, {Module.concat(aikido, ExternalRegistry), "nonexistent-alive-test"}}
       refute Aikido.AgentServer.alive?(via)
     end
 
@@ -349,7 +329,17 @@ defmodule AikidoTest.AgentServerCoverageTest do
           aikido: aikido
         )
 
-      via = {:via, Registry, {Aikido.registry_name(aikido), "alive-via-test"}}
+      registry = Module.concat(aikido, ExternalRegistry)
+      start_supervised!({Registry, keys: :unique, name: registry})
+      pid = Aikido.whereis(aikido, "alive-via-test")
+
+      {:ok, :registered} =
+        Aikido.AgentServer.state(pid, fn _ ->
+          Registry.register(registry, "alive-via-test", nil)
+          {:ok, :registered}
+        end)
+
+      via = {:via, Registry, {Module.concat(aikido, ExternalRegistry), "alive-via-test"}}
       assert Aikido.AgentServer.alive?(via)
     end
   end

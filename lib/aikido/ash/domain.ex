@@ -14,13 +14,14 @@ defmodule Aikido.Ash.Domain do
   """
   defmodule Entry do
     @moduledoc false
-    defstruct [:name, :resource, __spark_metadata__: nil]
+    defstruct [:name, :resource, __identifier__: nil, __spark_metadata__: nil]
   end
 
   @entry %Spark.Dsl.Entity{
     name: :agent,
     target: Entry,
     args: [:name, :resource],
+    identifier: :name,
     schema: [name: [type: :atom, required: true], resource: [type: :module, required: true]]
   }
   @agents %Spark.Dsl.Section{name: :agents, entities: [@entry]}

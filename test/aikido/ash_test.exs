@@ -153,7 +153,7 @@ defmodule AikidoTest.AshTest do
 
     assert {:ok, updated} =
              snapshot_result(
-               AikidoTest.AshFixtures.Domain.counter_increment(record, %{data: %{amount: 2}})
+               AikidoTest.AshFixtures.Domain.counter_increment(record, %{amount: 2})
              )
 
     assert updated.count == 2
@@ -195,7 +195,7 @@ defmodule AikidoTest.AshTest do
 
     assert {:ok, updated} =
              snapshot_result(
-               AikidoTest.AshFixtures.Domain.counter_increment(counter, %{data: %{amount: 3}})
+               AikidoTest.AshFixtures.Domain.counter_increment(counter, %{amount: 3})
              )
 
     assert updated.count == 7
@@ -351,12 +351,14 @@ defmodule AikidoTest.AshTest do
         source: "/test"
       )
 
-    assert {:ok, updated, []} =
-             AikidoTest.NativeAction.apply(
-               resource,
-               agent,
-               {{AikidoTest.AshFixtures.CounterSlice, :tick}, %{amount: 4}},
-               input_signal: signal
+    assert {:ok, %{agent: updated}, []} =
+             Aikido.AgentServer.apply_actions(
+               signal,
+               Map.merge(
+                 Aikido.SignalCtx.ctx(signal),
+                 Map.merge(%{}, %{agent_module: resource, agent: agent, agent_id: agent.id})
+               ),
+               [{{AikidoTest.AshFixtures.CounterSlice, :tick}, %{amount: 4}}]
              )
 
     assert updated.state.counter.count == 4
@@ -368,13 +370,17 @@ defmodule AikidoTest.AshTest do
     signal = Jido.Signal.new!("slice.increment", %{amount: 3}, source: "/test")
     state = %{count: 2}
 
-    assert {:ok, %{count: 5}, []} =
-             AikidoTest.NativeAction.run(
-               {AikidoTest.AshFixtures.CounterSlice, :increment},
-               signal,
-               state,
-               %{}
-             )
+    assert {:ok, %Aikido.ActionResult{state: %{count: 5}, directives: []}} =
+             then(signal, fn signal ->
+               AikidoTest.AshFixtures.CounterSlice
+               |> Ash.ActionInput.for_action(
+                 :increment,
+                 %{state: state, data: signal.data || %{}},
+                 context: %{aikido: Map.put(%{}, :signal, signal)},
+                 skip_unknown_inputs: [:*]
+               )
+               |> Ash.run_action()
+             end)
 
     assert state == %{count: 2}
   end
@@ -394,17 +400,18 @@ defmodule AikidoTest.AshTest do
   end
 
   test "colliding state paths are reported by the verifier" do
-    output = ExUnit.CaptureIO.capture_io(:stderr, fn ->
-      defmodule Elixir.AikidoTest.AshTest.DuplicatePaths do
-        use Ash.Resource, domain: nil, extensions: [Aikido.Ash.Agent]
+    output =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        defmodule Elixir.AikidoTest.AshTest.DuplicatePaths do
+          use Ash.Resource, domain: nil, extensions: [Aikido.Ash.Agent]
 
-        agent do
-          name "duplicate_paths"
-          instance AikidoTest.AshFixtures.Instance
-          slice :state, AikidoTest.AshFixtures.CounterSlice
+          agent do
+            name "duplicate_paths"
+            instance AikidoTest.AshFixtures.Instance
+            slice :state, AikidoTest.AshFixtures.CounterSlice
+          end
         end
-      end
-    end)
+      end)
 
     assert output =~ "Duplicate slice paths"
   end
@@ -453,18 +460,19 @@ defmodule AikidoTest.AshTest do
   end
 
   test "duplicate domain names are reported by the verifier" do
-    output = ExUnit.CaptureIO.capture_io(:stderr, fn ->
-      defmodule Elixir.AikidoTest.AshTest.DuplicateDomain do
-        use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+    output =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        defmodule Elixir.AikidoTest.AshTest.DuplicateDomain do
+          use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
 
-        agents do
-          agent :counter, AikidoTest.AshFixtures.Counter
-          agent :counter, AikidoTest.AshFixtures.Composed
+          agents do
+            agent :counter, AikidoTest.AshFixtures.Counter
+            agent :counter, AikidoTest.AshFixtures.Composed
+          end
         end
-      end
-    end)
+      end)
 
-    assert output =~ "Domain agent names must be unique"
+    assert output =~ "Got duplicate"
   end
 
   defp snapshot_result({:ok, %{resource: resource, id: id}}) do

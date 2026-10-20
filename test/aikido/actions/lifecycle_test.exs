@@ -14,13 +14,15 @@ defmodule AikidoTest.Actions.LifecycleTest do
       parent = %ParentRef{pid: parent_pid, id: "parent-1", tag: :child, meta: %{}}
       data = %{signal_type: "child.done", payload: %{result: 42}, source: "/child"}
 
-      {:ok, result, directives} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :notify_parent},
-          sig("notify_parent", data),
-          %{},
-          %{parent: parent}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: directives}} =
+        then(sig("notify_parent", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:notify_parent, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{parent: parent}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{notified: true}
       assert [%Directives.Emit{} = emit] = directives
@@ -32,13 +34,15 @@ defmodule AikidoTest.Actions.LifecycleTest do
     test "returns notified: false when ctx.parent is nil (orphaned)" do
       data = %{signal_type: "child.done", payload: %{}, source: "/child"}
 
-      {:ok, result, directives} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :notify_parent},
-          sig("notify_parent", data),
-          %{},
-          %{parent: nil}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: directives}} =
+        then(sig("notify_parent", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:notify_parent, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{parent: nil}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{notified: false}
       assert directives == []
@@ -57,13 +61,15 @@ defmodule AikidoTest.Actions.LifecycleTest do
         delivery_mode: :async
       }
 
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :notify_pid},
-          sig("notify_pid", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("notify_pid", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:notify_pid, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{sent_to: target}
       assert %Directives.Emit{} = directive
@@ -85,13 +91,15 @@ defmodule AikidoTest.Actions.LifecycleTest do
         delivery_mode: :sync
       }
 
-      {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :notify_pid},
-          sig("notify_pid", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+        then(sig("notify_pid", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:notify_pid, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert {:pid, opts} = directive.dispatch
       assert Keyword.get(opts, :target) == target
@@ -102,61 +110,67 @@ defmodule AikidoTest.Actions.LifecycleTest do
   describe("SpawnChild") do
     test "creates spawn_agent directive" do
       data = %{
-        agent_module: SomeWorker,
+        agent_module: AikidoTest.TestAgents.Minimal,
         tag: :worker_1,
         initial_state: %{batch_size: 100},
         meta: %{assigned: true},
-        restart: :permanent
+        restart?: true
       }
 
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :spawn_child},
-          sig("spawn_child", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("spawn_child", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:spawn_child, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{spawning: :worker_1}
       assert %Directives.SpawnAgent{} = directive
-      assert directive.agent == SomeWorker
+      assert directive.agent == AikidoTest.TestAgents.Minimal
       assert directive.tag == :worker_1
       assert directive.opts == %{initial_state: %{batch_size: 100}}
       assert directive.meta == %{assigned: true}
-      assert directive.restart == :permanent
+      assert directive.restart? == true
     end
 
     test "uses empty opts when no initial_state" do
       data = %{
-        agent_module: SomeWorker,
+        agent_module: AikidoTest.TestAgents.Minimal,
         tag: :worker_2,
         initial_state: %{},
         meta: %{},
-        restart: :transient
+        restart?: false
       }
 
-      {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :spawn_child},
-          sig("spawn_child", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+        then(sig("spawn_child", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:spawn_child, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert directive.opts == %{}
-      assert directive.restart == :transient
+      assert directive.restart? == false
     end
   end
 
   describe("StopSelf") do
     test "creates stop directive with normal reason" do
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :stop_self},
-          sig("stop_self", %{reason: :normal}),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("stop_self", %{reason: :normal}), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:stop_self, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{stopping: true, reason: :normal}
       assert %Directives.Stop{} = directive
@@ -164,13 +178,15 @@ defmodule AikidoTest.Actions.LifecycleTest do
     end
 
     test "supports custom stop reasons" do
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :stop_self},
-          sig("stop_self", %{reason: :work_complete}),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("stop_self", %{reason: :work_complete}), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:stop_self, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{stopping: true, reason: :work_complete}
       assert directive.reason == :work_complete
@@ -181,13 +197,15 @@ defmodule AikidoTest.Actions.LifecycleTest do
     test "creates stop_child directive" do
       data = %{tag: :worker_1, reason: :normal}
 
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :stop_child},
-          sig("stop_child", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("stop_child", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:stop_child, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{stopping_child: :worker_1, reason: :normal}
       assert %Directives.StopChild{} = directive
@@ -198,13 +216,15 @@ defmodule AikidoTest.Actions.LifecycleTest do
     test "supports custom stop reasons" do
       data = %{tag: :processor, reason: :shutdown}
 
-      {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :stop_child},
-          sig("stop_child", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+        then(sig("stop_child", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:stop_child, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert directive.reason == :shutdown
     end

@@ -4,10 +4,7 @@ defmodule AikidoTest.AgentTest.ConfiguredRoutesAgent do
 
   agent do
     name "configured_routes_agent"
-  end
-
-  signal_routes do
-    route "configured.route", AikidoTest.TestActions.NoSchema
+    route "configured.route", {AikidoTest.TestActions, :no_schema}
   end
 end
 
@@ -17,11 +14,8 @@ defmodule AikidoTest.AgentTest.ExtendingRoutesAgent do
 
   agent do
     name "extending_routes_agent"
-  end
-
-  signal_routes do
-    route "base.route", AikidoTest.TestActions.NoSchema
-    route "extended.route", AikidoTest.TestActions.BasicAction
+    route "base.route", {AikidoTest.TestActions, :no_schema}
+    route "extended.route", {AikidoTest.TestActions, :basic_action}
   end
 end
 
@@ -55,13 +49,13 @@ defmodule AikidoTest.AgentTest do
   describe("signal routes configuration") do
     test "agent's signal_routes section is exposed via Agent.Info.signal_routes/1" do
       routes = Aikido.Dsl.Agent.Info.signal_routes(AikidoTest.AgentTest.ConfiguredRoutesAgent)
-      assert routes == [{"configured.route", AikidoTest.TestActions.NoSchema}]
+      assert routes == [{"configured.route", {AikidoTest.TestActions, :no_schema}, 0}]
     end
 
     test "Agent.Info.signal_routes/1 returns configured routes for agents with multiple routes" do
       routes = Aikido.Dsl.Agent.Info.signal_routes(AikidoTest.AgentTest.ExtendingRoutesAgent)
-      assert {"base.route", AikidoTest.TestActions.NoSchema} in routes
-      assert {"extended.route", AikidoTest.TestActions.BasicAction} in routes
+      assert {"base.route", {AikidoTest.TestActions, :no_schema}, 0} in routes
+      assert {"extended.route", {AikidoTest.TestActions, :basic_action}, 0} in routes
       assert length(routes) == 2
     end
   end
@@ -115,14 +109,23 @@ defmodule AikidoTest.AgentTest do
   end
 
   describe("native action state transitions") do
-    test "executes action module" do
+    test "executes an explicit native action reference" do
       agent = AikidoTest.TestAgents.Basic.initialize!()
 
-      {:ok, updated, _directives} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.TestAgents.Basic,
-          agent,
-          AikidoTest.TestActions.NoSchema
+      {:ok, %{agent: updated}, _directives} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.TestAgents.Basic,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{AikidoTest.TestActions, :no_schema}, %{}}]
         )
 
       assert updated.state.domain.result == "No params"
@@ -131,11 +134,20 @@ defmodule AikidoTest.AgentTest do
     test "executes action tuple" do
       agent = AikidoTest.TestAgents.Basic.initialize!()
 
-      {:ok, updated, _directives} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.TestAgents.Basic,
-          agent,
-          {AikidoTest.TestActions.BasicAction, %{value: 42}}
+      {:ok, %{agent: updated}, _directives} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.TestAgents.Basic,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{AikidoTest.TestActions, :basic_action}, %{value: 42}}]
         )
 
       assert updated.state.domain.value == 42
@@ -144,11 +156,24 @@ defmodule AikidoTest.AgentTest do
     test "all-or-nothing batch: every action succeeds; slice reflects the last action" do
       agent = AikidoTest.TestAgents.Basic.initialize!()
 
-      {:ok, updated, directives} =
-        AikidoTest.NativeAction.apply(AikidoTest.TestAgents.Basic, agent, [
-          {AikidoTest.TestActions.Add, %{value: 5, amount: 3}},
-          {AikidoTest.TestActions.Add, %{value: 1, amount: 1}}
-        ])
+      {:ok, %{agent: updated}, directives} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.TestAgents.Basic,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [
+            {{AikidoTest.TestActions, :add}, %{value: 5, amount: 3}},
+            {{AikidoTest.TestActions, :add}, %{value: 1, amount: 1}}
+          ]
+        )
 
       assert updated.state.domain.value == 2
       assert directives == []
@@ -157,33 +182,54 @@ defmodule AikidoTest.AgentTest do
     test "all-or-nothing batch: middle action errors halts the batch and returns the input agent unchanged" do
       agent = AikidoTest.TestAgents.Basic.initialize!(%{state: %{counter: 0}})
 
-      assert {:error, %Ash.Error.Unknown{}} =
-               AikidoTest.NativeAction.apply(AikidoTest.TestAgents.Basic, agent, [
-                 {AikidoTest.TestActions.Add, %{value: 5, amount: 3}},
-                 {AikidoTest.TestActions.FailingAction, %{reason: "halted"}},
-                 {AikidoTest.TestActions.Add, %{value: 1, amount: 1}}
-               ])
+      assert {:error, _, %Ash.Error.Unknown{}} =
+               Aikido.AgentServer.apply_actions(
+                 struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+                 Map.merge(
+                   Aikido.SignalCtx.ctx(
+                     struct!(Jido.Signal,
+                       id: nil,
+                       type: "test.action",
+                       data: %{},
+                       source: "/test"
+                     )
+                   ),
+                   Map.merge(%{}, %{
+                     agent_module: AikidoTest.TestAgents.Basic,
+                     agent: agent,
+                     agent_id: agent.id
+                   })
+                 ),
+                 [
+                   {{AikidoTest.TestActions, :add}, %{value: 5, amount: 3}},
+                   {{AikidoTest.TestActions, :failing}, %{reason: "halted"}},
+                   {{AikidoTest.TestActions, :add}, %{value: 1, amount: 1}}
+                 ]
+               )
     end
 
     test "action error returns {:error, %Aikido.Error{}}" do
       agent = AikidoTest.TestAgents.Basic.initialize!()
 
-      assert {:error, %Ash.Error.Invalid{}} =
-               AikidoTest.NativeAction.apply(
-                 AikidoTest.TestAgents.Basic,
-                 agent,
-                 {AikidoTest.TestActions.BasicAction, %{}}
-               )
-    end
-
-    test "invalid input format returns {:error, %ValidationError{}}" do
-      agent = AikidoTest.TestAgents.Basic.initialize!()
-
-      assert {:error, %Aikido.Error.ValidationError{message: "Invalid action"}} =
-               AikidoTest.NativeAction.apply(
-                 AikidoTest.TestAgents.Basic,
-                 agent,
-                 {:unknown, "whatever"}
+      assert {:error, _, %Ash.Error.Invalid{}} =
+               Aikido.AgentServer.apply_actions(
+                 struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+                 Map.merge(
+                   Aikido.SignalCtx.ctx(
+                     struct!(Jido.Signal,
+                       id: nil,
+                       type: "test.action",
+                       data: %{},
+                       source: "/test"
+                     )
+                   ),
+                   Map.merge(%{}, %{
+                     agent_module: AikidoTest.TestAgents.Basic,
+                     agent: agent,
+                     agent_id: agent.id
+                   })
+                 ),
+                 [{{AikidoTest.TestActions, :basic_action}, %{}}]
                )
     end
   end
@@ -192,11 +238,20 @@ defmodule AikidoTest.AgentTest do
     test "action can emit signal via directive" do
       agent = AikidoTest.TestAgents.Basic.initialize!()
 
-      {:ok, updated, directives} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.TestAgents.Basic,
-          agent,
-          AikidoTest.TestActions.EmitAction
+      {:ok, %{agent: updated}, directives} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.TestAgents.Basic,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{AikidoTest.TestActions, :emit_action}, %{}}]
         )
 
       assert updated.state.domain.emitted == true
@@ -207,11 +262,20 @@ defmodule AikidoTest.AgentTest do
     test "action can return multiple directives" do
       agent = AikidoTest.TestAgents.Basic.initialize!()
 
-      {:ok, updated, directives} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.TestAgents.Basic,
-          agent,
-          AikidoTest.TestActions.MultiEffectAction
+      {:ok, %{agent: updated}, directives} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.TestAgents.Basic,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{AikidoTest.TestActions, :multi_effect_action}, %{}}]
         )
 
       assert updated.state.domain.triggered == true
@@ -225,11 +289,20 @@ defmodule AikidoTest.AgentTest do
           state: %{domain: %{prior: true}, audit: %{last_event: :none}}
         })
 
-      {:ok, updated, directives} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.TestAgents.Basic,
-          agent,
-          AikidoTest.TestActions.MultiSliceAction
+      {:ok, %{agent: updated}, directives} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.TestAgents.Basic,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{AikidoTest.TestActions, :multi_slice_action}, %{}}]
         )
 
       assert updated.state.domain == %{primary: "result"}

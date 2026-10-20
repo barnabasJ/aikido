@@ -27,36 +27,38 @@ end
 
 defmodule Aikido.Dsl.AgentExtensionsOrderTest.OrderedAgent do
   @moduledoc false
-  use Aikido.Agent,
-    middleware: [
+  use Aikido.Agent
+
+  agent do
+    name "ordered_agent"
+
+    middleware [
       Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareA,
       Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareB,
       Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareC
     ]
-
-  agent do
-    name "ordered_agent"
   end
 end
 
 defmodule Aikido.Dsl.AgentExtensionsOrderTest.InterleavedAgent do
   @moduledoc false
-  use Aikido.Agent,
-    middleware: [
+  use Aikido.Agent
+
+  agent do
+    name "interleaved_agent"
+
+    middleware [
       Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareA,
       Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareC,
       Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareB
     ]
-
-  agent do
-    name "interleaved_agent"
   end
 end
 
 defmodule Aikido.Dsl.AgentExtensionsOrderTest do
   use ExUnit.Case, async: true
 
-  test "middleware/0 preserves the `extensions: […]` keyword-list order" do
+  test "middleware follows its declared order" do
     assert [
              {Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareA, _},
              {Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareB, _},

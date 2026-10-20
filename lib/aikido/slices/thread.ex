@@ -5,8 +5,8 @@ defmodule Aikido.Slices.Thread do
 
   ## State shape
 
-  Declared by the embedded resource attributes. The slice starts as `nil` (lazy-init);
-  the first inbound `aikido.thread.*` signal materializes a fresh
+  Declared by the embedded resource attributes. Explicit mounts initialize from
+  native defaults. When called with nil state, the first inbound `aikido.thread.*` signal creates a fresh
   `%Aikido.Slices.Thread{}` via the relevant action.
 
   ## Routes
@@ -20,16 +20,8 @@ defmodule Aikido.Slices.Thread do
   DurableServer snapshots retain the complete thread and its entries with the
   rest of the agent state.
 
-  ## Default slice
+  Mount with `slice :thread, Aikido.Slices.Thread` inside an agent resource.
 
-  This slice is automatically included as a default slice for all agents
-  unless explicitly disabled:
-
-      use Aikido.Agent, default_slices: %{thread: false}
-
-      agent do
-        name "minimal"
-      end
   """
 
   use Ash.Resource,
@@ -43,9 +35,10 @@ defmodule Aikido.Slices.Thread do
 
     schema do
       attribute :id, :string,
+        default: "thread",
         public?: true,
         allow_nil?: false,
-        description: "Unique thread identifier",
+        description: "Thread identifier within the owning agent",
         constraints: [trim?: false, allow_empty?: true]
 
       attribute :rev, :integer,
@@ -54,18 +47,20 @@ defmodule Aikido.Slices.Thread do
         default: 0,
         description: "Monotonic revision, increments on append"
 
-      attribute :entries, {:array, :term},
+      attribute :entries, {:array, Aikido.Slices.Thread.Entry},
         public?: true,
         allow_nil?: false,
         default: [],
         description: "Ordered list of Entry structs"
 
       attribute :created_at, :integer,
+        default: 0,
         public?: true,
         allow_nil?: false,
         description: "Creation timestamp (ms)"
 
       attribute :updated_at, :integer,
+        default: 0,
         public?: true,
         allow_nil?: false,
         description: "Last update timestamp (ms)"
@@ -87,15 +82,6 @@ defmodule Aikido.Slices.Thread do
     route "aikido.thread.append", :append
     route "aikido.thread.clear", :clear
   end
-
-  @thread_section %Spark.Dsl.Section{
-    name: :thread,
-    describe: "Configuration block contributed by Aikido.Slices.Thread.",
-    schema: []
-  }
-  use Spark.Dsl.Extension,
-    sections: [@thread_section],
-    transformers: [Aikido.Slices.Thread.Transformers.RegisterContribution]
 
   actions do
     action :append, Aikido.ActionResult do
@@ -134,9 +120,6 @@ defmodule Aikido.Slices.Thread do
   alias Aikido.Slices.Thread.Entry
   alias Aikido.Slices.Thread.EntryNormalizer
   @type t :: map()
-  def new!(value) do
-    value |> then(&Ash.Type.cast_input(__MODULE__, &1)) |> Ash.Helpers.unwrap_or_raise!()
-  end
 
   @doc "Create a new empty thread"
   @spec new(keyword()) :: t()
@@ -239,6 +222,6 @@ defmodule Aikido.Slices.Thread do
   end
 
   defp generate_id do
-    "thread_" <> Aikido.Util.generate_id()
+    "thread_" <> Ash.UUIDv7.generate()
   end
 end

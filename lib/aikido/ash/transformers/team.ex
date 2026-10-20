@@ -3,7 +3,6 @@ defmodule Aikido.Ash.Transformers.Team do
   use Spark.Dsl.Transformer
   alias Spark.Dsl.Transformer
   alias Ash.Resource.Builder
-  alias Ash.Resource.Actions.Argument
 
   @commands [
     :start,
@@ -122,11 +121,8 @@ defmodule Aikido.Ash.Transformers.Team do
       arg(:metadata, :map, default: %{})
     ]
 
-  defp arg(name, type, opts \\ []),
-    do:
-      struct(
-        Argument,
-        Keyword.merge([name: name, type: Ash.Type.get_type(type), public?: true], opts)
-      )
-
+  defp arg(name, type, opts \\ []) do
+    {:ok, argument} = Builder.build_action_argument(name, type, opts)
+    argument
+  end
 end

@@ -7,7 +7,7 @@ defmodule Aikido.AgentServer.CronRuntimeSpec do
   @default_timezone "Etc/UTC"
 
   @enforce_keys [:kind, :cron_expression, :timezone]
-  defstruct [:kind, :cron_expression, :timezone, :message, :signal_type]
+  defstruct [:kind, :cron_expression, :timezone, :message, :signal_type, data: %{}]
 
   @type kind :: :dynamic | :schedule
 
@@ -31,13 +31,14 @@ defmodule Aikido.AgentServer.CronRuntimeSpec do
   end
 
   @spec schedule(String.t(), String.t(), String.t() | nil) :: t()
-  def schedule(cron_expression, signal_type, timezone \\ nil)
+  def schedule(cron_expression, signal_type, timezone \\ nil, data \\ %{})
       when is_binary(cron_expression) and is_binary(signal_type) do
     %__MODULE__{
       kind: :schedule,
       cron_expression: cron_expression,
       timezone: normalize_timezone(timezone),
-      signal_type: signal_type
+      signal_type: signal_type,
+      data: data
     }
   end
 
@@ -56,8 +57,12 @@ defmodule Aikido.AgentServer.CronRuntimeSpec do
     )
   end
 
-  def build_signal(%__MODULE__{kind: :schedule, signal_type: signal_type}, agent_id, _logical_id) do
-    Signal.new!(signal_type, %{}, source: "/agent/#{agent_id}/schedule")
+  def build_signal(
+        %__MODULE__{kind: :schedule, signal_type: signal_type, data: data},
+        agent_id,
+        _logical_id
+      ) do
+    Signal.new!(signal_type, data, source: "/agent/#{agent_id}/schedule")
   end
 
   defp normalize_timezone(nil), do: @default_timezone

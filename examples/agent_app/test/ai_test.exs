@@ -7,7 +7,15 @@ defmodule AgentExamples.AITest do
     @behaviour Aikido.AI.Client
     def generate_text(%{probe: probe} = model, messages, options) do
       send(probe, {:runtime_model_call, model, messages, options})
-      {:ok, %Aikido.Slices.AiReact.Turn{type: :final_answer, text: "runtime configured"}}
+
+      {:ok,
+       struct!(ReqLLM.Response,
+         id: "scripted",
+         model: "offline",
+         context: ReqLLM.Context.new(),
+         message: ReqLLM.Context.assistant("runtime configured", tool_calls: []),
+         finish_reason: :stop
+       )}
     end
   end
 
@@ -167,10 +175,10 @@ defmodule AgentExamples.AITest do
   end
 
   test "actual Ash AI callbacks and AshLua tools run through the model loop" do
-    tools = AI.Tools.from_ash_ai()
+    tools = AI.Tools.for_lua()
 
     assert Enum.sort(Enum.map(tools, &to_string/1)) ==
-             ["ash_text_stats", "lua_docs", "run_lua"]
+             ["lua_docs", "run_lua"]
 
     assistant = track(snapshot_result(Agents.assistant_start!(AI.offline(%{tools: tools}))))
     assert {:ok, answer} = AI.ask(assistant, "Signals carry results")
@@ -197,7 +205,7 @@ defmodule AgentExamples.AITest do
   end
 
   test "an AI orchestrator and its worker spawn agents using only AshLua tools" do
-    tools = AI.Tools.from_ash_ai()
+    tools = AI.Tools.for_lua()
     team = track(snapshot_result(Agents.research_team_start!(AI.offline(%{tools: tools}))))
     assert {:ok, answer} = AI.ask(team, "orchestrate: Signals carry results", timeout: 30_000)
     refute answer =~ "Tool error:"
@@ -213,7 +221,7 @@ defmodule AgentExamples.AITest do
   test "Lua can spawn teams, scope nested team management, and stop and remove owned workers" do
     team =
       track(
-        snapshot_result(Agents.research_team_start!(AI.offline(%{tools: AI.Tools.from_ash_ai()})))
+        snapshot_result(Agents.research_team_start!(AI.offline(%{tools: AI.Tools.for_lua()})))
       )
 
     assert {:ok, %{error: nil}} =

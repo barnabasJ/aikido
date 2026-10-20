@@ -28,10 +28,8 @@ defmodule Aikido.Directives.StopChild do
   which triggers a graceful shutdown. The child's exit will be delivered
   back to the parent as a `aikido.agent.child.exit` signal.
 
-  `SpawnAgent` children default to `restart: :transient`, so a normal
-  `StopChild` shutdown removes the child instead of immediately restarting it.
-  Custom reasons are wrapped as `{:shutdown, reason}` so transient children
-  are still removed cleanly.
+  A clean stop prevents DurableServer recovery. The resource's persistence policy
+  determines whether its snapshot is retained for a later explicit activation.
   """
 
   use Aikido.Directive

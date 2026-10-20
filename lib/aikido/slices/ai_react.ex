@@ -1,83 +1,20 @@
 defmodule Aikido.Slices.AiReact do
   @moduledoc """
-  ReAct strategy as a configured `Aikido.Slice`.
+  A native Ash slice that owns the ReAct conversation and its next execution step.
 
-  Attached to any `Aikido.Agent` via the agent's `extensions:` list and
-  configured through the contributed `react do … end` section:
+  Add `Aikido.Ash.AI` to an agent resource for model configuration and public
+  AI actions. Alternatively mount this slice directly with `slice :ai,
+  Aikido.Slices.AiReact, options: [...]` inside its `agent` block.
 
-      defmodule MyApp.SupportAgent do
-        use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  Runs move from `:idle` to `:setup` while native Ash AI tools are prepared,
+  then `:running` for model/tool turns. Terminal states are `:completed` and
+  `:failed`; optional todo completion can hold a result in `:waiting`.
+  Cancellation and queued messages are accepted during setup and execution.
 
-        agent do
-          name "support"
-        end
-
-        react do
-          model "anthropic:claude-haiku-4-5-20251001"
-          tools [:lookup_order, :refund_order]
-          tool_options [otp_app: :my_app]
-          system_prompt "You are a support agent."
-          max_iterations 5
-        end
-
-        slices do
-          slice :ai, Aikido.Slices.AiReact
-        end
-      end
-
-  The slice owns the `:ai` key of the agent's state and contains the full
-  lifecycle of one ReAct conversation.
-
-  ## State machine
-
-      :idle ──ask──▶ :setup ──tools ready──▶ :running
-                       │                       ├─tool calls──▶ :running (next turn)
-                       │                       ├─final answer / limit──▶ :completed
-                       │                       ├─unfinished blocking todos──▶ :waiting
-                       └─error / cancel──▶ :failed ◀──error / cancel──┘
-
-  Concurrent `ai.react.ask` while `:setup` or `:running` is rejected with
-  `{:error, :busy}`.
-
-  ## Slice fields
-
-    * `:status` — `:idle | :setup | :running | :waiting | :completed | :failed`.
-    * `:request_id` — opaque correlation id minted by `Aikido.AI.ask/3`.
-      Every response signal carries it; mismatched signals are dropped as
-      stale.
-    * `:context` — the full `ReqLLM.Context`: system, user, assistant and
-      tool messages.
-    * `:iteration` — number of LLM calls completed so far.
-    * `:max_iterations` — cap on LLM calls; further `:tool_calls` turns
-      after this is reached truncate the run as `:completed`.
-    * `:result` — final answer text on `:completed`, or `nil`.
-    * `:error` — error term on `:failed`, or `nil`.
-    * `:pending_tool_calls` — tool calls from the last `:tool_calls` turn,
-      kept until every paired tool result has come back.
-    * `:tool_results_received` — tool results accumulated for the in-flight
-      tool batch; cleared when the batch completes and the next LLMCall
-      fires.
-    * `:previous_tool_signature` — signature of the last batch's tool
-      calls; used to detect tool-call cycles and prepend a cycle-warning
-      user message before the next LLMCall.
-    * `:model`, `:tools`, `:system_prompt`, `:llm_opts` — run config
-      seeded from the slice's `slices:` config (validated through
-      the configuration contract); the `:ask` action falls back to these
-      values when the opening signal omits them.
-
-  ## Config keys (the configuration contract)
-
-    * `:model` — any value accepted by `ReqLLM.Generation.generate_text/3`.
-      Optional; the floor enforced by the `Ask` action is `{:error, :no_model}`
-      when neither the slice config nor the per-call `Aikido.AI.ask/3` opts
-      supply a model.
-    * `:tools` — Ash AI tool names. `tool_options` supplies native Ash AI source/filter configuration.
-    * `:system_prompt` — system message text prepended to the conversation.
-    * `:max_iterations` — cap on LLM calls per run (default 10).
-    * `:max_tokens` — folded into `:llm_opts` (default 4096).
-    * `:temperature` — folded into `:llm_opts` (default 0.2).
-    * `:llm_opts` — extra keyword list merged into per-call options
-      (last-write-wins over `:max_tokens` / `:temperature`).
+  The conversation retains native ReqLLM messages, including provider metadata
+  and signed reasoning. Model calls and tools run in directives; generic Ash
+  actions apply their results. Callers supply Ash AI tool names and native
+  `tool_options`; prepared callbacks are rebuilt for each run and never saved.
   """
   @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
   use Ash.Resource,
@@ -152,11 +89,13 @@ defmodule Aikido.Slices.AiReact do
 
       attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
       attribute :system_prompt, :term, public?: true, allow_nil?: true, default: nil
+
       attribute :llm_opts, {:array, :tuple},
         public?: true,
         allow_nil?: false,
-        default: [],
+        default: [max_tokens: 4096, temperature: 0.2],
         constraints: @keyword_constraints
+
       attribute :hooks, {:array, Aikido.Hooks.Hook}, public?: true, allow_nil?: false, default: []
       attribute :hooks_pending, :map, public?: true, allow_nil?: false, default: %{}
       attribute :hook_sequence, :integer, public?: true, allow_nil?: false, default: 0
@@ -180,16 +119,14 @@ defmodule Aikido.Slices.AiReact do
       attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
       attribute :system_prompt, :term, public?: true, allow_nil?: true
       attribute :max_iterations, :integer, public?: true, allow_nil?: false, default: 10
-      attribute :max_tokens, :integer, public?: true, allow_nil?: false, default: 4096
-      attribute :temperature, :term, public?: true, allow_nil?: false, default: 0.2
+
       attribute :llm_opts, {:array, :tuple},
         public?: true,
         allow_nil?: false,
-        default: [],
+        default: [max_tokens: 4096, temperature: 0.2],
         constraints: @keyword_constraints
     end
 
-    config_transform {__MODULE__, :__fold_llm_opts__, []}
     route "ai.react.context_handoff.completed", :handoff_completed
     route "ai.react.context_handoff.failed", :handoff_failed
     route "ai.react.tools.ready", :tools_ready
@@ -205,77 +142,6 @@ defmodule Aikido.Slices.AiReact do
     route "ai.react.cancel", :cancel
     route "ai.react.hook.completed", :hook_completed
     route "ai.react.hook.context", :hook_context
-  end
-
-  @react_section %Spark.Dsl.Section{
-    name: :react,
-    describe: "ReAct reasoning slice attached via `slices:` on a Aikido.Agent.",
-    schema: [
-      options: [type: :map, default: %{}],
-      model: [type: :any, doc: "Model spec accepted by `ReqLLM.Generation.generate_text/3`."],
-      client: [
-        type: :module,
-        default: ReqLLM.Generation,
-        doc: "Module implementing the model-call boundary."
-      ],
-      tool_options: [type: :keyword_list, default: [otp_app: :aikido]],
-      tool_context: [type: :map, default: %{}],
-      hooks: [type: {:list, :map}, default: []],
-      tools: [
-        type: {:list, :atom},
-        default: [],
-        doc: "Ash AI tool names, resolved using tool_options."
-      ],
-      system_prompt: [type: :any, doc: "System message text prepended to the conversation."],
-      max_iterations: [type: :integer, default: 10, doc: "Cap on LLM calls per run."],
-      max_tokens: [
-        type: :integer,
-        default: 4096,
-        doc: "Default max tokens, folded into `:llm_opts`."
-      ],
-      temperature: [
-        type: :any,
-        default: 0.2,
-        doc: "Default temperature, folded into `:llm_opts`."
-      ],
-      llm_opts: [
-        type: :any,
-        default: [],
-        doc:
-          "Extra keyword list merged into per-call options " <>
-            "(last-write-wins over `:max_tokens` / `:temperature`)."
-      ]
-    ]
-  }
-  use Spark.Dsl.Extension,
-    sections: [@react_section],
-    transformers: [Aikido.Slices.AiReact.Transformers.RegisterContribution]
-
-  @doc false
-  @spec __fold_llm_opts__(map(), term()) :: {:ok, map()}
-  def __fold_llm_opts__(config, _ctx) when is_map(config) do
-    {max_tokens, config} = Map.pop(config, :max_tokens)
-    {temperature, config} = Map.pop(config, :temperature)
-    base_opts = config[:llm_opts] || []
-
-    llm_opts =
-      base_opts
-      |> put_unless_present(:max_tokens, max_tokens)
-      |> put_unless_present(:temperature, temperature)
-
-    {:ok, Map.put(config, :llm_opts, llm_opts)}
-  end
-
-  defp put_unless_present(opts, _key, nil) do
-    opts
-  end
-
-  defp put_unless_present(opts, key, value) do
-    if Keyword.has_key?(opts, key) do
-      opts
-    else
-      Keyword.put(opts, key, value)
-    end
   end
 
   @doc """

@@ -28,7 +28,15 @@ defmodule Aikido.TeamDeliveryTest.Client do
 
   defp answer(messages) do
     text = messages |> List.last() |> Map.fetch!(:content) |> Enum.map_join(& &1.text)
-    {:ok, %Aikido.Slices.AiReact.Turn{text: text, type: :final_answer}}
+
+    {:ok,
+     struct!(ReqLLM.Response,
+       id: "scripted",
+       model: "offline",
+       context: ReqLLM.Context.new(),
+       message: ReqLLM.Context.assistant(text, tool_calls: []),
+       finish_reason: :stop
+     )}
   end
 end
 
@@ -147,12 +155,27 @@ defmodule Aikido.TeamDeliveryTest do
       tenant: "b"
     )
 
-    tool_turn = %Aikido.Slices.AiReact.Turn{
-      type: :tool_calls,
-      tool_calls: [%{id: "identity", name: "test_identity", arguments: %{}}]
-    }
+    tool_turn =
+      struct!(ReqLLM.Response,
+        id: "scripted",
+        model: "offline",
+        context: ReqLLM.Context.new(),
+        message:
+          ReqLLM.Context.assistant("",
+            tool_calls: [%{id: "identity", name: "test_identity", arguments: %{}}]
+          ),
+        finish_reason: :tool_calls
+      )
 
-    final = %Aikido.Slices.AiReact.Turn{type: :final_answer, text: "done"}
+    final =
+      struct!(ReqLLM.Response,
+        id: "scripted",
+        model: "offline",
+        context: ReqLLM.Context.new(),
+        message: ReqLLM.Context.assistant("done", tool_calls: []),
+        finish_reason: :stop
+      )
+
     send(first, {:answer, tool_turn})
     assert_receive {:tool_scope, "alice", "a"}, 2_000
     assert_receive {:team_model, finish_first, _}, 2_000
@@ -192,7 +215,18 @@ defmodule Aikido.TeamDeliveryTest do
 
     assert_receive {:DOWN, ^monitor, :process, ^slow, _}, 2_000
     assert_receive {:team_model, next, _}, 2_000
-    send(next, {:answer, %Aikido.Slices.AiReact.Turn{type: :final_answer, text: "done"}})
+
+    send(
+      next,
+      {:answer,
+       struct!(ReqLLM.Response,
+         id: "scripted",
+         model: "offline",
+         context: ReqLLM.Context.new(),
+         message: ReqLLM.Context.assistant("done", tool_calls: []),
+         finish_reason: :stop
+       )}
+    )
   end
 
   test "restoration marks interrupted tasks explicitly instead of replaying effects" do

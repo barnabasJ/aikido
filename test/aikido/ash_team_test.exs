@@ -270,6 +270,46 @@ defmodule AikidoTest.AshTeamTest do
     assert config.workers.counter.max_members == 2
   end
 
+  test "an owner's crash reconciles its active descendants through lifecycle events" do
+    team =
+      Domain.dynamic_start!(%{
+        topology: %{
+          "lead" => %{resource: Counter},
+          "child" => %{resource: Counter, owner: "lead"},
+          "grandchild" => %{resource: Counter, owner: "child"}
+        }
+      })
+
+    original = Domain.dynamic_inspect!(team).team.members
+
+    {:ok, subscription} =
+      Aikido.AgentServer.subscribe(
+        team.pid,
+        "**",
+        fn runtime ->
+          state = runtime.agent.state.team
+
+          replaced? =
+            Enum.all?(original, fn {name, old} ->
+              is_pid(state.members[name]) and state.members[name] != old
+            end)
+
+          if state.operation.status == :completed and replaced?,
+            do: {:ok, state.members},
+            else: :skip
+        end,
+        once: true
+      )
+
+    Process.exit(original["lead"], :kill)
+    assert_receive {:aikido_subscription, ^subscription, %{result: {:ok, replacements}}}, 5_000
+
+    assert {:ok, %{pid: parent}} =
+             Aikido.AgentServer.state(replacements["grandchild"], &{:ok, &1.parent})
+
+    assert parent == replacements["child"]
+  end
+
   # Commands return receipts; state assertions opt into a separate inspection.
   defp snapshot_result({:ok, %{resource: resource, id: id}}),
     do: Aikido.Ash.inspect(resource, id)

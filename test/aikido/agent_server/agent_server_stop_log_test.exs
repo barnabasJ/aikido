@@ -7,28 +7,20 @@ defmodule AikidoTest.AgentServerStopLogTest.StopTestAction.Implementation do
   end
 end
 
-defmodule AikidoTest.AgentServerStopLogTest.StopTestAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :stop_test, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServerStopLogTest.StopTestAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.AgentServerStopLogTest.TestAgent do
   @moduledoc false
   use Aikido.Agent
 
   agent do
     name "test_agent"
+    route "stop_test", {AikidoTest.AgentServerStopLogTest.TestAgent, :stop_test}
   end
 
-  signal_routes do
-    route "stop_test", AikidoTest.AgentServerStopLogTest.StopTestAction
+  actions do
+    action :stop_test, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.AgentServerStopLogTest.StopTestAction.Implementation, action: :run}
+    end
   end
 end
 

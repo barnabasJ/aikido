@@ -1,11 +1,8 @@
 defmodule Aikido.TodoTest.Agent do
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "todo_test"
-  end
-
-  slices do
     slice :ai, Aikido.Slices.AiReact
     slice :todos, Aikido.Slices.Todo
   end
@@ -13,7 +10,15 @@ end
 
 defmodule Aikido.TodoTest.Client do
   def generate_text(_, _, _),
-    do: {:ok, %Aikido.Slices.AiReact.Turn{text: "finished", type: :final_answer}}
+    do:
+      {:ok,
+       struct!(ReqLLM.Response,
+         id: "scripted",
+         model: "offline",
+         context: ReqLLM.Context.new(),
+         message: ReqLLM.Context.assistant("finished", tool_calls: []),
+         finish_reason: :stop
+       )}
 end
 
 defmodule Aikido.TodoTest do

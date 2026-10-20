@@ -75,8 +75,12 @@ defmodule Aikido.Durable do
         name: name,
         prefix: Keyword.get(opts, :prefix, "aikido/#{name}/"),
         backend: backend,
-        group: [shards: 1],
-        init_info: %{aikido_config: config}
+        init_info:
+          Map.put(
+            Keyword.get(opts, :durable_options, [])[:init_info] || %{},
+            :aikido_config,
+            config
+          )
       )
 
     Supervisor.init(stores ++ [{DurableServer.Supervisor, durable_opts}], strategy: :rest_for_one)
@@ -100,10 +104,8 @@ defmodule Aikido.Durable do
         aikido: config.aikido,
         partition: partition,
         initial_state: Keyword.get(opts, :initial_state, %{}),
-        registry: Aikido.registry_name(config.aikido),
-        register_global: is_nil(config.agent),
-        pool: name,
-        pool_key: key
+        durable_server: name,
+        durable_key: key
       )
 
     initial = %{options: agent_opts, permanent: Keyword.get(opts, :permanent, config.permanent)}
@@ -112,6 +114,7 @@ defmodule Aikido.Durable do
 
     case apply(DurableServer.Supervisor, operation, [name, spec]) do
       {:ok, {pid, _}} -> {:ok, pid}
+      {:error, {:already_started, {pid, _}}} -> {:error, {:already_started, pid}}
       {:error, _} = error -> error
     end
   end
@@ -193,18 +196,6 @@ defmodule Aikido.Durable do
   end
 
   def supervisor_name(name), do: Module.concat(name, Supervisor)
-
-  def agent_module(name) do
-    case Process.whereis(name) do
-      nil -> {:error, :not_found}
-      _ -> {:ok, config(name).agent}
-    end
-  end
-
-  def stats(name, opts \\ []) do
-    keys = Enum.map(members(name, opts), &elem(&1, 0))
-    %{count: length(keys), keys: keys}
-  end
 
   @doc "Lists active logical keys and their current local or remote processes."
   def members(name, opts \\ []) do

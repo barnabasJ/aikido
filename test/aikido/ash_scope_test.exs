@@ -149,16 +149,35 @@ defmodule Aikido.AshScopeTest do
         tenant: "org-a"
       )
 
-    turn = %Aikido.Slices.AiReact.Turn{
-      type: :tool_calls,
-      tool_calls: [%{id: "identity", name: tool.name, arguments: %{}}]
-    }
+    turn =
+      struct!(ReqLLM.Response,
+        id: "scripted",
+        model: "offline",
+        context: ReqLLM.Context.new(),
+        message:
+          ReqLLM.Context.assistant("",
+            tool_calls: [%{id: "identity", name: tool.name, arguments: %{}}]
+          ),
+        finish_reason: :tool_calls
+      )
 
     send(model, {:answer, {:ok, turn}})
     assert_receive {:model, next, messages}, 2_000
     result = Enum.find(messages, &(&1.role == :tool))
     text = Enum.map_join(result.content, & &1.text)
     assert Jason.decode!(text) == %{"actor" => "alice", "tenant" => "org-a"}
-    send(next, {:answer, {:ok, %Aikido.Slices.AiReact.Turn{type: :final_answer, text: "done"}}})
+
+    send(
+      next,
+      {:answer,
+       {:ok,
+        struct!(ReqLLM.Response,
+          id: "scripted",
+          model: "offline",
+          context: ReqLLM.Context.new(),
+          message: ReqLLM.Context.assistant("done", tool_calls: []),
+          finish_reason: :stop
+        )}}
+    )
   end
 end

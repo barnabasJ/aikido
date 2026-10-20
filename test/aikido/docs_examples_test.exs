@@ -6,7 +6,7 @@ defmodule Aikido.DocsExamplesTest do
   test "Aikido.Dsl.Agent.Info accessor docs do not emit doctest prompts" do
     docs = function_docs(Aikido.Dsl.Agent.Info)
 
-    for function_name <- [:slices, :signal_types] do
+    for function_name <- [:slices, :signal_routes] do
       doc = Map.fetch!(docs, {function_name, 1})
 
       refute doc =~ "iex>"

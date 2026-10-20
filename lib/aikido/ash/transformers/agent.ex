@@ -11,6 +11,7 @@ defmodule Aikido.Ash.Transformers.Agent do
 
   @impl true
   def transform(dsl) do
+    dsl = Transformer.eval(dsl, [], quote(do: @behaviour(Aikido.Agent)))
     resource = Transformer.get_persisted(dsl, :module)
     team_slice = Transformer.get_persisted(dsl, :aikido_team_slice)
     entities = Transformer.get_entities(dsl, [:agent])
@@ -33,15 +34,32 @@ defmodule Aikido.Ash.Transformers.Agent do
              primary_key?: true,
              allow_nil?: false,
              public?: true,
-             default: &Aikido.Util.generate_id/0
+             default: &Ash.UUIDv7.generate/0
            ),
          {:ok, dsl} <- add_mounts(dsl, mounts, team_slice),
          {:ok, dsl} <- add_lifecycle_actions(dsl),
          {:ok, dsl} <- add_signals(dsl, signals, mounts) do
-      routes =
-        for signal <- signals, !mounted_signal?(signal, mounts) do
-          %Aikido.Dsl.Agent.Route{type: signal.type, action: signal.target, priority: 0}
+      declared_routes =
+        for route <- entities, match?(%Aikido.Dsl.Agent.Route{}, route) do
+          case route.action do
+            name when is_atom(name) ->
+              name =
+                if Ash.Resource.Info.action(dsl, name),
+                  do: name,
+                  else: String.to_atom("__aikido_reduce_#{name}")
+
+              %{route | action: {resource, name}}
+
+            {_resource, _action} ->
+              route
+          end
         end
+
+      routes =
+        declared_routes ++
+          for signal <- signals, !mounted_signal?(signal, mounts) do
+            %Aikido.Dsl.Agent.Route{type: signal.type, action: signal.target, priority: 0}
+          end
 
       accepted = for attribute <- attributes, attribute.writable?, do: attribute.name
 
@@ -69,28 +87,44 @@ defmodule Aikido.Ash.Transformers.Agent do
   # A local reducer and its public command may share a declared name. Keep the
   # native reducer private and generate the command under the public name.
   defp resolve_local_actions(dsl, signals, resource) do
-    Enum.map_reduce(signals, dsl, fn signal, dsl ->
-      case signal.target do
-        name when is_atom(name) and not is_nil(name) ->
-          case Ash.Resource.Info.action(dsl, name) do
-            %{type: :action, returns: Aikido.ActionResult} = action ->
-              internal = String.to_atom("__aikido_reduce_#{name}")
-              reducer = %{action | name: internal, public?: false}
-              dsl = Transformer.remove_entity(dsl, [:actions], &(&1.name == name))
-              dsl = Transformer.add_entity(dsl, [:actions], reducer)
-              resolved = %{signal | target: {resource, internal}}
-              dsl = Transformer.replace_entity(dsl, [:agent], resolved, &(&1 == signal))
-              {resolved, dsl}
-
-            _ ->
-              {signal, dsl}
+    {signals, {dsl, _aliases}} =
+      Enum.map_reduce(signals, {dsl, %{}}, fn signal, {dsl, aliases} ->
+        local =
+          case signal.target do
+            name when is_atom(name) -> name
+            {^resource, name} -> name
+            _ -> nil
           end
 
-        _ ->
-          {signal, dsl}
-      end
-    end)
-    |> then(fn {signals, dsl} -> {dsl, signals} end)
+        if local do
+          name = Map.get(aliases, local, local)
+
+          {dsl, name, aliases} =
+            case Ash.Resource.Info.action(dsl, name) do
+              %{type: :action, returns: Aikido.ActionResult} = action when name == signal.name ->
+                internal = String.to_atom("__aikido_reduce_#{name}")
+                reducer = %{action | name: internal, public?: false}
+
+                next =
+                  dsl
+                  |> Transformer.remove_entity([:actions], &(&1.name == name))
+                  |> Transformer.add_entity([:actions], reducer)
+
+                {next, internal, Map.put(aliases, local, internal)}
+
+              _ ->
+                {dsl, name, aliases}
+            end
+
+          resolved = %{signal | target: {resource, name}}
+          dsl = Transformer.replace_entity(dsl, [:agent], resolved, &(&1 == signal))
+          {resolved, {dsl, aliases}}
+        else
+          {signal, {dsl, aliases}}
+        end
+      end)
+
+    {dsl, signals}
   end
 
   defp inherited_signals(mounts, declared) do
@@ -98,6 +132,7 @@ defmodule Aikido.Ash.Transformers.Agent do
         Spark.Dsl.is?(mount.module, Ash.Resource),
         Aikido.Ash.Slice in Spark.extensions(mount.module),
         route <- Spark.Dsl.Extension.get_entities(mount.module, [:slice]),
+        is_atom(route.action),
         action = Ash.Resource.Info.action(mount.module, route.action),
         match?(%{public?: true}, action),
         !Enum.any?(declared, &(&1.name == action.name)) do
@@ -121,9 +156,9 @@ defmodule Aikido.Ash.Transformers.Agent do
   end
 
   defp invalid_resource_slice?(mount) do
-    Spark.Dsl.is?(mount.module, Ash.Resource) &&
-      (!Ash.Resource.Info.embedded?(mount.module) ||
-         Aikido.Ash.Slice not in Spark.extensions(mount.module))
+    !Spark.Dsl.is?(mount.module, Ash.Resource) ||
+      !Ash.Resource.Info.embedded?(mount.module) ||
+      Aikido.Ash.Slice not in Spark.extensions(mount.module)
   end
 
   defp add_mounts(dsl, mounts, team_slice) do
@@ -177,7 +212,13 @@ defmodule Aikido.Ash.Transformers.Agent do
               build_argument!(
                 name,
                 options[:type],
-                Keyword.take(options, [:constraints, :allow_nil?, :default, :description])
+                Keyword.take(options, [
+                  :constraints,
+                  :allow_nil?,
+                  :default,
+                  :description,
+                  :sensitive?
+                ])
               )
             end)
           end
@@ -286,23 +327,10 @@ defmodule Aikido.Ash.Transformers.Agent do
   end
 
   defp signal_fields(dsl, %{target: target}) do
-    {resource, name} = Aikido.ActionRef.normalize(target)
+    {resource, name} = target
 
     if resource == Transformer.get_persisted(dsl, :module) do
-      action = Ash.Resource.Info.action(dsl, name)
-
-      case Enum.find(action.arguments, &(&1.name == :data)) do
-        nil ->
-          for argument <- action.arguments,
-              argument.name != :state,
-              do:
-                {argument.name,
-                 Map.take(argument, [:type, :constraints, :allow_nil?, :default, :description])
-                 |> Map.to_list()}
-
-        data ->
-          Keyword.get(data.constraints, :fields, [])
-      end
+      dsl |> Ash.Resource.Info.action(name) |> Aikido.ActionRef.schema()
     else
       Code.ensure_compiled!(resource)
       Aikido.ActionRef.schema(target)

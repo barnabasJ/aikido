@@ -16,13 +16,17 @@ defmodule AikidoTest.Actions.SchedulingTest do
         source: "/scheduler"
       }
 
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :schedule_signal},
-          sig("schedule_signal", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("schedule_signal", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(
+            :schedule_signal,
+            Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{scheduled_for_ms: 5000, signal_type: "work.check"}
       assert %Directives.Schedule{} = directive
@@ -34,13 +38,17 @@ defmodule AikidoTest.Actions.SchedulingTest do
     test "uses default source" do
       data = %{delay_ms: 1000, signal_type: "ping", payload: %{}, source: "/scheduler"}
 
-      {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :schedule_signal},
-          sig("schedule_signal", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+        then(sig("schedule_signal", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(
+            :schedule_signal,
+            Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert directive.message.source == "/scheduler"
     end
@@ -50,13 +58,17 @@ defmodule AikidoTest.Actions.SchedulingTest do
     test "creates schedule directive for timeout" do
       data = %{timeout_ms: 30000, timeout_id: :work_deadline, signal_type: "agent.timeout"}
 
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :schedule_timeout},
-          sig("schedule_timeout", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("schedule_timeout", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(
+            :schedule_timeout,
+            Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{timeout_set: :work_deadline, expires_in_ms: 30000}
       assert %Directives.Schedule{} = directive
@@ -68,13 +80,17 @@ defmodule AikidoTest.Actions.SchedulingTest do
     test "uses default timeout_id" do
       data = %{timeout_ms: 5000, timeout_id: :default, signal_type: "agent.timeout"}
 
-      {:ok, result, [_directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :schedule_timeout},
-          sig("schedule_timeout", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [_directive]}} =
+        then(sig("schedule_timeout", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(
+            :schedule_timeout,
+            Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result.timeout_set == :default
     end
@@ -90,13 +106,15 @@ defmodule AikidoTest.Actions.SchedulingTest do
         timezone: nil
       }
 
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :schedule_cron},
-          sig("schedule_cron", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("schedule_cron", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:schedule_cron, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{cron_scheduled: "* * * * *", job_id: :heartbeat}
       assert %Directives.Cron{} = directive
@@ -114,13 +132,15 @@ defmodule AikidoTest.Actions.SchedulingTest do
         timezone: "America/New_York"
       }
 
-      {:ok, _result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :schedule_cron},
-          sig("schedule_cron", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+        then(sig("schedule_cron", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:schedule_cron, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert directive.timezone == "America/New_York"
     end
@@ -130,13 +150,15 @@ defmodule AikidoTest.Actions.SchedulingTest do
     test "creates cron cancel directive" do
       data = %{job_id: :heartbeat}
 
-      {:ok, result, [directive]} =
-        AikidoTest.NativeAction.run(
-          {Aikido.AgentServer.RuntimeActions, :cancel_cron},
-          sig("cancel_cron", data),
-          %{},
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+        then(sig("cancel_cron", data), fn signal ->
+          Aikido.AgentServer.RuntimeActions
+          |> Ash.ActionInput.for_action(:cancel_cron, Map.put(signal.data || %{}, :state, %{}),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert result == %{cancelled_job: :heartbeat}
       assert %Directives.CronCancel{} = directive

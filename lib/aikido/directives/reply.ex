@@ -8,7 +8,7 @@ defmodule Aikido.Directives.Reply do
 
   Actions run with a sandboxed context (`agent.state`, the agent struct,
   the input signal) — they deliberately do not see server-level
-  internals like `state.children`, `state.aikido`, or `state.registry`.
+  internals like `state.children` or `state.aikido`.
   That's the right shape for domain logic, but it's the wrong shape for
   introspection queries that *must* read server state to answer
   correctly (e.g. "which of my nodes is running right now?").

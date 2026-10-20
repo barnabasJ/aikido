@@ -3,11 +3,12 @@ defmodule AikidoTest.Thread.SliceTest.AgentWithThread do
 
   agent do
     name "thread_slice_test_agent"
+    slice :thread, Aikido.Slices.Thread
   end
 end
 
 defmodule AikidoTest.Thread.SliceTest.AgentWithoutThread do
-  use Aikido.Agent, default_slices: %{thread: false}
+  use Aikido.Agent
 
   agent do
     name "thread_slice_test_no_thread"
@@ -75,34 +76,40 @@ defmodule AikidoTest.Thread.SliceTest do
   end
 
   describe("agent integration") do
-    nil
-    nil
-
-    test "agent includes thread slice by default" do
+    test "agent includes its explicitly mounted thread slice" do
       assert Aikido.Slices.Thread in Aikido.Dsl.Agent.Info.slices(
                AikidoTest.Thread.SliceTest.AgentWithThread
              )
     end
 
-    test "agent.state[:thread] starts nil (lazy init)" do
+    test "agent.state[:thread] starts from native resource defaults" do
       agent = AikidoTest.Thread.SliceTest.AgentWithThread.initialize!()
-      assert Map.get(agent.state, :thread) == nil
+      assert %Aikido.Slices.Thread{} = Map.get(agent.state, :thread)
     end
 
-    test "agent can disable thread slice" do
+    test "agent has no thread slice unless mounted" do
       refute Aikido.Slices.Thread in Aikido.Dsl.Agent.Info.slices(
                AikidoTest.Thread.SliceTest.AgentWithoutThread
              )
     end
 
-    test "thread can be attached after creation via Ensure action" do
+    test "Ensure preserves the mounted thread resource" do
       agent = AikidoTest.Thread.SliceTest.AgentWithThread.initialize!()
 
-      {:ok, agent, []} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.Thread.SliceTest.AgentWithThread,
-          agent,
-          {{Aikido.Slices.Thread, :ensure}, %{}}
+      {:ok, %{agent: agent}, []} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.Thread.SliceTest.AgentWithThread,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{Aikido.Slices.Thread, :ensure}, %{}}]
         )
 
       assert %Aikido.Slices.Thread{} = agent.state[:thread]
@@ -111,11 +118,20 @@ defmodule AikidoTest.Thread.SliceTest do
     test "Append action mutates agent.state.thread" do
       agent = AikidoTest.Thread.SliceTest.AgentWithThread.initialize!()
 
-      {:ok, agent, []} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.Thread.SliceTest.AgentWithThread,
-          agent,
-          {{Aikido.Slices.Thread, :append}, %{entry: %{kind: :message, payload: %{text: "hi"}}}}
+      {:ok, %{agent: agent}, []} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.Thread.SliceTest.AgentWithThread,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{Aikido.Slices.Thread, :append}, %{entry: %{kind: :message, payload: %{text: "hi"}}}}]
         )
 
       assert Aikido.Slices.Thread.entry_count(agent.state.thread) == 1

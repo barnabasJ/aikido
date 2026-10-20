@@ -61,7 +61,7 @@ defmodule Aikido.Ash.Transformers.AI do
          {:ok, dsl} <-
            add_action(dsl, :ask, [
              arg(:query, :string, allow_nil?: false),
-             arg(:request_id, :string, allow_nil?: false, default: &Aikido.Util.generate_id/0)
+             arg(:request_id, :string, allow_nil?: false, default: &Ash.UUIDv7.generate/0)
            ]),
          {:ok, dsl} <- add_action(dsl, :cancel, [arg(:request_id, :string)]) do
       dsl =

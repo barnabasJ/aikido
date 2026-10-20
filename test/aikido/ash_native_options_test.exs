@@ -38,11 +38,11 @@ defmodule AikidoTest.AshNativeOptionsTest do
     end
   end
 
-  test "delivery modes and restart policies use constrained Ash atoms" do
+  test "delivery modes and recovery flags use native Ash types" do
     for {action, argument, allowed, arguments} <- [
           {:notify_pid, :delivery_mode, [:async, :sync],
            %{target_pid: self(), signal_type: "test.notify"}},
-          {:spawn_child, :restart, Aikido.Directives.valid_restart_policies(),
+          {:spawn_child, :restart?, [true, false],
            %{agent_module: AikidoTest.TestAgents.Counter, tag: :worker}}
         ] do
       for value <- allowed do

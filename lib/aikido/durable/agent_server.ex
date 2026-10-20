@@ -51,10 +51,8 @@ defmodule Aikido.Durable.AgentServer do
       :id,
       :aikido,
       :partition,
-      :registry,
-      :register_global,
-      :pool,
-      :pool_key,
+      :durable_server,
+      :durable_key,
       :on_parent_death,
       :skip_schedules,
       :debug,
@@ -97,7 +95,7 @@ defmodule Aikido.Durable.AgentServer do
         {:ok, %{runtime: runtime, options: saved.options, permanent: saved.permanent},
          permanent: saved.permanent,
          meta: %{
-           key: runtime.lifecycle.pool_key,
+           key: runtime.durable_key,
            partition: runtime.partition,
            restored?: Map.has_key?(saved, :agent) && !Map.get(saved, :initial?, false)
          }}
@@ -140,16 +138,34 @@ defmodule Aikido.Durable.AgentServer do
   defp wrap({:noreply, runtime}, state, false), do: {:noreply, %{state | runtime: runtime}}
   defp wrap(result, state, false), do: wrap(result, state)
 
-  defp wrap({:reply, reply, runtime}, state),
-    do: {:reply, reply, %{state | runtime: runtime}, sync: true}
+  defp wrap({:reply, reply, runtime}, state) do
+    next = %{state | runtime: runtime}
 
-  defp wrap({:noreply, runtime}, state), do: {:noreply, %{state | runtime: runtime}, sync: true}
+    if durable_changed?(state.runtime, runtime),
+      do: {:reply, reply, next, sync: true},
+      else: {:reply, reply, next}
+  end
+
+  defp wrap({:noreply, runtime}, state) do
+    next = %{state | runtime: runtime}
+
+    if durable_changed?(state.runtime, runtime),
+      do: {:noreply, next, sync: true},
+      else: {:noreply, next}
+  end
 
   defp wrap({:stop, reason, runtime}, state),
     do: {:stop, stop_reason(reason, runtime), %{state | runtime: runtime}}
 
   defp wrap({:stop, reason, reply, runtime}, state),
     do: {:stop, stop_reason(reason, runtime), reply, %{state | runtime: runtime}}
+
+  # Runtime observations, subscriber bookkeeping and debug reads do not change
+  # the saved projection. Strict synchronization remains the command boundary.
+  defp durable_changed?(previous, next) do
+    previous.agent != next.agent or previous.parent != next.parent or
+      previous.cron_specs != next.cron_specs
+  end
 
   defp stop_reason(:normal, runtime), do: stop_disposition(runtime)
   defp stop_reason(:shutdown, runtime), do: {:shutdown, stop_disposition(runtime)}
@@ -202,17 +218,7 @@ defmodule Aikido.Durable.AgentServer do
                 "Invalid checkpoint from #{inspect(agent_module)}: #{inspect(other)}"
       end
     else
-      if function_exported?(agent_module, :restore, 2),
-        do:
-          {:checkpoint,
-           %{
-             version: 1,
-             agent_module: agent_module,
-             id: agent.id,
-             state: agent.state,
-             thread: nil
-           }},
-        else: {:agent, agent}
+      {:agent, agent}
     end
   end
 

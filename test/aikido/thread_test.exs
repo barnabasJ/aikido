@@ -4,53 +4,6 @@ defmodule AikidoTest.ThreadTest do
   alias Aikido.Slices.Thread.Entry
   alias Aikido.Slices.Thread, as: State
 
-  describe "Entry.new/1" do
-    test "creates entry with defaults" do
-      entry = Entry.new(%{})
-
-      assert entry.seq == 0
-      assert entry.kind == :note
-      assert entry.payload == %{}
-      assert entry.refs == %{}
-      assert is_integer(entry.at)
-    end
-
-    test "creates entry from keyword list" do
-      entry = Entry.new(kind: :message, payload: %{role: "user"})
-
-      assert entry.kind == :message
-      assert entry.payload == %{role: "user"}
-    end
-
-    test "creates entry with all attributes" do
-      now = System.system_time(:millisecond)
-
-      entry =
-        Entry.new(%{
-          id: "entry_123",
-          seq: 5,
-          at: now,
-          kind: :tool_call,
-          payload: %{name: "search"},
-          refs: %{signal_id: "sig_1"}
-        })
-
-      assert entry.id == "entry_123"
-      assert entry.seq == 5
-      assert entry.at == now
-      assert entry.kind == :tool_call
-      assert entry.payload == %{name: "search"}
-      assert entry.refs == %{signal_id: "sig_1"}
-    end
-
-    test "accepts string keys in map" do
-      entry = Entry.new(%{"kind" => :error, "payload" => %{"msg" => "failed"}})
-
-      assert entry.kind == :error
-      assert entry.payload == %{"msg" => "failed"}
-    end
-  end
-
   describe "State.new/1" do
     test "creates empty thread with defaults" do
       thread = State.new()
@@ -101,7 +54,7 @@ defmodule AikidoTest.ThreadTest do
     end
 
     test "appends Entry struct" do
-      entry = Entry.new(kind: :note, payload: %{text: "annotation"})
+      entry = Entry.new!(id: "annotation", at: 0, kind: :note, payload: %{text: "annotation"})
 
       thread =
         State.new()
@@ -158,10 +111,9 @@ defmodule AikidoTest.ThreadTest do
       old_time = 1_700_000_000_000
       thread = State.new(now: old_time)
 
-      Process.sleep(1)
-      thread = State.append(thread, %{kind: :message})
+      thread = State.append(thread, %{kind: :message}, now: old_time + 1)
 
-      assert thread.updated_at > old_time
+      assert thread.updated_at == old_time + 1
     end
 
     test "generates entry id if not provided" do

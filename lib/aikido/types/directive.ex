@@ -9,7 +9,9 @@ defmodule Aikido.Types.Directive do
   def cast_input(%module{} = value, _) do
     with {:ok, _module} <-
            Ash.Type.apply_constraints(:module, module, behaviour: Aikido.Directive) do
-      {:ok, value}
+      if Spark.Dsl.is?(module, Aikido.Directive),
+        do: module.new(Map.from_struct(value)),
+        else: {:error, message: "must use Aikido.Directive for its typed contract"}
     end
   end
 

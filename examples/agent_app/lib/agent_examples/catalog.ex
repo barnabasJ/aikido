@@ -75,7 +75,7 @@ defmodule AgentExamples.Catalog do
       kind: :ai,
       description: "Give an assistant tools at runtime and follow its reasoning-and-tool loop.",
       detail:
-        "Choose an offline scripted model or a live z.ai model. Runtime callbacks, native Ash actions, and Ash AI/Lua tools all enter the same ReAct loop.",
+        "Choose an offline scripted model or a live z.ai model. Native Ash AI tools and scoped Lua actions run through the same ReAct loop.",
       flow: ["Prompt", "Model turn", "Runtime tools", "Answer"]
     },
     %{

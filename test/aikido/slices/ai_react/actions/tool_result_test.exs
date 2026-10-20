@@ -40,13 +40,15 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
 
     slice = slice_with_pending(calls)
 
-    {:ok, new_slice, directives} =
-      AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact, :tool_result},
-        signal("req_1", "call_1", "test_add", "{\"result\":3}"),
-        slice,
-        %{}
-      )
+    {:ok, %Aikido.ActionResult{state: new_slice, directives: directives}} =
+      then(signal("req_1", "call_1", "test_add", "{\"result\":3}"), fn signal ->
+        Aikido.Slices.AiReact
+        |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
+          context: %{aikido: Map.put(%{}, :signal, signal)},
+          skip_unknown_inputs: [:*]
+        )
+        |> Ash.run_action()
+      end)
 
     assert directives == []
     assert length(new_slice.tool_results_received) == 1
@@ -59,13 +61,15 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
     slice = slice_with_pending(calls)
 
-    {:ok, new_slice, [%LLMCall{} = directive]} =
-      AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact, :tool_result},
-        signal("req_1", "call_1", "test_add", "{\"result\":3}"),
-        slice,
-        %{}
-      )
+    {:ok, %Aikido.ActionResult{state: new_slice, directives: [%LLMCall{} = directive]}} =
+      then(signal("req_1", "call_1", "test_add", "{\"result\":3}"), fn signal ->
+        Aikido.Slices.AiReact
+        |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
+          context: %{aikido: Map.put(%{}, :signal, signal)},
+          skip_unknown_inputs: [:*]
+        )
+        |> Ash.run_action()
+      end)
 
     assert new_slice.pending_tool_calls == []
     assert new_slice.tool_results_received == []
@@ -83,13 +87,15 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
     previous_signature = AiReact.tool_call_signature(calls)
     slice = slice_with_pending(calls, previous_tool_signature: previous_signature)
 
-    {:ok, new_slice, [%LLMCall{} = directive]} =
-      AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact, :tool_result},
-        signal("req_1", "call_1", "test_add", "{\"result\":3}"),
-        slice,
-        %{}
-      )
+    {:ok, %Aikido.ActionResult{state: new_slice, directives: [%LLMCall{} = directive]}} =
+      then(signal("req_1", "call_1", "test_add", "{\"result\":3}"), fn signal ->
+        Aikido.Slices.AiReact
+        |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
+          context: %{aikido: Map.put(%{}, :signal, signal)},
+          skip_unknown_inputs: [:*]
+        )
+        |> Ash.run_action()
+      end)
 
     messages = Context.to_list(new_slice.context)
     last = List.last(messages)
@@ -103,13 +109,15 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
     slice = slice_with_pending(calls, previous_tool_signature: nil)
 
-    {:ok, new_slice, [%LLMCall{}]} =
-      AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact, :tool_result},
-        signal("req_1", "call_1", "test_add", "{\"result\":3}"),
-        slice,
-        %{}
-      )
+    {:ok, %Aikido.ActionResult{state: new_slice, directives: [%LLMCall{}]}} =
+      then(signal("req_1", "call_1", "test_add", "{\"result\":3}"), fn signal ->
+        Aikido.Slices.AiReact
+        |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
+          context: %{aikido: Map.put(%{}, :signal, signal)},
+          skip_unknown_inputs: [:*]
+        )
+        |> Ash.run_action()
+      end)
 
     messages = Context.to_list(new_slice.context)
     refute List.last(messages).role == :user
@@ -119,13 +127,15 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
     slice = slice_with_pending(calls, request_id: "req_active")
 
-    {:ok, returned, []} =
-      AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact, :tool_result},
-        signal("req_old", "call_1", "test_add", "{}"),
-        slice,
-        %{}
-      )
+    {:ok, %Aikido.ActionResult{state: returned, directives: []}} =
+      then(signal("req_old", "call_1", "test_add", "{}"), fn signal ->
+        Aikido.Slices.AiReact
+        |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
+          context: %{aikido: Map.put(%{}, :signal, signal)},
+          skip_unknown_inputs: [:*]
+        )
+        |> Ash.run_action()
+      end)
 
     assert returned == slice
   end
@@ -134,13 +144,15 @@ defmodule Aikido.Slices.AiReact.ToolResultTest do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
     slice = %{slice_with_pending(calls) | status: :completed, result: "earlier"}
 
-    {:ok, returned, []} =
-      AikidoTest.NativeAction.run(
-        {Aikido.Slices.AiReact, :tool_result},
-        signal("req_1", "call_1", "test_add", "{}"),
-        slice,
-        %{}
-      )
+    {:ok, %Aikido.ActionResult{state: returned, directives: []}} =
+      then(signal("req_1", "call_1", "test_add", "{}"), fn signal ->
+        Aikido.Slices.AiReact
+        |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
+          context: %{aikido: Map.put(%{}, :signal, signal)},
+          skip_unknown_inputs: [:*]
+        )
+        |> Ash.run_action()
+      end)
 
     assert returned == slice
   end

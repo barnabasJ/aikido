@@ -14,7 +14,7 @@ defmodule AgentExamples.AI do
   end
 
   def ask(record, query, opts \\ []) do
-    request_id = Aikido.Util.generate_id()
+    request_id = Ash.UUIDv7.generate()
     timeout = Keyword.get(opts, :timeout, 30_000)
     resource = Map.get(record, :resource) || record.__struct__
     pid = Aikido.whereis(Aikido.Ash.Runtime.option(resource, :instance), record.id)
@@ -30,29 +30,24 @@ defmodule AgentExamples.AI do
       end
     end
 
-    with {:ok, reference} <- Aikido.AgentServer.subscribe(pid, "**", observe, once: true) do
-      try do
-        with {:ok, _} <-
-               Aikido.Ash.command(
-                 record,
-                 %{query: query, request_id: request_id},
-                 Keyword.put(Keyword.get(opts, :ash, []), :action, :ask)
-               ) do
-          receive do
-            {:aikido_subscription, ^reference, %{result: result}} -> result
-          after
-            timeout -> {:error, :timeout}
-          end
-        end
-      after
-        Aikido.AgentServer.unsubscribe(pid, reference)
-      end
-    end
+    Aikido.AgentServer.call_until(
+      pid,
+      fn ->
+        Aikido.Ash.command(
+          record,
+          %{query: query, request_id: request_id},
+          Keyword.put(Keyword.get(opts, :ash, []), :action, :ask)
+        )
+      end,
+      "**",
+      observe,
+      timeout: timeout
+    )
   end
 
   @doc "Assign work from an external caller or a tool task, then await its correlated result."
   def delegate(team, member, text, opts \\ []) do
-    task_id = Aikido.Util.generate_id()
+    task_id = Ash.UUIDv7.generate()
     timeout = Keyword.get(opts, :timeout, 20_000)
     pid = Aikido.whereis(Aikido.Default, team.id)
 
@@ -64,29 +59,23 @@ defmodule AgentExamples.AI do
       end
     end
 
-    with {:ok, reference} <-
-           Aikido.AgentServer.subscribe(pid, "aikido.ash.team.**", observe, once: true) do
-      try do
-        with {:ok, _} <-
-               Aikido.Ash.command(
-                 team,
-                 %{
-                   member: member,
-                   task_id: task_id,
-                   payload: %{text: text},
-                   timeout_ms: timeout
-                 },
-                 Keyword.put(Keyword.get(opts, :ash, []), :action, :assign_task)
-               ) do
-          receive do
-            {:aikido_subscription, ^reference, %{result: result}} -> result
-          after
-            timeout + 1_000 -> {:error, :timeout}
-          end
-        end
-      after
-        Aikido.AgentServer.unsubscribe(pid, reference)
-      end
-    end
+    Aikido.AgentServer.call_until(
+      pid,
+      fn ->
+        Aikido.Ash.command(
+          team,
+          %{
+            member: member,
+            task_id: task_id,
+            payload: %{text: text},
+            timeout_ms: timeout
+          },
+          Keyword.put(Keyword.get(opts, :ash, []), :action, :assign_task)
+        )
+      end,
+      "aikido.ash.team.**",
+      observe,
+      timeout: timeout + 1_000
+    )
   end
 end

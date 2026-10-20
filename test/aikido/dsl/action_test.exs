@@ -27,7 +27,7 @@ defmodule Aikido.NativeActionTest.Actions.Implementation do
         _opts,
         _context
       ) do
-    {:ok, %{state: %{count: 100}, directives: [input.arguments.directive]}}
+    Aikido.ActionResult.new(state: %{count: 100}, directives: [input.arguments.directive])
   end
 
   @impl true
@@ -56,7 +56,7 @@ defmodule Aikido.NativeActionTest.Actions.Implementation do
         _opts,
         _context
       ) do
-    {:ok, %{state: %{}, directives: :invalid}}
+    Aikido.ActionResult.new(state: %{}, directives: :invalid)
   end
 end
 
@@ -112,12 +112,16 @@ defmodule Aikido.NativeActionTest do
     signal = %{signal | data: params}
     runtime = Map.merge(Aikido.SignalCtx.ctx(signal), Map.get(context, :ctx, %{}))
 
-    AikidoTest.NativeAction.run(
-      {Aikido.NativeActionTest.Actions, action},
-      signal,
-      Map.get(context, :state, %{}),
-      runtime
-    )
+    then(signal, fn signal ->
+      Aikido.NativeActionTest.Actions
+      |> Ash.ActionInput.for_action(
+        action,
+        Map.put(signal.data || %{}, :state, Map.get(context, :state, %{})),
+        context: %{aikido: Map.put(runtime, :signal, signal)},
+        skip_unknown_inputs: [:*]
+      )
+      |> Ash.run_action()
+    end)
   end
 
   test "actions are native Ash definitions" do
@@ -152,11 +156,12 @@ defmodule Aikido.NativeActionTest do
   end
 
   test "native input casting coerces strings" do
-    assert {:ok, %{count: 5}, []} = run(:increment, %{amount: "3"})
+    assert {:ok, %Aikido.ActionResult{state: %{count: 5}, directives: []}} =
+             run(:increment, %{amount: "3"})
   end
 
   test "native defaults apply when arguments are omitted" do
-    assert {:ok, %{count: 3}, []} = run(:increment)
+    assert {:ok, %Aikido.ActionResult{state: %{count: 3}, directives: []}} = run(:increment)
   end
 
   test "native constraints reject invalid values" do
@@ -172,7 +177,7 @@ defmodule Aikido.NativeActionTest do
   end
 
   test "preparations and native before-action hooks execute" do
-    assert {:ok, %{prepared: true}, []} = run(:prepared)
+    assert {:ok, %Aikido.ActionResult{state: %{prepared: true}, directives: []}} = run(:prepared)
   end
 
   test "results are a reusable Ash type" do
@@ -189,12 +194,14 @@ defmodule Aikido.NativeActionTest do
              Aikido.ActionResult.new(state: %{}, directives: [directive])
   end
 
-  test "custom protocol implementations validate" do
+  test "custom directive behaviours validate" do
     directive = %Aikido.NativeActionTest.CustomDirective{value: 1}
-    assert {:ok, %{count: 100}, [^directive]} = run(:emit, %{directive: directive})
+
+    assert {:ok, %Aikido.ActionResult{state: %{count: 100}, directives: [^directive]}} =
+             run(:emit, %{directive: directive})
   end
 
-  test "unknown structs cannot use the Any fallback to pass validation" do
+  test "unknown structs are rejected as directives" do
     assert {:error, _} = run(:emit, %{directive: %URI{}})
   end
 
@@ -206,7 +213,7 @@ defmodule Aikido.NativeActionTest do
     assert {:error, _} = run(:emit, %{directive: :unknown})
   end
 
-  test "malformed directive lists are rejected at the execution boundary" do
+  test "result constructors reject malformed directive lists" do
     assert {:error, _} = run(:invalid_result)
   end
 
@@ -230,10 +237,13 @@ defmodule Aikido.NativeActionTest do
     }
 
     assert {:ok,
-            %{
-              agent_id: "agent",
-              signal: ^signal,
-              slice_config: %{label: "mount"}
-            }, []} = run(:runtime, %{}, context)
+            %Aikido.ActionResult{
+              state: %{
+                agent_id: "agent",
+                signal: ^signal,
+                slice_config: %{label: "mount"}
+              },
+              directives: []
+            }} = run(:runtime, %{}, context)
   end
 end

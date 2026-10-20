@@ -17,23 +17,25 @@ defmodule Aikido.Ash.Agent do
 
   defmodule Signal do
     @moduledoc false
-    defstruct [:name, :type, :target, __spark_metadata__: nil]
+    defstruct [:name, :type, :target, __identifier__: nil, __spark_metadata__: nil]
   end
 
   @slice %Spark.Dsl.Entity{
     name: :slice,
     target: Aikido.Dsl.Agent.SliceMount,
     args: [:path, :module],
+    identifier: :path,
     schema: [
       path: [type: :atom, required: true],
       module: [type: :module, required: true],
-      options: [type: :keyword_list, default: []]
+      options: [type: {:or, [:keyword_list, :map]}, default: []]
     ]
   }
   @signal %Spark.Dsl.Entity{
     name: :signal,
     target: Signal,
     args: [:name, :type, :target],
+    identifier: :name,
     schema: [
       name: [type: :atom, required: true],
       type: [type: :string, required: true],
@@ -47,10 +49,35 @@ defmodule Aikido.Ash.Agent do
   # Reuse Ash's attribute entities so types, constraints and options have exactly
   # the same syntax and validation as an ordinary resource attributes section.
   @schema %{Enum.find(Ash.Resource.Dsl.sections(), &(&1.name == :attributes)) | name: :schema}
+  @route %Spark.Dsl.Entity{
+    name: :route,
+    target: Aikido.Dsl.Agent.Route,
+    args: [:type, :action],
+    schema: [
+      type: [type: :string, required: true],
+      action: [type: :any, required: true],
+      priority: [type: :integer, default: 0],
+      match: [type: {:fun, 1}]
+    ]
+  }
+  @schedule %Spark.Dsl.Entity{
+    name: :schedule,
+    target: Aikido.Dsl.Agent.Schedule,
+    args: [:cron, :signal_type],
+    schema: [
+      cron: [type: :string, required: true],
+      signal_type: [type: :string, required: true],
+      data: [type: :map, default: %{}],
+      job_id: [type: :any],
+      timezone: [type: :string]
+    ]
+  }
+  @schedules %Spark.Dsl.Section{name: :schedules, entities: [@schedule]}
   @agent %Spark.Dsl.Section{
     name: :agent,
     schema: [
       name: [type: :string, required: true],
+      description: [type: :string],
       instance: [
         type: :atom,
         default: Aikido.Default,
@@ -66,10 +93,10 @@ defmodule Aikido.Ash.Agent do
       path: [type: :atom, default: :state]
     ],
     sections: [@schema],
-    entities: [@slice, @signal]
+    entities: [@slice, @signal, @route]
   }
   use Spark.Dsl.Extension,
-    sections: [@agent],
+    sections: [@agent, @schedules],
     transformers: [
       Aikido.Ash.Transformers.Agent,
       Aikido.Dsl.Agent.Transformers.WalkExtensions,

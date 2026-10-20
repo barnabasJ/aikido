@@ -86,7 +86,9 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
     content =
       case result do
         {:ok, content} -> content
-        {:error, reason} -> Jason.encode!(%{error: format_error(reason)})
+        {:error, :timeout} -> Jason.encode!(%{error: "tool timeout"})
+        {:error, :cancelled} -> Jason.encode!(%{error: "tool cancelled"})
+        {:error, reason} -> Jason.encode!(%{error: AshAi.Tool.Errors.format(reason)})
       end
 
     data = %{
@@ -122,15 +124,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         end
 
       :error ->
-        {:error, "tool not found: #{name}"}
+        {:ok, Jason.encode!(%{error: "tool not found: #{name}"})}
     end
   end
-
-  defp format_error(%{errors: errors}) when is_list(errors),
-    do: Enum.map_join(errors, "; ", &format_error/1)
-
-  defp format_error(%Ash.Error.Unknown.UnknownError{error: error}), do: format_error(error)
-  defp format_error(%_{} = err) when is_exception(err), do: Exception.message(err)
-  defp format_error(reason) when is_binary(reason), do: reason
-  defp format_error(reason), do: inspect(reason)
 end

@@ -62,13 +62,14 @@ defmodule Aikido.AI.Handoff do
   @doc false
   def complete(state, data) do
     if active?(state, data) do
-      turn = data.turn
+      response = data.turn
+      turn = ReqLLM.Response.classify(response)
 
       cond do
         turn.type != :final_answer || !is_binary(turn.text) || String.trim(turn.text) == "" ->
           fail(state, Map.put(data, :reason, :empty_or_invalid_document))
 
-        turn.finish_reason in [:length, :max_tokens] ->
+        turn.finish_reason == :length ->
           fail(state, Map.put(data, :reason, :truncated_document))
 
         true ->
@@ -98,7 +99,7 @@ defmodule Aikido.AI.Handoff do
             fail(state, Map.put(data, :reason, :document_exceeds_context_limit))
           else
             usage =
-              Map.merge(state.usage, turn.usage || %{}, fn _, old, new ->
+              Map.merge(state.usage, ReqLLM.Response.usage(response) || %{}, fn _, old, new ->
                 if is_number(old) && is_number(new), do: old + new, else: new
               end)
 

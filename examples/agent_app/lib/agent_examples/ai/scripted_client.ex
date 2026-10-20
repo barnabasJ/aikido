@@ -7,7 +7,6 @@ defmodule AgentExamples.AI.ScriptedClient do
   reviewer and the specialist. Ordinary requests use text_stats and team_roster.
   """
   @behaviour Aikido.AI.Client
-  alias Aikido.Slices.AiReact.Turn
 
   @impl true
   def generate_text(_model, messages, options) do
@@ -27,10 +26,17 @@ defmodule AgentExamples.AI.ScriptedClient do
     cond do
       tools == [] && String.starts_with?(query, "This conversation is about to be replaced") ->
         {:ok,
-         %Turn{
-           text:
-             "Offline handoff demonstration. Follow the system instructions and continue the conversation with the supplied tools. Next action: process the latest user instruction and report the result."
-         }}
+         struct!(ReqLLM.Response,
+           id: "scripted",
+           model: "offline",
+           context: ReqLLM.Context.new(),
+           message:
+             ReqLLM.Context.assistant(
+               "Offline handoff demonstration. Follow the system instructions and continue the conversation with the supplied tools. Next action: process the latest user instruction and report the result.",
+               tool_calls: []
+             ),
+           finish_reason: :stop
+         )}
 
       String.starts_with?(query, "orchestrate:") &&
           ("spawn_worker" in tools || "run_lua" in tools) ->
@@ -42,17 +48,24 @@ defmodule AgentExamples.AI.ScriptedClient do
       results == [] ->
         calls =
           for name <- tools,
-              name in ["text_stats", "team_roster", "stamp", "ash_text_stats", "run_lua"],
+              name in ["text_stats", "team_roster", "stamp", "run_lua"],
               do: call(name, arguments(name, query))
 
-        {:ok, %Turn{type: :tool_calls, tool_calls: calls}}
+        {:ok,
+         struct!(ReqLLM.Response,
+           id: "scripted",
+           model: "offline",
+           context: ReqLLM.Context.new(),
+           message: ReqLLM.Context.assistant("", tool_calls: calls),
+           finish_reason: :tool_calls
+         )}
 
       true ->
         final(results)
     end
   end
 
-  defp arguments(name, query) when name in ["ash_text_stats", "text_stats", "stamp"],
+  defp arguments(name, query) when name in ["text_stats", "stamp"],
     do: %{"input" => %{"text" => query}}
 
   defp arguments("run_lua", _query),
@@ -127,17 +140,34 @@ defmodule AgentExamples.AI.ScriptedClient do
   defp tool(name, arguments),
     do:
       {:ok,
-       %Turn{
-         type: :tool_calls,
-         tool_calls: [
-           call(name, %{
-             "input" => Map.new(arguments, fn {key, value} -> {to_string(key), value} end)
-           })
-         ]
-       }}
+       struct!(ReqLLM.Response,
+         id: "scripted",
+         model: "offline",
+         context: ReqLLM.Context.new(),
+         message:
+           ReqLLM.Context.assistant("",
+             tool_calls: [
+               call(name, %{
+                 "input" => Map.new(arguments, fn {key, value} -> {to_string(key), value} end)
+               })
+             ]
+           ),
+         finish_reason: :tool_calls
+       )}
 
   defp call(name, arguments),
-    do: %{id: Aikido.Util.generate_id(), name: name, arguments: arguments}
+    do: %{id: Ash.UUIDv7.generate(), name: name, arguments: arguments}
+
+  defp format_lua_result(%{"words" => words, "characters" => characters}),
+    do: "Words: #{words}; characters: #{characters}."
+
+  defp format_lua_result(%{"member" => member, "result" => result}),
+    do: "#{member}: #{result}"
+
+  defp format_lua_result(%{"status" => "started", "member" => member}),
+    do: "Started #{member}."
+
+  defp format_lua_result(result), do: Jason.encode!(result)
 
   defp final(results) do
     output =
@@ -152,7 +182,7 @@ defmodule AgentExamples.AI.ScriptedClient do
             "#{label}: #{text}"
 
           %{"result" => result, "error" => nil} ->
-            "Lua: #{Jason.encode!(result)}"
+            "Lua: #{format_lua_result(result)}"
 
           %{"members" => members} ->
             "Team: #{Enum.join(members, ", ")}."
@@ -168,7 +198,14 @@ defmodule AgentExamples.AI.ScriptedClient do
         end
       end)
 
-    {:ok, %Turn{type: :final_answer, text: output}}
+    {:ok,
+     struct!(ReqLLM.Response,
+       id: "scripted",
+       model: "offline",
+       context: ReqLLM.Context.new(),
+       message: ReqLLM.Context.assistant(output, tool_calls: []),
+       finish_reason: :stop
+     )}
   end
 
   defp text(message), do: Enum.map_join(message.content, "", &(&1.text || ""))

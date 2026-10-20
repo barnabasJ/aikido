@@ -7,7 +7,7 @@ defmodule AgentExamples.AI.Tools do
   def for_team, do: for_assistant() ++ [:team_roster, :spawn_worker, :delegate]
 
   @doc "Ash AI tool names for the native AshLua eval/docs actions."
-  def from_ash_ai, do: [:ash_text_stats, :run_lua, :lua_docs]
+  def for_lua, do: [:run_lua, :lua_docs]
 
   actions do
     action :stamp, :map do

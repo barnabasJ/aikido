@@ -3,11 +3,12 @@ defmodule AikidoTest.Memory.SliceTest.AgentWithMemory do
 
   agent do
     name "memory_slice_test_agent"
+    slice :memory, Aikido.Slices.Memory
   end
 end
 
 defmodule AikidoTest.Memory.SliceTest.AgentWithoutMemory do
-  use Aikido.Agent, default_slices: %{memory: false}
+  use Aikido.Agent
 
   agent do
     name "memory_slice_test_no_memory"
@@ -91,29 +92,35 @@ defmodule AikidoTest.Memory.SliceTest do
   end
 
   describe("agent integration") do
-    nil
-    nil
-
-    test "agent includes memory slice by default" do
+    test "agent includes its explicitly mounted memory slice" do
       assert Aikido.Slices.Memory in Aikido.Dsl.Agent.Info.slices(
                AikidoTest.Memory.SliceTest.AgentWithMemory
              )
     end
 
-    test "agent can disable memory slice" do
+    test "agent has no memory slice unless mounted" do
       refute Aikido.Slices.Memory in Aikido.Dsl.Agent.Info.slices(
                AikidoTest.Memory.SliceTest.AgentWithoutMemory
              )
     end
 
-    test "memory can be attached after creation via Ensure action" do
+    test "Ensure preserves the mounted memory resource" do
       agent = AikidoTest.Memory.SliceTest.AgentWithMemory.initialize!()
 
-      {:ok, agent, []} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.Memory.SliceTest.AgentWithMemory,
-          agent,
-          {{Aikido.Slices.Memory, :ensure}, %{}}
+      {:ok, %{agent: agent}, []} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.Memory.SliceTest.AgentWithMemory,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{Aikido.Slices.Memory, :ensure}, %{}}]
         )
 
       assert %Aikido.Slices.Memory{} = agent.state[:memory]
@@ -122,11 +129,23 @@ defmodule AikidoTest.Memory.SliceTest do
     test "PutInSpace action mutates agent.state.memory.spaces[:world]" do
       agent = AikidoTest.Memory.SliceTest.AgentWithMemory.initialize!()
 
-      {:ok, agent, []} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.Memory.SliceTest.AgentWithMemory,
-          agent,
-          {{Aikido.Slices.Memory, :put_in_space}, %{space: :world, key: :temperature, value: 22}}
+      {:ok, %{agent: agent}, []} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.Memory.SliceTest.AgentWithMemory,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [
+            {{Aikido.Slices.Memory, :put_in_space},
+             %{space: :world, key: :temperature, value: 22}}
+          ]
         )
 
       assert agent.state.memory.spaces[:world].data == %{temperature: 22}

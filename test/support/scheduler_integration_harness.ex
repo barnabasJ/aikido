@@ -3,8 +3,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementati
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    params =
-      Map.merge(input.context.aikido.signal.data || %{}, Map.delete(input.arguments, :state))
+    params = input.arguments.data
 
     slice = input.arguments.state
     count = Map.get(slice, :tick_count, 0)
@@ -17,26 +16,12 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementati
   end
 end
 
-defmodule AikidoTest.Support.SchedulerIntegrationHarness.TickAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :cron_count, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    params =
-      Map.merge(input.context.aikido.signal.data || %{}, Map.delete(input.arguments, :state))
+    params = Map.delete(input.arguments, :state)
 
     slice = input.arguments.state
     cron_expr = Map.get(params, :cron)
@@ -44,24 +29,11 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Impl
     timezone = Map.get(params, :timezone)
 
     message =
-      Map.get(params, :message, struct!(Jido.Signal, id: nil, type: "cron.tick", source: "/test"))
+      Map.get(params, :message) ||
+        struct!(Jido.Signal, id: nil, type: "cron.tick", data: %{}, source: "/test")
 
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
     Aikido.ActionResult.new(state: slice, directives: [directive])
-  end
-end
-
-defmodule AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :register_cron, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Implementation,
-           action: :run}
-    end
   end
 end
 
@@ -70,28 +42,10 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction.Implem
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    job_id =
-      case Map.fetch(input.arguments, :job_id) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:job_id]
-      end
+    job_id = input.arguments.job_id
 
     slice = input.arguments.state
     Aikido.ActionResult.new(state: slice, directives: [Aikido.Directives.cron_cancel(job_id)])
-  end
-end
-
-defmodule AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :cancel_cron, Aikido.ActionResult do
-      argument :state, :term
-
-      run {AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction.Implementation,
-           action: :run}
-    end
   end
 end
 
@@ -107,12 +61,40 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CronAgent do
       attribute :tick_count, :integer, default: 0
       attribute :ticks, {:array, :term}, default: []
     end
+
+    route "register_cron",
+          {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :register_cron}
+
+    route "cancel_cron", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cancel_cron}
+    route "cron.tick", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cron_count}
   end
 
-  signal_routes do
-    route "register_cron", AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction
-    route "cancel_cron", AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction
-    route "cron.tick", AikidoTest.Support.SchedulerIntegrationHarness.TickAction
+  actions do
+    action :cron_count, Aikido.ActionResult do
+      argument :state, :term
+      argument :data, :map, default: %{}
+
+      run {AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementation, action: :run}
+    end
+
+    action :register_cron, Aikido.ActionResult do
+      argument :state, :term
+      argument :cron, :string, allow_nil?: false
+      argument :job_id, :term
+      argument :timezone, :string
+      argument :message, :term
+
+      run {AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Implementation,
+           action: :run}
+    end
+
+    action :cancel_cron, Aikido.ActionResult do
+      argument :state, :term
+      argument :job_id, :term, allow_nil?: false
+
+      run {AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction.Implementation,
+           action: :run}
+    end
   end
 end
 
@@ -128,14 +110,12 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.ScheduledCronAgent do
       attribute :tick_count, :integer, default: 0
       attribute :ticks, {:array, :term}, default: []
     end
+
+    route "cron.tick", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cron_count}
   end
 
   schedules do
     schedule "* * * * * * *", "cron.tick", job_id: :scheduled_heartbeat
-  end
-
-  signal_routes do
-    route "cron.tick", AikidoTest.Support.SchedulerIntegrationHarness.TickAction
   end
 end
 

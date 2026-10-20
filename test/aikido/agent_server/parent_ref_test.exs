@@ -22,21 +22,6 @@ defmodule AikidoTest.AgentServer.ParentRefTest do
       assert {:ok, %ParentRef{meta: %{priority: :high}}} = ParentRef.new(attrs)
     end
 
-    test "returns error for non-map input" do
-      assert {:error, error} = ParentRef.new("not a map")
-      assert error.message == "ParentRef requires a map"
-    end
-
-    test "returns error for nil input" do
-      assert {:error, error} = ParentRef.new(nil)
-      assert error.message == "ParentRef requires a map"
-    end
-
-    test "returns error for list input" do
-      assert {:error, error} = ParentRef.new([])
-      assert error.message == "ParentRef requires a map"
-    end
-
     test "returns error for missing required fields" do
       assert {:error, _reason} = ParentRef.new(%{})
     end
@@ -50,51 +35,9 @@ defmodule AikidoTest.AgentServer.ParentRefTest do
     end
 
     test "raises on invalid attrs" do
-      assert_raise Aikido.Error.ValidationError, fn ->
+      assert_raise Ash.Error.Invalid, fn ->
         ParentRef.new!(%{})
       end
     end
-
-    test "raises on non-map input" do
-      assert_raise Aikido.Error.ValidationError, fn ->
-        ParentRef.new!("not a map")
-      end
-    end
   end
-
-  describe "validate/1" do
-    test "returns ok for valid ParentRef struct" do
-      {:ok, parent_ref} = ParentRef.new(@valid_attrs)
-      assert {:ok, ^parent_ref} = ParentRef.validate(parent_ref)
-    end
-
-    test "creates ParentRef from valid map" do
-      assert {:ok, %ParentRef{id: "parent-123"}} = ParentRef.validate(@valid_attrs)
-    end
-
-    test "returns error for invalid map" do
-      assert {:error, _reason} = ParentRef.validate(%{invalid: "data"})
-    end
-
-    test "returns error for non-map, non-struct input" do
-      assert {:error, error} = ParentRef.validate("not valid")
-      assert error.message == "Expected a ParentRef struct or map"
-    end
-
-    test "returns error for nil input" do
-      assert {:error, error} = ParentRef.validate(nil)
-      assert error.message == "Expected a ParentRef struct or map"
-    end
-
-    test "returns error for list input" do
-      assert {:error, error} = ParentRef.validate([])
-      assert error.message == "Expected a ParentRef struct or map"
-    end
-
-    test "returns error for integer input" do
-      assert {:error, error} = ParentRef.validate(123)
-      assert error.message == "Expected a ParentRef struct or map"
-    end
-  end
-
 end

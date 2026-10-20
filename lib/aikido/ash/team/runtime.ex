@@ -2,23 +2,29 @@ defmodule Aikido.Ash.Team.Runtime do
   @moduledoc false
 
   # Each function is one AsyncTask unit. No function changes agent state.
-  def start_member(resource, id, initial_state, parent) do
-    with {:ok, _record} <-
-           Aikido.Ash.start(resource, Map.put(initial_state, :id, id),
-             context: %{
-               aikido_runtime_options: [
-                 parent: parent,
-                 partition: parent.partition,
-                 on_parent_death: :stop,
-                 restart: :temporary
-               ]
-             }
+  def start_member(resource, id, initial_state, parent, scope) do
+    options = Ash.Scope.to_opts(scope)
+    context = Keyword.get(options, :context, %{})
+
+    context =
+      Map.put(context, :aikido_runtime_options,
+        parent: parent,
+        partition: parent.partition,
+        on_parent_death: :stop,
+        restart?: false
+      )
+
+    with {:ok, %{pid: pid}} <-
+           Aikido.Ash.start(
+             resource,
+             Map.put(initial_state, :id, id),
+             Keyword.put(options, :context, context)
            ),
-         pid when is_pid(pid) <-
-           Aikido.whereis(Aikido.Ash.Runtime.option(resource, :instance), id) do
+         :ok <- Aikido.AgentServer.await_ready(pid),
+         {:ok, ^pid} <- Aikido.AgentServer.await_child(parent.pid, parent.tag) do
       {:ok, pid}
     else
-      nil -> {:error, :member_disappeared}
+      {:ok, _different_pid} -> {:error, :member_not_attached}
       error -> error
     end
   end
@@ -28,20 +34,10 @@ defmodule Aikido.Ash.Team.Runtime do
       :ok -> {:ok, :stopped}
       {:error, :not_found} -> {:ok, :stopped}
     end
-  end
-
-  def watch_member(pid, team) do
-    member_ref = Process.monitor(pid)
-    team_ref = Process.monitor(team)
-
-    receive do
-      {:DOWN, ^member_ref, :process, ^pid, reason} ->
-        Process.demonitor(team_ref, [:flush])
-        {:ok, reason}
-
-      {:DOWN, ^team_ref, :process, ^team, _reason} ->
-        Process.demonitor(member_ref, [:flush])
-        {:signals, []}
-    end
+  catch
+    :exit, {:noproc, _} -> {:ok, :stopped}
+    :exit, {:normal, _} -> {:ok, :stopped}
+    :exit, {:shutdown, _} -> {:ok, :stopped}
+    :exit, {{:shutdown, _}, _} -> {:ok, :stopped}
   end
 end

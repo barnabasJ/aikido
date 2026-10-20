@@ -1,11 +1,8 @@
 defmodule Aikido.PreparedToolsTest.Agent do
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "prepared_tools"
-  end
-
-  slices do
     slice :ai, Aikido.Slices.AiReact
   end
 end
@@ -106,13 +103,17 @@ defmodule Aikido.PreparedToolsTest do
       signal =
         Jido.Signal.new!("ai.react.tools.ready", %{request_id: "old", prepared_tools: {[], %{}}})
 
-      assert {:ok, ^current, []} =
-               AikidoTest.NativeAction.run(
-                 {Aikido.Slices.AiReact, :tools_ready},
-                 signal,
-                 current,
-                 %{}
-               )
+      assert {:ok, %Aikido.ActionResult{state: ^current, directives: []}} =
+               then(signal, fn signal ->
+                 Aikido.Slices.AiReact
+                 |> Ash.ActionInput.for_action(
+                   :tools_ready,
+                   Map.put(signal.data || %{}, :state, current),
+                   context: %{aikido: Map.put(%{}, :signal, signal)},
+                   skip_unknown_inputs: [:*]
+                 )
+                 |> Ash.run_action()
+               end)
     end
   end
 

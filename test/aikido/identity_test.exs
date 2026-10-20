@@ -70,20 +70,4 @@ defmodule AikidoTest.IdentityTest do
       assert identity.profile[:origin] == "lab"
     end
   end
-
-  describe "snapshot/1" do
-    test "returns profile" do
-      identity = State.new()
-      snap = State.snapshot(identity)
-
-      assert Map.keys(snap) == [:profile]
-    end
-
-    test "filters profile to only age, generation, origin keys" do
-      identity = State.new(profile: %{age: 5, generation: 2, origin: "lab", secret: "x"})
-      snap = State.snapshot(identity)
-
-      assert snap.profile == %{age: 5, generation: 2, origin: "lab"}
-    end
-  end
 end

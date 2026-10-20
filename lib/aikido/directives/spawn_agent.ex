@@ -19,13 +19,13 @@ defmodule Aikido.Directives.SpawnAgent do
 
   ## Fields
 
-  - `agent` - Agent module (atom) or pre-built agent struct to spawn
+  - `agent` - Agent Ash resource module to spawn
   - `tag` - Tag for tracking this child (used as key in children map)
   - `opts` - Additional options passed to child AgentServer. Supports standard
     child startup options like `:id`, `:initial_state`, and `:on_parent_death`,
-    but not Durable lifecycle options like `:pool`, or `:pool_key`
+    but not Durable lifecycle options like `:durable_server` or `:durable_key`
   - `meta` - Metadata to pass to child via parent reference
-  - `restart` - Restart policy for the child under supervision (default: `:transient`)
+  - `restart?` - Automatically recover the child after a crash (default: `true`)
 
   ## Examples
 
@@ -50,16 +50,16 @@ defmodule Aikido.Directives.SpawnAgent do
       %SpawnAgent{
         agent: MyWorkerAgent,
         tag: :supervised,
-        restart: :permanent
+        restart?: true
       }
   """
 
   use Aikido.Directive
 
   typed_struct do
-    field :agent, :term,
+    field :agent, :module,
       allow_nil?: false,
-      description: "Agent module (atom) or pre-built agent struct"
+      description: "Agent Ash resource module"
 
     field :tag, :term, allow_nil?: false, description: "Tag for tracking this child"
 
@@ -70,11 +70,10 @@ defmodule Aikido.Directives.SpawnAgent do
 
     field :meta, :map, allow_nil?: false, default: %{}, description: "Metadata to pass to child"
 
-    field :restart, :atom,
+    field :restart?, :boolean,
       allow_nil?: false,
-      default: :transient,
-      constraints: [one_of: [:permanent, :transient, :temporary]],
-      description: "Restart policy for the child"
+      default: true,
+      description: "Let DurableServer automatically recover the child after a crash"
   end
 
   @doc """
@@ -91,36 +90,19 @@ defmodule Aikido.Directives.SpawnAgent do
   immediately.
   """
 
-  alias Aikido.Directives
-
   require Logger
 
   @reserved_child_opts [:agent, :agent_module, :id, :aikido, :parent, :partition]
 
   @impl true
-  def exec(
-        %{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart},
-        _input_signal,
-        state
-      ) do
-    with :ok <- Directives.validate_restart_policy(restart),
-         :ok <- Directives.validate_spawn_agent_opts(opts) do
-      spawn_child(state, agent, tag, opts, meta, restart)
-    else
-      {:error, reason} ->
-        Logger.error("AgentServer #{state.id} failed to spawn child: #{reason}")
-        :ok
-    end
+  def exec(%{agent: agent, tag: tag, opts: opts, meta: meta, restart?: restart?}, _signal, state) do
+    spawn_child(state, agent, tag, opts, meta, restart?)
   end
 
-  defp resolve_agent_module(agent) when is_atom(agent), do: agent
-  defp resolve_agent_module(%{__struct__: module}), do: module
-  defp resolve_agent_module(_), do: nil
-
-  defp spawn_child(state, agent, tag, opts, meta, restart) do
+  defp spawn_child(state, agent, tag, opts, meta, restart?) do
     child_id = opts[:id] || "#{state.id}/#{tag}"
     child_partition = Map.get(opts, :partition, state.partition)
-    agent_module = resolve_agent_module(agent)
+    agent_module = agent
 
     parent_ref = %{
       pid: self(),
@@ -143,7 +125,7 @@ defmodule Aikido.Directives.SpawnAgent do
     case Aikido.start_agent(
            state.aikido || Aikido.Default,
            agent_module,
-           Keyword.put(child_opts, :restart, restart)
+           Keyword.put(child_opts, :restart?, restart?)
          ) do
       {:ok, _pid} ->
         :ok

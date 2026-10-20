@@ -7,43 +7,14 @@ defmodule AikidoTest.PluginTestAction.Implementation do
   end
 end
 
-defmodule AikidoTest.PluginTestAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :plugin_test_action, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.PluginTestAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.PluginTestAnotherAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    value =
-      case Map.fetch(input.arguments, :value) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:value]
-      end
+    value = input.arguments.value
 
     Aikido.ActionResult.new(state: %{value: value}, directives: [])
-  end
-end
-
-defmodule AikidoTest.PluginTestAnotherAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :plugin_test_another_action, Aikido.ActionResult do
-      argument :state, :term
-      argument :value, :integer, default: 0
-      run {AikidoTest.PluginTestAnotherAction.Implementation, action: :run}
-    end
   end
 end
 
@@ -59,27 +30,9 @@ defmodule AikidoTest.TestActions.BasicAction.Implementation do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    value =
-      case Map.fetch(input.arguments, :value) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:value]
-      end
+    value = input.arguments.value
 
     Aikido.ActionResult.new(state: %{value: value}, directives: [])
-  end
-end
-
-defmodule AikidoTest.TestActions.BasicAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :basic_action, Aikido.ActionResult do
-      argument :state, :term
-      argument :value, :integer, allow_nil?: false
-      description "A basic action for testing"
-      run {AikidoTest.TestActions.BasicAction.Implementation, action: :run}
-    end
   end
 end
 
@@ -88,33 +41,9 @@ defmodule AikidoTest.TestActions.NoSchema.Implementation do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    runtime = input.context.aikido
-
-    signal = %{
-      runtime.signal
-      | data: Map.merge(runtime.signal.data || %{}, Map.delete(input.arguments, :state))
-    }
-
-    case {signal, input.arguments.state, runtime[:action_opts] || %{}, runtime} do
-      {%Jido.Signal{data: %{value: value}}, _slice, _opts, _ctx} ->
-        Aikido.ActionResult.new(state: %{result: value + 2}, directives: [])
-
-      {_signal, _slice, _opts, _ctx} ->
-        Aikido.ActionResult.new(state: %{result: "No params"}, directives: [])
-    end
-  end
-end
-
-defmodule AikidoTest.TestActions.NoSchema do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :no_schema, Aikido.ActionResult do
-      argument :state, :term
-      description "Action with no schema"
-      run {AikidoTest.TestActions.NoSchema.Implementation, action: :run}
-    end
+    value = Map.get(input.arguments, :value)
+    result = if is_nil(value), do: "No params", else: value + 2
+    Aikido.ActionResult.new(state: %{result: result})
   end
 end
 
@@ -123,34 +52,11 @@ defmodule AikidoTest.TestActions.Add.Implementation do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    value =
-      case Map.fetch(input.arguments, :value) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:value]
-      end
+    value = input.arguments.value
 
-    amount =
-      case Map.fetch(input.arguments, :amount) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:amount]
-      end
+    amount = input.arguments.amount
 
     Aikido.ActionResult.new(state: %{value: value + amount}, directives: [])
-  end
-end
-
-defmodule AikidoTest.TestActions.Add do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :add, Aikido.ActionResult do
-      argument :state, :term
-      argument :value, :integer, allow_nil?: false
-      argument :amount, :integer, default: 1
-      description "Adds amount to value"
-      run {AikidoTest.TestActions.Add.Implementation, action: :run}
-    end
   end
 end
 
@@ -161,19 +67,6 @@ defmodule AikidoTest.TestActions.EmitAction.Implementation do
   def run(_input, _opts, _context) do
     signal = %{type: "test.emitted", data: %{value: 42}}
     Aikido.ActionResult.new(state: %{emitted: true}, directives: [Aikido.Directives.emit(signal)])
-  end
-end
-
-defmodule AikidoTest.TestActions.EmitAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :emit_action, Aikido.ActionResult do
-      argument :state, :term
-      description "Action that returns an emit effect"
-      run {AikidoTest.TestActions.EmitAction.Implementation, action: :run}
-    end
   end
 end
 
@@ -191,19 +84,6 @@ defmodule AikidoTest.TestActions.MultiEffectAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.MultiEffectAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :multi_effect_action, Aikido.ActionResult do
-      argument :state, :term
-      description "Action that returns multiple effects"
-      run {AikidoTest.TestActions.MultiEffectAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.TestActions.MultiSliceAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
@@ -218,29 +98,12 @@ defmodule AikidoTest.TestActions.MultiSliceAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.MultiSliceAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :multi_slice_action, Aikido.ActionResult do
-      argument :state, :term
-      description "Action that returns a SliceUpdate writing two slices in one turn"
-      run {AikidoTest.TestActions.MultiSliceAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.TestActions.IncrementAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    amount =
-      case Map.fetch(input.arguments, :amount) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:amount]
-      end
+    amount = input.arguments.amount
 
     slice = input.arguments.state
 
@@ -256,29 +119,12 @@ defmodule AikidoTest.TestActions.IncrementAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.IncrementAction do
-  @moduledoc "Action that increments the :counter state field"
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :increment, Aikido.ActionResult do
-      argument :state, :term
-      argument :amount, :integer, default: 1
-      run {AikidoTest.TestActions.IncrementAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.TestActions.DecrementAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    amount =
-      case Map.fetch(input.arguments, :amount) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:amount]
-      end
+    amount = input.arguments.amount
 
     slice = input.arguments.state
 
@@ -294,26 +140,12 @@ defmodule AikidoTest.TestActions.DecrementAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.DecrementAction do
-  @moduledoc "Action that decrements the :counter state field"
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :decrement, Aikido.ActionResult do
-      argument :state, :term
-      argument :amount, :integer, default: 1
-      run {AikidoTest.TestActions.DecrementAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.TestActions.RecordAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    params =
-      Map.merge(input.context.aikido.signal.data || %{}, Map.delete(input.arguments, :state))
+    params = input.arguments.data
 
     slice = input.arguments.state
     messages = Map.get(slice, :messages, [])
@@ -322,44 +154,15 @@ defmodule AikidoTest.TestActions.RecordAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.RecordAction do
-  @moduledoc "Action that appends params to the :messages state field"
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :record, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.TestActions.RecordAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.TestActions.SlowAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    delay =
-      case Map.fetch(input.arguments, :delay_ms) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:delay_ms]
-      end
+    delay = input.arguments.delay_ms
 
-    AikidoTest.TestActions.SlowAction.work(delay)
+    AikidoTest.TestActions.SlowAction.Implementation.work(delay)
     Aikido.ActionResult.new(state: %{processed: true, delay: delay}, directives: [])
-  end
-end
-
-defmodule AikidoTest.TestActions.SlowAction do
-  @moduledoc "Pure CPU-bound action used to exercise execution timeouts."
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :slow, Aikido.ActionResult do
-      argument :state, :term
-      argument :delay_ms, :integer, default: 100
-      run {AikidoTest.TestActions.SlowAction.Implementation, action: :run}
-    end
   end
 
   # Deliberately expensive pure work: timeout tests must not model I/O in reducers.
@@ -373,21 +176,99 @@ defmodule AikidoTest.TestActions.FailingAction.Implementation do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    reason =
-      case Map.fetch(input.arguments, :reason) do
-        {:ok, value} -> value
-        :error -> input.context.aikido.signal.data[:reason]
-      end
+    reason = input.arguments.reason
 
     {:error, reason}
   end
 end
 
-defmodule AikidoTest.TestActions.FailingAction do
-  @moduledoc "Action that always fails with a configurable error message"
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+defmodule AikidoTest.TestActions do
+  @moduledoc "Reusable native slice actions for runtime tests."
+  use Ash.Resource,
+    data_layer: :embedded,
+    validate_domain_inclusion?: false,
+    extensions: [Aikido.Ash.Slice]
+
+  slice do
+    name "test_actions"
+  end
 
   actions do
+    action :plugin_test_action, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.PluginTestAction.Implementation, action: :run}
+    end
+
+    action :plugin_test_another_action, Aikido.ActionResult do
+      argument :state, :term
+      argument :value, :integer, default: 0
+      run {AikidoTest.PluginTestAnotherAction.Implementation, action: :run}
+    end
+
+    action :basic_action, Aikido.ActionResult do
+      argument :state, :term
+      argument :value, :integer, allow_nil?: false
+      description "A basic action for testing"
+      run {AikidoTest.TestActions.BasicAction.Implementation, action: :run}
+    end
+
+    action :no_schema, Aikido.ActionResult do
+      argument :state, :term
+      argument :value, :integer
+      description "Optional typed input"
+      run {AikidoTest.TestActions.NoSchema.Implementation, action: :run}
+    end
+
+    action :add, Aikido.ActionResult do
+      argument :state, :term
+      argument :value, :integer, allow_nil?: false
+      argument :amount, :integer, default: 1
+      description "Adds amount to value"
+      run {AikidoTest.TestActions.Add.Implementation, action: :run}
+    end
+
+    action :emit_action, Aikido.ActionResult do
+      argument :state, :term
+      description "Action that returns an emit effect"
+      run {AikidoTest.TestActions.EmitAction.Implementation, action: :run}
+    end
+
+    action :multi_effect_action, Aikido.ActionResult do
+      argument :state, :term
+      description "Action that returns multiple effects"
+      run {AikidoTest.TestActions.MultiEffectAction.Implementation, action: :run}
+    end
+
+    action :multi_slice_action, Aikido.ActionResult do
+      argument :state, :term
+      description "Action that returns a SliceUpdate writing two slices in one turn"
+      run {AikidoTest.TestActions.MultiSliceAction.Implementation, action: :run}
+    end
+
+    action :increment, Aikido.ActionResult do
+      argument :state, :term
+      argument :amount, :integer, default: 1
+      run {AikidoTest.TestActions.IncrementAction.Implementation, action: :run}
+    end
+
+    action :decrement, Aikido.ActionResult do
+      argument :state, :term
+      argument :amount, :integer, default: 1
+      run {AikidoTest.TestActions.DecrementAction.Implementation, action: :run}
+    end
+
+    action :record, Aikido.ActionResult do
+      argument :state, :term
+      argument :data, :map, default: %{}
+      run {AikidoTest.TestActions.RecordAction.Implementation, action: :run}
+    end
+
+    action :slow, Aikido.ActionResult do
+      argument :state, :term
+      argument :delay_ms, :integer, default: 100
+      run {AikidoTest.TestActions.SlowAction.Implementation, action: :run}
+    end
+
     action :failing, Aikido.ActionResult do
       argument :state, :term
       argument :reason, :string, default: "intentional failure"

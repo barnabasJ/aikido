@@ -33,33 +33,5 @@ defmodule Aikido.AgentServer.ChildInfo do
       description: "Metadata passed during spawn"
   end
 
-  defoverridable new!: 1
-
   @type t :: %__MODULE__{}
-
-  @doc """
-  Creates a new ChildInfo from a map of attributes.
-
-  Returns `{:ok, child_info}` or `{:error, reason}`.
-  """
-  @spec new(map()) :: {:ok, t()} | {:error, term()}
-  def new(attrs) when is_map(attrs) do
-    super(attrs)
-  end
-
-  def new(_), do: {:error, Aikido.Error.validation_error("ChildInfo requires a map")}
-
-  @doc """
-  Creates a new ChildInfo from a map, raising on error.
-  """
-  @spec new!(map()) :: t()
-  def new!(attrs) do
-    case new(attrs) do
-      {:ok, child_info} ->
-        child_info
-
-      {:error, reason} ->
-        raise Aikido.Error.validation_error("Invalid ChildInfo", details: reason)
-    end
-  end
 end

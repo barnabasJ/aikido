@@ -7,7 +7,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
   setup do
     Playground.subscribe()
-    %{conn: build_conn() |> Plug.Test.init_test_session(%{browser_id: Aikido.Util.generate_id()})}
+    %{conn: build_conn() |> Plug.Test.init_test_session(%{browser_id: Ash.UUIDv7.generate()})}
   end
 
   test "the index links to a descriptive LiveView page for every example", %{conn: conn} do

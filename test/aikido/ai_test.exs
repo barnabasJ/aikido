@@ -1,80 +1,62 @@
 defmodule Aikido.AITest.MathAgent do
   @moduledoc false
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "math"
-  end
 
-  slices do
-    slice :ai, Aikido.Slices.AiReact
-  end
-
-  react do
-    model "anthropic:claude-haiku-4-5-20251001"
-    tools [:test_add]
-    system_prompt "You are precise."
-    max_iterations 4
-    max_tokens 256
-    temperature 0.0
+    slice :ai, Aikido.Slices.AiReact,
+      options: [
+        model: "anthropic:claude-haiku-4-5-20251001",
+        tools: [:test_add],
+        system_prompt: "You are precise.",
+        max_iterations: 4,
+        llm_opts: [max_tokens: 256, temperature: 0.0]
+      ]
   end
 end
 
 defmodule Aikido.AITest.FailingAgent do
   @moduledoc false
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "failing"
-  end
 
-  slices do
-    slice :ai, Aikido.Slices.AiReact
-  end
-
-  react do
-    model "anthropic:claude-haiku-4-5-20251001"
-    tools [:test_fails]
-    system_prompt "x"
-    max_iterations 4
+    slice :ai, Aikido.Slices.AiReact,
+      options: [
+        model: "anthropic:claude-haiku-4-5-20251001",
+        tools: [:test_fails],
+        system_prompt: "x",
+        max_iterations: 4
+      ]
   end
 end
 
 defmodule Aikido.AITest.TightAgent do
   @moduledoc false
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "tight"
-  end
 
-  slices do
-    slice :ai, Aikido.Slices.AiReact
-  end
-
-  react do
-    model "anthropic:claude-haiku-4-5-20251001"
-    tools [:test_add]
-    system_prompt "x"
-    max_iterations 1
+    slice :ai, Aikido.Slices.AiReact,
+      options: [
+        model: "anthropic:claude-haiku-4-5-20251001",
+        tools: [:test_add],
+        system_prompt: "x",
+        max_iterations: 1
+      ]
   end
 end
 
 defmodule Aikido.AITest.NoModelAgent do
   @moduledoc false
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "no_model"
-  end
-
-  slices do
-    slice :ai, Aikido.Slices.AiReact
-  end
-
-  react do
-    tools [:test_add]
-    max_iterations 2
+    slice :ai, Aikido.Slices.AiReact, options: [tools: [:test_add], max_iterations: 2]
   end
 end
 
@@ -399,20 +381,17 @@ defmodule Aikido.AITest do
     test(":api_key in slice config llm_opts is propagated to ReqLLM", ctx) do
       defmodule Elixir.Aikido.AITest.SliceKeyAgent do
         @moduledoc false
-        use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+        use Aikido.Agent
 
         agent do
           name "slice_key"
-        end
 
-        slices do
-          slice :ai, Aikido.Slices.AiReact
-        end
-
-        react do
-          model "anthropic:claude-haiku-4-5-20251001"
-          tools []
-          llm_opts api_key: "key-from-slice"
+          slice :ai, Aikido.Slices.AiReact,
+            options: [
+              model: "anthropic:claude-haiku-4-5-20251001",
+              tools: [],
+              llm_opts: [api_key: "key-from-slice"]
+            ]
         end
       end
 
@@ -431,20 +410,17 @@ defmodule Aikido.AITest do
     test(":api_key per-call llm_opts overrides the slice default", ctx) do
       defmodule Elixir.Aikido.AITest.SliceKeyOverrideAgent do
         @moduledoc false
-        use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+        use Aikido.Agent
 
         agent do
           name "slice_key_override"
-        end
 
-        slices do
-          slice :ai, Aikido.Slices.AiReact
-        end
-
-        react do
-          model "anthropic:claude-haiku-4-5-20251001"
-          tools []
-          llm_opts api_key: "slice-default"
+          slice :ai, Aikido.Slices.AiReact,
+            options: [
+              model: "anthropic:claude-haiku-4-5-20251001",
+              tools: [],
+              llm_opts: [api_key: "slice-default"]
+            ]
         end
       end
 

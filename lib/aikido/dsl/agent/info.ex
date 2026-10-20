@@ -1,14 +1,12 @@
 defmodule Aikido.Dsl.Agent.Info do
   @moduledoc """
-  Introspection for agent resource metadata and `use Aikido.Agent` hosts.
+  Introspection for native Ash agent resources.
 
-  Reads the agent host's Spark `dsl_state` for the `:agent` /
-  `:signal_routes` / `:schedules` sections, plus the cross-section values
-  the agent's transformer pipeline persists (slice mounts, middleware and
-  expanded routes).
+  Reads declared agent options and compiled slice mounts, action ownership,
+  middleware, routes and schedules from Spark metadata.
   """
 
-  use Spark.InfoGenerator, extension: Aikido.Dsl.Agent, sections: [:agent]
+  use Spark.InfoGenerator, extension: Aikido.Ash.Agent, sections: [:agent]
 
   alias Spark.Dsl.Extension
 
@@ -31,7 +29,7 @@ defmodule Aikido.Dsl.Agent.Info do
   @spec middleware(module()) :: [module() | {module(), map()}]
   def middleware(module), do: Extension.get_persisted(module, :middleware_list, [])
 
-  @doc "Returns the deduplicated list of bare-slice modules attached to this agent."
+  @doc "Returns the deduplicated list of slice modules attached to this agent."
   @spec slices(module()) :: [module()]
   def slices(module) do
     module
@@ -55,14 +53,6 @@ defmodule Aikido.Dsl.Agent.Info do
   def routes(module),
     do: Extension.get_persisted(module, :validated_routes, [])
 
-  @doc "Returns all expanded route signal types."
-  @spec signal_types(module()) :: [String.t()]
-  def signal_types(module) do
-    module
-    |> routes()
-    |> Enum.map(fn {signal_type, _action, _priority} -> signal_type end)
-  end
-
   @doc "Returns the expanded slice and agent schedules."
   @spec schedules(module()) :: [
           Aikido.Slice.Schedules.schedule_spec()
@@ -83,7 +73,7 @@ defmodule Aikido.Dsl.Agent.Info do
   AgentServer to fan an action out across every mount that owns it.
 
   Multi-instance mounts of the same slice produce multi-element lists;
-  single-mount actions are one-element lists; agent-level `signal_routes`
+  single-mount actions are one-element lists; agent-level `route`
   declarations contribute the agent's own path. Actions not owned by any
   declared route are absent from the map and use the agent's own path.
   """
@@ -98,28 +88,4 @@ defmodule Aikido.Dsl.Agent.Info do
   @spec mount_config_map(module()) :: %{atom() => map()}
   def mount_config_map(module),
     do: Extension.get_persisted(module, :mount_config_map, %{})
-
-  @doc """
-  Returns the resolved configuration for a specific slice attached to
-  the agent, or `nil` if the slice isn't mounted.
-  """
-  @spec slice_config(module(), module()) :: map() | nil
-  def slice_config(agent_module, slice_mod) when is_atom(slice_mod) do
-    case Enum.find(slice_instances(agent_module), &(&1.module == slice_mod)) do
-      nil -> nil
-      instance -> instance.config
-    end
-  end
-
-  @doc """
-  Returns the slice of `agent.state` owned by a specific slice
-  attached to the agent's module, or `nil` if the slice isn't mounted.
-  """
-  @spec slice_state(module(), Aikido.Agent.t(), module()) :: map() | nil
-  def slice_state(agent_module, agent, slice_mod) when is_atom(slice_mod) do
-    case Enum.find(slice_instances(agent_module), &(&1.module == slice_mod)) do
-      nil -> nil
-      instance -> Map.get(agent.state, instance.path)
-    end
-  end
 end

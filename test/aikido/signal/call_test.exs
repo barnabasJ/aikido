@@ -9,18 +9,6 @@ defmodule AikidoTest.Signal.CallTest.EchoAction.Implementation do
   end
 end
 
-defmodule AikidoTest.Signal.CallTest.EchoAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :echo_action, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.Signal.CallTest.EchoAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.Signal.CallTest.SilentAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
@@ -30,29 +18,26 @@ defmodule AikidoTest.Signal.CallTest.SilentAction.Implementation do
   end
 end
 
-defmodule AikidoTest.Signal.CallTest.SilentAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :silent_action, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.Signal.CallTest.SilentAction.Implementation, action: :run}
-    end
-  end
-end
-
 defmodule AikidoTest.Signal.CallTest.CallTestAgent do
   @moduledoc false
   use Aikido.Agent
 
   agent do
     name "call_test_agent"
+    route "aikido.test.echo", {AikidoTest.Signal.CallTest.CallTestAgent, :echo_action}
+    route "aikido.test.silent", {AikidoTest.Signal.CallTest.CallTestAgent, :silent_action}
   end
 
-  signal_routes do
-    route "aikido.test.echo", AikidoTest.Signal.CallTest.EchoAction
-    route "aikido.test.silent", AikidoTest.Signal.CallTest.SilentAction
+  actions do
+    action :echo_action, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.Signal.CallTest.EchoAction.Implementation, action: :run}
+    end
+
+    action :silent_action, Aikido.ActionResult do
+      argument :state, :term
+      run {AikidoTest.Signal.CallTest.SilentAction.Implementation, action: :run}
+    end
   end
 end
 
@@ -156,22 +141,19 @@ defmodule AikidoTest.Signal.CallTest do
         )
 
       Process.unlink(pid)
-      caller = self()
+
+      {:ok, ref} =
+        Aikido.AgentServer.subscribe(pid, "aikido.test.silent", fn _ -> {:ok, :received} end,
+          once: true
+        )
 
       task =
         Task.async(fn ->
           query = Jido.Signal.new!("aikido.test.silent", %{}, source: "/test")
-          send(caller, :sent)
           Aikido.Signal.Call.call(pid, query, timeout: 5000)
         end)
 
-      receive do
-        :sent -> :ok
-      after
-        500 -> flunk("task did not send the query in time")
-      end
-
-      Process.sleep(20)
+      assert_receive {:aikido_subscription, ^ref, %{result: {:ok, :received}}}, 1000
       Process.exit(pid, :kill)
       assert {:error, :noproc} = Task.await(task, 1000)
     end

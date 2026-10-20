@@ -3,11 +3,12 @@ defmodule AikidoTest.Identity.SliceTest.AgentWithIdentity do
 
   agent do
     name "identity_slice_test_agent"
+    slice :identity, Aikido.Slices.Identity
   end
 end
 
 defmodule AikidoTest.Identity.SliceTest.AgentWithoutIdentity do
-  use Aikido.Agent, default_slices: %{identity: false}
+  use Aikido.Agent
 
   agent do
     name "identity_slice_test_no_identity"
@@ -59,34 +60,40 @@ defmodule AikidoTest.Identity.SliceTest do
   end
 
   describe("agent integration") do
-    nil
-    nil
-
-    test "agent includes identity slice by default" do
+    test "agent includes its explicitly mounted identity slice" do
       assert Aikido.Slices.Identity in Aikido.Dsl.Agent.Info.slices(
                AikidoTest.Identity.SliceTest.AgentWithIdentity
              )
     end
 
-    test "agent.state[:identity] starts nil (lazy init)" do
+    test "agent.state[:identity] starts from native resource defaults" do
       agent = AikidoTest.Identity.SliceTest.AgentWithIdentity.initialize!()
-      assert Map.get(agent.state, :identity) == nil
+      assert %Aikido.Slices.Identity{} = Map.get(agent.state, :identity)
     end
 
-    test "agent can disable identity slice" do
+    test "agent has no identity slice unless mounted" do
       refute Aikido.Slices.Identity in Aikido.Dsl.Agent.Info.slices(
                AikidoTest.Identity.SliceTest.AgentWithoutIdentity
              )
     end
 
-    test "identity can be attached after creation via Ensure action" do
+    test "Ensure preserves the mounted identity resource" do
       agent = AikidoTest.Identity.SliceTest.AgentWithIdentity.initialize!()
 
-      {:ok, agent, []} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.Identity.SliceTest.AgentWithIdentity,
-          agent,
-          {{Aikido.Slices.Identity, :ensure}, %{}}
+      {:ok, %{agent: agent}, []} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.Identity.SliceTest.AgentWithIdentity,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{Aikido.Slices.Identity, :ensure}, %{}}]
         )
 
       assert %Aikido.Slices.Identity{} = agent.state[:identity]
@@ -95,11 +102,20 @@ defmodule AikidoTest.Identity.SliceTest do
     test "UpdateProfile action mutates agent.state.identity" do
       agent = AikidoTest.Identity.SliceTest.AgentWithIdentity.initialize!()
 
-      {:ok, agent, []} =
-        AikidoTest.NativeAction.apply(
-          AikidoTest.Identity.SliceTest.AgentWithIdentity,
-          agent,
-          {{Aikido.Slices.Identity, :update_profile}, %{profile: %{nickname: "Sam"}}}
+      {:ok, %{agent: agent}, []} =
+        Aikido.AgentServer.apply_actions(
+          struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test"),
+          Map.merge(
+            Aikido.SignalCtx.ctx(
+              struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
+            ),
+            Map.merge(%{}, %{
+              agent_module: AikidoTest.Identity.SliceTest.AgentWithIdentity,
+              agent: agent,
+              agent_id: agent.id
+            })
+          ),
+          [{{Aikido.Slices.Identity, :update_profile}, %{profile: %{nickname: "Sam"}}}]
         )
 
       assert agent.state.identity.profile[:nickname] == "Sam"

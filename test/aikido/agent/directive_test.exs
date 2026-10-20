@@ -50,61 +50,51 @@ defmodule AikidoTest.Agent.DirectiveTest do
 
   describe "spawn_agent/3" do
     test "creates SpawnAgent directive with defaults" do
-      directive = Directives.spawn_agent(MyAgent, :worker_1)
+      directive = Directives.spawn_agent(AikidoTest.TestAgents.Minimal, :worker_1)
       assert %Directives.SpawnAgent{} = directive
-      assert directive.agent == MyAgent
+      assert directive.agent == AikidoTest.TestAgents.Minimal
       assert directive.tag == :worker_1
       assert directive.opts == %{}
       assert directive.meta == %{}
-      assert directive.restart == :transient
+      assert directive.restart? == true
     end
 
     test "creates SpawnAgent directive with opts" do
       directive =
-        Directives.spawn_agent(MyAgent, :processor, opts: %{initial_state: %{batch: 100}})
+        Directives.spawn_agent(AikidoTest.TestAgents.Minimal, :processor,
+          opts: %{initial_state: %{batch: 100}}
+        )
 
       assert directive.opts == %{initial_state: %{batch: 100}}
       assert directive.meta == %{}
-      assert directive.restart == :transient
+      assert directive.restart? == true
     end
 
     test "creates SpawnAgent directive with meta" do
-      directive = Directives.spawn_agent(MyAgent, :handler, meta: %{topic: "events"})
+      directive =
+        Directives.spawn_agent(AikidoTest.TestAgents.Minimal, :handler, meta: %{topic: "events"})
+
       assert directive.opts == %{}
       assert directive.meta == %{topic: "events"}
-      assert directive.restart == :transient
+      assert directive.restart? == true
     end
 
     test "creates SpawnAgent directive with both opts and meta" do
       directive =
-        Directives.spawn_agent(MyAgent, :worker,
+        Directives.spawn_agent(AikidoTest.TestAgents.Minimal, :worker,
           opts: %{id: "custom"},
           meta: %{assigned: true}
         )
 
       assert directive.opts == %{id: "custom"}
       assert directive.meta == %{assigned: true}
-      assert directive.restart == :transient
+      assert directive.restart? == true
     end
 
-    test "creates SpawnAgent directive with explicit restart policy" do
-      directive = Directives.spawn_agent(MyAgent, :durable, restart: :permanent)
+    test "creates SpawnAgent directive with explicit recovery setting" do
+      directive = Directives.spawn_agent(AikidoTest.TestAgents.Minimal, :durable, restart?: false)
 
-      assert directive.restart == :permanent
-    end
-
-    test "raises validation error for unsupported lifecycle opts" do
-      assert_raise Aikido.Error.ValidationError,
-                   ~r/SpawnAgent does not support lifecycle\/persistence opts/,
-                   fn ->
-                     Directives.spawn_agent(MyAgent, :worker, opts: %{pool: :managed_agents})
-                   end
-    end
-
-    test "raises validation error when opts is not a map" do
-      assert_raise Aikido.Error.ValidationError, ~r/SpawnAgent opts must be a map/, fn ->
-        Directives.spawn_agent(MyAgent, :worker, opts: [:not_a_map])
-      end
+      assert directive.restart? == false
     end
   end
 
@@ -224,5 +214,4 @@ defmodule AikidoTest.Agent.DirectiveTest do
       assert directive.job_id == :heartbeat
     end
   end
-
 end

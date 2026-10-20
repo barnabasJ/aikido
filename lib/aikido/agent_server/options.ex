@@ -23,7 +23,7 @@ defmodule Aikido.AgentServer.Options do
 
     field :aikido, :atom,
       allow_nil?: true,
-      description: "Aikido instance name for registry scoping (default: Aikido)"
+      description: "Aikido instance name for DurableServer scoping (default: Aikido.Default)"
 
     field :partition, :term,
       allow_nil?: true,
@@ -38,16 +38,6 @@ defmodule Aikido.AgentServer.Options do
       allow_nil?: false,
       default: %{},
       description: "Initial agent state"
-
-    field :registry, :atom,
-      allow_nil?: false,
-      default: Aikido.Registry,
-      description: "Registry module"
-
-    field :register_global, :boolean,
-      allow_nil?: false,
-      default: true,
-      description: "Register agent id in :registry during init"
 
     field :default_dispatch, :term,
       allow_nil?: true,
@@ -66,22 +56,18 @@ defmodule Aikido.AgentServer.Options do
       default: :stop,
       description: "Behavior when parent dies"
 
-    field :spawn_fun, :term,
-      allow_nil?: true,
-      description: "Custom function for spawning children"
-
     field :skip_schedules, :boolean,
       allow_nil?: false,
       default: false,
       description: "Skip registering slice schedules (useful for tests)"
 
-    field :pool, :atom,
+    field :durable_server, :atom,
       allow_nil?: true,
-      description: "Manager name if started via Aikido.Durable"
+      description: "Owning DurableServer supervisor"
 
-    field :pool_key, :term,
+    field :durable_key, :term,
       allow_nil?: true,
-      description: "Manager key if started via Aikido.Durable"
+      description: "Logical DurableServer identity"
 
     field :debug, :boolean,
       allow_nil?: false,
@@ -140,22 +126,20 @@ defmodule Aikido.AgentServer.Options do
   defp normalize_attrs(attrs) do
     id =
       case Map.get(attrs, :id) do
-        nil -> Aikido.Util.generate_id()
-        "" -> Aikido.Util.generate_id()
+        nil -> Ash.UUIDv7.generate()
+        "" -> Ash.UUIDv7.generate()
         id when is_binary(id) -> id
         id when is_atom(id) -> Atom.to_string(id)
       end
 
     partition = Map.get(attrs, :partition)
 
-    aikido_instance = Map.get(attrs, :aikido, Aikido)
-    registry = Map.get(attrs, :registry, Aikido.registry_name(aikido_instance))
+    aikido_instance = Map.get(attrs, :aikido, Aikido.Default)
     attrs = Map.put(attrs, :aikido, aikido_instance)
 
     attrs
     |> Map.put(:id, id)
     |> Map.put(:partition, partition)
-    |> Map.put(:registry, registry)
   end
 
   defp validate_agent_module(nil),

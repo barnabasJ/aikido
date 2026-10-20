@@ -29,7 +29,7 @@ defmodule AikidoTest.AshTeamVerifierTest do
       member :lead, AikidoTest.AshFixtures.Counter
       """)
 
-    assert_team_error(errors, "Team member names must be unique")
+    assert_team_error(errors, "Got duplicate")
   end
 
   test "rejects duplicate worker templates" do
@@ -39,7 +39,7 @@ defmodule AikidoTest.AshTeamVerifierTest do
       worker :helper, AikidoTest.AshFixtures.Counter
       """)
 
-    assert_team_error(errors, "Worker names must be unique")
+    assert_team_error(errors, "Got duplicate")
   end
 
   test "rejects members declared in both the graph and member entities" do

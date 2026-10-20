@@ -144,20 +144,18 @@ defmodule Aikido.MixProject do
       {:simple_sat, "~> 0.1"},
       {:deep_merge, "~> 1.0"},
       {:jason, "~> 1.4"},
-      {:ok, "~> 2.3"},
       {:phoenix_pubsub, "~> 2.1"},
       {:req_llm, "~> 1.24"},
       {:spark, "~> 2.2"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
-      {:poolboy, "~> 1.5"},
       {:telemetry_metrics, "~> 1.1"},
       {:crontab, "~> 1.2"},
       {:time_zone_info, "~> 0.7"},
-      {:uniq, "~> 0.6.1"},
 
       # Development & Test Dependencies
       {:benchee, "~> 1.5", only: :dev, runtime: false},
+      {:sourceror, "~> 1.12", only: [:dev, :test], runtime: false},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test]},
@@ -177,10 +175,9 @@ defmodule Aikido.MixProject do
   defp aliases do
     dsl_extensions =
       Enum.join(
-        ~w(Aikido.Dsl.Agent Aikido.Dsl.Slice
-           Aikido.Dsl.Instance Aikido.Ash.Agent Aikido.Ash.Slice
-           Aikido.Ash.Team Aikido.Ash.AI Aikido.Ash.Domain Aikido.Slices.AiReact
-           Aikido.Slices.Memory Aikido.Slices.Identity Aikido.Slices.Thread Ash.TypedStruct.Dsl),
+        ~w(Aikido.Dsl.Instance Aikido.Ash.Agent Aikido.Ash.Slice
+           Aikido.Ash.Team Aikido.Ash.AI Aikido.Ash.Domain
+           Ash.TypedStruct.Dsl),
         ","
       )
 

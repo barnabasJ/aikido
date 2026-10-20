@@ -4,9 +4,9 @@ defmodule Aikido.Dsl.ScaffoldTest do
   # Public DSL extensions share Spark's extension contract.
 
   @migrated_modules [
-    Aikido.Dsl.Agent,
+    Aikido.Ash.Agent,
     Aikido.Dsl.Instance,
-    Aikido.Dsl.Slice,
+    Aikido.Ash.Slice,
     Ash.Resource.Dsl
   ]
 
@@ -16,10 +16,9 @@ defmodule Aikido.Dsl.ScaffoldTest do
     end
   end
 
-  test "Aikido.Dsl.Agent contributes the host-owned sections" do
-    section_names = Enum.map(Aikido.Dsl.Agent.sections(), & &1.name)
+  test "Aikido.Ash.Agent contributes the host-owned sections" do
+    section_names = Enum.map(Aikido.Ash.Agent.sections(), & &1.name)
     assert :agent in section_names
-    assert :signal_routes in section_names
     assert :schedules in section_names
   end
 
@@ -28,10 +27,9 @@ defmodule Aikido.Dsl.ScaffoldTest do
     assert :instance in section_names
   end
 
-  test "Aikido.Dsl.Slice contributes the slice surface sections" do
-    section_names = Enum.map(Aikido.Dsl.Slice.sections(), & &1.name)
+  test "Aikido.Ash.Slice contributes the slice surface sections" do
+    section_names = Enum.map(Aikido.Ash.Slice.sections(), & &1.name)
     assert :slice in section_names
-    assert :signal_routes in section_names
     assert :schedules in section_names
   end
 

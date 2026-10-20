@@ -14,7 +14,7 @@ defmodule AgentExamplesWeb.IndexLive do
           Explore agents one signal at a time. Change state, compose slices, dispatch work, and watch a team build itself.
         </p>
         <div class="hero-pills">
-          <span>9 interactive examples</span><span>Offline AI included</span><span>No database required</span>
+          <span>{length(@examples)} interactive examples</span><span>Offline AI included</span><span>No database required</span>
         </div>
       </header>
       <div class="section-heading">

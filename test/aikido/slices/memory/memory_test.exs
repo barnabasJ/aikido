@@ -1,7 +1,6 @@
 defmodule AikidoTest.Memory.MemoryTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Slices.Memory.Space
   alias Aikido.Slices.Memory, as: State
 
   describe "new/0,1" do
@@ -14,13 +13,13 @@ defmodule AikidoTest.Memory.MemoryTest do
 
     test "world space is a map space" do
       memory = State.new()
-      assert Space.map?(memory.spaces.world)
+      assert is_map(memory.spaces.world.data)
       assert memory.spaces.world.data == %{}
     end
 
     test "tasks space is a list space" do
       memory = State.new()
-      assert Space.list?(memory.spaces.tasks)
+      assert is_list(memory.spaces.tasks.data)
       assert memory.spaces.tasks.data == []
     end
 
@@ -64,5 +63,4 @@ defmodule AikidoTest.Memory.MemoryTest do
       assert :world in State.reserved_spaces()
     end
   end
-
 end

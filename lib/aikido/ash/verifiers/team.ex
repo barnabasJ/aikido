@@ -7,21 +7,13 @@ defmodule Aikido.Ash.Verifiers.Team do
   def verify(dsl) do
     entities = Verifier.get_entities(dsl, [:team])
     members = Enum.filter(entities, &match?(%Aikido.Ash.Team.Member{}, &1))
-    workers = Enum.filter(entities, &match?(%Aikido.Ash.Team.Worker{}, &1))
     names = Enum.map(members, & &1.name)
-    worker_names = Enum.map(workers, & &1.name)
     instance = Verifier.get_option(dsl, [:agent], :instance)
     raw = Verifier.get_option(dsl, [:team], :topology, %{})
 
     cond do
       Aikido.Ash.Agent not in Spark.extensions(dsl) ->
         error("requires the Aikido.Ash.Agent extension")
-
-      names != Enum.uniq(names) ->
-        error("Team member names must be unique")
-
-      worker_names != Enum.uniq(worker_names) ->
-        error("Worker names must be unique")
 
       Enum.any?(names, &Map.has_key?(raw, &1)) ->
         error("Duplicate topology member")

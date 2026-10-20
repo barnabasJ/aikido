@@ -1,7 +1,7 @@
 defmodule Aikido.Slices.AiReact.LLMTurnTest do
   use ExUnit.Case, async: true
   alias Aikido.Slices.AiReact.Directives.ToolExec
-  alias Aikido.Slices.AiReact.Turn
+
   alias ReqLLM.Context
 
   defp running_slice(opts \\ []) do
@@ -27,23 +27,84 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
     Jido.Signal.new!("ai.react.llm.completed", %{turn: turn, request_id: request_id})
   end
 
+  test "model history retains the canonical assistant message and provider reasoning" do
+    for tool_calls <- [[], [%{id: "lookup", name: "test_add", arguments: %{"a" => 1}}]] do
+      message =
+        ReqLLM.Context.assistant(
+          [
+            ReqLLM.Message.ContentPart.thinking("reasoning"),
+            ReqLLM.Message.ContentPart.text("answer")
+          ],
+          tool_calls: tool_calls,
+          metadata: %{response_id: "provider-response"}
+        )
+        |> Map.put(:reasoning_details, [
+          %ReqLLM.Message.ReasoningDetails{
+            text: "reasoning",
+            signature: "provider-signature",
+            provider: :anthropic
+          }
+        ])
+
+      response =
+        struct!(ReqLLM.Response,
+          id: "provider-response",
+          model: "offline",
+          context: Context.new(),
+          message: message,
+          finish_reason: if(tool_calls == [], do: :stop, else: :tool_calls)
+        )
+
+      assert {:ok, %Aikido.ActionResult{state: state, directives: _directives}} =
+               then(signal("req_1", response), fn signal ->
+                 Aikido.Slices.AiReact
+                 |> Ash.ActionInput.for_action(
+                   :llm_turn,
+                   Map.put(signal.data || %{}, :state, running_slice()),
+                   context: %{aikido: Map.put(%{}, :signal, signal)},
+                   skip_unknown_inputs: [:*]
+                 )
+                 |> Ash.run_action()
+               end)
+
+      assert List.last(state.context.messages) == message
+      assert state.estimated_tokens == Aikido.AI.Context.estimate_tokens(state.context)
+    end
+  end
+
   defp final_turn(text) do
-    %Turn{type: :final_answer, text: text, tool_calls: []}
+    struct!(ReqLLM.Response,
+      id: "scripted",
+      model: "offline",
+      context: ReqLLM.Context.new(),
+      message: ReqLLM.Context.assistant(text, tool_calls: []),
+      finish_reason: :stop
+    )
   end
 
   defp tool_turn(calls, opts \\ []) do
-    %Turn{type: :tool_calls, text: Keyword.get(opts, :text, ""), tool_calls: calls}
+    struct!(ReqLLM.Response,
+      id: "scripted",
+      model: "offline",
+      context: ReqLLM.Context.new(),
+      message: ReqLLM.Context.assistant(Keyword.get(opts, :text, ""), tool_calls: calls),
+      finish_reason: :tool_calls
+    )
   end
 
   describe("final answer turn") do
     test "appends the assistant message and settles :completed with the text" do
-      {:ok, new_slice, directives} =
-        AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact, :llm_turn},
-          signal("req_1", final_turn("42")),
-          running_slice(),
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: new_slice, directives: directives}} =
+        then(signal("req_1", final_turn("42")), fn signal ->
+          Aikido.Slices.AiReact
+          |> Ash.ActionInput.for_action(
+            :llm_turn,
+            Map.put(signal.data || %{}, :state, running_slice()),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert directives == []
       assert new_slice.status == :completed
@@ -58,13 +119,17 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
     test "stores pending calls, emits one ToolExec per call, increments iteration" do
       calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
 
-      {:ok, new_slice, directives} =
-        AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact, :llm_turn},
-          signal("req_1", tool_turn(calls)),
-          running_slice(),
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: new_slice, directives: directives}} =
+        then(signal("req_1", tool_turn(calls)), fn signal ->
+          Aikido.Slices.AiReact
+          |> Ash.ActionInput.for_action(
+            :llm_turn,
+            Map.put(signal.data || %{}, :state, running_slice()),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert new_slice.status == :running
       assert new_slice.iteration == 1
@@ -85,13 +150,17 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
         %{id: "call_2", name: "test_add", arguments: %{"a" => 3, "b" => 4}}
       ]
 
-      {:ok, new_slice, directives} =
-        AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact, :llm_turn},
-          signal("req_1", tool_turn(calls)),
-          running_slice(),
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: new_slice, directives: directives}} =
+        then(signal("req_1", tool_turn(calls)), fn signal ->
+          Aikido.Slices.AiReact
+          |> Ash.ActionInput.for_action(
+            :llm_turn,
+            Map.put(signal.data || %{}, :state, running_slice()),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert length(new_slice.pending_tool_calls) == 2
       assert length(directives) == 2
@@ -102,13 +171,15 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
       slice = running_slice(iteration: 3, max_iterations: 4)
       calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
 
-      {:ok, new_slice, directives} =
-        AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact, :llm_turn},
-          signal("req_1", tool_turn(calls)),
-          slice,
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: new_slice, directives: directives}} =
+        then(signal("req_1", tool_turn(calls)), fn signal ->
+          Aikido.Slices.AiReact
+          |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, slice),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert directives == []
       assert new_slice.status == :completed
@@ -121,13 +192,15 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
     test "drops a signal whose request_id doesn't match the slice" do
       slice = running_slice(request_id: "req_active")
 
-      {:ok, returned, []} =
-        AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact, :llm_turn},
-          signal("req_old", final_turn("ignored")),
-          slice,
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: returned, directives: []}} =
+        then(signal("req_old", final_turn("ignored")), fn signal ->
+          Aikido.Slices.AiReact
+          |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, slice),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert returned == slice
     end
@@ -135,13 +208,15 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
     test "drops a signal that arrives after the slice has already terminated" do
       slice = %{running_slice() | status: :completed, result: "earlier"}
 
-      {:ok, returned, []} =
-        AikidoTest.NativeAction.run(
-          {Aikido.Slices.AiReact, :llm_turn},
-          signal("req_1", final_turn("ignored")),
-          slice,
-          %{}
-        )
+      {:ok, %Aikido.ActionResult{state: returned, directives: []}} =
+        then(signal("req_1", final_turn("ignored")), fn signal ->
+          Aikido.Slices.AiReact
+          |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, slice),
+            context: %{aikido: Map.put(%{}, :signal, signal)},
+            skip_unknown_inputs: [:*]
+          )
+          |> Ash.run_action()
+        end)
 
       assert returned == slice
     end

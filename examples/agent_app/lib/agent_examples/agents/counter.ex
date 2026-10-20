@@ -1,5 +1,5 @@
 defmodule AgentExamples.Counter do
-  @moduledoc "Typed update arguments become signals; a pure action increments state."
+  @moduledoc "Typed action arguments become signals; a pure action increments state."
   use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Ash.Agent]
 
   agent do

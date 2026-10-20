@@ -30,7 +30,6 @@ defmodule Aikido.Ash.Transformers.Slice do
       )
 
     resource = Transformer.get_persisted(dsl, :module)
-    dsl = Transformer.persist(dsl, :aikido_slice_schema, resource)
     {:ok, Aikido.Dsl.Transformers.Attributes.configure(dsl, :slice, resource)}
   end
 end

@@ -23,21 +23,6 @@ defmodule AikidoTest.AgentServer.ChildInfoTest do
       assert {:ok, %ChildInfo{meta: %{role: :processor}}} = ChildInfo.new(attrs)
     end
 
-    test "returns error for non-map input" do
-      assert {:error, error} = ChildInfo.new("not a map")
-      assert error.message == "ChildInfo requires a map"
-    end
-
-    test "returns error for nil input" do
-      assert {:error, error} = ChildInfo.new(nil)
-      assert error.message == "ChildInfo requires a map"
-    end
-
-    test "returns error for list input" do
-      assert {:error, error} = ChildInfo.new([])
-      assert error.message == "ChildInfo requires a map"
-    end
-
     test "returns error for missing required fields" do
       assert {:error, _reason} = ChildInfo.new(%{})
     end
@@ -64,24 +49,11 @@ defmodule AikidoTest.AgentServer.ChildInfoTest do
     end
 
     test "raises on invalid attrs" do
-      assert_raise Aikido.Error.ValidationError, fn ->
+      assert_raise Ash.Error.Invalid, fn ->
         ChildInfo.new!(%{})
       end
     end
-
-    test "raises on non-map input" do
-      assert_raise Aikido.Error.ValidationError, fn ->
-        ChildInfo.new!("not a map")
-      end
-    end
-
-    test "raises on nil input" do
-      assert_raise Aikido.Error.ValidationError, fn ->
-        ChildInfo.new!(nil)
-      end
-    end
   end
-
 
   defp valid_attrs do
     %{

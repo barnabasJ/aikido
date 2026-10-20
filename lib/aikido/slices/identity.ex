@@ -5,8 +5,8 @@ defmodule Aikido.Slices.Identity do
 
   ## State shape
 
-  Declared by the embedded resource attributes. The slice starts as `nil` (lazy-init);
-  the first inbound `aikido.identity.*` signal materializes a fresh
+  Declared by the embedded resource attributes. Explicit mounts initialize from
+  native defaults. When called with nil state, the first inbound `aikido.identity.*` signal creates a fresh
   `%Aikido.Slices.Identity{}` via the relevant action.
 
   ## Routes
@@ -15,16 +15,8 @@ defmodule Aikido.Slices.Identity do
       route "aikido.identity.evolve", :evolve
       route "aikido.identity.update_profile", :update_profile
 
-  ## Default slice
+  Mount with `slice :identity, Aikido.Slices.Identity` inside an agent resource.
 
-  This slice is automatically included as a default slice for all agents
-  unless explicitly disabled:
-
-      use Aikido.Agent, default_slices: %{identity: false}
-
-      agent do
-        name "minimal"
-      end
   """
 
   use Ash.Resource,
@@ -50,11 +42,13 @@ defmodule Aikido.Slices.Identity do
         description: "Lifecycle facts"
 
       attribute :created_at, :integer,
+        default: 0,
         public?: true,
         allow_nil?: false,
         description: "Creation timestamp (ms)"
 
       attribute :updated_at, :integer,
+        default: 0,
         public?: true,
         allow_nil?: false,
         description: "Last update timestamp (ms)"
@@ -64,15 +58,6 @@ defmodule Aikido.Slices.Identity do
     route "aikido.identity.evolve", :evolve
     route "aikido.identity.update_profile", :update_profile
   end
-
-  @identity_section %Spark.Dsl.Section{
-    name: :identity,
-    describe: "Configuration block contributed by Aikido.Slices.Identity.",
-    schema: []
-  }
-  use Spark.Dsl.Extension,
-    sections: [@identity_section],
-    transformers: [Aikido.Slices.Identity.Transformers.RegisterContribution]
 
   actions do
     action :ensure, Aikido.ActionResult do
@@ -107,9 +92,6 @@ defmodule Aikido.Slices.Identity do
   end
 
   @type t :: map()
-  def new!(value) do
-    value |> then(&Ash.Type.cast_input(__MODULE__, &1)) |> Ash.Helpers.unwrap_or_raise!()
-  end
 
   @doc "Create a new identity"
   @spec new(keyword()) :: t()
@@ -146,12 +128,6 @@ defmodule Aikido.Slices.Identity do
   def update_profile(%{__struct__: __MODULE__} = identity, profile_updates, opts \\ [])
       when is_map(profile_updates) do
     %{identity | profile: Map.merge(identity.profile, profile_updates)} |> bump(opts)
-  end
-
-  @doc "Return a public snapshot of the identity"
-  @spec snapshot(t()) :: map()
-  def snapshot(%{__struct__: __MODULE__} = identity) do
-    %{profile: Map.take(identity.profile, [:age, :generation, :origin])}
   end
 
   @doc "Bump identity revision and updated_at timestamp"

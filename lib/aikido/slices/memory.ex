@@ -5,8 +5,8 @@ defmodule Aikido.Slices.Memory do
 
   ## State shape
 
-  Declared by the embedded resource attributes. The slice starts as `nil` (lazy-init);
-  the first inbound `aikido.memory.*` signal materializes a fresh
+  Declared by the embedded resource attributes. Explicit mounts initialize from
+  native defaults. When called with nil state, the first inbound `aikido.memory.*` signal creates a fresh
   `%Aikido.Slices.Memory{}` via the relevant action.
 
   ## Routes
@@ -28,23 +28,14 @@ defmodule Aikido.Slices.Memory do
       # list space ops
       route "aikido.memory.append_to_space", :append_to_space
 
-  ## Default slice
-
-  This slice is automatically included as a default slice for all agents
-  unless explicitly disabled:
-
-      use Aikido.Agent, default_slices: %{memory: false}
-
-      agent do
-        name "minimal"
-      end
+  Mount with `slice :memory, Aikido.Slices.Memory` inside an agent resource.
 
   ## Persistence
 
   DurableServer snapshots retain the complete memory state. For a custom
   serialized representation, implement
   your own slice that declares `@behaviour Aikido.Durable.Codec` and
-  override `default_slices: %{memory: MyApp.MyMemorySlice}`.
+  mount that custom resource instead.
   """
 
   use Ash.Resource,
@@ -58,9 +49,10 @@ defmodule Aikido.Slices.Memory do
 
     schema do
       attribute :id, :string,
+        default: "memory",
         public?: true,
         allow_nil?: false,
-        description: "Unique memory identifier",
+        description: "Memory identifier within the owning agent",
         constraints: [trim?: false, allow_empty?: true]
 
       attribute :rev, :integer,
@@ -72,15 +64,20 @@ defmodule Aikido.Slices.Memory do
       attribute :spaces, :map,
         public?: true,
         allow_nil?: false,
-        default: %{},
+        default: %{
+          world: %Aikido.Slices.Memory.Space{data: %{}},
+          tasks: %Aikido.Slices.Memory.Space{data: []}
+        },
         description: "Open map of named spaces"
 
       attribute :created_at, :integer,
+        default: 0,
         public?: true,
         allow_nil?: false,
         description: "Creation timestamp (ms)"
 
       attribute :updated_at, :integer,
+        default: 0,
         public?: true,
         allow_nil?: false,
         description: "Last update timestamp (ms)"
@@ -101,15 +98,6 @@ defmodule Aikido.Slices.Memory do
     route "aikido.memory.delete_from_space", :delete_from_space
     route "aikido.memory.append_to_space", :append_to_space
   end
-
-  @memory_section %Spark.Dsl.Section{
-    name: :memory,
-    describe: "Configuration block contributed by Aikido.Slices.Memory.",
-    schema: []
-  }
-  use Spark.Dsl.Extension,
-    sections: [@memory_section],
-    transformers: [Aikido.Slices.Memory.Transformers.RegisterContribution]
 
   actions do
     action :append_to_space, Aikido.ActionResult do
@@ -194,9 +182,6 @@ defmodule Aikido.Slices.Memory do
 
   alias Aikido.Slices.Memory.Space
   @type t :: map()
-  def new!(value) do
-    value |> then(&Ash.Type.cast_input(__MODULE__, &1)) |> Ash.Helpers.unwrap_or_raise!()
-  end
 
   @reserved_spaces [:tasks, :world]
   @doc "Returns the list of reserved (non-deletable) space names."
@@ -213,7 +198,7 @@ defmodule Aikido.Slices.Memory do
     struct!(__MODULE__,
       id: opts[:id] || generate_id(),
       rev: 0,
-      spaces: %{world: Space.new_kv(), tasks: Space.new_list()},
+      spaces: %{world: Space.new!(data: %{}), tasks: Space.new!(data: [])},
       created_at: now,
       updated_at: now,
       metadata: opts[:metadata] || %{}
@@ -378,6 +363,6 @@ defmodule Aikido.Slices.Memory do
   end
 
   defp generate_id do
-    "mem_" <> Aikido.Util.generate_id()
+    "mem_" <> Ash.UUIDv7.generate()
   end
 end

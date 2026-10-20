@@ -17,7 +17,6 @@ defmodule Aikido.AgentServer.State do
   require Logger
 
   alias Aikido.AgentServer.{ChildInfo, Options, ParentRef}
-  alias Aikido.AgentServer.State.Lifecycle, as: LifecycleState
 
   @type status :: :initializing | :idle | :stopping
 
@@ -51,6 +50,7 @@ defmodule Aikido.AgentServer.State do
     field :on_parent_death, :atom,
       allow_nil?: false,
       default: :stop,
+      constraints: [one_of: [:stop, :continue, :emit_orphan]],
       description: "Behavior on parent death"
 
     field :cron_jobs, :map,
@@ -110,19 +110,12 @@ defmodule Aikido.AgentServer.State do
       allow_nil?: true,
       description: "Composed middleware chain function (Signal, ctx -> {ctx, dirs})"
 
-    field :registry, :atom, allow_nil?: false, description: "Registry module"
-    field :spawn_fun, :term, allow_nil?: true, description: "Custom spawn function"
-
     field :signal_router, :term,
       allow_nil?: true,
       description: "Jido.Signal.Router for signal routing"
 
-    field :error_count, :integer,
-      allow_nil?: false,
-      default: 0,
-      description: "Count of errors for max_errors policy"
-
-    field :metrics, :map, allow_nil?: false, default: %{}, description: "Runtime metrics"
+    field :durable_server, :atom, description: "DurableServer supervisor"
+    field :durable_key, :term, description: "Logical DurableServer key"
 
     field :signal_subscribers, :map,
       allow_nil?: false,
@@ -134,10 +127,6 @@ defmodule Aikido.AgentServer.State do
       allow_nil?: false,
       default: %{},
       description: "Map of ref => pid waiting on lifecycle.ready"
-
-    field :lifecycle, :term,
-      allow_nil?: false,
-      description: "Lifecycle state (State.Lifecycle.t())"
 
     field :debug, :boolean,
       allow_nil?: false,
@@ -174,48 +163,15 @@ defmodule Aikido.AgentServer.State do
   @spec from_options(Options.t(), module(), struct(), keyword()) ::
           {:ok, t()} | {:error, term()}
   def from_options(%Options{} = opts, agent_module, agent, extra \\ []) do
-    lifecycle_opts = [
-      pool: opts.pool,
-      pool_key: opts.pool_key
-    ]
-
-    with {:ok, lifecycle} <- LifecycleState.new(lifecycle_opts) do
-      attrs = %{
-        id: opts.id,
-        agent_module: agent_module,
-        agent: agent,
-        status: :initializing,
-        parent: opts.parent,
-        orphaned_from: nil,
-        children: %{},
-        on_parent_death: opts.on_parent_death,
-        aikido: opts.aikido,
-        partition: opts.partition,
-        default_dispatch: opts.default_dispatch,
-        middleware_chain: Keyword.get(extra, :middleware_chain),
-        registry: opts.registry,
-        spawn_fun: opts.spawn_fun,
-        cron_jobs: %{},
-        cron_monitors: %{},
-        cron_monitor_refs: %{},
-        cron_restart_attempts: %{},
-        cron_restart_timers: %{},
-        cron_restart_timer_refs: %{},
-        cron_specs: %{},
-        cron_runtime_specs: %{},
-        skip_schedules: opts.skip_schedules,
-        error_count: 0,
-        metrics: %{},
-        signal_subscribers: %{},
-        ready_waiters: %{},
-        lifecycle: lifecycle,
-        debug: opts.debug,
-        debug_events: [],
-        debug_max_events: Aikido.Observe.Config.debug_max_events(opts.aikido)
-      }
-
-      Ash.Type.apply_constraints(:struct, attrs, __MODULE__.subtype_constraints())
-    end
+    opts
+    |> Map.from_struct()
+    |> Map.merge(%{
+      agent_module: agent_module,
+      agent: agent,
+      middleware_chain: Keyword.get(extra, :middleware_chain),
+      debug_max_events: Aikido.Observe.Config.debug_max_events(opts.aikido)
+    })
+    |> new()
   end
 
   @doc """
@@ -295,14 +251,6 @@ defmodule Aikido.AgentServer.State do
   @spec get_child(t(), term()) :: ChildInfo.t() | nil
   def get_child(%__MODULE__{children: children}, tag) do
     Map.get(children, tag)
-  end
-
-  @doc """
-  Increments the error count.
-  """
-  @spec increment_error_count(t()) :: t()
-  def increment_error_count(%__MODULE__{error_count: count} = state) do
-    %{state | error_count: count + 1}
   end
 
   @doc """

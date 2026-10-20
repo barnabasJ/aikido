@@ -1,11 +1,8 @@
 defmodule Aikido.ContextHandoffTest.Agent do
-  use Aikido.Agent, extensions: [Aikido.Slices.AiReact]
+  use Aikido.Agent
 
   agent do
     name "context_handoff"
-  end
-
-  slices do
     slice :ai, Aikido.Slices.AiReact
   end
 end
@@ -24,7 +21,6 @@ defmodule Aikido.ContextHandoffTest do
   use AikidoTest.Case, async: false
   use Mimic
   alias Aikido.ContextHandoffTest.{Agent, Client}
-  alias Aikido.Slices.AiReact.Turn
 
   setup :set_mimic_global
   setup :verify_on_exit!
@@ -50,7 +46,16 @@ defmodule Aikido.ContextHandoffTest do
 
     send(
       writer,
-      {:answer, {:ok, %Turn{text: document, usage: %{input_tokens: 4_400, output_tokens: 50}}}}
+      {:answer,
+       {:ok,
+        struct!(ReqLLM.Response,
+          usage: %{input_tokens: 4_400, output_tokens: 50},
+          id: "scripted",
+          model: "offline",
+          context: ReqLLM.Context.new(),
+          message: ReqLLM.Context.assistant(document, tool_calls: []),
+          finish_reason: :stop
+        )}}
     )
 
     assert_receive {:request, successor, fresh, [%ReqLLM.Tool{name: "test_add"}]}, 5_000
@@ -68,7 +73,16 @@ defmodule Aikido.ContextHandoffTest do
 
     send(
       successor,
-      {:answer, {:ok, %Turn{text: "done", usage: %{input_tokens: 100, output_tokens: 10}}}}
+      {:answer,
+       {:ok,
+        struct!(ReqLLM.Response,
+          usage: %{input_tokens: 100, output_tokens: 10},
+          id: "scripted",
+          model: "offline",
+          context: ReqLLM.Context.new(),
+          message: ReqLLM.Context.assistant("done", tool_calls: []),
+          finish_reason: :stop
+        )}}
     )
 
     assert {:ok, "done"} = Task.await(task)
@@ -90,7 +104,16 @@ defmodule Aikido.ContextHandoffTest do
 
     send(
       model,
-      {:answer, {:ok, %Turn{type: :tool_calls, tool_calls: calls, usage: %{input_tokens: 4_400}}}}
+      {:answer,
+       {:ok,
+        struct!(ReqLLM.Response,
+          usage: %{input_tokens: 4_400},
+          id: "scripted",
+          model: "offline",
+          context: ReqLLM.Context.new(),
+          message: ReqLLM.Context.assistant("", tool_calls: calls),
+          finish_reason: :tool_calls
+        )}}
     )
 
     assert_receive {:tool_running, first}, 5_000
@@ -118,20 +141,65 @@ defmodule Aikido.ContextHandoffTest do
 
     send(
       writer,
-      {:answer, {:ok, %Turn{text: "Both workers finished. Next action: report the result."}}}
+      {:answer,
+       {:ok,
+        struct!(ReqLLM.Response,
+          id: "scripted",
+          model: "offline",
+          context: ReqLLM.Context.new(),
+          message:
+            ReqLLM.Context.assistant("Both workers finished. Next action: report the result.",
+              tool_calls: []
+            ),
+          finish_reason: :stop
+        )}}
     )
 
     assert_receive {:request, successor, _, [_]}, 5_000
-    send(successor, {:answer, {:ok, %Turn{text: "done"}}})
+
+    send(
+      successor,
+      {:answer,
+       {:ok,
+        struct!(ReqLLM.Response,
+          id: "scripted",
+          model: "offline",
+          context: ReqLLM.Context.new(),
+          message: ReqLLM.Context.assistant("done", tool_calls: []),
+          finish_reason: :stop
+        )}}
+    )
+
     assert {:ok, "done"} = Task.await(task)
   end
 
   test "failed or unusable handoffs preserve the original history instead of trimming", ctx do
     for {result, reason} <- [
           {{:error, :provider_unavailable}, :provider_unavailable},
-          {{:ok, %Turn{text: "   "}}, :empty_or_invalid_document},
-          {{:ok, %Turn{text: "partial", finish_reason: :length}}, :truncated_document},
-          {{:ok, %Turn{type: :tool_calls, text: "not a document"}}, :empty_or_invalid_document}
+          {{:ok,
+            struct!(ReqLLM.Response,
+              id: "scripted",
+              model: "offline",
+              context: ReqLLM.Context.new(),
+              message: ReqLLM.Context.assistant("   ", tool_calls: []),
+              finish_reason: :stop
+            )}, :empty_or_invalid_document},
+          {{:ok,
+            struct!(ReqLLM.Response,
+              id: "scripted",
+              model: "offline",
+              context: ReqLLM.Context.new(),
+              message: ReqLLM.Context.assistant("partial", tool_calls: []),
+              finish_reason: :length
+            )}, :truncated_document},
+          {{:ok,
+            struct!(ReqLLM.Response,
+              id: "scripted",
+              model: "offline",
+              context: ReqLLM.Context.new(),
+              message: ReqLLM.Context.assistant("not a document", tool_calls: []),
+              finish_reason: :tool_calls
+            )}, :empty_or_invalid_document}
         ] do
       pid = start_server(ctx, Agent)
       observer = self()
@@ -168,7 +236,14 @@ defmodule Aikido.ContextHandoffTest do
       Jido.Signal.new!("ai.react.context_handoff.completed", %{
         request_id: id,
         handoff_id: handoff_id,
-        turn: %Turn{text: "late"}
+        turn:
+          struct!(ReqLLM.Response,
+            id: "scripted",
+            model: "offline",
+            context: ReqLLM.Context.new(),
+            message: ReqLLM.Context.assistant("late", tool_calls: []),
+            finish_reason: :stop
+          )
       })
 
     assert {:ok, :failed} = Aikido.AgentServer.call(pid, late, &{:ok, &1.agent.state.ai.status})

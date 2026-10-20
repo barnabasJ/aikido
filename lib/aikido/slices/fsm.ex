@@ -21,16 +21,13 @@ defmodule Aikido.Slices.FSM do
 
   ## Configuration
 
-  Mount in `slices do …` and pass per-agent transitions and terminal states
+  Mount inside `agent do …` and pass per-agent transitions and terminal states
   via `options:`:
 
       use Aikido.Agent
 
       agent do
         name "my_agent"
-      end
-
-      slices do
         slice :fsm, Aikido.Slices.FSM,
           options: [
             initial_state: "ready",
@@ -71,6 +68,12 @@ defmodule Aikido.Slices.FSM do
     extensions: [Aikido.Ash.Slice]
 
   actions do
+    create :create do
+      primary? true
+      accept :*
+      change Aikido.Slices.FSM.Initialize
+    end
+
     action :transition, Aikido.ActionResult do
       argument :state, :term, allow_nil?: false
       argument :to, :string, allow_nil?: false, constraints: [trim?: false, allow_empty?: true]
@@ -108,30 +111,6 @@ defmodule Aikido.Slices.FSM do
         constraints: [items: [trim?: false, allow_empty?: true]]
     end
 
-    state_transform {__MODULE__, :seed_runtime_fields, []}
     route "aikido.fsm.transition", :transition
-  end
-
-  @doc false
-  def default_initial_state do
-    @default_initial_state
-  end
-
-  @doc false
-  def default_transitions do
-    @default_transitions
-  end
-
-  @doc false
-  def default_terminal_states do
-    @default_terminal_states
-  end
-
-  @doc false
-  @spec seed_runtime_fields(map(), keyword() | keyword()) :: {:ok, map()}
-  def seed_runtime_fields(slice, _ctx) do
-    state = Map.get(slice, :state) || slice.initial_state
-    terminal? = Map.get(slice, :terminal?) || state in slice.terminal_states
-    {:ok, Map.merge(slice, %{state: state, terminal?: terminal?})}
   end
 end

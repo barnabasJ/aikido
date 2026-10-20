@@ -1,124 +1,53 @@
 defmodule Aikido.Dsl.Agent.Transformers.ExpandRoutes do
-  @moduledoc """
-  Expands slice routes (with absolute paths) and agent / slice schedules
-  into the runtime route_spec tuple shape and persists each expansion
-  under its dsl_state key:
-
-    * `:expanded_signal_routes` — host-declared `signal_routes do … end`
-      flattened to route_spec tuples.
-    * `:expanded_slice_routes` — per-slice route expansions.
-    * `:expanded_slice_schedules` and `:expanded_agent_schedules` — cron
-      schedule specs.
-
-  Conflict detection is not performed in this transformer; route conflicts
-  surface at runtime through the signal router's own dedup logic.
-  """
-
+  @moduledoc "Compiles native action routes and cron signal schedules for AgentServer."
   use Spark.Dsl.Transformer
-
-  alias Aikido.Dsl.Agent.Route
-  alias Aikido.Dsl.Agent.Schedule
   alias Spark.Dsl.Transformer
 
-  @impl Spark.Dsl.Transformer
+  @impl true
   def after?(Aikido.Dsl.Agent.Transformers.WalkExtensions), do: true
   def after?(_), do: false
 
-  @impl Spark.Dsl.Transformer
-  def transform(dsl_state) do
-    expanded_signal_routes = build_signal_routes(dsl_state)
-    slice_instances = Transformer.get_persisted(dsl_state, :slice_instances, [])
+  @impl true
+  def transform(dsl) do
+    instances = Transformer.get_persisted(dsl, :slice_instances, [])
 
-    expanded_slice_routes =
-      Enum.flat_map(slice_instances, &Aikido.Slice.Instance.expand_routes/1)
+    routes =
+      Enum.flat_map(instances, &Aikido.Slice.Instance.expand_routes/1) ++
+        Enum.flat_map(instances, &Aikido.Slice.Schedules.schedule_routes/1)
 
-    expanded_slice_schedules =
-      Enum.flat_map(slice_instances, &Aikido.Slice.Schedules.expand_schedules/1)
+    routes =
+      Enum.map(routes, fn
+        {type, match, target, priority} when is_function(match, 1) ->
+          {type, match, target, priority}
 
-    schedule_routes =
-      Enum.flat_map(slice_instances, &Aikido.Slice.Schedules.schedule_routes/1)
+        {type, target, options} when is_list(options) ->
+          {type, target, Keyword.get(options, :priority, -10)}
 
-    agent_name = Spark.Dsl.Extension.get_opt(dsl_state, [:agent], :name)
-
-    expanded_agent_schedules =
-      dsl_state
-      |> agent_schedules_input()
-      |> Aikido.Agent.Schedules.expand_schedules(agent_name)
-
-    agent_schedule_routes =
-      Aikido.Agent.Schedules.schedule_routes(expanded_agent_schedules)
-
-    all_routes =
-      expanded_slice_routes ++ schedule_routes ++ agent_schedule_routes
-
-    validated_routes = normalize_routes(all_routes)
-
-    mount_config_map =
-      Enum.reduce(slice_instances, %{}, fn instance, acc ->
-        Map.put(acc, instance.path, instance.config)
+        {type, target, priority} when is_integer(priority) ->
+          {type, target, priority}
       end)
 
-    dsl_state =
-      dsl_state
-      |> Transformer.persist(:expanded_signal_routes, expanded_signal_routes)
-      |> Transformer.persist(:expanded_slice_routes, expanded_slice_routes)
-      |> Transformer.persist(:expanded_slice_schedules, expanded_slice_schedules)
-      |> Transformer.persist(:expanded_agent_schedules, expanded_agent_schedules)
-      |> Transformer.persist(:validated_routes, validated_routes)
-      |> Transformer.persist(:mount_config_map, mount_config_map)
+    own_routes =
+      Enum.map(Transformer.get_persisted(dsl, :aikido_agent_routes, []), fn route ->
+        if is_function(route.match, 1),
+          do: {route.type, route.match, route.action, route.priority},
+          else: {route.type, route.action, route.priority}
+      end)
 
-    {:ok, dsl_state}
-  end
+    schedules =
+      dsl
+      |> Transformer.get_entities([:schedules])
+      |> Aikido.Agent.Schedules.expand_schedules(Transformer.get_option(dsl, [:agent], :name))
 
-  defp build_signal_routes(dsl_state) do
-    dsl_state
-    |> Transformer.get_persisted(
-      :aikido_agent_routes,
-      Transformer.get_entities(dsl_state, [:signal_routes])
-    )
-    |> Enum.map(&route_to_route_spec/1)
-  end
-
-  defp route_to_route_spec(%Route{type: type, action: action, priority: priority, match: nil}) do
-    if priority == 0,
-      do: {type, action},
-      else: {type, action, priority}
-  end
-
-  defp route_to_route_spec(%Route{type: type, action: action, priority: priority, match: match})
-       when is_function(match, 1) do
-    if priority == 0,
-      do: {type, match, action},
-      else: {type, match, action, priority}
-  end
-
-  defp agent_schedules_input(dsl_state) do
-    [:schedules]
-    |> get_entities(dsl_state)
-    |> Enum.map(fn %Schedule{} = s ->
-      opts =
-        []
-        |> append_if(s.timezone, fn opts -> [{:timezone, s.timezone} | opts] end)
-        |> append_if(s.job_id, fn opts -> [{:job_id, s.job_id} | opts] end)
-
-      case opts do
-        [] -> {s.cron, s.signal_type}
-        opts -> {s.cron, s.signal_type, opts}
-      end
-    end)
-  end
-
-  defp append_if(opts, nil, _fun), do: opts
-  defp append_if(opts, _, fun), do: fun.(opts)
-
-  defp get_entities(path, dsl_state), do: Transformer.get_entities(dsl_state, path)
-
-  @default_priority -10
-
-  defp normalize_routes(routes) do
-    Enum.map(routes, fn {path, target, opts} ->
-      priority = Keyword.get(opts, :priority, @default_priority)
-      {path, target, priority}
-    end)
+    {:ok,
+     dsl
+     |> Transformer.persist(:expanded_signal_routes, own_routes)
+     |> Transformer.persist(
+       :expanded_slice_schedules,
+       Enum.flat_map(instances, &Aikido.Slice.Schedules.expand_schedules/1)
+     )
+     |> Transformer.persist(:expanded_agent_schedules, schedules)
+     |> Transformer.persist(:validated_routes, routes)
+     |> Transformer.persist(:mount_config_map, Map.new(instances, &{&1.path, &1.config}))}
   end
 end

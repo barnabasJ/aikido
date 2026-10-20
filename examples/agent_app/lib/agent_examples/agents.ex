@@ -29,7 +29,6 @@ defmodule AgentExamples.Agents do
     tool :remove_worker, AgentExamples.AI.Tools, :remove_worker
     tool :text_stats, AgentExamples.AI.Tools, :text_stats
     tool :stamp, AgentExamples.AI.Tools, :stamp
-    tool :ash_text_stats, AgentExamples.AI.Tools, :text_stats
     tool :run_lua, AgentExamples.AI.LuaSurface, :eval
     tool :lua_docs, AgentExamples.AI.LuaSurface, :docs
   end

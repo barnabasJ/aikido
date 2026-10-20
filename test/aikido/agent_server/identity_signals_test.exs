@@ -4,7 +4,7 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementatio
   @impl true
   def run(input, _opts, _context) do
     type = Map.fetch!(input.context.aikido.signal, :type)
-    data = Map.merge(input.context.aikido.signal.data || %{}, Map.delete(input.arguments, :state))
+    data = input.arguments.data
     slice = input.arguments.state
     events = Map.get(slice, :identity_events, [])
 
@@ -12,18 +12,6 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementatio
       state: %{slice | identity_events: events ++ [%{type: type, data: data}]},
       directives: []
     )
-  end
-end
-
-defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction do
-  @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
-
-  actions do
-    action :identity_watcher, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementation, action: :run}
-    end
   end
 end
 
@@ -38,11 +26,17 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAgent do
     schema do
       attribute :identity_events, {:array, :term}, default: []
     end
+
+    route "aikido.agent.identity.partition_assigned",
+          {AikidoTest.AgentServer.IdentitySignalsTest.WatcherAgent, :identity_watcher}
   end
 
-  signal_routes do
-    route "aikido.agent.identity.partition_assigned",
-          AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction
+  actions do
+    action :identity_watcher, Aikido.ActionResult do
+      argument :state, :term
+      argument :data, :map, allow_nil?: false, default: %{}
+      run {AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementation, action: :run}
+    end
   end
 end
 
