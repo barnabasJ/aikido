@@ -31,6 +31,21 @@ defmodule Aikido.Dsl.MountedRouteContractsTest.Remote do
   end
 end
 
+defmodule Aikido.Dsl.MountedRouteContractsTest.PrivateIncrement do
+  use Aikido.Signal
+
+  signal do
+    type "mounted.private_typed"
+
+    schema do
+      attribute :amount, :integer do
+        description "Amount handled through the internal typed route."
+        default 1
+      end
+    end
+  end
+end
+
 defmodule Aikido.Dsl.MountedRouteContractsTest.Counter do
   use Aikido.Slice
 
@@ -47,6 +62,9 @@ defmodule Aikido.Dsl.MountedRouteContractsTest.Counter do
     route "mounted.local", {__MODULE__, :local}
     route "mounted.remote", {Aikido.Dsl.MountedRouteContractsTest.Remote, :remote}
     route "mounted.private", {Aikido.Dsl.MountedRouteContractsTest.Remote, :private_remote}
+    route "mounted.internal", :internal, public?: false
+
+    route Aikido.Dsl.MountedRouteContractsTest.PrivateIncrement, :typed_internal, public?: false
 
     route "mounted.matched", :matched,
       match: fn signal -> signal.data[:allowed] == true end,
@@ -71,6 +89,15 @@ defmodule Aikido.Dsl.MountedRouteContractsTest.Counter do
   end
 
   actions do
+    for name <- [:internal, :typed_internal] do
+      action name, Aikido.Types.ActionResult do
+        public? true
+        argument :state, :term
+        argument :amount, :integer, default: 1
+        run Aikido.Dsl.MountedRouteContractsTest.Increment
+      end
+    end
+
     action :local, Aikido.Types.ActionResult do
       argument :state, :term
       argument :amount, :integer, default: 1
@@ -187,6 +214,22 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
     assert_counts(reference, 2)
     assert {:ok, _} = raw_signal(reference, "mounted.matched", %{allowed: true, amount: "3"})
     assert_counts(reference, 5)
+  end
+
+  test "private routes retain delivery without exporting their public native targets", context do
+    for name <- [:internal, :typed_internal] do
+      assert Ash.Resource.Info.action(Counter, name).public?
+      refute Ash.Resource.Info.action(context.resource, name)
+      refute function_exported?(context.domain, :"counter_#{name}", 2)
+    end
+
+    assert Ash.Resource.Info.action(context.resource, :local).public?
+    assert function_exported?(context.domain, :counter_local, 2)
+
+    assert {:ok, _} = raw_signal(context.reference, "mounted.internal", %{amount: "2"})
+    assert_counts(context.reference, 2)
+    assert {:ok, _} = raw_signal(context.reference, "mounted.private_typed", %{amount: "3"})
+    assert_counts(context.reference, 5)
   end
 
   test "multiple routes share one canonical public command and retain raw delivery", context do

@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Respect private mounted routes when exporting agent commands. Keep example
+  worker completion and failure signals internal while exposing its run command.
+
 - Preserve adopted state and notify subscribers when a directive raises. Stop
   the remaining effects, return the existing error contract to synchronous
   callers, and checkpoint the adopted state through DurableServer.

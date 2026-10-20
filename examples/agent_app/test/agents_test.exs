@@ -86,6 +86,14 @@ defmodule AgentExamples.AgentsTest do
   end
 
   test "an async result enters the receiving action through a signal", %{prefix: prefix} do
+    assert Ash.Resource.Info.action(AgentExamples.Worker, :run).public?
+    assert function_exported?(Agents, :worker_run, 2)
+
+    for name <- [:completed, :failed] do
+      refute Ash.Resource.Info.action(AgentExamples.Worker, name).public?
+      refute function_exported?(Agents, :"worker_#{name}", 2)
+    end
+
     worker = snapshot_result(Agents.worker_start!(%{id: prefix <> "-worker"}))
 
     pid =

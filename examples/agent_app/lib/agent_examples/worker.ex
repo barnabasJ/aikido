@@ -27,8 +27,8 @@ defmodule AgentExamples.Worker do
     end
 
     signal :run, AgentExamples.Worker.Signals.Run, AgentExamples.Worker.Work
-    signal :completed, AgentExamples.Worker.Signals.Completed, AgentExamples.Worker.Completed
-    signal :failed, AgentExamples.Worker.Signals.Failed, AgentExamples.Worker.Failed
+    route AgentExamples.Worker.Signals.Completed, AgentExamples.Worker.Completed, public?: false
+    route AgentExamples.Worker.Signals.Failed, AgentExamples.Worker.Failed, public?: false
   end
 
   def uppercase(text) do

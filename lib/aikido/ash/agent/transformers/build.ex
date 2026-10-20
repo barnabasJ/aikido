@@ -148,6 +148,7 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
         Spark.Dsl.is?(mount.module, Ash.Resource),
         Aikido.Ash.Slice in Spark.extensions(mount.module),
         route <- Spark.Dsl.Extension.get_entities(mount.module, [:slice]),
+        route.public?,
         {resource, name} = Aikido.Ash.Slice.Info.target(mount.module, route.action),
         action = Ash.Resource.Info.action(resource, name),
         match?(%{public?: true}, action),

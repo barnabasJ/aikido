@@ -43,8 +43,13 @@ defmodule AgentExamplesWeb.LiveViewTest do
     worker = Catalog.find("worker") |> AgentExamples.Source.for_example()
     definition = Enum.find(worker, &(&1.module == AgentExamples.Worker))
     assert definition.code =~ "signal :run, AgentExamples.Worker.Signals.Run"
-    assert definition.code =~ "signal :completed, AgentExamples.Worker.Signals.Completed"
-    assert definition.code =~ "signal :failed, AgentExamples.Worker.Signals.Failed"
+
+    assert definition.code =~
+             "route AgentExamples.Worker.Signals.Completed, AgentExamples.Worker.Completed, public?: false"
+
+    assert definition.code =~
+             "route AgentExamples.Worker.Signals.Failed, AgentExamples.Worker.Failed, public?: false"
+
     refute definition.code =~ "argument :"
     assert definition.open?
 
