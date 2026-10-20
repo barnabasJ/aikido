@@ -9,8 +9,9 @@ defmodule Aikido.AI.Execution do
   def run(owner, request_id, supervisor, work, opts) do
     selector = fn runtime ->
       if Enum.any?(runtime.agent.state, fn
-           {_, %{request_id: ^request_id, status: status}} when status in [:setup, :running] ->
-             true
+           {_, %{request_id: ^request_id, status: status} = slice}
+           when status in [:setup, :running] ->
+             Map.get(slice, :hook_terminal) not in [:completed, :failed]
 
            _ ->
              false
