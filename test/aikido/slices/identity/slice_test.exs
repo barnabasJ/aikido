@@ -36,7 +36,7 @@ defmodule AikidoTest.Identity.SliceTest do
              )
     end
 
-    test "schema is bound to Aikido.Slices.Identity.schema/0" do
+    test "schema is bound to the identity resource" do
       assert Ash.Resource.Info.attribute_names(
                Aikido.Dsl.Slice.Info.schema(Aikido.Slices.Identity)
              ) ==

@@ -15,7 +15,6 @@ defmodule Aikido.AgentServer.State.Lifecycle do
       description: "Pool key if started via Durable"
   end
 
-  @schema __MODULE__
   defoverridable new!: 1
 
   defoverridable cast_input: 2
@@ -28,10 +27,6 @@ defmodule Aikido.AgentServer.State.Lifecycle do
   end
 
   @type t :: %__MODULE__{}
-
-  @doc false
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
 
   @doc """
   Creates a new Lifecycle state from options.

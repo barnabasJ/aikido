@@ -64,10 +64,10 @@ defmodule Aikido.Dsl.Slice.Info do
   end
 
   @doc """
-  Returns the deduplicated list of action modules referenced by this
+  Returns the deduplicated list of native Ash action references used by this
   slice's signal routes.
   """
-  @spec actions(module()) :: [module()]
+  @spec actions(module()) :: [{module(), atom()}]
   def actions(module) do
     if native_slice?(module) do
       module |> signal_routes() |> Enum.map(&elem(&1, 1)) |> Enum.uniq()
@@ -96,8 +96,6 @@ defmodule Aikido.Dsl.Slice.Info do
   defp build_route_opts(entry) do
     []
     |> maybe_put(:priority, entry.priority, fn p -> is_integer(p) and p != 0 end)
-    |> maybe_put(:on_conflict, entry.on_conflict, &(not is_nil(&1)))
-    |> maybe_put(:static, entry.static, &(not is_nil(&1)))
     |> Enum.reverse()
   end
 

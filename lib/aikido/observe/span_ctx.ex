@@ -30,14 +30,9 @@ defmodule Aikido.Observe.SpanCtx do
     field :tracer_ctx, :term, allow_nil?: true, description: "Tracer-specific context"
   end
 
-  @schema __MODULE__
   defoverridable new!: 1
 
   @type t :: %__MODULE__{}
-
-  @doc false
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
 
   @doc """
   Creates a new SpanCtx from a map of attributes.

@@ -5,28 +5,28 @@ defmodule Aikido.Slices.Memory do
 
   ## State shape
 
-  Bound to `Aikido.Slices.Memory.schema/0`. The slice starts as `nil` (lazy-init);
+  Declared by the embedded resource attributes. The slice starts as `nil` (lazy-init);
   the first inbound `aikido.memory.*` signal materializes a fresh
   `%Aikido.Slices.Memory{}` via the relevant action.
 
   ## Routes
 
-  Each `aikido.memory.*` signal type maps to a single action under
-  `Aikido.Slices.Memory.*`:
+  Each `aikido.memory.*` signal type maps to a native action on
+  `Aikido.Slices.Memory`:
 
       # ensure / put / update / delete
-      route "aikido.memory.ensure",            Actions.Ensure
-      route "aikido.memory.put_space",         Actions.PutSpace
-      route "aikido.memory.update_space",      Actions.UpdateSpace
-      route "aikido.memory.ensure_space",      Actions.EnsureSpace
-      route "aikido.memory.delete_space",      Actions.DeleteSpace
+      route "aikido.memory.ensure", :ensure
+      route "aikido.memory.put_space", :put_space
+      route "aikido.memory.update_space", :update_space
+      route "aikido.memory.ensure_space", :ensure_space
+      route "aikido.memory.delete_space", :delete_space
 
       # map space ops
-      route "aikido.memory.put_in_space",      Actions.PutInSpace
-      route "aikido.memory.delete_from_space", Actions.DeleteFromSpace
+      route "aikido.memory.put_in_space", :put_in_space
+      route "aikido.memory.delete_from_space", :delete_from_space
 
       # list space ops
-      route "aikido.memory.append_to_space",   Actions.AppendToSpace
+      route "aikido.memory.append_to_space", :append_to_space
 
   ## Default slice
 
@@ -41,9 +41,9 @@ defmodule Aikido.Slices.Memory do
 
   ## Persistence
 
-  This bare-minimum default slice keeps memory in-process only and does not
-  externalize on checkpoint. If you need a persistence transform, implement
-  your own slice that declares `@behaviour Aikido.Persist.Transform` and
+  DurableServer snapshots retain the complete memory state. For a custom
+  serialized representation, implement
+  your own slice that declares `@behaviour Aikido.Durable.Codec` and
   override `default_slices: %{memory: MyApp.MyMemorySlice}`.
   """
 
@@ -194,18 +194,11 @@ defmodule Aikido.Slices.Memory do
 
   alias Aikido.Slices.Memory.Space
   @type t :: map()
-  @schema __MODULE__
   def new!(value) do
     value |> then(&Ash.Type.cast_input(__MODULE__, &1)) |> Ash.Helpers.unwrap_or_raise!()
   end
 
   @reserved_spaces [:tasks, :world]
-  @doc "Returns the Ash type for Memory."
-  @spec schema() :: Ash.Type.t()
-  def schema do
-    @schema
-  end
-
   @doc "Returns the list of reserved (non-deletable) space names."
   @spec reserved_spaces() :: [atom()]
   def reserved_spaces do

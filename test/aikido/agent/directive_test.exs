@@ -225,26 +225,4 @@ defmodule AikidoTest.Agent.DirectiveTest do
     end
   end
 
-  describe "schema functions" do
-    @schema_modules [
-      Directives.Emit,
-      Directives.Error,
-      Directives.Spawn,
-      Directives.SpawnAgent,
-      Directives.AdoptChild,
-      Directives.StopChild,
-      Directives.Schedule,
-      Directives.Stop,
-      Directives.Cron,
-      Directives.CronCancel
-    ]
-
-    for module <- @schema_modules do
-      @module module
-      test "#{inspect(@module)}.schema/0 returns Ash field contract" do
-        schema = @module.schema()
-        assert Ash.Type.ash_type?(schema)
-      end
-    end
-  end
 end

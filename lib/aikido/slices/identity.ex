@@ -5,15 +5,15 @@ defmodule Aikido.Slices.Identity do
 
   ## State shape
 
-  Bound to `Aikido.Slices.Identity.schema/0`. The slice starts as `nil` (lazy-init);
+  Declared by the embedded resource attributes. The slice starts as `nil` (lazy-init);
   the first inbound `aikido.identity.*` signal materializes a fresh
   `%Aikido.Slices.Identity{}` via the relevant action.
 
   ## Routes
 
-      route "aikido.identity.ensure",         Actions.Ensure
-      route "aikido.identity.evolve",         Actions.Evolve
-      route "aikido.identity.update_profile", Actions.UpdateProfile
+      route "aikido.identity.ensure", :ensure
+      route "aikido.identity.evolve", :evolve
+      route "aikido.identity.update_profile", :update_profile
 
   ## Default slice
 
@@ -107,15 +107,8 @@ defmodule Aikido.Slices.Identity do
   end
 
   @type t :: map()
-  @schema __MODULE__
   def new!(value) do
     value |> then(&Ash.Type.cast_input(__MODULE__, &1)) |> Ash.Helpers.unwrap_or_raise!()
-  end
-
-  @doc "Returns the Ash type for Identity."
-  @spec schema() :: Ash.Type.t()
-  def schema do
-    @schema
   end
 
   @doc "Create a new identity"

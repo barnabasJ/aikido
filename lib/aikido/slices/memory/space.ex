@@ -33,7 +33,6 @@ defmodule Aikido.Slices.Memory.Space do
     field :metadata, :map, allow_nil?: false, default: %{}, description: "Space-level metadata"
   end
 
-  @schema __MODULE__
   defoverridable new!: 1
 
   def new!(value) do
@@ -52,10 +51,6 @@ defmodule Aikido.Slices.Memory.Space do
   end
 
   @type t :: %__MODULE__{}
-
-  @doc "Returns the Ash type for Space."
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
 
   @doc "Create a new space from attributes."
   @spec new(map() | keyword()) :: t()

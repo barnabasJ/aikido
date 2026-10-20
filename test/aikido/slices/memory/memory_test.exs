@@ -65,9 +65,4 @@ defmodule AikidoTest.Memory.MemoryTest do
     end
   end
 
-  describe "schema/0" do
-    test "returns Ash field contract" do
-      assert State.schema() == State
-    end
-  end
 end

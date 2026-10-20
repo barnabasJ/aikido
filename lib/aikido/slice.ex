@@ -42,8 +42,8 @@ defmodule Aikido.Slice do
 
   - `slice do … end` — slice identity (`name`, `description`,
     `otp_app`, `schema`, `config_schema`).
-  - `signal_routes do … end` — `route "type", Action, opts` entries.
-  - `schedules do … end` — `schedule "cron", Action, %{data}` entries.
+  - `signal_routes do … end` — `route "type", {Resource, :action}, opts` entries.
+  - `schedules do … end` — `schedule "cron", {Resource, :action}, data: %{...}` entries.
 
   Declare reducers in the native `actions do … end` section. Implement them
   with `Ash.Resource.Actions.Implementation` and return directives for I/O.

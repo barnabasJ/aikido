@@ -23,8 +23,6 @@ defmodule Aikido.Ash.Slice do
       :type,
       :action,
       :match,
-      :static,
-      :on_conflict,
       priority: 0,
       __spark_metadata__: nil
     ]
@@ -43,9 +41,7 @@ defmodule Aikido.Ash.Slice do
       type: [type: :string, required: true],
       action: [type: :atom, required: true],
       priority: [type: :integer, default: 0],
-      match: [type: {:fun, 1}],
-      static: [type: :map],
-      on_conflict: [type: {:in, [:replace]}]
+      match: [type: {:fun, 1}]
     ]
   }
   @slice %Spark.Dsl.Section{

@@ -10,12 +10,6 @@ defmodule AikidoTest.Observe.SpanCtxTest do
     metadata: %{key: "value"}
   }
 
-  describe "schema/0" do
-    test "returns the Ash field contract" do
-      schema = SpanCtx.schema()
-      assert Ash.Type.ash_type?(schema)
-    end
-  end
 
   describe "new/1" do
     test "creates a SpanCtx with valid attrs" do

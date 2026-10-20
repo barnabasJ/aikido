@@ -33,14 +33,9 @@ defmodule Aikido.AgentServer.ChildInfo do
       description: "Metadata passed during spawn"
   end
 
-  @schema __MODULE__
   defoverridable new!: 1
 
   @type t :: %__MODULE__{}
-
-  @doc false
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
 
   @doc """
   Creates a new ChildInfo from a map of attributes.

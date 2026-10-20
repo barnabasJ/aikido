@@ -1,14 +1,12 @@
 defmodule Aikido.Slice.RouteEntry do
   @moduledoc false
 
-  defstruct [:type, :action, :priority, :match, :static, :on_conflict, __spark_metadata__: nil]
+  defstruct [:type, :action, :priority, :match, __spark_metadata__: nil]
 
   @type t :: %__MODULE__{
           type: String.t(),
-          action: module() | mfa() | nil,
+          action: {module(), atom()},
           priority: integer(),
-          match: (any() -> boolean()) | nil,
-          static: map() | nil,
-          on_conflict: :replace | nil
+          match: (any() -> boolean()) | nil
         }
 end

@@ -6,6 +6,12 @@
 
 ### Changed
 
+- Remove unused plugin-action metadata, reserved slice aliases and path-override
+  handling, ignored route options, unused timeout defaults and path-conflict
+  exceptions, unused action formatting and schema identity wrappers. Use native
+  Ash types directly. Update examples and introspection docs to describe native Ash
+  action references and agent-declared slice mounts.
+
 - Use DurableServer as the sole persistence path. Remove Storage adapters,
   explicit hibernate/thaw, persistence middleware, separate thread stores and
   scheduler manifests embedded in domain state. Keep agent and slice codecs

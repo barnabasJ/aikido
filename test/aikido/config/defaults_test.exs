@@ -8,8 +8,6 @@ defmodule AikidoTest.Config.DefaultsTest do
     assert Defaults.agent_server_shutdown_timeout_ms() == 5_000
     assert Defaults.agent_server_call_timeout_ms() == 5_000
     assert Defaults.agent_server_await_timeout_ms() == 10_000
-    assert Defaults.await_timeout_ms() == 10_000
-    assert Defaults.await_child_timeout_ms() == 30_000
     assert Defaults.worker_pool_checkout_timeout_ms() == 5_000
     assert Defaults.worker_pool_call_timeout_ms() == 5_000
   end

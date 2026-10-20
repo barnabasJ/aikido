@@ -233,54 +233,6 @@ defmodule Aikido.Telemetry.Formatter do
   def format_signal_type(_), do: "unknown"
 
   @doc """
-  Summarize action for logging without exposing full data.
-
-  Shows the action/module name and parameter keys but not values.
-
-  ## Examples
-
-      iex> Formatter.format_action({:analyze, %{query: "secret", context: %{}}})
-      "{:analyze, keys: [:context, :query]}"
-
-      iex> Formatter.format_action(MyApp.Actions.ProcessData)
-      "MyApp.Actions.ProcessData"
-
-      iex> Formatter.format_action(%{action: :run, params: %{x: 1}})
-      "{:run, keys: [:x]}"
-  """
-  @spec format_action(term()) :: String.t()
-  def format_action(nil), do: "nil"
-
-  def format_action({action, params}) when is_atom(action) and is_map(params) do
-    keys = params |> Map.keys() |> Enum.sort()
-    "{#{inspect(action)}, keys: #{inspect(keys)}}"
-  end
-
-  def format_action({action, params}) when is_atom(action) and is_list(params) do
-    "{#{inspect(action)}, arity: #{length(params)}}"
-  end
-
-  def format_action(%{action: action, params: params}) when is_map(params) do
-    keys = params |> Map.keys() |> Enum.sort()
-    "{#{inspect(action)}, keys: #{inspect(keys)}}"
-  end
-
-  def format_action(%{action: action}) do
-    inspect(action)
-  end
-
-  def format_action(module) when is_atom(module) do
-    case to_string(module) do
-      "Elixir." <> rest -> rest
-      other -> other
-    end
-  end
-
-  def format_action(action) do
-    safe_inspect(action, 60)
-  end
-
-  @doc """
   Inspect a term with a length limit.
 
   Safely inspects any term and truncates if necessary.

@@ -24,8 +24,7 @@ defmodule Aikido.AgentServer.SignalRouter do
 
   ## Target Types
 
-  - `module()` - Action module, params = signal.data
-  - `{module(), map()}` - Action module with static params
+  - `{resource, action}` - Native generic Ash action; signal data supplies its arguments
   """
 
   alias Aikido.AgentServer.State
@@ -39,7 +38,7 @@ defmodule Aikido.AgentServer.SignalRouter do
 
   Collects routes from:
   - Agent routes (priority 0) via `agent_module.signal_routes/1`
-  - Slice routes (priority -10) via slice `signal_routes/0`
+  - Slice routes (priority -10) via the compiled slice route table
 
   Returns an empty router if no routes are found or if building fails.
   """

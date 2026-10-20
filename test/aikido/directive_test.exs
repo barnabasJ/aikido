@@ -30,7 +30,6 @@ defmodule Aikido.DirectiveTest do
     assert Spark.Dsl.is?(Notify, Aikido.Directive)
     assert Ash.TypedStruct.Dsl in Spark.extensions(Notify)
     assert Spark.implements_behaviour?(Notify, Aikido.Directive)
-    assert Notify.schema() == Notify
 
     assert {:ok, %Notify{count: 2}} = Notify.new(recipient: self(), count: "2")
     assert {:error, _} = Notify.new(recipient: self(), count: 0)

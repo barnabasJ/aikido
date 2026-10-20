@@ -97,10 +97,4 @@ defmodule AikidoTest.AgentServer.ParentRefTest do
     end
   end
 
-  describe "schema/0" do
-    test "returns the Ash field contract" do
-      schema = ParentRef.schema()
-      assert Ash.Type.ash_type?(schema)
-    end
-  end
 end

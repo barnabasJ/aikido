@@ -82,10 +82,4 @@ defmodule AikidoTest.Memory.SpaceTest do
     end
   end
 
-  describe "schema/0" do
-    test "returns Ash field contract" do
-      schema = Space.schema()
-      assert schema == Aikido.Slices.Memory.Space
-    end
-  end
 end

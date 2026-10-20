@@ -8,7 +8,7 @@ defmodule Aikido.AgentServer.ParentRef do
   struct, child-start signals, and process monitors.
 
   The current parent ref lives on `%Aikido.AgentServer.State{}` (under
-  `:parent`) and is exposed to actions via the `ctx` arg of `run/4`. When a
+  `:parent`) and is exposed to actions in `input.context.aikido.parent`. When a
   child becomes orphaned, the runtime moves the former parent to
   `state.orphaned_from` and emits identity-transition signals
   (`aikido.agent.identity.parent_died` / `aikido.agent.identity.orphaned`).
@@ -38,14 +38,9 @@ defmodule Aikido.AgentServer.ParentRef do
       description: "Arbitrary metadata from parent"
   end
 
-  @schema __MODULE__
   defoverridable new!: 1
 
   @type t :: %__MODULE__{}
-
-  @doc false
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
 
   @doc """
   Creates a new ParentRef from a map of attributes.

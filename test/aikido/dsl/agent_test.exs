@@ -65,9 +65,7 @@ defmodule Aikido.Dsl.AgentTest do
       assert Aikido.Dsl.Agent.Info.middleware(Aikido.Dsl.AgentTest.SimpleAgent) == []
     end
 
-    test "actions/1 returns the union from all attached slices" do
-      assert is_list(Aikido.Dsl.Agent.Info.actions(Aikido.Dsl.AgentTest.SimpleAgent))
-    end
+
   end
 
   describe("agent state helpers") do

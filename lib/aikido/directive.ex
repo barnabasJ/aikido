@@ -39,9 +39,6 @@ defmodule Aikido.Directive do
   def handle_opts(_opts) do
     quote do
       @behaviour Aikido.Directive
-
-      @doc "Returns the directive's Ash type."
-      def schema, do: __MODULE__
     end
   end
 

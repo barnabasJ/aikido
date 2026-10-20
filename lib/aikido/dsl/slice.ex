@@ -4,10 +4,10 @@ defmodule Aikido.Dsl.Slice do
 
   Defines three host-owned sections:
 
-    * `slice do … end` — slice identity (`name`, `path`, `description`,
+    * `slice do … end` — slice identity (`name`, `description`,
       `otp_app`, `schema`, `config_schema`).
-    * `signal_routes do … end` — `route "type", Action, opts` entries.
-    * `schedules do … end` — `schedule "cron", Action, %{data}` entries.
+    * `signal_routes do … end` — `route "type", {Resource, :action}, opts` entries.
+    * `schedules do … end` — `schedule "cron", {Resource, :action}, data: %{...}` entries.
 
   Introspection happens through `Aikido.Dsl.Slice.Info`, which reads each
   field (and the derived `actions/1`) from the slice's Spark
@@ -46,9 +46,7 @@ defmodule Aikido.Dsl.Slice do
       type: [type: :string, required: true],
       action: [type: :any, required: true],
       priority: [type: :integer, default: 0],
-      match: [type: {:fun, 1}],
-      static: [type: :map],
-      on_conflict: [type: {:in, [:replace]}]
+      match: [type: {:fun, 1}]
     ]
   }
 

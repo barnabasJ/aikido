@@ -25,22 +25,7 @@ defmodule Aikido.Dsl.ExtensionPathOverrideTest.HostWithoutMemoryOverride do
 end
 
 defmodule Aikido.Dsl.ExtensionPathOverrideTest do
-  @moduledoc """
-  End-to-end tests for the per-contributed-section `path:` override
-  declared explicitly by Spark extensions.
-
-  The override lets a host rename a contributed slice's mount path:
-
-      use Aikido.Agent, extensions: [Aikido.Slices.Memory]
-
-      memory do
-        path :short_term
-      end
-
-  When the contributed section's `:path` option is set, the slice
-  instance attached to the host mounts at the override; otherwise it
-  falls back to the slice's declared `path/0`.
-  """
+  @moduledoc "Agent-declared paths bind mounted slices to their state keys."
   use ExUnit.Case, async: true
 
   describe("agent-declared mount path") do
@@ -74,11 +59,5 @@ defmodule Aikido.Dsl.ExtensionPathOverrideTest do
       assert instance.module == Aikido.Slices.Memory
     end
 
-    test "strips the :__path_override__ mount override key from config" do
-      instance =
-        Aikido.Slice.Instance.new({Aikido.Slices.Memory, %{__path_override__: :renamed}}, :memory)
-
-      refute Map.has_key?(instance.config, :__path_override__)
-    end
   end
 end

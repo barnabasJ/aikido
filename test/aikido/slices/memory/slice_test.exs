@@ -40,7 +40,7 @@ defmodule AikidoTest.Memory.SliceTest do
              )
     end
 
-    test "schema is bound to Aikido.Slices.Memory.schema/0" do
+    test "schema is bound to the memory resource" do
       assert Ash.Resource.Info.attribute_names(Aikido.Dsl.Slice.Info.schema(Aikido.Slices.Memory)) ==
                Ash.Resource.Info.attribute_names(Aikido.Slices.Memory)
     end

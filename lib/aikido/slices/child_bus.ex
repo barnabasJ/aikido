@@ -6,7 +6,7 @@ defmodule Aikido.Slices.ChildBus do
   child emits `aikido.agent.child.started` back to the parent during its
   post-init hook. This slice routes that signal to an action that
   subscribes the child's pid to every path declared by the child
-  agent's `signal_routes/0`, against the bus named in the slice's
+  agent's compiled route table, against the bus named in the slice's
   config.
 
   The slice does not start the bus — the caller is responsible for
@@ -30,7 +30,7 @@ defmodule Aikido.Slices.ChildBus do
 
   ## Routes
 
-  Bare slices register their `signal_routes/0` with **absolute** paths;
+  Slices declare absolute signal types;
   slice-declared routes do not get a per-instance prefix (see
   `Aikido.Slice.Instance`). The two inbound routes
   (`aikido.agent.child.started`, `aikido.agent.child.exit`) are

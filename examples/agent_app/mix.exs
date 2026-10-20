@@ -6,6 +6,7 @@ defmodule AgentExamples.MixProject do
       app: :agent_examples,
       version: "0.1.0",
       elixir: "~> 1.19",
+      consolidate_protocols: Mix.env() != :test,
       deps: [
         {:aikido, path: "../.."},
         {:ash, "~> 3.36"},

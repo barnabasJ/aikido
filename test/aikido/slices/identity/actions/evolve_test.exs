@@ -7,7 +7,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
     Signal.new!(%{type: "identity_evolve", source: "/test", data: data})
   end
 
-  describe("run/4") do
+  describe("native evolve action") do
     test "initializes identity when slice is nil" do
       assert {:ok, %State{} = evolved, []} =
                AikidoTest.NativeAction.run(

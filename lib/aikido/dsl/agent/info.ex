@@ -4,8 +4,8 @@ defmodule Aikido.Dsl.Agent.Info do
 
   Reads the agent host's Spark `dsl_state` for the `:agent` /
   `:signal_routes` / `:schedules` sections, plus the cross-section values
-  the agent's transformer pipeline persists (plugin instances, slice
-  instances, plugin actions, expanded routes, …).
+  the agent's transformer pipeline persists (slice mounts, middleware and
+  expanded routes).
   """
 
   use Spark.InfoGenerator, extension: Aikido.Dsl.Agent, sections: [:agent]
@@ -50,12 +50,8 @@ defmodule Aikido.Dsl.Agent.Info do
   def slice_paths(module),
     do: Extension.get_persisted(module, :slice_paths, [])
 
-  @doc "Returns the deduplicated list of action modules from all attached slices."
-  @spec actions(module()) :: [module()]
-  def actions(module), do: Extension.get_persisted(module, :plugin_actions, [])
-
   @doc "Returns the expanded and validated routes for this agent."
-  @spec routes(module()) :: [{String.t(), module(), integer()}]
+  @spec routes(module()) :: [{String.t(), {module(), atom()}, integer()}]
   def routes(module),
     do: Extension.get_persisted(module, :validated_routes, [])
 
@@ -83,7 +79,7 @@ defmodule Aikido.Dsl.Agent.Info do
     do: Extension.get_persisted(module, :expanded_signal_routes, [])
 
   @doc """
-  Returns the compile-time `action_module => [mount_path, …]` map used by
+  Returns the compile-time `{resource, action} => [mount_path, …]` map used by
   AgentServer to fan an action out across every mount that owns it.
 
   Multi-instance mounts of the same slice produce multi-element lists;
@@ -91,13 +87,13 @@ defmodule Aikido.Dsl.Agent.Info do
   declarations contribute the agent's own path. Actions not owned by any
   declared route are absent from the map and use the agent's own path.
   """
-  @spec slice_paths_for_action(module()) :: %{module() => [atom()]}
+  @spec slice_paths_for_action(module()) :: %{{module(), atom()} => [atom()]}
   def slice_paths_for_action(module),
     do: Extension.get_persisted(module, :slice_paths_for_action, %{})
 
   @doc """
   Returns the compile-time `mount_path => config` map exposed to actions as
-  `ctx.slice_config` during fan-out. Includes both plugin and slice mounts.
+  `ctx.slice_config` during fan-out. Each mount has its own configuration.
   """
   @spec mount_config_map(module()) :: %{atom() => map()}
   def mount_config_map(module),

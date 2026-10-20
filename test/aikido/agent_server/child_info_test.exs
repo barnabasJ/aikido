@@ -82,12 +82,6 @@ defmodule AikidoTest.AgentServer.ChildInfoTest do
     end
   end
 
-  describe "schema/0" do
-    test "returns the Ash field contract" do
-      schema = ChildInfo.schema()
-      assert Ash.Type.ash_type?(schema)
-    end
-  end
 
   defp valid_attrs do
     %{

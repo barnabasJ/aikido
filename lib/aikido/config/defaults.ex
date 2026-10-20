@@ -17,9 +17,6 @@ defmodule Aikido.Config.Defaults do
   @agent_server_call_timeout_ms 5_000
   @agent_server_await_timeout_ms 10_000
 
-  @await_timeout_ms 10_000
-  @await_child_timeout_ms 30_000
-
   @worker_pool_checkout_timeout_ms 5_000
   @worker_pool_call_timeout_ms 5_000
 
@@ -50,14 +47,6 @@ defmodule Aikido.Config.Defaults do
   @doc "Default timeout for AgentServer waiting primitives (call/4, await_child/3, await_ready/2)."
   @spec agent_server_await_timeout_ms() :: pos_integer()
   def agent_server_await_timeout_ms, do: @agent_server_await_timeout_ms
-
-  @doc "Default timeout for caller-side wait helpers."
-  @spec await_timeout_ms() :: pos_integer()
-  def await_timeout_ms, do: @await_timeout_ms
-
-  @doc "Default timeout for caller-side child-wait helpers."
-  @spec await_child_timeout_ms() :: pos_integer()
-  def await_child_timeout_ms, do: @await_child_timeout_ms
 
   @doc "Default checkout timeout for worker pools."
   @spec worker_pool_checkout_timeout_ms() :: pos_integer()

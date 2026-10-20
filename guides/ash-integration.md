@@ -1,7 +1,5 @@
 # Ash domains, agents, slices, and teams
 
-<!-- covers: aikido.integrations_and_migration.framework_guides -->
-
 Define your public API on an Ash domain. Agents are Ash resources extended by
 `Aikido.Ash.Agent`; slices are embedded Ash resources with `Aikido.Ash.Slice`;
 teams are agent resources with `Aikido.Ash.Team`.
@@ -282,10 +280,9 @@ end
 Declare ordered middleware with `middleware [MyApp.Audit]` inside the agent
 section; it wraps signals using the existing Aikido middleware contract.
 
-Existing `Aikido.Slice` modules can also be mounted during migration. Each resource
-slice gets an internal Aikido slice and action adapters; it does not start a process
-of its own. Mounting the same resource at several paths retains the existing
-slice fan-out behavior.
+Mounted slices retain their own Ash attributes and actions. They do not start
+processes or generate companion modules. Mounting the same slice resource at
+several paths runs its actions against each mount's own state.
 
 ## Teams
 

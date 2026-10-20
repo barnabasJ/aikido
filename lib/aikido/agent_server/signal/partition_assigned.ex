@@ -4,7 +4,7 @@ defmodule Aikido.AgentServer.Signal.PartitionAssigned do
 
   Delivered as `aikido.agent.identity.partition_assigned` shortly after
   `State.from_options/3` returns. Routed through the same signal pipeline as
-  any other lifecycle signal so plugins/middleware can observe it.
+  any other lifecycle signal so slices and middleware can observe it.
 
   ## Fields
 

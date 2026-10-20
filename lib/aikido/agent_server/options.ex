@@ -73,7 +73,7 @@ defmodule Aikido.AgentServer.Options do
     field :skip_schedules, :boolean,
       allow_nil?: false,
       default: false,
-      description: "Skip registering plugin schedules (useful for tests)"
+      description: "Skip registering slice schedules (useful for tests)"
 
     field :pool, :atom,
       allow_nil?: true,
@@ -89,14 +89,9 @@ defmodule Aikido.AgentServer.Options do
       description: "Enable debug mode with event buffer"
   end
 
-  @schema __MODULE__
   defoverridable new!: 1
 
   @type t :: %__MODULE__{}
-
-  @doc false
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
 
   @doc """
   Creates validated Options from a keyword list or map.

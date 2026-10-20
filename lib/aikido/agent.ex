@@ -28,14 +28,14 @@ defmodule Aikido.Agent do
 
     slices do
       slice :memory, MyApp.MemorySlice
-      slice :slack, MyApp.SlackPlugin do
+      slice :slack, MyApp.SlackSlice do
         options token: "xoxb-..."
       end
     end
 
     signal_routes do
-      route "user.created", HandleUserCreated
-      route "payment.*", LargePayment, priority: 10, match: &(&1.data.amount > 100)
+      route "user.created", {MyApp.Users, :handle_created}
+      route "payment.*", {MyApp.Payments, :handle_large}, priority: 10, match: &(&1.data.amount > 100)
     end
 
     schedules do
@@ -45,13 +45,12 @@ defmodule Aikido.Agent do
   ```
 
   Each `slice :path, Module` line in `slices do … end` mounts a slice
-  (or plugin) at the agent-declared path. Plugin modules with
-  middleware behaviour also appear in the top-level `middleware: […]`
-  list so their position in the wrap chain is explicit.
+  at the agent-declared path. Middleware modules appear in the top-level
+  `middleware: […]` list, in their execution order.
 
   The `extensions: […]` keyword stays available for modules whose typed
   DSL section the host wants to call into (e.g. `extensions: [Aikido.Slices.AiReact]`
-  unlocks `react do … end`). It is **not** the channel for slice/plugin
+  unlocks `react do … end`). It is **not** the channel for slice
   enumeration — that role moves entirely into `slices do … end`.
   """
 
@@ -83,7 +82,6 @@ defmodule Aikido.Agent do
   @doc """
   Returns signal routes for this agent.
   """
-  @callback signal_routes() :: [Jido.Signal.Router.route_spec()]
   @callback signal_routes(ctx :: map()) :: [Jido.Signal.Router.route_spec()]
 
   @doc """
@@ -93,7 +91,6 @@ defmodule Aikido.Agent do
   @callback restore(checkpoint :: map(), ctx :: map()) :: {:ok, t()} | {:error, term()}
 
   @optional_callbacks [
-    signal_routes: 0,
     signal_routes: 1,
     checkpoint: 2,
     restore: 2

@@ -1,6 +1,6 @@
 defmodule Aikido.Agent.SliceValidationError do
   @moduledoc """
-  Raised at `Aikido.Agent.new/1` when a slice's seeded value fails schema
+  Raised during the native `:initialize` action when a slice's seeded value fails schema
   validation. The exception carries the offending path, the slice module
   (or `nil` for the agent's own slice), and the underlying Ash errors.
   """

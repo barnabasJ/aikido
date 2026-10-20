@@ -16,7 +16,7 @@ defmodule Aikido.Agent.Schedules do
   Job IDs are namespaced as tuples: `{:agent_schedule, agent_name, signal_type_or_job_id}`
   """
 
-  @typedoc "Expanded agent schedule specification (same shape as plugin schedule specs)."
+  @typedoc "Expanded agent schedule specification (same shape as slice schedule specs)."
   @type schedule_spec :: %{
           cron_expression: String.t(),
           action: nil,
