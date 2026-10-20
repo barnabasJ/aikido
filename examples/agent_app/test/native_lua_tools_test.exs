@@ -1,4 +1,4 @@
-defmodule AgentExamples.NativeLuaToolsTest.EchoImplementation do
+defmodule AgentExamples.NativeLuaToolsTest.EchoAction do
   use Ash.Resource.Actions.Implementation
 
   def run(input, _, context) do
@@ -14,7 +14,7 @@ defmodule AgentExamples.NativeLuaToolsTest.Echo do
   actions do
     action :echo, :map do
       argument :text, :string, allow_nil?: false
-      run AgentExamples.NativeLuaToolsTest.EchoImplementation
+      run AgentExamples.NativeLuaToolsTest.EchoAction
     end
   end
 end

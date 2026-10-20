@@ -1,5 +1,5 @@
-defmodule AgentExamples.Journal.Implementation do
-  @moduledoc false
+defmodule AgentExamples.Journal.AppendEntry do
+  @moduledoc "Appends the supplied text to the journal entries."
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do

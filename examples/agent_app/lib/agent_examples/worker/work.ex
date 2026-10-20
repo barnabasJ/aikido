@@ -1,5 +1,5 @@
 defmodule AgentExamples.Worker.Work do
-  @moduledoc false
+  @moduledoc "Marks the worker busy and returns a directive for the uppercase task."
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
@@ -19,29 +19,5 @@ defmodule AgentExamples.Worker.Work do
         directives: [directive]
       )
     end
-  end
-end
-
-defmodule AgentExamples.Worker.Completed do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-
-  @impl true
-  def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | status: :completed, result: input.arguments.result}
-    )
-  end
-end
-
-defmodule AgentExamples.Worker.Failed do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-
-  @impl true
-  def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | status: :failed, error: input.arguments.reason}
-    )
   end
 end

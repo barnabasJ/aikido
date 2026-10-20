@@ -1,15 +1,5 @@
-defmodule AgentExamples.Checklist.Add do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(input, _opts, _context) do
-    state = input.arguments.state
-    Aikido.Types.ActionResult.new(state: %{state | items: state.items ++ [input.arguments.item]})
-  end
-end
-
 defmodule AgentExamples.Checklist.Complete do
-  @moduledoc false
+  @moduledoc "Removes a pending item and increments the completed count."
   use Ash.Resource.Actions.Implementation
 
   @impl true

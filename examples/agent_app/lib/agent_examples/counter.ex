@@ -21,7 +21,7 @@ defmodule AgentExamples.Counter do
       end
     end
 
-    signal :add, AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Implementation
+    signal :add, AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Increment
 
     route [AgentExamples.Counter.Signals.Increase, AgentExamples.Counter.Signals.Decrease],
           AgentExamples.Counter.Adjust

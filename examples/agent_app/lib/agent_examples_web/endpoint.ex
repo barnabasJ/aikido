@@ -32,7 +32,3 @@ defmodule AgentExamplesWeb.Endpoint do
   plug(Plug.Session, @session_options)
   plug(AgentExamplesWeb.Router)
 end
-
-defmodule AgentExamplesWeb.ErrorHTML do
-  def render(template, _assigns), do: Phoenix.Controller.status_message_from_template(template)
-end

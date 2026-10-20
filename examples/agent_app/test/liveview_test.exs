@@ -66,15 +66,31 @@ defmodule AgentExamplesWeb.LiveViewTest do
     refute definition.code =~ "argument :"
     assert definition.open?
 
-    implementation = Enum.find(worker, &(&1.module == AgentExamples.Worker.Work))
-    assert implementation.code =~ "use Ash.Resource.Actions.Implementation"
-    assert implementation.code =~ "Aikido.Directives.async_task"
-    refute implementation.open?
+    work = Enum.find(worker, &(&1.module == AgentExamples.Worker.Work))
+    assert work.code =~ "use Ash.Resource.Actions.Implementation"
+    assert work.code =~ "Aikido.Directives.async_task"
+    assert work.path == "examples/agent_app/lib/agent_examples/worker/work.ex"
+    refute work.open?
+
+    for {slug, module, path} <- [
+          {"counter", AgentExamples.Counter.Increment, "counter/increment.ex"},
+          {"notebook", AgentExamples.Journal.AppendEntry, "journal/append_entry.ex"}
+        ] do
+      definition =
+        Catalog.find(slug)
+        |> AgentExamples.Source.for_example()
+        |> Enum.find(&(&1.module == module))
+
+      assert definition.category == :action
+      assert definition.path == "examples/agent_app/lib/agent_examples/" <> path
+      refute definition.open?
+    end
 
     signal = Enum.find(worker, &(&1.module == AgentExamples.Worker.Signals.Run))
     assert signal.category == :signal
     assert signal.code =~ "use Aikido.Signal"
     assert signal.code =~ "attribute :text, :string"
+    assert signal.path == "examples/agent_app/lib/agent_examples/worker/signals/run.ex"
     refute signal.open?
 
     directive =

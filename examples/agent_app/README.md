@@ -101,7 +101,7 @@ block with a description of its role. Agent declarations bind that
 contract directly to an Ash action implementation:
 
 ```elixir
-signal :add, AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Implementation
+signal :add, AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Increment
 
 route [AgentExamples.Counter.Signals.Increase, AgentExamples.Counter.Signals.Decrease],
       AgentExamples.Counter.Adjust
@@ -163,12 +163,14 @@ Agents.team_stop!(team.id)
 
 Start with [the domain](lib/agent_examples/agents.ex), then
 [Counter](lib/agent_examples/counter.ex) and its
-[signals](lib/agent_examples/counter/signals.ex) and
-[pure action](lib/agent_examples/counter/implementation.ex). Resource files sit
+[Add](lib/agent_examples/counter/signals/add.ex),
+[Increase](lib/agent_examples/counter/signals/increase.ex), and
+[Decrease](lib/agent_examples/counter/signals/decrease.ex) signals and
+[pure action](lib/agent_examples/counter/increment.ex). Resource files sit
 beside their own signal and implementation folders. Compare
 [Notebook](lib/agent_examples/notebook.ex) with its
 [embedded Journal](lib/agent_examples/journal.ex).
-[Work](lib/agent_examples/worker/implementation.ex) shows the complete asynchronous
+[Work](lib/agent_examples/worker/work.ex) shows the complete asynchronous
 signal chain; its uppercase task is a local stand-in for one blocking tool call.
 [Demo](lib/agent_examples/demo.ex) subscribes before sending work so it can
 observe completion through subscriptions. The tests cover these behaviors.
