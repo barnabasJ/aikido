@@ -402,7 +402,7 @@ defmodule AgentExamples.Playground do
   end
 
   defp snapshot(state) do
-    resource = Aikido.Dsl.Agent.Info.resource_module(state.agent_module)
+    resource = state.agent_module
 
     fixed =
       if resource && !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)),

@@ -153,7 +153,7 @@ defmodule AikidoTest.AshPersistenceTest do
 
     assert {:ok, fresh} =
              Aikido.Durable.ensure_started(pool, "partitioned",
-               agent: Aikido.Dsl.Agent.Info.runtime_module(Permanent),
+               agent: Permanent,
                partition: :alpha,
                initial_state: %{state: %{value: 3}}
              )

@@ -40,7 +40,7 @@ defmodule Aikido.Ash.Runtime do
       with {:ok, pid} <-
              Aikido.start_agent(
                option(resource, :instance),
-               Aikido.Dsl.Agent.Info.runtime_module(resource),
+               resource,
                runtime_options
              ) do
         pool = Aikido.durable_supervisor_name(option(resource, :instance))
@@ -149,7 +149,7 @@ defmodule Aikido.Ash.Runtime do
            end) do
       if pool do
         Aikido.Durable.delete(pool, key,
-          agent: Aikido.Dsl.Agent.Info.runtime_module(resource),
+          agent: resource,
           partition: partition
         )
       else
@@ -163,7 +163,7 @@ defmodule Aikido.Ash.Runtime do
     pool = Aikido.durable_supervisor_name(instance)
 
     if Process.whereis(pool) do
-      Aikido.Durable.delete(pool, id, agent: Aikido.Dsl.Agent.Info.runtime_module(resource))
+      Aikido.Durable.delete(pool, id, agent: resource)
     else
       with {:ok, {_id, pid}} <- resolve(resource, id), do: Aikido.stop_agent(instance, pid)
     end
@@ -223,7 +223,7 @@ defmodule Aikido.Ash.Runtime do
 
   defp resolve(resource, pid) when is_pid(pid) do
     AgentServer.state(pid, fn state ->
-      if state.agent.agent_module == Aikido.Dsl.Agent.Info.runtime_module(resource),
+      if state.agent.agent_module == resource,
         do: {:ok, {state.agent.id, pid}},
         else: {:error, :different_resource}
     end)
@@ -233,7 +233,7 @@ defmodule Aikido.Ash.Runtime do
 
   defp snapshot(resource, pid) do
     AgentServer.state(pid, fn state ->
-      if state.agent.agent_module == Aikido.Dsl.Agent.Info.runtime_module(resource) do
+      if state.agent.agent_module == resource do
         {:ok, record(resource, state.agent)}
       else
         {:error, :different_resource}

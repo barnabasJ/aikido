@@ -23,7 +23,12 @@ defmodule Aikido.Agent.Initialize do
 
     state =
       if path,
-        do: Map.put(state, path, create_own(input.resource, Map.get(user, path) || %{})),
+        do:
+          Map.put(
+            state,
+            path,
+            create_own(input.resource, Map.get(user, path) || %{}, input.arguments.id)
+          ),
         else: state
 
     Aikido.Agent.new(
@@ -35,8 +40,20 @@ defmodule Aikido.Agent.Initialize do
     )
   end
 
-  defp create_own(resource, values) do
-    case Ash.create(resource, values, authorize?: false, skip_unknown_inputs: [:*]) do
+  defp create_own(resource, values, id) do
+    result =
+      if Aikido.Ash.Agent in Spark.extensions(resource) do
+        resource
+        |> Ash.Changeset.for_create(:__aikido_initialize_state__, Map.put(values, :id, id),
+          skip_unknown_inputs: [:*],
+          authorize?: false
+        )
+        |> Ash.Changeset.apply_attributes()
+      else
+        Ash.create(resource, values, authorize?: false, skip_unknown_inputs: [:*])
+      end
+
+    case result do
       {:ok, record} ->
         Map.merge(values, Map.take(record, Aikido.Dsl.Agent.Info.state_fields(resource)))
 

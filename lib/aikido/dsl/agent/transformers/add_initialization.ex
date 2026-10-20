@@ -19,6 +19,7 @@ defmodule Aikido.Dsl.Agent.Transformers.AddInitialization do
     with {:ok, dsl} <-
            Ash.Resource.Builder.add_new_action(dsl, :action, :initialize,
              returns: Aikido.Agent,
+             public?: false,
              arguments: [id, state],
              run:
                {Aikido.Agent.Initialize,

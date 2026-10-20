@@ -189,16 +189,7 @@ defmodule Aikido.Durable do
 
   @doc false
   def keep_snapshot?(agent_module) do
-    if resource = Aikido.Dsl.Agent.Info.resource_module(agent_module) do
-      Spark.Dsl.Extension.get_opt(
-        resource,
-        [:agent],
-        :persistence,
-        :permanent
-      ) == :permanent
-    else
-      true
-    end
+    Spark.Dsl.Extension.get_opt(agent_module, [:agent], :persistence, :permanent) == :permanent
   end
 
   def supervisor_name(name), do: Module.concat(name, Supervisor)

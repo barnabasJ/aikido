@@ -43,7 +43,12 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         agent_id: state.id,
         request_id: directive.request_id,
         tool_call_id: directive.tool_call.id,
-        agent_resource: Aikido.Dsl.Agent.Info.resource_module(agent_module),
+        agent_resource:
+          if(
+            Spark.Dsl.is?(agent_module, Ash.Resource) &&
+              Aikido.Ash.Agent in Spark.extensions(agent_module),
+            do: agent_module
+          ),
         aikido: state.aikido,
         partition: Map.get(state, :partition),
         parent: Map.get(state, :parent)

@@ -71,8 +71,11 @@ defmodule Aikido.Dsl.Agent.Transformers.ExpandRoutes do
   end
 
   defp build_signal_routes(dsl_state) do
-    [:signal_routes]
-    |> get_entities(dsl_state)
+    dsl_state
+    |> Transformer.get_persisted(
+      :aikido_agent_routes,
+      Transformer.get_entities(dsl_state, [:signal_routes])
+    )
     |> Enum.map(&route_to_route_spec/1)
   end
 

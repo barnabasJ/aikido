@@ -420,7 +420,7 @@ defmodule Aikido.Persist do
     agent =
       agent_module
       |> Ash.ActionInput.for_action(:initialize, %{id: checkpoint.id})
-      |> Ash.run_action!()
+      |> Ash.run_action!(authorize?: false)
 
     {:ok, %{agent | state: Map.merge(agent.state, checkpoint.state || %{})}}
   end

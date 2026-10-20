@@ -9,9 +9,7 @@ defmodule Aikido.Dsl.Transformers.Attributes do
     module = Transformer.get_persisted(dsl, :module)
     section = Enum.find([:agent, :slice], &Map.has_key?(dsl, [&1]))
 
-    declared =
-      Transformer.get_entities(dsl, [section, :schema]) ++
-        Transformer.get_persisted(dsl, :aikido_runtime_attributes, [])
+    declared = Transformer.get_entities(dsl, [section, :schema])
 
     dsl = Enum.reduce(declared, dsl, &Transformer.add_entity(&2, [:attributes], &1))
 
@@ -36,10 +34,9 @@ defmodule Aikido.Dsl.Transformers.Attributes do
     resource = module
 
     dsl =
-      if Map.has_key?(dsl, [section, :schema]) ||
-           Transformer.get_persisted(dsl, :aikido_runtime_attributes),
-         do: Transformer.set_option(dsl, [section], :schema, resource),
-         else: dsl
+      if Map.has_key?(dsl, [section, :schema]),
+        do: Transformer.set_option(dsl, [section], :schema, resource),
+        else: dsl
 
     dsl = configure(dsl, section, module)
     names = Enum.map(declared, & &1.name)

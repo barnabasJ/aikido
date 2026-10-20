@@ -70,5 +70,10 @@ defmodule Aikido.Ash.Agent do
   }
   use Spark.Dsl.Extension,
     sections: [@agent],
-    transformers: [Aikido.Ash.Transformers.Agent]
+    transformers: [
+      Aikido.Ash.Transformers.Agent,
+      Aikido.Dsl.Agent.Transformers.WalkExtensions,
+      Aikido.Dsl.Agent.Transformers.ExpandRoutes,
+      Aikido.Dsl.Agent.Transformers.AddInitialization
+    ]
 end

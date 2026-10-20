@@ -16,7 +16,10 @@ defmodule AikidoTest.AshTest do
     refute function_exported?(AikidoTest.AshFixtures.Domain, :add_counter, 2)
 
     for resource <- [AikidoTest.AshFixtures.Counter, AikidoTest.AshFixtures.Team] do
-      assert Enum.all?(Ash.Resource.Info.actions(resource), &(&1.type == :action))
+      assert resource
+             |> Ash.Resource.Info.actions()
+             |> Enum.filter(& &1.public?)
+             |> Enum.all?(&(&1.type == :action))
     end
 
     assert {:ok, reference} =
@@ -61,6 +64,11 @@ defmodule AikidoTest.AshTest do
 
     reference =
       AikidoTest.AshFixtures.Domain.generated_counter_start!(%{id: "custom-layer", count: 3})
+
+    assert {:ok, ^resource} = Aikido.AgentServer.state(reference.pid, &{:ok, &1.agent_module})
+
+    query = Ash.DataLayer.resource_to_query(resource, AikidoTest.AshFixtures.Domain)
+    assert {:ok, []} = Ash.DataLayer.run_query(query, resource)
 
     assert {:ok, _} =
              AikidoTest.AshFixtures.Domain.generated_counter_add(reference.id, %{amount: 2})
@@ -134,10 +142,9 @@ defmodule AikidoTest.AshTest do
   end
 
   test "resource agents reuse their attributes without a generated schema resource" do
-    runtime = Aikido.Dsl.Agent.Info.runtime_module(AikidoTest.AshFixtures.Counter)
-    schema = Spark.Dsl.Extension.get_opt(runtime, [:agent], :schema)
-    assert schema == runtime
-    assert Ash.Resource.Info.attribute(schema, :count).type == Ash.Type.Integer
+    resource = AikidoTest.AshFixtures.Counter
+    assert Ash.Resource.Info.attribute(resource, :count).type == Ash.Type.Integer
+    refute Code.ensure_loaded?(Module.concat(resource, Runtime))
 
     assert {:ok, record} =
              snapshot_result(AikidoTest.AshFixtures.Domain.counter_start(%{id: "native-default"}))
@@ -336,8 +343,8 @@ defmodule AikidoTest.AshTest do
   end
 
   test "scheduled-only Ash actions mutate their mounted slice" do
-    runtime = Aikido.Dsl.Agent.Info.runtime_module(AikidoTest.AshFixtures.Composed)
-    agent = runtime.initialize!()
+    resource = AikidoTest.AshFixtures.Composed
+    agent = resource.initialize!()
 
     signal =
       Jido.Signal.new!("aikido.ash.schedule.ash_counter_slice.tick", %{amount: 4},
@@ -346,7 +353,7 @@ defmodule AikidoTest.AshTest do
 
     assert {:ok, updated, []} =
              AikidoTest.NativeAction.apply(
-               runtime,
+               resource,
                agent,
                {{AikidoTest.AshFixtures.CounterSlice, :tick}, %{amount: 4}},
                input_signal: signal
@@ -430,12 +437,10 @@ defmodule AikidoTest.AshTest do
     refute Ash.Resource.Info.action(resource, :tick)
     refute function_exported?(AikidoTest.AshFixtures.Domain, :composed_internal, 1)
 
-    assert Aikido.Dsl.Agent.Info.signal_routes(Aikido.Dsl.Agent.Info.runtime_module(resource)) ==
+    assert Aikido.Dsl.Agent.Info.signal_routes(resource) ==
              []
 
-    assert Aikido.Dsl.Agent.Info.slice_paths_for_action(
-             Aikido.Dsl.Agent.Info.runtime_module(resource)
-           )[
+    assert Aikido.Dsl.Agent.Info.slice_paths_for_action(resource)[
              signal.target
            ] == [:counter]
 

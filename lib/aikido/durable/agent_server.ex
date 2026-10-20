@@ -28,7 +28,7 @@ defmodule Aikido.Durable.AgentServer do
         id: Keyword.fetch!(options, :id),
         state: options[:initial_state] || %{}
       })
-      |> Ash.run_action!()
+      |> Ash.run_action!(authorize?: false)
 
     agent = Persister.transform_agent(agent, module, :externalize)
 
@@ -192,24 +192,23 @@ defmodule Aikido.Durable.AgentServer do
     end
   end
 
-  defp serialize_agent(agent, runtime_module) do
-    module = Persister.callback_module(runtime_module)
-
-    if function_exported?(module, :checkpoint, 2) do
-      case module.checkpoint(agent, %{}) do
+  defp serialize_agent(agent, agent_module) do
+    if function_exported?(agent_module, :checkpoint, 2) do
+      case agent_module.checkpoint(agent, %{}) do
         {:ok, checkpoint} when is_map(checkpoint) ->
           {:checkpoint, checkpoint}
 
         other ->
-          raise ArgumentError, "Invalid checkpoint from #{inspect(module)}: #{inspect(other)}"
+          raise ArgumentError,
+                "Invalid checkpoint from #{inspect(agent_module)}: #{inspect(other)}"
       end
     else
-      if function_exported?(module, :restore, 2),
+      if function_exported?(agent_module, :restore, 2),
         do:
           {:checkpoint,
            %{
              version: 1,
-             agent_module: runtime_module,
+             agent_module: agent_module,
              id: agent.id,
              state: agent.state,
              thread: nil
@@ -218,20 +217,19 @@ defmodule Aikido.Durable.AgentServer do
     end
   end
 
-  defp restore_agent({:checkpoint, checkpoint}, runtime_module) do
-    module = Persister.callback_module(runtime_module)
-
-    case module.restore(checkpoint, %{}) do
+  defp restore_agent({:checkpoint, checkpoint}, agent_module) do
+    case agent_module.restore(checkpoint, %{}) do
       {:ok, %Aikido.Agent{} = agent} ->
-        Persister.transform_agent(agent, runtime_module, :reinstate)
+        Persister.transform_agent(agent, agent_module, :reinstate)
 
       other ->
-        raise ArgumentError, "Invalid restoration from #{inspect(module)}: #{inspect(other)}"
+        raise ArgumentError,
+              "Invalid restoration from #{inspect(agent_module)}: #{inspect(other)}"
     end
   end
 
-  defp restore_agent({:agent, agent}, runtime_module),
-    do: Persister.transform_agent(agent, runtime_module, :reinstate)
+  defp restore_agent({:agent, agent}, agent_module),
+    do: Persister.transform_agent(agent, agent_module, :reinstate)
 
   defp durable_domain_state(state) do
     case state[:team] do
@@ -249,7 +247,7 @@ defmodule Aikido.Durable.AgentServer do
   end
 
   defp maybe_reconcile(runtime) do
-    resource = Aikido.Dsl.Agent.Info.resource_module(runtime.agent_module)
+    resource = runtime.agent_module
 
     if Aikido.Dsl.Agent.Info.team_config(resource) do
       send(self(), {:signal, Jido.Signal.new!("aikido.ash.team.reconcile", %{})})

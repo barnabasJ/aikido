@@ -157,13 +157,7 @@ defmodule Aikido.Middlewares.Persister do
       end
 
     (own_target ++ slice_targets)
-    |> Enum.map(fn {mod, path} -> {callback_module(mod), path} end)
     |> Enum.filter(fn {mod, _path} -> transform_impl?(mod) end)
-  end
-
-  @doc false
-  def callback_module(module) do
-    Aikido.Dsl.Agent.Info.resource_module(module) || module
   end
 
   defp transform_impl?(mod) do

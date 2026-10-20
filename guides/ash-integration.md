@@ -18,16 +18,16 @@ exclusively from action return values. Agent and slice actions are pure and must
 never perform side effects. Return directives for all I/O, including message
 delivery, database writes, model requests and process creation; the runtime
 executes them after applying the action result.
-The resource DSL generates the internal agent modules; consumers call the domain.
-Runtime-module and own-state field metadata live in Spark and are available through
-`Aikido.Dsl.Agent.Info.runtime_module/1` and `state_fields/1`.
-The same Info module exposes `resource_module/1`, `ai?/1` and `team_config/1`;
-resources do not generate metadata accessor functions.
+AgentServer runs the original resource module. Its attributes, actions, slice mounts
+and middleware configuration are reused directly; no companion resource is generated.
+Own-state fields, AI flags and team configuration live in Spark and are read through
+`Aikido.Dsl.Agent.Info.state_fields/1`, `ai?/1` and `team_config/1`.
 
-Internal agent hosts expose an `:initialize` generic action implemented by
-`Aikido.Agent.Initialize`, configured by the transformer with the state path
-and slice mounts. It creates embedded resource values through native Ash create
-actions. Its native code interface accepts a parameter map, such as
+A private `:initialize` generic action uses `Aikido.Agent.Initialize`, configured
+by the transformer with the state path and slice mounts. Ash changesets apply the
+original resource's defaults and validation without writing its data layer. Mounted
+embedded resources are initialized through their native create actions. The native
+initialization code interface accepts a parameter map, such as
 `MyAgent.initialize!(%{id: "example", state: %{count: 1}})`.
 
 Embedded resources also expose an update action for typed attribute changes.
@@ -358,7 +358,7 @@ process side effects cannot be rolled back as a database transaction.
 `Aikido.Agent` and `Aikido.Slice` are convenience macros over
 native Ash resource hosts. Their state declarations become resource attributes.
 Use `Ash.Resource` with `Aikido.Ash.Agent` and domain interfaces for the public
-agent API. The generated `Runtime` module supplies the pure decision engine.
+agent API. AgentServer invokes the original resource's native Ash actions directly.
 
 ## Native contracts and tools
 

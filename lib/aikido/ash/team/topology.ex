@@ -107,7 +107,7 @@ defmodule Aikido.Ash.Team.Topology do
            resource when is_atom(resource) and not is_nil(resource) <- raw[:resource],
            true <-
              Code.ensure_loaded?(resource) && Spark.Dsl.is?(resource, Ash.Resource) &&
-               !is_nil(Aikido.Dsl.Agent.Info.runtime_module(resource)),
+               Aikido.Ash.Agent in Spark.extensions(resource),
            true <- Aikido.Ash.Runtime.option(resource, :instance) == instance,
            activation when activation in [:eager, :lazy] <- Map.get(raw, :activation, :eager),
            dependencies when is_list(dependencies) <- Map.get(raw, :depends_on, []),

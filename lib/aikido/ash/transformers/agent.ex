@@ -12,9 +12,7 @@ defmodule Aikido.Ash.Transformers.Agent do
   @impl true
   def transform(dsl) do
     resource = Transformer.get_persisted(dsl, :module)
-    name = Transformer.get_option(dsl, [:agent], :name)
     path = Transformer.get_option(dsl, [:agent], :path, :state)
-    middleware = Transformer.get_option(dsl, [:agent], :middleware, [])
     team_slice = Transformer.get_persisted(dsl, :aikido_team_slice)
     entities = Transformer.get_entities(dsl, [:agent])
     mounts = Enum.filter(entities, &match?(%Aikido.Dsl.Agent.SliceMount{}, &1))
@@ -51,58 +49,23 @@ defmodule Aikido.Ash.Transformers.Agent do
          {:ok, dsl} <- add_mounts(dsl, mounts, team_slice),
          {:ok, dsl} <- add_lifecycle_actions(dsl),
          {:ok, dsl} <- add_signals(dsl, signals, mounts) do
-      slices =
-        Enum.map(mounts, fn mount ->
-          module = mount.module
-
-          quote do
-            slice(unquote(mount.path), unquote(module),
-              options: unquote(Macro.escape(mount.options))
-            )
-          end
-        end)
-
       routes =
         for signal <- signals, !mounted_signal?(signal, mounts) do
-          quote do
-            route unquote(signal.type), unquote(Macro.escape(signal.target))
-          end
+          %Aikido.Dsl.Agent.Route{type: signal.type, action: signal.target, priority: 0}
         end
 
-      runtime = Module.concat(resource, Runtime)
+      accepted = for attribute <- attributes, attribute.writable?, do: attribute.name
 
-      block =
-        quote do
-          defmodule unquote(runtime) do
-            import Aikido.Ash.Agent, only: []
-            use Aikido.Agent, default_slices: false, middleware: unquote(Macro.escape(middleware))
-
-            # Ash has already cast these attributes and applied their defaults.
-            # Reuse the resource's contracts; do not create a second schema type.
-            @persist {:aikido_runtime_attributes, unquote(Macro.escape(attributes))}
-
-            @persist {:aikido_resource, unquote(resource)}
-
-            agent do
-              name unquote(name)
-              path unquote(path)
-            end
-
-            slices do
-              (unquote_splicing(slices))
-            end
-
-            signal_routes do
-              (unquote_splicing(routes))
-            end
-          end
-        end
-
-      {:ok,
-       dsl
-       |> Transformer.persist(:aikido_runtime_module, runtime)
-       |> Transformer.persist(:aikido_state_fields, state_fields)
-       |> Transformer.eval([], block)}
+      with {:ok, dsl} <-
+             Builder.add_new_action(dsl, :create, :__aikido_initialize_state__,
+               accept: Enum.uniq([:id | accepted]),
+               public?: false
+             ) do
+        {:ok,
+         dsl
+         |> Transformer.persist(:aikido_agent_routes, routes)
+         |> Transformer.persist(:aikido_state_fields, state_fields)}
+      end
     end
   end
 

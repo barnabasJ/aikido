@@ -6,8 +6,12 @@
 
 ### Changed
 
-- Store agent resource/runtime mappings, state fields, AI flags and team
-  configuration in Spark instead of generating functions on every resource.
+- Run AgentServer directly on the original Ash resource. Remove generated
+  companion resources and resource/runtime mappings. Initialize typed state
+  through native Ash changesets without writing the configured data layer.
+
+- Store agent state fields, AI flags and team configuration in Spark instead of
+  generating functions on every resource.
   Read it through `Aikido.Dsl.Agent.Info`.
 
 - Replace generated agent constructors, setters and whole-agent validators with

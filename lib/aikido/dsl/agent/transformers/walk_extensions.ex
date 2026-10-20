@@ -28,6 +28,10 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
   alias Aikido.Slice.Instance, as: SliceInstance
   alias Spark.Dsl.Transformer
 
+  @impl true
+  def after?(Aikido.Ash.Transformers.Agent), do: true
+  def after?(_), do: false
+
   @impl Spark.Dsl.Transformer
   def transform(dsl_state) do
     with :ok <- check_section_name_collisions(dsl_state) do
@@ -63,9 +67,20 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
   end
 
   defp do_transform(dsl_state) do
-    user_mounts = Transformer.get_entities(dsl_state, [:slices])
-    user_middleware = Transformer.get_persisted(dsl_state, :aikido_user_middleware, [])
-    default_slice_list = resolve_default_slices(dsl_state)
+    native? = Aikido.Ash.Agent in Spark.extensions(dsl_state)
+
+    user_mounts =
+      if native?,
+        do:
+          Enum.filter(Transformer.get_entities(dsl_state, [:agent]), &match?(%SliceMount{}, &1)),
+        else: Transformer.get_entities(dsl_state, [:slices])
+
+    user_middleware =
+      if native?,
+        do: Transformer.get_option(dsl_state, [:agent], :middleware, []),
+        else: Transformer.get_persisted(dsl_state, :aikido_user_middleware, [])
+
+    default_slice_list = if native?, do: [], else: resolve_default_slices(dsl_state)
 
     slice_instances_from_user = Enum.map(user_mounts, &classify_mount(&1, dsl_state))
 
@@ -84,7 +99,13 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
       |> Enum.uniq()
 
     agent_path = Spark.Dsl.Extension.get_opt(dsl_state, [:agent], :path)
-    agent_routes = Transformer.get_entities(dsl_state, [:signal_routes])
+
+    agent_routes =
+      Transformer.get_persisted(
+        dsl_state,
+        :aikido_agent_routes,
+        Transformer.get_entities(dsl_state, [:signal_routes])
+      )
 
     slice_paths_for_action =
       build_action_path_table(slice_instances, agent_routes, agent_path)

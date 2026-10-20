@@ -1029,8 +1029,8 @@ defmodule Aikido.AgentServer do
 
   defp build_agent(agent_module, %Options{id: id, initial_state: state}) do
     agent_module
-    |> Ash.ActionInput.for_action(:initialize, %{id: id, state: state})
-    |> Ash.run_action!()
+    |> Ash.ActionInput.for_action(:initialize, %{id: id, state: state}, authorize?: false)
+    |> Ash.run_action!(authorize?: false)
   end
 
   defp lifecycle_starting_signal(%State{} = state) do
