@@ -139,6 +139,7 @@ defmodule Aikido.Dsl.Agent do
     ],
     verifiers: [
       Aikido.Dsl.Agent.Verifiers.PathSchemaPair,
-      Aikido.Dsl.Agent.Verifiers.UniquePaths
+      Aikido.Dsl.Agent.Verifiers.UniquePaths,
+      Aikido.Dsl.Agent.Verifiers.Composition
     ]
 end

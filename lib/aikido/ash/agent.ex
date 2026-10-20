@@ -75,5 +75,10 @@ defmodule Aikido.Ash.Agent do
       Aikido.Dsl.Agent.Transformers.WalkExtensions,
       Aikido.Dsl.Agent.Transformers.ExpandRoutes,
       Aikido.Dsl.Agent.Transformers.AddInitialization
+    ],
+    verifiers: [
+      Aikido.Ash.Verifiers.Agent,
+      Aikido.Dsl.Agent.Verifiers.UniquePaths,
+      Aikido.Dsl.Agent.Verifiers.Composition
     ]
 end

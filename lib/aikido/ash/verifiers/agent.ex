@@ -1,0 +1,39 @@
+defmodule Aikido.Ash.Verifiers.Agent do
+  @moduledoc false
+  use Spark.Dsl.Verifier
+  alias Spark.Dsl.Verifier
+
+  @impl true
+  def verify(dsl) do
+    path = Verifier.get_option(dsl, [:agent], :path)
+    entities = Verifier.get_entities(dsl, [:agent])
+    mounts = Enum.filter(entities, &match?(%Aikido.Dsl.Agent.SliceMount{}, &1))
+    signals = Enum.filter(entities, &match?(%Aikido.Ash.Agent.Signal{}, &1))
+    names = Enum.map(signals, & &1.name)
+    reserved = [path | Enum.map(mounts, & &1.path)]
+    fields = Verifier.get_persisted(dsl, :aikido_state_fields, [])
+
+    cond do
+      :id in reserved ->
+        error("The :id attribute is reserved for the agent identity")
+
+      names != Enum.uniq(names) ->
+        error("Agent signal action names must be unique")
+
+      Enum.any?(signals, &String.contains?(&1.type, "*")) ->
+        error("Public signals require a concrete type; mark wildcard slice actions public? false")
+
+      Enum.any?(fields, &(&1 in reserved)) ->
+        error("Resource attributes cannot collide with the agent state path or mounted slice paths")
+
+      Verifier.get_persisted(dsl, :aikido_team_slice) && :topology in fields ->
+        error("Team resources reserve :topology for the startup graph")
+
+      true ->
+        :ok
+    end
+  end
+
+  defp error(message),
+    do: {:error, Spark.Error.DslError.exception(message: message, path: [:agent])}
+end

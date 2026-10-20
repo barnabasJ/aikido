@@ -34,39 +34,6 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
 
   @impl Spark.Dsl.Transformer
   def transform(dsl_state) do
-    with :ok <- check_section_name_collisions(dsl_state) do
-      do_transform(dsl_state)
-    end
-  end
-
-  defp check_section_name_collisions(dsl_state) do
-    contributed = Transformer.get_persisted(dsl_state, :aikido_contributed_sections, %{})
-
-    duplicates =
-      contributed
-      |> Enum.group_by(fn {_mod, section} -> section end, fn {mod, _} -> mod end)
-      |> Enum.filter(fn {_section, mods} -> length(Enum.uniq(mods)) > 1 end)
-
-    case duplicates do
-      [] ->
-        :ok
-
-      list ->
-        message =
-          Enum.map_join(list, "; ", fn {section, mods} ->
-            names = mods |> Enum.uniq() |> Enum.map_join(", ", &inspect/1)
-            "section #{inspect(section)} is contributed by multiple extensions: #{names}"
-          end)
-
-        {:error,
-         Spark.Error.DslError.exception(
-           message: "Section name collisions: " <> message,
-           path: []
-         )}
-    end
-  end
-
-  defp do_transform(dsl_state) do
     native? = Aikido.Ash.Agent in Spark.extensions(dsl_state)
 
     user_mounts =
@@ -132,33 +99,10 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
     SliceInstance.new({module, config}, path)
   end
 
-  defp normalize_middleware!(module) when is_atom(module) do
-    ensure_module_loaded!(module)
+  defp normalize_middleware!(module) when is_atom(module), do: {module, %{}}
 
-    if behaves_as_middleware?(module) do
-      {module, %{}}
-    else
-      raise CompileError,
-        description:
-          "Middleware module #{inspect(module)} does not implement the " <>
-            "`Aikido.Middleware` behaviour. Add `@behaviour Aikido.Middleware` " <>
-            "or move it out of the top-level `middleware: […]` list."
-    end
-  end
-
-  defp normalize_middleware!({module, opts}) when is_atom(module) do
-    ensure_module_loaded!(module)
-
-    if behaves_as_middleware?(module) do
-      {module, normalize_to_map(opts)}
-    else
-      raise CompileError,
-        description:
-          "Middleware module #{inspect(module)} does not implement the " <>
-            "`Aikido.Middleware` behaviour. Add `@behaviour Aikido.Middleware` " <>
-            "or move it out of the top-level `middleware: […]` list."
-    end
-  end
+  defp normalize_middleware!({module, opts}) when is_atom(module),
+    do: {module, normalize_to_map(opts)}
 
   defp normalize_middleware!(other) do
     raise CompileError,
@@ -212,13 +156,6 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensions do
         raise CompileError,
           description: "Module #{inspect(module)} could not be compiled: #{inspect(reason)}"
     end
-  end
-
-  defp behaves_as_middleware?(module) do
-    behaviours =
-      module.module_info(:attributes) |> Keyword.get_values(:behaviour) |> List.flatten()
-
-    Aikido.Middleware in behaviours
   end
 
   defp normalize_to_map(opts) when is_map(opts), do: opts

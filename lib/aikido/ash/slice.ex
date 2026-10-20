@@ -68,5 +68,6 @@ defmodule Aikido.Ash.Slice do
   @schedules %Spark.Dsl.Section{name: :schedules, entities: [@schedule]}
   use Spark.Dsl.Extension,
     sections: [@slice, @schedules],
-    transformers: [Aikido.Ash.Transformers.Slice]
+    transformers: [Aikido.Ash.Transformers.Slice],
+    verifiers: [Aikido.Ash.Verifiers.Slice]
 end

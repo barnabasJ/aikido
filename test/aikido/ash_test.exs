@@ -393,20 +393,20 @@ defmodule AikidoTest.AshTest do
     assert {:ok, %{status: :stopped}} = AikidoTest.AshFixtures.Domain.team_stop(team)
   end
 
-  test "colliding state paths fail at compile time" do
-    ExUnit.CaptureIO.capture_io(:stderr, fn ->
-      assert_raise Spark.Error.DslError, ~r/paths must be unique/, fn ->
-        defmodule Elixir.AikidoTest.AshTest.DuplicatePaths do
-          use Ash.Resource, extensions: [Aikido.Ash.Agent]
+  test "colliding state paths are reported by the verifier" do
+    output = ExUnit.CaptureIO.capture_io(:stderr, fn ->
+      defmodule Elixir.AikidoTest.AshTest.DuplicatePaths do
+        use Ash.Resource, domain: nil, extensions: [Aikido.Ash.Agent]
 
-          agent do
-            name "duplicate_paths"
-            instance AikidoTest.AshFixtures.Instance
-            slice :state, AikidoTest.AshFixtures.CounterSlice
-          end
+        agent do
+          name "duplicate_paths"
+          instance AikidoTest.AshFixtures.Instance
+          slice :state, AikidoTest.AshFixtures.CounterSlice
         end
       end
     end)
+
+    assert output =~ "Duplicate slice paths"
   end
 
   test "signal declarations require a positional target" do
@@ -452,19 +452,19 @@ defmodule AikidoTest.AshTest do
     assert %{counter: %{count: 2}} = AikidoTest.AshFixtures.Domain.composed_inspect!(reference.id)
   end
 
-  test "duplicate domain names fail at compile time" do
-    ExUnit.CaptureIO.capture_io(:stderr, fn ->
-      assert_raise Spark.Error.DslError, ~r/names must be unique/, fn ->
-        defmodule Elixir.AikidoTest.AshTest.DuplicateDomain do
-          use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+  test "duplicate domain names are reported by the verifier" do
+    output = ExUnit.CaptureIO.capture_io(:stderr, fn ->
+      defmodule Elixir.AikidoTest.AshTest.DuplicateDomain do
+        use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
 
-          agents do
-            agent(:counter, AikidoTest.AshFixtures.Counter)
-            agent(:counter, AikidoTest.AshFixtures.Composed)
-          end
+        agents do
+          agent :counter, AikidoTest.AshFixtures.Counter
+          agent :counter, AikidoTest.AshFixtures.Composed
         end
       end
     end)
+
+    assert output =~ "Domain agent names must be unique"
   end
 
   defp snapshot_result({:ok, %{resource: resource, id: id}}) do

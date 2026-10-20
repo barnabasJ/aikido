@@ -1,8 +1,8 @@
 defmodule Aikido.Dsl.Agent.Transformers.WalkExtensionsSectionCollisionTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
-  test "raises when AikidoTest.Fixtures.OtherCollidingSectionExtension is mounted alongside a slice that also picks `:shared_section`" do
-    assert_raise Spark.Error.DslError, ~r/Section name collisions.*:shared_section/s, fn ->
+  test "reports when AikidoTest.Fixtures.OtherCollidingSectionExtension is mounted alongside a slice that also picks `:shared_section`" do
+    output = ExUnit.CaptureIO.capture_io(:stderr, fn ->
       Code.compile_string("""
       defmodule Aikido.Dsl.Agent.Transformers.WalkExtensionsSectionCollisionTest.CollidingHost do
         use Aikido.Agent,
@@ -19,7 +19,9 @@ defmodule Aikido.Dsl.Agent.Transformers.WalkExtensionsSectionCollisionTest do
         end
       end
       """)
-    end
+    end)
+
+    assert output =~ ~r/Section name collisions.*:shared_section/s
   end
 
   test "mounting just AikidoTest.Fixtures.OtherCollidingSectionExtension compiles cleanly" do

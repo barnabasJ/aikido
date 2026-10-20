@@ -9,12 +9,7 @@ defmodule Aikido.Ash.Transformers.AI do
   def before?(_), do: false
 
   def transform(dsl) do
-    if Aikido.Ash.Agent not in Spark.extensions(dsl) do
-      {:error,
-       Spark.Error.DslError.exception(message: "AI requires Aikido.Ash.Agent", path: [:ai])}
-    else
-      build(dsl)
-    end
+    if Aikido.Ash.Agent in Spark.extensions(dsl), do: build(dsl), else: {:ok, dsl}
   end
 
   defp build(dsl) do

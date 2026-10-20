@@ -35,5 +35,8 @@ defmodule Aikido.Ash.AI do
       max_iterations: [type: :pos_integer, default: 10]
     ]
   }
-  use Spark.Dsl.Extension, sections: [@ai], transformers: [Aikido.Ash.Transformers.AI]
+  use Spark.Dsl.Extension,
+    sections: [@ai],
+    transformers: [Aikido.Ash.Transformers.AI],
+    verifiers: [Aikido.Ash.Verifiers.AI]
 end

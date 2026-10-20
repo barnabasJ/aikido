@@ -12,7 +12,6 @@ defmodule Aikido.Ash.Transformers.Agent do
   @impl true
   def transform(dsl) do
     resource = Transformer.get_persisted(dsl, :module)
-    path = Transformer.get_option(dsl, [:agent], :path, :state)
     team_slice = Transformer.get_persisted(dsl, :aikido_team_slice)
     entities = Transformer.get_entities(dsl, [:agent])
     mounts = Enum.filter(entities, &match?(%Aikido.Dsl.Agent.SliceMount{}, &1))
@@ -23,22 +22,12 @@ defmodule Aikido.Ash.Transformers.Agent do
     dsl = Enum.reduce(inherited, dsl, &Transformer.add_entity(&2, [:agent], &1))
 
     declared = Transformer.get_entities(dsl, [:agent, :schema])
-    existing = Ash.Resource.Info.attributes(dsl)
-    duplicates = Enum.map(declared ++ existing, & &1.name)
-
-    if length(duplicates) != length(Enum.uniq(duplicates)) do
-      raise Spark.Error.DslError,
-        message: "Agent schema and resource attributes must have unique names",
-        path: [:agent, :schema]
-    end
-
     dsl = Enum.reduce(declared, dsl, &Transformer.add_entity(&2, [:attributes], &1))
     attributes = Ash.Resource.Info.attributes(dsl)
 
     state_fields = for attribute <- attributes, attribute.name != :id, do: attribute.name
 
-    with :ok <- validate(path, mounts, signals),
-         :ok <- validate_attributes(attributes, path, mounts),
+    with :ok <- ensure_embedded_mounts(mounts),
          {:ok, dsl} <-
            Builder.add_new_attribute(dsl, :id, :string,
              primary_key?: true,
@@ -69,42 +58,12 @@ defmodule Aikido.Ash.Transformers.Agent do
     end
   end
 
-  defp validate_attributes(attributes, path, mounts) do
-    reserved = [path | Enum.map(mounts, & &1.path)]
-
-    if Enum.any?(attributes, &(&1.name in reserved)) do
-      error("Resource attributes cannot collide with the agent state path or mounted slice paths")
-    else
-      :ok
-    end
-  end
-
-  defp validate(path, mounts, signals) do
-    paths = [path | Enum.map(mounts, & &1.path)]
-    names = Enum.map(signals, & &1.name)
-
-    cond do
-      :id in paths ->
-        error("The :id attribute is reserved for the agent identity")
-
-      length(paths) != length(Enum.uniq(paths)) ->
-        error("Agent state and slice paths must be unique")
-
-      length(names) != length(Enum.uniq(names)) ->
-        error("Agent signal action names must be unique")
-
-      Enum.any?(mounts, &invalid_resource_slice?/1) ->
-        error("Resource slices must be embedded Ash resources with Aikido.Ash.Slice")
-
-      Enum.any?(signals, &String.contains?(&1.type, "*")) ->
-        error("Public signals require a concrete type; mark wildcard slice actions public? false")
-
-      Enum.any?(signals, &is_nil(&1.target)) ->
-        error("Every signal must have a target action")
-
-      true ->
-        :ok
-    end
+  # Mount types and their schemas are inputs to attribute/action generation.
+  # Reject unusable resources here rather than passing invalid types to Ash.
+  defp ensure_embedded_mounts(mounts) do
+    if Enum.any?(mounts, &invalid_resource_slice?/1),
+      do: error("Resource slices must be embedded Ash resources with Aikido.Ash.Slice"),
+      else: :ok
   end
 
   # A local reducer and its public command may share a declared name. Keep the
@@ -140,7 +99,7 @@ defmodule Aikido.Ash.Transformers.Agent do
         Aikido.Ash.Slice in Spark.extensions(mount.module),
         route <- Spark.Dsl.Extension.get_entities(mount.module, [:slice]),
         action = Ash.Resource.Info.action(mount.module, route.action),
-        action.public?,
+        match?(%{public?: true}, action),
         !Enum.any?(declared, &(&1.name == action.name)) do
       %Aikido.Ash.Agent.Signal{
         name: action.name,
@@ -185,7 +144,11 @@ defmodule Aikido.Ash.Transformers.Agent do
   end
 
   defp add_signals(dsl, signals, mounts) do
-    Enum.reduce_while(signals, {:ok, dsl}, fn signal, {:ok, dsl} ->
+    # The verifier checks duplicate declarations; generation must not bind a
+    # second command to the handler generated for the first one.
+    signals
+    |> Enum.uniq_by(& &1.name)
+    |> Enum.reduce_while({:ok, dsl}, fn signal, {:ok, dsl} ->
       case add_signal(dsl, signal, mounts) do
         {:ok, dsl} -> {:cont, {:ok, dsl}}
         error -> {:halt, error}
@@ -283,13 +246,7 @@ defmodule Aikido.Ash.Transformers.Agent do
 
     arguments =
       if Transformer.get_persisted(dsl, :aikido_team_slice) do
-        if Enum.any?(arguments, &(&1.name == :topology)) do
-          raise Spark.Error.DslError,
-            message: "Team resources reserve :topology for the startup graph",
-            path: [:agent, :schema]
-        end
-
-        arguments ++
+        Enum.reject(arguments, &(&1.name == :topology)) ++
           [
             build_argument!(:topology, :map,
               description:

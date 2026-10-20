@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Move agent, slice, domain, AI and composition declaration checks into Spark
+  verifiers. Delegate field uniqueness to Ash; keep construction preconditions
+  with the transformations that require them.
+
 - Validate team declarations and topology with a Spark verifier after compilation;
   the team transformer only assembles configuration and generates actions.
 

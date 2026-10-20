@@ -11,7 +11,7 @@ defmodule AikidoTest.AshTeamVerifierTest.ForeignAgent do
 end
 
 defmodule AikidoTest.AshTeamVerifierTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   test "valid declarations pass the registered verifier" do
     assert "" = compile_team("member :lead, AikidoTest.AshFixtures.Counter")

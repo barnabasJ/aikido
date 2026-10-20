@@ -9,18 +9,8 @@ defmodule Aikido.Ash.Transformers.Domain do
   @impl true
   def transform(dsl) do
     entries = Transformer.get_entities(dsl, [:agents])
-    names = Enum.map(entries, & &1.name)
-
-    cond do
-      length(names) != length(Enum.uniq(names)) ->
-        error("Domain agent names must be unique")
-
-      Enum.any?(entries, &(Aikido.Ash.Agent not in Spark.extensions(&1.resource))) ->
-        error("Domain agents must use the Aikido.Ash.Agent extension")
-
-      true ->
-        register(dsl, entries)
-    end
+    # Preserve declarations for the verifier, but emit each interface name once.
+    register(dsl, Enum.uniq_by(entries, & &1.name))
   end
 
   defp register(dsl, entries) do
@@ -48,9 +38,5 @@ defmodule Aikido.Ash.Transformers.Domain do
       end)
 
     {:ok, dsl}
-  end
-
-  defp error(message) do
-    {:error, Spark.Error.DslError.exception(message: message, path: [:agents])}
   end
 end
