@@ -49,6 +49,11 @@ is the runtime callback implementation hosted by DurableServer. Configure
 return state transitions and directives without performing side effects. All
 side effects belong in directives; results return through signals.
 
+If a directive raises, the runtime stops that effect batch and retains the
+already adopted state. Subscribers observe that state, synchronous callers
+receive the error, and DurableServer checkpoints the state as usual. Effects
+already delivered are not rolled back; later directives in the batch do not run.
+
 Signal emission descriptors may use
 `%Aikido.Signal{id: nil, type: "work.ready", data: %{}, source: "/worker"}`.
 Emit, Schedule and Cron complete missing envelope IDs and timestamps during

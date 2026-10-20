@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Preserve adopted state and notify subscribers when a directive raises. Stop
+  the remaining effects, return the existing error contract to synchronous
+  callers, and checkpoint the adopted state through DurableServer.
+
 - Group concrete signals and feature helpers with their owning agent runtime,
   slice or Ash extension. Keep shared signal infrastructure under `Aikido.Signal`.
   Update examples, source panels and tests to the same ownership layout. Renamed

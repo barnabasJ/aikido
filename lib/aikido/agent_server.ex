@@ -1314,7 +1314,8 @@ defmodule Aikido.AgentServer do
   # returned directives inline, and fires `subscribe/4` subscribers — then
   # hands back the committed state and the chain's tagged result.
   #
-  # Uncaught raises propagate up; the `handle_call` handler catches them
+  # Directive failures retain the adopted state and stop the remaining batch.
+  # Uncaught reducer raises propagate up; the `handle_call` handler catches them
   # and surfaces a clean `{:error, _}` reply, while cast/info handlers
   # let the GenServer crash so supervision can react. The Erlang mailbox
   # is the only queue; new incoming signals wait there until the current
@@ -1386,6 +1387,10 @@ defmodule Aikido.AgentServer do
               # Subscribers are intentionally not fired on the stop branch
               # — the agent is going down; observers see the :DOWN monitor.
               {:stop, reason, executed_state}
+
+            {:error, executed_state, reason} ->
+              executed_state = fire_subscribers(executed_state, signal)
+              {:error, executed_state, reason}
           end
 
         {:error, new_state, reason} ->
@@ -1457,6 +1462,7 @@ defmodule Aikido.AgentServer do
             case execute_directives(directives, signal, next) do
               {:ok, state} -> state
               {:stop, _reason, state} -> state
+              {:error, state, _reason} -> state
             end
 
           fire_subscribers(executed, signal)
@@ -1490,14 +1496,15 @@ defmodule Aikido.AgentServer do
   # Inline directive loop. Each directive returns `:ok` (bounded I/O;
   # for async effects, spawn a task and emit a signal when done — see
   # the Aikido.Directive docs). `{:stop, reason}` aborts the batch and
-  # propagates as `{:stop, reason, state}` to the GenServer.
+  # propagates as `{:stop, reason, state}` to the GenServer. A failing callback
+  # stops the batch with `{:error, state, reason}`, preserving adopted state.
   #
   # The directive contract has no state slot in its return value:
   # directives mutate no state. This runtime loop records debug events.
   # Cascade callbacks retire cron ownership before shutdown and install
   # runtime results received through subsequent signals.
   @spec execute_directives([struct()], Signal.t(), State.t()) ::
-          {:ok, State.t()} | {:stop, term(), State.t()}
+          {:ok, State.t()} | {:stop, term(), State.t()} | {:error, State.t(), term()}
   def execute_directives(directives, signal, state)
 
   def execute_directives([], _signal, state) do
@@ -1511,7 +1518,18 @@ defmodule Aikido.AgentServer do
         signal_type: signal.type
       })
 
-    result = exec_directive_with_telemetry(directive, signal, state)
+    result =
+      try do
+        exec_directive_with_telemetry(directive, signal, state)
+      catch
+        kind, reason ->
+          Logger.error("""
+          Directive execution failed for #{state.id}: #{inspect(kind)} #{inspect(reason)}
+          #{Exception.format_stacktrace(__STACKTRACE__)}
+          """)
+
+          {:error, reason}
+      end
 
     case result do
       :ok ->
@@ -1520,6 +1538,9 @@ defmodule Aikido.AgentServer do
       {:stop, reason} ->
         warn_if_normal_stop(reason, directive, state)
         {:stop, reason, state}
+
+      {:error, reason} ->
+        {:error, state, reason}
     end
   end
 
