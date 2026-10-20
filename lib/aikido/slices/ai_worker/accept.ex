@@ -4,6 +4,7 @@ defmodule Aikido.Slices.AiWorker.Accept do
 
   Ignores duplicate task IDs, queues work while AI is busy, or returns updated
   worker state and an `Emit` directive starting an AI request on the owning agent.
+  Tasks without an effective model fail immediately through the team reply protocol.
   """
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -32,6 +33,14 @@ defmodule Aikido.Slices.AiWorker.Accept do
 
   @doc false
   def start_task(state, data, context) do
+    if is_nil(data[:model] || context.agent.state.ai.model) do
+      Aikido.Slices.AiWorker.Settle.complete_task(state, data, :failed, :no_model, context)
+    else
+      launch_task(state, data, context)
+    end
+  end
+
+  defp launch_task(state, data, context) do
     pending = Map.take(data, [:task_id, :member, :attempt, :reply_to])
 
     payload =

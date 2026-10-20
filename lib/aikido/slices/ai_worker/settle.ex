@@ -17,36 +17,34 @@ defmodule Aikido.Slices.AiWorker.Settle do
 
     if pending && signal.data.task_id == pending.task_id && ai.request_id == pending.task_id &&
          ai.status in [:completed, :failed] do
-      type =
-        if ai.status == :completed do
-          "aikido.ash.team.task.completed"
-        else
-          "aikido.ash.team.task.failed"
-        end
-
-      result =
-        if ai.status == :completed do
-          ai.result
-        else
-          ai.error
-        end
-
-      reply =
-        %Aikido.Signal{
-          id: nil,
-          type: type,
-          data: Map.merge(Map.take(pending, [:task_id, :member, :attempt]), %{result: result}),
-          source: "/aikido"
-        }
-
-      next(%{state | pending: nil, completed: state.completed + 1}, context, [
-        Aikido.Directives.emit_to_pid(reply, pending.reply_to)
-      ])
+      result = if ai.status == :completed, do: ai.result, else: ai.error
+      complete_task(state, pending, ai.status, result, context)
     else
       if is_nil(pending) && ai.status in [:completed, :failed, :idle],
         do: next(state, context, []),
         else: Aikido.Types.ActionResult.new(state: state)
     end
+  end
+
+  @doc false
+  def complete_task(state, task, status, result, context) do
+    type =
+      if status == :completed,
+        do: "aikido.ash.team.task.completed",
+        else: "aikido.ash.team.task.failed"
+
+    reply =
+      %Aikido.Signal{
+        id: nil,
+        type: type,
+        data: Map.merge(Map.take(task, [:task_id, :member, :attempt]), %{result: result}),
+        source: "/aikido"
+      }
+      |> Aikido.Signal.put_ctx(Map.get(task, :signal_context, %{}))
+
+    next(%{state | pending: nil, completed: state.completed + 1}, context, [
+      Aikido.Directives.emit_to_pid(reply, task.reply_to)
+    ])
   end
 
   defp next(state, context, effects) do
