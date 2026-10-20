@@ -65,14 +65,16 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
     tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
 
-    {:ok, _pid} =
-      Task.Supervisor.start_child(task_sup, fn ->
-        Ash.ProcessHelpers.transfer_context(transfer)
+    case Task.Supervisor.start_child(task_sup, fn ->
+           Ash.ProcessHelpers.transfer_context(transfer)
 
-        Ash.Tracer.span {:custom, :aikido_tool_call}, "aikido_tool_call", tracers do
-          run_and_dispatch(directive, agent_pid, source, context, task_sup)
-        end
-      end)
+           Ash.Tracer.span {:custom, :aikido_tool_call}, "aikido_tool_call", tracers do
+             run_and_dispatch(directive, agent_pid, source, context, task_sup)
+           end
+         end) do
+      {:ok, _pid} -> :ok
+      {:error, reason} -> dispatch_result(directive, {:error, reason}, agent_pid, source, context)
+    end
 
     :ok
   end
@@ -92,6 +94,10 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         backoff: options.retry_backoff_ms
       )
 
+    dispatch_result(d, result, agent_pid, source, context)
+  end
+
+  defp dispatch_result(d, result, agent_pid, source, context) do
     content =
       case result do
         {:ok, content} -> content

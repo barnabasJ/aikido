@@ -57,20 +57,25 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
 
-    {:ok, _pid} =
-      Task.Supervisor.start_child(task_sup, fn ->
-        Ash.ProcessHelpers.transfer_context(transfer)
+    case Task.Supervisor.start_child(task_sup, fn ->
+           Ash.ProcessHelpers.transfer_context(transfer)
 
-        Ash.Tracer.span {:custom, :aikido_model_call}, "aikido_model_call", tracers do
-          run_and_dispatch(
-            directive,
-            agent_pid,
-            source,
-            Aikido.SignalCtx.ctx(input_signal),
-            task_sup
-          )
-        end
-      end)
+           Ash.Tracer.span {:custom, :aikido_model_call}, "aikido_model_call", tracers do
+             run_and_dispatch(
+               directive,
+               agent_pid,
+               source,
+               Aikido.SignalCtx.ctx(input_signal),
+               task_sup
+             )
+           end
+         end) do
+      {:ok, _pid} ->
+        :ok
+
+      {:error, reason} ->
+        dispatch_failure(directive, reason, agent_pid, source, Aikido.SignalCtx.ctx(input_signal))
+    end
 
     :ok
   end
@@ -162,16 +167,19 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
 
     AgentServer.cast(agent_pid, Aikido.SignalCtx.put_ctx(signal, scope))
   rescue
-    exception ->
-      AgentServer.cast(
-        agent_pid,
-        Signal.new!(
-          failure_type(d),
-          handoff_data(%{reason: exception, request_id: d.request_id}, d),
-          source: source
-        )
-        |> Aikido.SignalCtx.put_ctx(scope)
+    exception -> dispatch_failure(d, exception, agent_pid, source, scope)
+  end
+
+  defp dispatch_failure(d, reason, agent_pid, source, scope) do
+    AgentServer.cast(
+      agent_pid,
+      Signal.new!(
+        failure_type(d),
+        handoff_data(%{reason: reason, request_id: d.request_id}, d),
+        source: source
       )
+      |> Aikido.SignalCtx.put_ctx(scope)
+    )
   end
 
   defp failure_type(%{mode: :handoff}), do: "ai.react.context_handoff.failed"

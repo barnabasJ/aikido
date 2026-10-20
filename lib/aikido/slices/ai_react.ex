@@ -62,7 +62,13 @@ defmodule Aikido.Slices.AiReact do
       attribute :request_id, :term, public?: true, allow_nil?: true, default: nil
       attribute :context, :term, public?: true, allow_nil?: true, default: nil
       attribute :iteration, :integer, public?: true, allow_nil?: false, default: 0
-      attribute :max_iterations, :integer, public?: true, allow_nil?: false, default: 10
+
+      attribute :max_iterations, :integer,
+        public?: true,
+        allow_nil?: false,
+        default: 10,
+        constraints: [min: 1]
+
       attribute :result, :term, public?: true, allow_nil?: true, default: nil
       attribute :error, :term, public?: true, allow_nil?: true, default: nil
 
@@ -117,7 +123,12 @@ defmodule Aikido.Slices.AiReact do
 
       attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
       attribute :system_prompt, :term, public?: true, allow_nil?: true
-      attribute :max_iterations, :integer, public?: true, allow_nil?: false, default: 10
+
+      attribute :max_iterations, :integer,
+        public?: true,
+        allow_nil?: false,
+        default: 10,
+        constraints: [min: 1]
 
       attribute :llm_opts, {:array, :tuple},
         public?: true,

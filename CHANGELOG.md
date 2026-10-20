@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Settle rejected model/tool task starts through correlated result signals and
+  preserve caller scope. Enforce positive ReAct iteration limits with native
+  constraints and simplify task cleanup and normalized run-state handling.
+
 - Resolve all local reducer routes after public command renaming, allow team
   members named `nodes`, and distinguish slice schedules by their full normalized
   declaration. Deduplicate shared schedule routes and reject colliding agent job

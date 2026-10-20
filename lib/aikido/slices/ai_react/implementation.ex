@@ -397,8 +397,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
           Map.merge(slice, %{
             usage: usage,
             last_input_tokens: Aikido.AI.Handoff.input_tokens(ReqLLM.Response.usage(response)),
-            streaming_text: turn.text || "",
-            streaming_thinking: turn.thinking || "",
+            streaming_text: turn.text,
+            streaming_thinking: turn.thinking,
             stream_attempt: 0
           })
         )
@@ -464,7 +464,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
          tool_context
        ) do
     context =
-      case Map.get(slice || %{}, :context) do
+      case Map.get(slice, :context) do
         %ReqLLM.Context{} = context ->
           context = Conversation.close_tool_calls(context)
           messages = Enum.reject(context.messages, &(&1.role == :system))
@@ -477,7 +477,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
           )
       end
 
-    base = slice || %{}
+    base = slice
     cached = Map.get(base, :estimated_tokens)
 
     base =
@@ -493,7 +493,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
     context = base.context
 
-    options = data[:options] || Map.get(slice || %{}, :options) || %Aikido.AI.Options{}
+    options = data[:options] || Map.get(slice, :options) || %Aikido.AI.Options{}
 
     new_slice = %{
       status: :setup,
@@ -529,7 +529,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       hook_terminal: nil,
       client: client,
       tools: tools,
-      tool_options: data[:tool_options] || Map.get(slice || %{}, :tool_options, otp_app: :aikido),
+      tool_options: data[:tool_options] || Map.get(slice, :tool_options, otp_app: :aikido),
       tool_context: tool_context,
       system_prompt: system_prompt,
       llm_opts: llm_opts
@@ -546,7 +546,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     }
 
     Aikido.Types.ActionResult.new(
-      state: Map.merge(slice || %{}, new_slice),
+      state: Map.merge(slice, new_slice),
       directives: [directive]
     )
   end

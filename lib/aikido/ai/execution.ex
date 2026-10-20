@@ -42,33 +42,23 @@ defmodule Aikido.AI.Execution do
 
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: opts[:tracer])
 
-    task =
-      Task.Supervisor.async_nolink(supervisor, fn ->
-        Ash.ProcessHelpers.transfer_context(transfer)
-        notify = fn event -> send(parent, {key, event}) end
-
-        try do
-          Ash.Tracer.span {:custom, :aikido_attempt}, "aikido.attempt.#{number}", opts[:tracer] do
-            work.(notify, number)
-          end
-        rescue
-          error -> {:error, error}
-        catch
-          kind, reason -> {:error, {kind, reason}}
-        end
-      end)
-
     result =
-      wait(
-        task,
-        key,
-        sub,
-        monitor,
-        deadline,
-        now() + Keyword.get(opts, :progress_timeout, opts[:timeout]),
-        opts,
-        []
-      )
+      case start_attempt(supervisor, work, opts, transfer, parent, key, number) do
+        {:ok, task} ->
+          wait(
+            task,
+            key,
+            sub,
+            monitor,
+            deadline,
+            now() + Keyword.get(opts, :progress_timeout, opts[:timeout]),
+            opts,
+            []
+          )
+
+        {:error, reason} ->
+          {:error, reason}
+      end
 
     if number < Keyword.get(opts, :retries, 0) && Aikido.Error.retryable?(result) &&
          match?({:error, _}, result) && now() < deadline && result != {:error, :cancelled} do
@@ -92,14 +82,37 @@ defmodule Aikido.AI.Execution do
     end
   end
 
-  defp wait(task, key, sub, monitor, deadline, progress, opts, cleanups) do
+  defp start_attempt(supervisor, work, opts, transfer, parent, key, number) do
+    task =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        Ash.ProcessHelpers.transfer_context(transfer)
+        notify = fn event -> send(parent, {key, event}) end
+
+        try do
+          Ash.Tracer.span {:custom, :aikido_attempt}, "aikido.attempt.#{number}", opts[:tracer] do
+            work.(notify, number)
+          end
+        rescue
+          error -> {:error, error}
+        catch
+          kind, reason -> {:error, {kind, reason}}
+        end
+      end)
+
+    {:ok, task}
+  rescue
+    error -> {:error, error}
+  catch
+    :exit, reason -> {:error, reason}
+  end
+
+  defp wait(%Task{ref: task_ref} = task, key, sub, monitor, deadline, progress, opts, cleanups) do
     result =
       receive do
-        {ref, value} when ref == task.ref ->
-          Process.demonitor(task.ref, [:flush])
+        {^task_ref, value} ->
           value
 
-        {:DOWN, ref, :process, _, reason} when ref == task.ref ->
+        {:DOWN, ^task_ref, :process, _, reason} ->
           {:error, reason}
 
         {^key, :progress} ->

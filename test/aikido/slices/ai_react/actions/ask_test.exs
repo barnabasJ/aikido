@@ -39,6 +39,26 @@ defmodule Aikido.Slices.AiReact.AskTest do
     }
   end
 
+  test "initialization and mount configuration enforce positive iteration budgets" do
+    for invalid <- [0, -1] do
+      assert {:error, _} =
+               Aikido.Slice.Config.resolve_config(Aikido.Slices.AiReact, %{
+                 max_iterations: invalid
+               })
+
+      assert {:error, _} =
+               Aikido.Slices.AiReact
+               |> Ash.Changeset.for_create(:create, %{max_iterations: invalid})
+               |> Ash.Changeset.apply_attributes()
+    end
+
+    assert {:ok, %{max_iterations: 1}} =
+             Aikido.Slice.Config.resolve_config(Aikido.Slices.AiReact, %{max_iterations: 1})
+
+    assert {:ok, %{max_iterations: 10}} =
+             Aikido.Slice.Config.resolve_config(Aikido.Slices.AiReact)
+  end
+
   test "transitions an idle slice to :setup and prepares tools before the model call" do
     {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [directive]}} =
       then(ask_signal(), fn signal ->

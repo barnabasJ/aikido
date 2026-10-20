@@ -66,7 +66,7 @@ defmodule Aikido.AI.Handoff do
       turn = ReqLLM.Response.classify(response)
 
       cond do
-        turn.type != :final_answer || !is_binary(turn.text) || String.trim(turn.text) == "" ->
+        turn.type != :final_answer || String.trim(turn.text) == "" ->
           fail(state, Map.put(data, :reason, :empty_or_invalid_document))
 
         turn.finish_reason == :length ->
