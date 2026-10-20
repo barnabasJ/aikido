@@ -6,6 +6,21 @@
 
 ### Changed
 
+- Remove the `Aikido.Ash` forwarding facade. Invoke lifecycle and signal actions
+  through application domain interfaces or native `Ash.ActionInput` and
+  `Ash.run_action`; update example callers and tests accordingly.
+- Infer public team command contracts from their owning reducers. Use native Ash
+  defaults and casting for startup, AI directive options, memory spaces and thread
+  entries, removing duplicate schema and normalization code.
+- Simplify runtime startup validation, directive dispatch and scheduling. Remove
+  unused lifecycle wrappers and stale signal-extension registrations; validate
+  agent modules through Ash's behaviour constraint.
+- Remove the unused `Aikido.Observe` facade, logger and span context wrappers and
+  their configuration. Active telemetry configuration now lives in
+  `Aikido.Telemetry.Config`; tracing continues through native Ash APIs.
+- Remove the obsolete Livebook verification script and repair the action benchmark
+  fixture to construct a typed memory space.
+
 - Keep `Aikido` focused on runtime supervision and configuration. Remove its
   agent lifecycle, lookup and enumeration entry points; domain action
   implementations and spawning directives call `Aikido.Durable` directly.

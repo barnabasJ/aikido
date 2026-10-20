@@ -8,7 +8,7 @@ defmodule Aikido.Bench.Actions do
       Map.new([1, 100, 10_000], fn size ->
         entries = Map.new(1..size, &{"key_#{&1}", &1})
         memory = Memory.new(id: "benchmark-memory", now: 0)
-        memory = Memory.put_space(memory, :world, Memory.Space.new(data: entries), now: 0)
+        memory = Memory.put_space(memory, :world, Memory.Space.new!(data: entries), now: 0)
         params = %{state: memory, space: :world, key: "benchmark", value: 1}
         input = Ash.ActionInput.for_action(Memory, :put_in_space, params)
         {"#{size} memory keys", %{params: params, input: input}}
