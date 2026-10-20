@@ -12,9 +12,9 @@ defmodule AikidoTest.Agent.DirectiveTest do
 
     test "creates Emit directive with dispatch config" do
       signal = %{type: "test"}
-      directive = Directives.emit(signal, {:pubsub, topic: "events"})
+      directive = Directives.emit(signal, {:pubsub, target: MyApp.PubSub, topic: "events"})
       assert directive.signal == signal
-      assert directive.dispatch == {:pubsub, topic: "events"}
+      assert directive.dispatch == {:pubsub, target: MyApp.PubSub, topic: "events"}
     end
   end
 

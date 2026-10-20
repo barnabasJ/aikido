@@ -33,6 +33,7 @@ defmodule AikidoTest.Actions.StatePreservationTest.Agent do
     end
 
     route "test.noop", {Aikido.AgentServer.RuntimeActions, :noop}
+    route "test.broadcast", {Aikido.AgentServer.RuntimeActions, :broadcast}
   end
 end
 
@@ -46,7 +47,7 @@ defmodule AikidoTest.Actions.StatePreservationTest do
     actions = [
       noop: %{},
       forward: %{target_pid: self()},
-      broadcast: %{topic: "test", signal_type: "test.output"},
+      broadcast: %{pubsub: MyApp.PubSub, topic: "test", signal_type: "test.output"},
       reply: %{signal_type: "test.output"},
       notify_parent: %{signal_type: "test.output"},
       notify_pid: %{target_pid: self(), signal_type: "test.output"},
@@ -76,6 +77,42 @@ defmodule AikidoTest.Actions.StatePreservationTest do
 
     assert {:ok, %{count: 42}} =
              Aikido.AgentServer.call(pid, signal("test.noop"), &{:ok, &1.agent.state.state})
+  end
+
+  test "native routed broadcast delivers a materialized event and preserves state", context do
+    pubsub = Module.concat(context.aikido, PubSub)
+    start_supervised!({Phoenix.PubSub, name: pubsub})
+    topic = "work.available"
+    :ok = Phoenix.PubSub.subscribe(pubsub, topic)
+    pid = start_server(context, __MODULE__.Agent)
+    assert {:ok, before} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state})
+
+    assert {:ok, after_broadcast} =
+             Aikido.AgentServer.call(
+               pid,
+               signal("test.broadcast", %{
+                 pubsub: pubsub,
+                 topic: topic,
+                 signal_type: "work.available",
+                 payload: %{job: "one"},
+                 source: "/test-broadcast"
+               }),
+               &{:ok, &1.agent.state}
+             )
+
+    assert after_broadcast === before
+
+    assert_receive %Jido.Signal{
+                     id: id,
+                     time: time,
+                     type: "work.available",
+                     data: %{job: "one"},
+                     source: "/test-broadcast"
+                   },
+                   2_000
+
+    assert is_binary(id) and id != ""
+    assert {:ok, _, _} = DateTime.from_iso8601(time)
   end
 
   test "cancel keeps unrelated state and validates native resource fields without update defaults" do

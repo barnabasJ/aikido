@@ -112,6 +112,7 @@ defmodule AikidoTest.Actions.ControlTest do
   describe("Broadcast") do
     test "creates emit directive with pubsub dispatch" do
       data = %{
+        pubsub: MyApp.PubSub,
         topic: "workers",
         signal_type: "work.available",
         payload: %{},
@@ -130,8 +131,26 @@ defmodule AikidoTest.Actions.ControlTest do
 
       assert result == %{}
       assert %Directives.Emit{} = directive
-      assert directive.dispatch == {:pubsub, topic: "workers"}
+      assert directive.dispatch == {:pubsub, target: MyApp.PubSub, topic: "workers"}
       assert directive.signal.type == "work.available"
+    end
+
+    test "requires an explicit PubSub server through native argument validation" do
+      for params <- [%{}, %{pubsub: nil}] do
+        input =
+          Ash.ActionInput.for_action(
+            Aikido.AgentServer.RuntimeActions,
+            :broadcast,
+            Map.merge(
+              %{state: %{count: 42}, topic: "workers", signal_type: "work.available"},
+              params
+            )
+          )
+
+        refute input.valid?
+        assert Enum.any?(input.errors, &(&1.field == :pubsub))
+        assert {:error, %Ash.Error.Invalid{}} = Ash.run_action(input)
+      end
     end
   end
 

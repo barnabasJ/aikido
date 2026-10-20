@@ -48,7 +48,7 @@ defmodule Aikido.Directives do
 
       # Emit a signal (runtime will dispatch via configured adapters)
       %Directives.Emit{signal: my_signal}
-      %Directives.Emit{signal: my_signal, dispatch: {:pubsub, topic: "events"}}
+      %Directives.Emit{signal: my_signal, dispatch: {:pubsub, target: MyApp.PubSub, topic: "events"}}
       %Directives.Emit{signal: my_signal, dispatch: {:pid, target: pid}}
 
       # Schedule for later
@@ -127,7 +127,7 @@ defmodule Aikido.Directives do
   ## Examples
 
       Directives.emit(signal)
-      Directives.emit(signal, {:pubsub, topic: "events"})
+      Directives.emit(signal, {:pubsub, target: MyApp.PubSub, topic: "events"})
   """
   @spec emit(term(), term()) :: Emit.t()
   def emit(signal, dispatch \\ nil) do

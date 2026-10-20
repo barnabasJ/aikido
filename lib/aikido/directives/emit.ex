@@ -25,11 +25,11 @@ defmodule Aikido.Directives.Emit do
       %Emit{signal: signal}
 
       # Explicit dispatch to PubSub
-      %Emit{signal: signal, dispatch: {:pubsub, topic: "events"}}
+      %Emit{signal: signal, dispatch: {:pubsub, target: MyApp.PubSub, topic: "events"}}
 
       # Multiple dispatch targets
       %Emit{signal: signal, dispatch: [
-        {:pubsub, topic: "events"},
+        {:pubsub, target: MyApp.PubSub, topic: "events"},
         {:logger, level: :info}
       ]}
   """

@@ -33,6 +33,11 @@ defmodule Aikido.AgentServer.RuntimeActions do
 
     action :broadcast, Aikido.Types.ActionResult do
       argument :state, :term
+
+      argument :pubsub, :atom,
+        description: "Application-owned Phoenix.PubSub server name",
+        allow_nil?: false
+
       argument :topic, :string, description: "PubSub topic", allow_nil?: false
       argument :signal_type, :string, description: "Signal type to broadcast", allow_nil?: false
       argument :payload, :map, description: "Signal payload", default: %{}
