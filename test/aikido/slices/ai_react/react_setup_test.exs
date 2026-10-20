@@ -38,8 +38,10 @@ defmodule Aikido.ReactSetupTest do
     refute_received {:model_started, _}
     assert {:error, _} = Aikido.AI.ask(pid, "another start", opts)
 
-    handoff = Aikido.Signal.new!("ai.react.handoff", %{messages: []})
-    assert {:error, _} = Aikido.AgentServer.call(pid, handoff, fn _ -> {:ok, :unexpected} end)
+    replace_context = Aikido.Signal.new!("ai.react.replace_context", %{messages: []})
+
+    assert {:error, _} =
+             Aikido.AgentServer.call(pid, replace_context, fn _ -> {:ok, :unexpected} end)
 
     assert {:error, _} =
              Aikido.AI.queue_message(pid, "wrong actor", actor: %{id: "bob"}, tenant: "workspace")

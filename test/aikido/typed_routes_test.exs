@@ -3,6 +3,7 @@ defmodule AikidoTest.TypedRoutesTest.Increment do
 
   signal do
     type "typed.increment"
+    description "Increases the counter by the supplied positive amount."
 
     schema do
       attribute :amount, :integer do
@@ -291,6 +292,8 @@ defmodule AikidoTest.TypedRoutesTest do
     command = Ash.Resource.Info.action(Resource, :increment)
     reducer = Ash.Resource.Info.action(Resource, :__aikido_reduce_increment)
     assert reducer.run == {AikidoTest.TypedRoutesTest.Add, []}
+    assert command.description == "Increases the counter by the supplied positive amount."
+    assert reducer.description == command.description
     assert reducer.returns == Aikido.Types.ActionResult
     refute reducer.public?
     assert [:state, :amount] == Enum.map(reducer.arguments, & &1.name)
@@ -354,6 +357,11 @@ defmodule AikidoTest.TypedRoutesTest do
 
     assert Ash.Resource.Info.action(CounterSlice, :change).run ==
              {AikidoTest.TypedRoutesTest.Change, []}
+
+    assert Ash.Resource.Info.action(CounterSlice, :change).description == nil
+
+    assert Ash.Resource.Info.action(AikidoTest.TypedRoutesTest.ObserverSlice, :count).description ==
+             nil
 
     data =
       Enum.find(Ash.Resource.Info.action(CounterSlice, :change).arguments, &(&1.name == :data))

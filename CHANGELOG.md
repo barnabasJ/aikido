@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Rename the idle conversation-history setter to `replace_context`, including its
+  signal and generated interfaces. Describe it explicitly and propagate typed
+  signal descriptions into native reducer and public command metadata. Keep
+  model-written handoff as its separate execution flow.
+
 - Bind example AI tools directly to their individual native action implementations
   and retain only shared scope and ownership helpers.
 
@@ -347,7 +352,7 @@
 
 - Retain ReAct history, queue messages, stream text/thinking and record usage.
   Add bounded cancellable model/tool execution, opt-in retries, context handoff,
-  idle handoff, and explicit interrupted-run recovery.
+  idle context replacement, and explicit interrupted-run recovery.
 - Add the optional Todo slice and todo-gated completion, plus an offline LiveView
   example for conversations, streaming and todo evidence.
 - Activate lazy workers on delegation, queue worker tasks, deliver results to an

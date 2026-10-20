@@ -362,7 +362,9 @@ defmodule Aikido.Slices.AiReact do
     route Aikido.Slices.AiReact.Signals.Ask, Aikido.Slices.AiReact.Actions.Ask
     route Aikido.Slices.AiReact.Signals.Message, Aikido.Slices.AiReact.Actions.Message
     route Aikido.Slices.AiReact.Signals.Deliver, Aikido.Slices.AiReact.Actions.Deliver
-    route Aikido.Slices.AiReact.Signals.Handoff, Aikido.Slices.AiReact.Actions.Handoff
+
+    route Aikido.Slices.AiReact.Signals.ReplaceContext,
+          Aikido.Slices.AiReact.Actions.ReplaceContext
 
     route Aikido.Slices.Todo.Signals.TodoChanged, Aikido.Slices.AiReact.Actions.TodoChanged,
       public?: false

@@ -222,18 +222,19 @@ defmodule Aikido.ReactFeaturesTest do
     assert {:ok, "second"} = Task.await(task)
   end
 
-  test "handoff validates replacement history and refuses to replace an active run", ctx do
+  test "replace_context validates replacement history and refuses to replace an active run",
+       ctx do
     pid = start_server(ctx, Agent)
 
-    handoff = fn messages ->
+    replace_context = fn messages ->
       Aikido.AgentServer.call(
         pid,
-        Aikido.Signal.new!("ai.react.handoff", %{messages: messages}),
+        Aikido.Signal.new!("ai.react.replace_context", %{messages: messages}),
         &{:ok, &1.agent.state.ai}
       )
     end
 
-    assert {:ok, replaced} = handoff.([ReqLLM.Context.user("previous summary")])
+    assert {:ok, replaced} = replace_context.([ReqLLM.Context.user("previous summary")])
 
     assert replaced.estimated_tokens ==
              Aikido.Slices.AiReact.Context.estimate_tokens(replaced.context)
@@ -242,7 +243,7 @@ defmodule Aikido.ReactFeaturesTest do
     task = Task.async(fn -> Aikido.AI.ask_sync(pid, "continue", ctx.options) end)
     assert_receive {:model, worker, messages}, 2_000
     assert length(messages) == 2
-    assert {:error, _} = handoff.([])
+    assert {:error, _} = replace_context.([])
     send(worker, {:answer, {:ok, Responses.final_answer_response("continued")}})
     assert {:ok, "continued"} = Task.await(task)
   end

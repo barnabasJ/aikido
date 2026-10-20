@@ -4,6 +4,7 @@ defmodule Aikido.Signal.Dsl do
     name: :signal,
     schema: [
       type: [type: :string, required: true],
+      description: [type: :string],
       source: [type: :string, default: "/aikido"]
     ],
     sections: [Aikido.Dsl.Schema.attribute_section()]

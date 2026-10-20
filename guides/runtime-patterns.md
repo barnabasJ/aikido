@@ -284,9 +284,10 @@ The ReAct slice retains its conversation between requests. `message(text)`
 queues input while a model/tool turn is active. A final answer with queued
 messages starts the next turn before completing the request. `deliver(text,
 request_id)` starts a run when idle and queues input when busy; teams use this
-same interface to wake an orchestrator. `handoff(messages)` replaces an idle
-conversation with a validated ReqLLM context, such as an externally prepared
-summary. It rejects replacement during an active or todo-waiting run.
+same interface to wake an orchestrator. `replace_context(messages)` installs
+caller-supplied conversation history while idle and refreshes the cached token
+estimate, such as after an externally prepared summary. It rejects replacement
+during an active or todo-waiting run.
 
 Pass `options` at agent startup, in `ai`, or per `ask`:
 
@@ -348,7 +349,7 @@ context ceiling. Estimates are not provider-enforced limits.
 A failed, empty, truncated or oversized handoff fails the run with
 `{:context_handoff_failed, reason}` and preserves its original context. There is
 no automatic trimming fallback. Cancellation also stops an active handoff.
-The separate public `handoff` action replaces history while idle; automatic
+The public `replace_context` action installs caller-supplied history while idle; automatic
 context handoff operates within an active run through its own result actions.
 
 Restoring an interrupted run retains its conversation but marks the run failed
@@ -398,8 +399,8 @@ Native tool action errors reach the model unchanged as Ash AI's formatted conten
 execution deadlines and crashes are handled by the bounded I/O task.
 
 A run starts in `:setup`. Startup hooks and tool preparation must finish before
-it enters `:running` and sends its first model request. Another start or handoff
-is rejected during setup. Messages and deliveries from the same actor/tenant
+it enters `:running` and sends its first model request. Another start or
+`replace_context` is rejected during setup. Messages and deliveries from the same actor/tenant
 are queued and included in that first request. Cancellation stops an active
 preparation task; failures settle the run without calling the model. Late results
 cannot revive a cancelled or replaced run. Tool preparation uses the configured

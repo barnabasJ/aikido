@@ -175,12 +175,22 @@ defmodule Aikido.Ash.SignalRoutes do
     if Enum.any?(payload, &(&1.name == :state)) do
       error(section, "Signal payload field :state conflicts with the reducer state argument")
     else
+      description =
+        with module when is_atom(module) and not is_nil(module) <- definition,
+             {:ok, description} <- Aikido.Signal.Info.signal_description(module) do
+          description
+        else
+          _ -> nil
+        end
+
       options = [
         returns: Aikido.Types.ActionResult,
         arguments: [state_argument(dsl, section) | payload],
         run: {implementation, []},
         public?: public? && section == :slice && not is_nil(definition)
       ]
+
+      options = if description, do: Keyword.put(options, :description, description), else: options
 
       with {:ok, generated} <- Builder.build_action(:action, name, options),
            {:ok, dsl} <- add_handler(dsl, section, generated) do

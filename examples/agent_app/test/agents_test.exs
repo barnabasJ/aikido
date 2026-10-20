@@ -25,6 +25,17 @@ defmodule AgentExamples.AgentsTest do
     %{prefix: prefix}
   end
 
+  test "conversation resources expose context replacement separately from automatic handoff" do
+    action = Ash.Resource.Info.action(AgentExamples.ConversationAssistant, :replace_context)
+
+    assert action.public?
+
+    assert action.description ==
+             "Installs caller-supplied conversation history while idle and refreshes the cached token estimate."
+
+    refute Ash.Resource.Info.action(AgentExamples.ConversationAssistant, :handoff)
+  end
+
   test "domain arguments cast and reject invalid input before state changes", %{prefix: prefix} do
     counter = snapshot_result(Agents.counter_start!(%{id: prefix <> "-counter"}))
     assert snapshot_result(Agents.counter_add!(counter, %{amount: "7"})).count == 7

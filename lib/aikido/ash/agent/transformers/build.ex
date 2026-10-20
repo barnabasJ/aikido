@@ -237,11 +237,24 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
             dsl
           end
 
-        Builder.add_new_action(dsl, :action, signal.name,
+        description =
+          with module when is_atom(module) and not is_nil(module) <- signal.signal_module,
+               {:ok, description} <- Aikido.Signal.Info.signal_description(module) do
+            description
+          else
+            _ -> nil
+          end
+
+        options = [
           returns: :map,
           run: {Aikido.Ash.Actions.Signal, []},
           arguments: [reference_argument() | arguments]
-        )
+        ]
+
+        options =
+          if description, do: Keyword.put(options, :description, description), else: options
+
+        Builder.add_new_action(dsl, :action, signal.name, options)
 
       %{type: :action, run: nil} = action ->
         updated = %{

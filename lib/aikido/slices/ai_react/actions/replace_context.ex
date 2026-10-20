@@ -1,5 +1,5 @@
-defmodule Aikido.Slices.AiReact.Actions.Handoff do
-  @moduledoc "Replaces conversation context only while the run is inactive."
+defmodule Aikido.Slices.AiReact.Actions.ReplaceContext do
+  @moduledoc "Installs caller-supplied conversation history while idle and refreshes the cached token estimate."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Slices.AiReact.Preparation
   alias Aikido.Slices.AiReact.Context
