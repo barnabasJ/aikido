@@ -265,7 +265,7 @@ defmodule AikidoTest.AshTeamTest do
     assert {:error, _} =
              Topology.build(%{"missing" => %{resource: String}}, AikidoTest.AshFixtures.Instance)
 
-    config = DynamicTeam.__aikido_team_config__()
+    config = Aikido.Dsl.Agent.Info.team_config(DynamicTeam)
     assert config.max_members == 5
     assert config.workers.counter.max_members == 2
   end

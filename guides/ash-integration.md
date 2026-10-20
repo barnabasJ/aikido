@@ -19,6 +19,10 @@ never perform side effects. Return directives for all I/O, including message
 delivery, database writes, model requests and process creation; the runtime
 executes them after applying the action result.
 The resource DSL generates the internal agent modules; consumers call the domain.
+Runtime-module and own-state field metadata live in Spark and are available through
+`Aikido.Dsl.Agent.Info.runtime_module/1` and `state_fields/1`.
+The same Info module exposes `resource_module/1`, `ai?/1` and `team_config/1`;
+resources do not generate metadata accessor functions.
 
 Internal agent hosts expose an `:initialize` generic action implemented by
 `Aikido.Agent.Initialize`, configured by the transformer with the state path

@@ -43,10 +43,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
         agent_id: state.id,
         request_id: directive.request_id,
         tool_call_id: directive.tool_call.id,
-        agent_resource:
-          if(function_exported?(agent_module, :__aikido_resource__, 0),
-            do: agent_module.__aikido_resource__()
-          ),
+        agent_resource: Aikido.Dsl.Agent.Info.resource_module(agent_module),
         aikido: state.aikido,
         partition: Map.get(state, :partition),
         parent: Map.get(state, :parent)

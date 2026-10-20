@@ -38,7 +38,7 @@ defmodule Aikido.Agent.Initialize do
   defp create_own(resource, values) do
     case Ash.create(resource, values, authorize?: false, skip_unknown_inputs: [:*]) do
       {:ok, record} ->
-        Map.merge(values, Map.take(record, resource.__aikido_state_fields__()))
+        Map.merge(values, Map.take(record, Aikido.Dsl.Agent.Info.state_fields(resource)))
 
       {:error, error} ->
         raise Aikido.Agent.SliceValidationError, path: nil, module: resource, errors: error

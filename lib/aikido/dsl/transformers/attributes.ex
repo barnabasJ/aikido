@@ -44,15 +44,7 @@ defmodule Aikido.Dsl.Transformers.Attributes do
     dsl = configure(dsl, section, module)
     names = Enum.map(declared, & &1.name)
 
-    {:ok,
-     Transformer.eval(
-       dsl,
-       [],
-       quote do
-         @doc false
-         def __aikido_state_fields__, do: unquote(names)
-       end
-     )}
+    {:ok, Transformer.persist(dsl, :aikido_state_fields, names)}
   end
 
   def configure(dsl, section, module) do

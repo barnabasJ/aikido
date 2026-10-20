@@ -134,7 +134,7 @@ defmodule AikidoTest.AshTest do
   end
 
   test "resource agents reuse their attributes without a generated schema resource" do
-    runtime = AikidoTest.AshFixtures.Counter.__aikido_runtime__()
+    runtime = Aikido.Dsl.Agent.Info.runtime_module(AikidoTest.AshFixtures.Counter)
     schema = Spark.Dsl.Extension.get_opt(runtime, [:agent], :schema)
     assert schema == runtime
     assert Ash.Resource.Info.attribute(schema, :count).type == Ash.Type.Integer
@@ -336,7 +336,7 @@ defmodule AikidoTest.AshTest do
   end
 
   test "scheduled-only Ash actions mutate their mounted slice" do
-    runtime = AikidoTest.AshFixtures.Composed.__aikido_runtime__()
+    runtime = Aikido.Dsl.Agent.Info.runtime_module(AikidoTest.AshFixtures.Composed)
     agent = runtime.initialize!()
 
     signal =
@@ -429,9 +429,13 @@ defmodule AikidoTest.AshTest do
     refute Ash.Resource.Info.action(resource, :internal)
     refute Ash.Resource.Info.action(resource, :tick)
     refute function_exported?(AikidoTest.AshFixtures.Domain, :composed_internal, 1)
-    assert Aikido.Dsl.Agent.Info.signal_routes(resource.__aikido_runtime__()) == []
 
-    assert Aikido.Dsl.Agent.Info.slice_paths_for_action(resource.__aikido_runtime__())[
+    assert Aikido.Dsl.Agent.Info.signal_routes(Aikido.Dsl.Agent.Info.runtime_module(resource)) ==
+             []
+
+    assert Aikido.Dsl.Agent.Info.slice_paths_for_action(
+             Aikido.Dsl.Agent.Info.runtime_module(resource)
+           )[
              signal.target
            ] == [:counter]
 

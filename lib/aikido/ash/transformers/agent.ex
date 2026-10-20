@@ -81,8 +81,7 @@ defmodule Aikido.Ash.Transformers.Agent do
             # Reuse the resource's contracts; do not create a second schema type.
             @persist {:aikido_runtime_attributes, unquote(Macro.escape(attributes))}
 
-            @doc false
-            def __aikido_resource__, do: unquote(resource)
+            @persist {:aikido_resource, unquote(resource)}
 
             agent do
               name unquote(name)
@@ -97,15 +96,13 @@ defmodule Aikido.Ash.Transformers.Agent do
               (unquote_splicing(routes))
             end
           end
-
-          @doc false
-          def __aikido_runtime__, do: unquote(runtime)
-
-          @doc false
-          def __aikido_state_fields__, do: unquote(state_fields)
         end
 
-      {:ok, Transformer.eval(dsl, [], block)}
+      {:ok,
+       dsl
+       |> Transformer.persist(:aikido_runtime_module, runtime)
+       |> Transformer.persist(:aikido_state_fields, state_fields)
+       |> Transformer.eval([], block)}
     end
   end
 

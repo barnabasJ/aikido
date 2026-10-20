@@ -1,6 +1,6 @@
 defmodule Aikido.Dsl.Agent.Info do
   @moduledoc """
-  Introspection surface for `use Aikido.Agent` modules.
+  Introspection for agent resource metadata and `use Aikido.Agent` hosts.
 
   Reads the agent host's Spark `dsl_state` for the `:agent` /
   `:signal_routes` / `:schedules` sections, plus the cross-section values
@@ -11,6 +11,32 @@ defmodule Aikido.Dsl.Agent.Info do
   use Spark.InfoGenerator, extension: Aikido.Dsl.Agent, sections: [:agent]
 
   alias Spark.Dsl.Extension
+
+  @doc "Returns the internal runtime host of an Ash agent resource."
+  @spec runtime_module(module()) :: module() | nil
+  def runtime_module(resource), do: Extension.get_persisted(resource, :aikido_runtime_module)
+
+  @doc "Returns the resource attributes belonging to the agent's own state."
+  @spec state_fields(module()) :: [atom()]
+  def state_fields(resource), do: Extension.get_persisted(resource, :aikido_state_fields, [])
+
+  @doc "Returns the public Ash resource associated with an internal runtime host."
+  @spec resource_module(module()) :: module() | nil
+  def resource_module(module) do
+    if Spark.Dsl.is?(module, Ash.Resource),
+      do: Extension.get_persisted(module, :aikido_resource)
+  end
+
+  @doc "Returns the compiled team configuration, or nil for a resource without a team."
+  @spec team_config(module() | nil) :: map() | nil
+  def team_config(resource) do
+    if Spark.Dsl.is?(resource, Ash.Resource),
+      do: Extension.get_persisted(resource, :aikido_team_config)
+  end
+
+  @doc "Whether the agent resource has AI configuration."
+  @spec ai?(module()) :: boolean()
+  def ai?(resource), do: Extension.get_persisted(resource, :aikido_ai?, false)
 
   @doc "Returns the middleware modules attached to this agent."
   @spec middleware(module()) :: [module() | {module(), map()}]

@@ -106,7 +106,8 @@ defmodule Aikido.Ash.Team.Topology do
            true <- is_map(raw) || {:error, {:invalid_member, name}},
            resource when is_atom(resource) and not is_nil(resource) <- raw[:resource],
            true <-
-             Code.ensure_loaded?(resource) && function_exported?(resource, :__aikido_runtime__, 0),
+             Code.ensure_loaded?(resource) && Spark.Dsl.is?(resource, Ash.Resource) &&
+               !is_nil(Aikido.Dsl.Agent.Info.runtime_module(resource)),
            true <- Aikido.Ash.Runtime.option(resource, :instance) == instance,
            activation when activation in [:eager, :lazy] <- Map.get(raw, :activation, :eager),
            dependencies when is_list(dependencies) <- Map.get(raw, :depends_on, []),

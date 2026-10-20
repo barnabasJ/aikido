@@ -163,9 +163,7 @@ defmodule Aikido.Middlewares.Persister do
 
   @doc false
   def callback_module(module) do
-    if function_exported?(module, :__aikido_resource__, 0),
-      do: module.__aikido_resource__(),
-      else: module
+    Aikido.Dsl.Agent.Info.resource_module(module) || module
   end
 
   defp transform_impl?(mod) do

@@ -81,17 +81,7 @@ defmodule Aikido.Ash.Transformers.AI do
           options: []
         })
 
-      dsl = Transformer.persist(dsl, :aikido_ai?, true)
-
-      {:ok,
-       Transformer.eval(
-         dsl,
-         [],
-         quote do
-           @doc false
-           def __aikido_ai__, do: true
-         end
-       )}
+      {:ok, Transformer.persist(dsl, :aikido_ai?, true)}
     end
   end
 

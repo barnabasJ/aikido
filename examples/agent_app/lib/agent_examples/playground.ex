@@ -402,11 +402,11 @@ defmodule AgentExamples.Playground do
   end
 
   defp snapshot(state) do
-    resource = state.agent_module.__aikido_resource__()
+    resource = Aikido.Dsl.Agent.Info.resource_module(state.agent_module)
 
     fixed =
-      if resource && function_exported?(resource, :__aikido_team_config__, 0),
-        do: Map.keys(resource.__aikido_team_config__().topology.nodes),
+      if resource && !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)),
+        do: Map.keys(Aikido.Dsl.Agent.Info.team_config(resource).topology.nodes),
         else: []
 
     own = Map.get(state.agent.state, :state, %{})
@@ -438,7 +438,7 @@ defmodule AgentExamples.Playground do
      %{
        id: state.id,
        resource: resource,
-       team?: resource && function_exported?(resource, :__aikido_team_config__, 0),
+       team?: resource && !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)),
        children: %{},
        own: Map.take(own, [:count, :items, :completed, :title, :status, :result, :error]),
        journal: Map.get(Map.get(state.agent.state, :journal) || %{}, :entries, []),

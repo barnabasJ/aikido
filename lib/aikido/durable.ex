@@ -189,9 +189,9 @@ defmodule Aikido.Durable do
 
   @doc false
   def keep_snapshot?(agent_module) do
-    if function_exported?(agent_module, :__aikido_resource__, 0) do
+    if resource = Aikido.Dsl.Agent.Info.resource_module(agent_module) do
       Spark.Dsl.Extension.get_opt(
-        agent_module.__aikido_resource__(),
+        resource,
         [:agent],
         :persistence,
         :permanent

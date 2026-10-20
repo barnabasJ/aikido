@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Store agent resource/runtime mappings, state fields, AI flags and team
+  configuration in Spark instead of generating functions on every resource.
+  Read it through `Aikido.Dsl.Agent.Info`.
+
 - Replace generated agent constructors, setters and whole-agent validators with
   a configured native initialization action and Ash code interface. Embedded
   resource create/update actions own defaults, casting and validation.

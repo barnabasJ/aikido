@@ -105,7 +105,7 @@ defmodule Aikido.Ash.Team do
     end
 
     Aikido.AgentServer.call_until(pid, signal, "aikido.ash.team.**", selector,
-      timeout: resource.__aikido_team_config__().timeout + 1_000
+      timeout: Aikido.Dsl.Agent.Info.team_config(resource).timeout + 1_000
     )
   end
 end

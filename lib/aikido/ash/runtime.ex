@@ -11,9 +11,7 @@ defmodule Aikido.Ash.Runtime do
   end
 
   defp startup_topology(resource, definition) do
-    if function_exported?(resource, :__aikido_team_config__, 0) do
-      config = resource.__aikido_team_config__()
-
+    if config = Aikido.Dsl.Agent.Info.team_config(resource) do
       Aikido.Ash.Team.Topology.build(
         definition || config.topology.nodes,
         config.instance,
@@ -42,7 +40,7 @@ defmodule Aikido.Ash.Runtime do
       with {:ok, pid} <-
              Aikido.start_agent(
                option(resource, :instance),
-               resource.__aikido_runtime__(),
+               Aikido.Dsl.Agent.Info.runtime_module(resource),
                runtime_options
              ) do
         pool = Aikido.durable_supervisor_name(option(resource, :instance))
@@ -51,7 +49,7 @@ defmodule Aikido.Ash.Runtime do
           Process.whereis(pool) && Aikido.Durable.restored?(pool, record.id, runtime_options)
 
         result =
-          if function_exported?(resource, :__aikido_team_config__, 0) && !restored?,
+          if !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)) && !restored?,
             do:
               Aikido.Ash.Team.start(
                 resource,
@@ -110,7 +108,7 @@ defmodule Aikido.Ash.Runtime do
   end
 
   defp dispatch(resource, pid, signal) do
-    if function_exported?(resource, :__aikido_team_config__, 0) &&
+    if !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)) &&
          signal.type in ~w(aikido.ash.team.start aikido.ash.team.reconcile aikido.ash.team.add_member aikido.ash.team.remove_member aikido.ash.team.ensure_member aikido.ash.team.stop_member) do
       Aikido.Ash.Team.call(resource, pid, signal)
     else
@@ -151,7 +149,7 @@ defmodule Aikido.Ash.Runtime do
            end) do
       if pool do
         Aikido.Durable.delete(pool, key,
-          agent: resource.__aikido_runtime__(),
+          agent: Aikido.Dsl.Agent.Info.runtime_module(resource),
           partition: partition
         )
       else
@@ -165,7 +163,7 @@ defmodule Aikido.Ash.Runtime do
     pool = Aikido.durable_supervisor_name(instance)
 
     if Process.whereis(pool) do
-      Aikido.Durable.delete(pool, id, agent: resource.__aikido_runtime__())
+      Aikido.Durable.delete(pool, id, agent: Aikido.Dsl.Agent.Info.runtime_module(resource))
     else
       with {:ok, {_id, pid}} <- resolve(resource, id), do: Aikido.stop_agent(instance, pid)
     end
@@ -225,7 +223,7 @@ defmodule Aikido.Ash.Runtime do
 
   defp resolve(resource, pid) when is_pid(pid) do
     AgentServer.state(pid, fn state ->
-      if state.agent.agent_module == resource.__aikido_runtime__(),
+      if state.agent.agent_module == Aikido.Dsl.Agent.Info.runtime_module(resource),
         do: {:ok, {state.agent.id, pid}},
         else: {:error, :different_resource}
     end)
@@ -235,7 +233,7 @@ defmodule Aikido.Ash.Runtime do
 
   defp snapshot(resource, pid) do
     AgentServer.state(pid, fn state ->
-      if state.agent.agent_module == resource.__aikido_runtime__() do
+      if state.agent.agent_module == Aikido.Dsl.Agent.Info.runtime_module(resource) do
         {:ok, record(resource, state.agent)}
       else
         {:error, :different_resource}
@@ -260,7 +258,7 @@ defmodule Aikido.Ash.Runtime do
             attr.name == :id ->
               agent.id
 
-            attr.name in resource.__aikido_state_fields__() ->
+            attr.name in Aikido.Dsl.Agent.Info.state_fields(resource) ->
               agent.state |> Map.get(option(resource, :path), %{}) |> Map.get(attr.name)
 
             true ->
@@ -287,10 +285,10 @@ defmodule Aikido.Ash.Runtime do
     end)
     |> Map.delete(:id)
     |> then(fn attributes ->
-      {own_state, slices} = Map.split(attributes, resource.__aikido_state_fields__())
+      {own_state, slices} = Map.split(attributes, Aikido.Dsl.Agent.Info.state_fields(resource))
 
       slices =
-        if function_exported?(resource, :__aikido_ai__, 0) do
+        if Aikido.Dsl.Agent.Info.ai?(resource) do
           configuration =
             Map.take(own_state, [
               :options,

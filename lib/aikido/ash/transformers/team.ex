@@ -88,15 +88,7 @@ defmodule Aikido.Ash.Transformers.Team do
         options: []
       })
 
-    dsl =
-      Transformer.eval(
-        dsl,
-        [],
-        quote do
-          @doc false
-          def __aikido_team_config__, do: unquote(Macro.escape(config))
-        end
-      )
+    dsl = Transformer.persist(dsl, :aikido_team_config, config)
 
     Enum.reduce_while(@commands, {:ok, dsl}, fn command, {:ok, dsl} ->
       dsl =

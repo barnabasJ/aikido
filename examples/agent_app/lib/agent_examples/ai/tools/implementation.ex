@@ -18,7 +18,7 @@ defmodule AgentExamples.AI.Tools.Implementation do
       members = team.team.members |> Map.keys() |> Enum.map(&to_string/1) |> Enum.sort()
 
       templates =
-        team.__struct__.__aikido_team_config__().workers
+        Aikido.Dsl.Agent.Info.team_config(team.__struct__).workers
         |> Map.keys()
         |> Enum.map(&to_string/1)
         |> Enum.sort()
@@ -85,7 +85,7 @@ defmodule AgentExamples.AI.Tools.Implementation do
   end
 
   defp resolve_template(team, name) do
-    case Enum.find(team.__struct__.__aikido_team_config__().workers, fn {key, _} ->
+    case Enum.find(Aikido.Dsl.Agent.Info.team_config(team.__struct__).workers, fn {key, _} ->
            to_string(key) == name
          end) do
       {key, %{resource: resource}} -> {:ok, key, resource}
@@ -158,7 +158,7 @@ defmodule AgentExamples.AI.Tools.Implementation do
              {:error, "Agent management requires agent runtime context"},
          {:ok, record} <- Aikido.Ash.inspect(resource, caller.agent_id, opts) do
       cond do
-        function_exported?(resource, :__aikido_team_config__, 0) ->
+        !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)) ->
           {:ok, record, nil, record}
 
         caller.parent && caller.parent.meta[:team_resource] ->
