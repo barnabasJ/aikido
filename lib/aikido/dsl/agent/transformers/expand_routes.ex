@@ -16,7 +16,8 @@ defmodule Aikido.Dsl.Agent.Transformers.ExpandRoutes do
         Enum.flat_map(instances, &Aikido.Slice.Schedules.schedule_routes/1)
 
     routes =
-      Enum.map(routes, fn
+      routes
+      |> Enum.map(fn
         {type, match, target, priority} when is_function(match, 1) ->
           {type, match, target, priority}
 
@@ -29,6 +30,7 @@ defmodule Aikido.Dsl.Agent.Transformers.ExpandRoutes do
         {type, target, priority} when is_integer(priority) ->
           {type, target, priority}
       end)
+      |> Enum.uniq()
 
     own_routes =
       Enum.map(Transformer.get_persisted(dsl, :aikido_agent_routes, []), fn route ->

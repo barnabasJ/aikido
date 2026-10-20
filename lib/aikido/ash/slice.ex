@@ -11,7 +11,9 @@ defmodule Aikido.Ash.Slice do
 
   Mounting the slice automatically exposes its routed public actions on the
   agent's domain interface, using the Ash action names and payload contracts.
-  Private actions and schedule-only actions remain internal.
+  Private actions and schedule-only actions remain internal. When several routes
+  target the same public action, its generated command uses the first declared
+  route's signal type; every original route remains available for signal delivery.
 
   A slice is an embedded resource because its value lives inside an agent's
   state. Implementation modules use `Ash.Resource.Actions.Implementation`;

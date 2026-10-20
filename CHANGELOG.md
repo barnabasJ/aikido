@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Inherit public mounted actions from local and remote tuple targets, preserve
+  route predicates and priorities, and generate one canonical command for a
+  reducer with multiple signal types. Deduplicate identical normalized mount
+  routes so each mounted path runs once per matching dispatch.
+
 - Run the configured high-priority Credo checks instead of an empty priority
   selection. Simplify the local constructs they flag, remove obsolete Dialyzer
   suppression and unused test helpers, and refresh native-action test descriptions.

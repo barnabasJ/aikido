@@ -128,17 +128,17 @@ defmodule Aikido.Ash.Transformers.Agent do
         Spark.Dsl.is?(mount.module, Ash.Resource),
         Aikido.Ash.Slice in Spark.extensions(mount.module),
         route <- Spark.Dsl.Extension.get_entities(mount.module, [:slice]),
-        is_atom(route.action),
-        action = Ash.Resource.Info.action(mount.module, route.action),
+        {resource, name} = Aikido.Dsl.Slice.Info.target(mount.module, route.action),
+        action = Ash.Resource.Info.action(resource, name),
         match?(%{public?: true}, action),
         !Enum.any?(declared, &(&1.name == action.name)) do
       %Aikido.Ash.Agent.Signal{
         name: action.name,
         type: route.type,
-        target: {mount.module, action.name}
+        target: {resource, action.name}
       }
     end
-    |> Enum.uniq()
+    |> Enum.uniq_by(&{&1.name, &1.target})
   end
 
   # Mounted slices already own these routes and state paths. Exposing their
@@ -146,8 +146,11 @@ defmodule Aikido.Ash.Transformers.Agent do
   defp mounted_signal?(signal, mounts) do
     Enum.any?(mounts, fn mount ->
       mount.module
-      |> Aikido.Dsl.Slice.Info.signal_routes()
-      |> Enum.any?(&(elem(&1, 0) == signal.type && elem(&1, 1) == signal.target))
+      |> Spark.Dsl.Extension.get_entities([:slice])
+      |> Enum.any?(fn route ->
+        route.type == signal.type &&
+          Aikido.Dsl.Slice.Info.target(mount.module, route.action) == signal.target
+      end)
     end)
   end
 
