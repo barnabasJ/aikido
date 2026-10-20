@@ -8,7 +8,10 @@ defmodule Aikido.Ash.Team.Action do
     resource = runtime.agent_module
     config = Aikido.Dsl.Agent.Info.team_config(resource)
 
-    case Aikido.Ash.Team.Engine.handle(runtime.signal, input.arguments.state, runtime, config) do
+    data = Map.get(input.arguments, :data, Map.delete(input.arguments, :state))
+    signal = %{runtime.signal | data: Map.merge(runtime.signal.data || %{}, data)}
+
+    case Aikido.Ash.Team.Engine.handle(signal, input.arguments.state, runtime, config) do
       {:ok, state, directives} ->
         Aikido.Types.ActionResult.new(state: state, directives: directives)
 

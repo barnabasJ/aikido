@@ -63,7 +63,9 @@ defmodule AgentExamples.Playground do
         end
 
       %{status: :running} = run when slug == "conversation" ->
-        case Aikido.Ash.command(run.record, %{text: query}, action: :message) do
+        case run.record.resource
+             |> Ash.ActionInput.for_action(:message, %{agent: run.record.id, text: query})
+             |> Ash.run_action() do
           {:ok, _} ->
             {:reply, :ok,
              put_run(state, key, %{run | messages: run.messages ++ [%{role: :user, text: query}]})}
@@ -150,13 +152,14 @@ defmodule AgentExamples.Playground do
         true ->
           owner = if snapshot.team?, do: nil, else: member_key(coordinator, List.last(path))
 
-          with {:ok, record} <- Aikido.Ash.inspect(coordinator.resource, coordinator.id) do
-            Aikido.Ash.command(
-              record,
-              %{member: input.name, resource: resource, owner: owner},
-              action: :add_member
-            )
-          end
+          coordinator.resource
+          |> Ash.ActionInput.for_action(:add_member, %{
+            agent: coordinator.id,
+            member: input.name,
+            resource: resource,
+            owner: owner
+          })
+          |> Ash.run_action()
       end
 
     case result do
@@ -172,7 +175,9 @@ defmodule AgentExamples.Playground do
       %{status: status} = run when status != :stopped ->
         input = normalize_member_input(action, input, run.snapshot)
 
-        case Aikido.Ash.command(run.record, input, action: action) do
+        case run.record.resource
+             |> Ash.ActionInput.for_action(action, Map.put(input, :agent, run.record.id))
+             |> Ash.run_action() do
           {:ok, _receipt} ->
             run = %{run | error: nil}
 
@@ -198,7 +203,9 @@ defmodule AgentExamples.Playground do
 
     case state.runs[key] do
       %{status: status} = run when status != :stopped ->
-        case Aikido.Ash.stop(run.record) do
+        case (Map.get(run.record, :resource) || run.record.__struct__)
+             |> Ash.ActionInput.for_action(:stop, %{agent: run.record})
+             |> Ash.run_action() do
           {:ok, _receipt} ->
             state = finish_requests(state, key, {:error, :stopped})
             for {_ref, {^key, task}} <- state.tasks, do: Task.shutdown(task, :brutal_kill)
@@ -279,7 +286,8 @@ defmodule AgentExamples.Playground do
   defp create_run(key, example, options, state) do
     with {:ok, attributes} <- attributes(example, options),
          attributes = with_request_callback(example, attributes, key),
-         {:ok, record} <- Aikido.Ash.start(example.resource, attributes) do
+         {:ok, record} <-
+           example.resource |> Ash.ActionInput.for_action(:start, attributes) |> Ash.run_action() do
       pid = record.pid
 
       {:ok, ref} = Aikido.AgentServer.subscribe(pid, "**", &snapshot/1)

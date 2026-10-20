@@ -3,7 +3,6 @@ defmodule Aikido.Dsl.Slice.Info do
   use Spark.InfoGenerator, extension: Aikido.Ash.Slice, sections: [:slice]
   alias Spark.Dsl.Extension
 
-  def schema(resource), do: resource
   def config_schema(resource), do: Extension.get_entities(resource, [:slice, :config_schema])
 
   def signal_routes(resource) do

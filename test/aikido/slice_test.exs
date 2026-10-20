@@ -123,7 +123,7 @@ defmodule AikidoTest.SliceTest do
                {"send", {AikidoTest.TestActions, :noop}}
              ]
 
-      assert Ash.Type.ash_type?(Aikido.Dsl.Slice.Info.schema(AikidoTest.SliceTest.FullSlice))
+      assert Ash.Type.ash_type?(AikidoTest.SliceTest.FullSlice)
 
       assert [%Ash.Resource.Attribute{name: :enabled}] =
                Aikido.Dsl.Slice.Info.config_schema(AikidoTest.SliceTest.FullSlice)

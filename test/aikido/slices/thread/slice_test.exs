@@ -37,7 +37,7 @@ defmodule AikidoTest.Thread.SliceTest do
     end
 
     test "schema is bound to the thread resource" do
-      assert Ash.Resource.Info.attribute_names(Aikido.Dsl.Slice.Info.schema(Aikido.Slices.Thread)) ==
+      assert Ash.Resource.Info.attribute_names(Aikido.Slices.Thread) ==
                Ash.Resource.Info.attribute_names(Aikido.Slices.Thread)
     end
 

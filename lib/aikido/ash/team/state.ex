@@ -60,42 +60,48 @@ defmodule Aikido.Ash.Team.State do
     action :start, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
-      argument :data, :map, default: %{}
+      argument :topology, :map
       run Aikido.Ash.Team.Action
     end
 
     action :reconcile, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
-      argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
     action :add_member, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
-      argument :data, :map, default: %{}
+      argument :member, :term, allow_nil?: false
+      argument :resource, :atom
+      argument :template, :atom
+      argument :initial_state, :map, default: %{}
+      argument :owner, :term
+      argument :depends_on, {:array, :term}, default: []
+      argument :activation, :atom, default: :eager, constraints: [one_of: [:eager, :lazy]]
       run Aikido.Ash.Team.Action
     end
 
     action :remove_member, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
-      argument :data, :map, default: %{}
+      argument :member, :term, allow_nil?: false
+      argument :cascade?, :boolean, default: false
       run Aikido.Ash.Team.Action
     end
 
     action :ensure_member, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
-      argument :data, :map, default: %{}
+      argument :member, :term, allow_nil?: false
       run Aikido.Ash.Team.Action
     end
 
     action :stop_member, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
-      argument :data, :map, default: %{}
+      argument :member, :term, allow_nil?: false
       run Aikido.Ash.Team.Action
     end
 
@@ -109,14 +115,22 @@ defmodule Aikido.Ash.Team.State do
     action :broadcast, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
-      argument :data, :map, default: %{}
+      argument :type, :string, allow_nil?: false
+      argument :payload, :map, default: %{}
+      argument :members, {:array, :term}
       run Aikido.Ash.Team.Action
     end
 
     action :assign_task, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
-      argument :data, :map, default: %{}
+      argument :member, :term, allow_nil?: false
+      argument :task_id, :string
+      argument :type, :string, default: "harness.task"
+      argument :payload, :map, default: %{}
+      argument :timeout_ms, :integer, default: 30_000, constraints: [min: 1]
+      argument :notify, :term
+      argument :metadata, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 

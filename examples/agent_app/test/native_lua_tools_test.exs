@@ -139,15 +139,22 @@ defmodule AgentExamples.NativeLuaToolsTest do
 
   defp start(entrypoints) do
     {:ok, ref} =
-      Aikido.Ash.start(Assistant, %{
+      Assistant
+      |> Ash.ActionInput.for_action(:start, %{
         model: "offline",
         client: Client,
         tools: [:scoped_lua, :scoped_lua_docs],
         tool_options: [actions: [{Lua, [:eval, :docs]}]],
         tool_context: %{context: %{shared: %{entrypoints: entrypoints}}}
       })
+      |> Ash.run_action()
 
-    on_exit(fn -> Aikido.Ash.delete(ref) end)
+    on_exit(fn ->
+      (Map.get(ref, :resource) || ref.__struct__)
+      |> Ash.ActionInput.for_action(:delete, %{agent: ref})
+      |> Ash.run_action()
+    end)
+
     ref
   end
 
@@ -184,7 +191,9 @@ defmodule AgentExamples.NativeLuaToolsTest do
     snapshot = Aikido.Durable.AgentServer.load_state(1, dumped)
     refute functions?(snapshot)
     assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(Aikido.Default), ref.pid)
-    assert {:ok, restored} = Aikido.Ash.start(Assistant, %{id: ref.id})
+
+    assert {:ok, restored} =
+             Assistant |> Ash.ActionInput.for_action(:start, %{id: ref.id}) |> Ash.run_action()
 
     assert {:ok, answer} =
              AgentExamples.AI.ask(

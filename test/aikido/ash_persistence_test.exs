@@ -41,7 +41,7 @@ end
 defmodule AikidoTest.AshPersistenceTest do
   use ExUnit.Case, async: false
 
-  alias AikidoTest.AshPersistence.{Domain, Permanent, Temporary}
+  alias AikidoTest.AshPersistence.{Domain, Permanent}
 
   setup do
     directory =
@@ -91,7 +91,7 @@ defmodule AikidoTest.AshPersistenceTest do
   test "delete terminates a running agent and discards its saved state" do
     ref = Domain.permanent_start!(%{id: "live", value: 7})
     monitor = Process.monitor(ref.pid)
-    assert {:ok, %{status: :deleted}} = Aikido.Ash.delete(ref)
+    assert {:ok, %{status: :deleted}} = Domain.permanent_delete(ref)
     assert_receive {:DOWN, ^monitor, :process, _, _}
 
     restarted = Domain.permanent_start!(%{id: "live", value: 99})
@@ -179,8 +179,8 @@ defmodule AikidoTest.AshPersistenceTest do
 
   test "explicit delete handles reference inputs and malformed identifiers" do
     ref = Domain.temporary_start!(%{id: "reference"})
-    assert %{status: :deleted} = Aikido.Ash.delete!(ref)
-    assert {:error, _} = Aikido.Ash.run(Temporary, :delete, %{agent: 123})
-    assert {:error, _} = Aikido.Ash.run(Permanent, :delete, %{agent: "missing"})
+    assert %{status: :deleted} = Domain.temporary_delete!(ref)
+    assert {:error, _} = Domain.temporary_delete(123)
+    assert {:error, _} = Domain.permanent_delete("missing")
   end
 end

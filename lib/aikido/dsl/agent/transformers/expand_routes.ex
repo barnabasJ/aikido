@@ -12,13 +12,16 @@ defmodule Aikido.Dsl.Agent.Transformers.ExpandRoutes do
     instances = Transformer.get_persisted(dsl, :slice_instances, [])
 
     routes =
-      Enum.flat_map(instances, &Aikido.Slice.Instance.expand_routes/1) ++
+      Enum.flat_map(instances, &Aikido.Dsl.Slice.Info.signal_routes(&1.module)) ++
         Enum.flat_map(instances, &Aikido.Slice.Schedules.schedule_routes/1)
 
     routes =
       Enum.map(routes, fn
         {type, match, target, priority} when is_function(match, 1) ->
           {type, match, target, priority}
+
+        {type, target} ->
+          {type, target, -10}
 
         {type, target, options} when is_list(options) ->
           {type, target, Keyword.get(options, :priority, -10)}

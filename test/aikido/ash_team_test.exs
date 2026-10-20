@@ -11,6 +11,35 @@ defmodule AikidoTest.AshTeamTest do
     :ok
   end
 
+  test "team commands derive their public arguments from the owning reducer" do
+    public = Ash.Resource.Info.action(DynamicTeam, :add_member)
+    reducer = Ash.Resource.Info.action(Aikido.Ash.Team.State, :add_member)
+
+    assert Enum.map(public.arguments, & &1.name) -- [:agent] ==
+             Enum.map(reducer.arguments, & &1.name) -- [:state]
+
+    input =
+      Ash.ActionInput.for_action(Aikido.Ash.Team.State, :add_member, %{
+        state: %{},
+        member: "worker",
+        activation: "lazy"
+      })
+
+    assert input.valid?
+    assert input.arguments.activation == :lazy
+    assert input.arguments.initial_state == %{}
+    assert input.arguments.depends_on == []
+
+    assert {:error, %Ash.Error.Invalid{}} =
+             Aikido.Ash.Team.State
+             |> Ash.ActionInput.for_action(:add_member, %{
+               state: %{},
+               member: "worker",
+               activation: :unknown
+             })
+             |> Ash.run_action()
+  end
+
   test "lifecycle commands return even when they complete immediately and release their subscriptions" do
     team = snapshot_result(Domain.dynamic_start!(%{id: "immediate"}))
 
@@ -315,10 +344,10 @@ defmodule AikidoTest.AshTeamTest do
 
   # Commands return receipts; state assertions opt into a separate inspection.
   defp snapshot_result({:ok, %{resource: resource, id: id}}),
-    do: Aikido.Ash.inspect(resource, id)
+    do: resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action()
 
   defp snapshot_result({:error, _} = error), do: error
 
   defp snapshot_result(%{resource: resource, id: id}),
-    do: Aikido.Ash.inspect!(resource, id)
+    do: resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action!()
 end

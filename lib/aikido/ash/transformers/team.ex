@@ -2,7 +2,6 @@ defmodule Aikido.Ash.Transformers.Team do
   @moduledoc false
   use Spark.Dsl.Transformer
   alias Spark.Dsl.Transformer
-  alias Ash.Resource.Builder
 
   @commands [
     :start,
@@ -61,68 +60,15 @@ defmodule Aikido.Ash.Transformers.Team do
 
     dsl = Transformer.persist(dsl, :aikido_team_config, config)
 
-    Enum.reduce_while(@commands, {:ok, dsl}, fn command, {:ok, dsl} ->
-      dsl =
+    dsl =
+      Enum.reduce(@commands, dsl, fn command, dsl ->
         Transformer.add_entity(dsl, [:agent], %Aikido.Ash.Agent.Signal{
           name: if(command == :start, do: :configure_topology, else: command),
           type: "aikido.ash.team.#{command}",
           target: {slice, command}
         })
+      end)
 
-      case Builder.add_new_action(
-             dsl,
-             :action,
-             if(command == :start, do: :configure_topology, else: command),
-             returns: :map,
-             arguments: arguments(command)
-           ) do
-        {:ok, dsl} -> {:cont, {:ok, dsl}}
-        error -> {:halt, error}
-      end
-    end)
-  end
-
-  defp arguments(:send), do: [arg(:data, :map, default: %{})]
-  defp arguments(:start), do: [arg(:topology, :map)]
-  defp arguments(:reconcile), do: []
-
-  defp arguments(:add_member),
-    do: [
-      arg(:member, :term, allow_nil?: false),
-      arg(:resource, :atom),
-      arg(:template, :atom),
-      arg(:initial_state, :map, default: %{}),
-      arg(:owner, :term),
-      arg(:depends_on, {:array, :term}, default: []),
-      arg(:activation, :atom, default: :eager, constraints: [one_of: [:eager, :lazy]])
-    ]
-
-  defp arguments(:remove_member),
-    do: [arg(:member, :term, allow_nil?: false), arg(:cascade?, :boolean, default: false)]
-
-  defp arguments(command) when command in [:ensure_member, :stop_member],
-    do: [arg(:member, :term, allow_nil?: false)]
-
-  defp arguments(:broadcast),
-    do: [
-      arg(:type, :string, allow_nil?: false),
-      arg(:payload, :map, default: %{}),
-      arg(:members, {:array, :term})
-    ]
-
-  defp arguments(:assign_task),
-    do: [
-      arg(:member, :term, allow_nil?: false),
-      arg(:task_id, :string),
-      arg(:type, :string, default: "harness.task"),
-      arg(:payload, :map, default: %{}),
-      arg(:timeout_ms, :integer, default: 30_000, constraints: [min: 1]),
-      arg(:notify, :term),
-      arg(:metadata, :map, default: %{})
-    ]
-
-  defp arg(name, type, opts \\ []) do
-    {:ok, argument} = Builder.build_action_argument(name, type, opts)
-    argument
+    {:ok, dsl}
   end
 end

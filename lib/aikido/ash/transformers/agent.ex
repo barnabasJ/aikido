@@ -38,7 +38,7 @@ defmodule Aikido.Ash.Transformers.Agent do
            ),
          {:ok, dsl} <- add_mounts(dsl, mounts, team_slice),
          {:ok, dsl} <- add_lifecycle_actions(dsl),
-         {:ok, dsl} <- add_signals(dsl, signals, mounts) do
+         {:ok, dsl} <- add_signals(dsl, signals) do
       declared_routes =
         for route <- entities, match?(%Aikido.Dsl.Agent.Route{}, route) do
           case route.action do
@@ -164,9 +164,7 @@ defmodule Aikido.Ash.Transformers.Agent do
 
   defp add_mounts(dsl, mounts, team_slice) do
     Enum.reduce_while(mounts, {:ok, dsl}, fn mount, {:ok, dsl} ->
-      type = if Spark.Dsl.is?(mount.module, Ash.Resource), do: mount.module, else: :map
-
-      case Builder.add_new_attribute(dsl, mount.path, type,
+      case Builder.add_new_attribute(dsl, mount.path, mount.module,
              public?: true,
              writable?:
                mount.module != team_slice &&
@@ -179,20 +177,20 @@ defmodule Aikido.Ash.Transformers.Agent do
     end)
   end
 
-  defp add_signals(dsl, signals, mounts) do
+  defp add_signals(dsl, signals) do
     # The verifier checks duplicate declarations; generation must not bind a
     # second command to the handler generated for the first one.
     signals
     |> Enum.uniq_by(& &1.name)
     |> Enum.reduce_while({:ok, dsl}, fn signal, {:ok, dsl} ->
-      case add_signal(dsl, signal, mounts) do
+      case add_signal(dsl, signal) do
         {:ok, dsl} -> {:cont, {:ok, dsl}}
         error -> {:halt, error}
       end
     end)
   end
 
-  defp add_signal(dsl, signal, _mounts) do
+  defp add_signal(dsl, signal) do
     case Enum.find(Transformer.get_entities(dsl, [:actions]), &(&1.name == signal.name)) do
       nil ->
         arguments = signal_arguments(dsl, signal)
@@ -228,7 +226,6 @@ defmodule Aikido.Ash.Transformers.Agent do
   end
 
   defp build_argument!(name, type, options) do
-    options = Enum.reject(options, fn {_key, value} -> is_nil(value) end)
     {:ok, argument} = Builder.build_action_argument(name, type, options)
     argument
   end

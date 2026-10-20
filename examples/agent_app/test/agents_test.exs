@@ -14,9 +14,11 @@ defmodule AgentExamples.AgentsTest do
             AgentExamples.Worker,
             AgentExamples.Team
           ],
-          record <- Aikido.Ash.list!(resource),
+          record <- resource |> Ash.ActionInput.for_action(:list, %{}) |> Ash.run_action!(),
           String.starts_with?(record.id, prefix <> "-") do
-        Aikido.Ash.stop(record)
+        resource
+        |> Ash.ActionInput.for_action(:stop, %{agent: record})
+        |> Ash.run_action()
       end
     end)
 
@@ -101,10 +103,10 @@ defmodule AgentExamples.AgentsTest do
 
   # Commands return receipts; state assertions opt into a separate inspection.
   defp snapshot_result({:ok, %{resource: resource, id: id}}),
-    do: Aikido.Ash.inspect(resource, id)
+    do: resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action()
 
   defp snapshot_result({:error, _} = error), do: error
 
   defp snapshot_result(%{resource: resource, id: id}),
-    do: Aikido.Ash.inspect!(resource, id)
+    do: resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action!()
 end

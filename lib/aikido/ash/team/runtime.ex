@@ -14,12 +14,12 @@ defmodule Aikido.Ash.Team.Runtime do
         restart?: false
       )
 
+    options = Keyword.put(options, :context, context)
+
     with {:ok, %{pid: pid}} <-
-           Aikido.Ash.start(
-             resource,
-             Map.put(initial_state, :id, id),
-             Keyword.put(options, :context, context)
-           ),
+           resource
+           |> Ash.ActionInput.for_action(:start, Map.put(initial_state, :id, id), options)
+           |> Ash.run_action(options),
          :ok <- Aikido.AgentServer.await_ready(pid),
          {:ok, ^pid} <- Aikido.AgentServer.await_child(parent.pid, parent.tag) do
       {:ok, pid}

@@ -59,7 +59,7 @@ defmodule AgentExamples.Demo do
             AgentExamples.Worker,
             AgentExamples.Team
           ],
-          record <- Aikido.Ash.list!(resource),
+          record <- resource |> Ash.ActionInput.for_action(:list, %{}) |> Ash.run_action!(),
           record.id in [
             "demo-counter",
             "demo-checklist",
@@ -67,7 +67,9 @@ defmodule AgentExamples.Demo do
             "demo-worker",
             "demo-team"
           ] do
-        Aikido.Ash.stop!(record)
+        resource
+        |> Ash.ActionInput.for_action(:stop, %{agent: record})
+        |> Ash.run_action!()
       end
     end
   end

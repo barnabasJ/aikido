@@ -108,7 +108,7 @@ defmodule Aikido.Ash.Team.Topology do
            true <-
              Code.ensure_loaded?(resource) && Spark.Dsl.is?(resource, Ash.Resource) &&
                Aikido.Ash.Agent in Spark.extensions(resource),
-           true <- Aikido.Ash.Runtime.option(resource, :instance) == instance,
+           true <- Aikido.Dsl.Agent.Info.agent_instance!(resource) == instance,
            activation when activation in [:eager, :lazy] <- Map.get(raw, :activation, :eager),
            dependencies when is_list(dependencies) <- Map.get(raw, :depends_on, []),
            owner <- Map.get(raw, :owner),

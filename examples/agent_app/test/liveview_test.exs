@@ -152,7 +152,12 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert has_element?(view, "#events", "ai.react.hook.completed")
     run = Playground.get(owner, "hooks")
     assert run.snapshot.ai.hook_errors == []
-    assert length(Aikido.Ash.inspect!(run.record.resource, run.record).hooks) == 3
+
+    assert length(
+             (run.record.resource
+              |> Ash.ActionInput.for_action(:inspect, %{agent: run.record})
+              |> Ash.run_action!()).hooks
+           ) == 3
 
     view |> form("#prompt-form", %{query: "deny-tools for this task"}) |> render_submit()
     await(owner, "hooks", &(&1.status == :failed), 10_000)
@@ -431,7 +436,12 @@ defmodule AgentExamplesWeb.LiveViewTest do
       })
 
     reference = Playground.get(owner, "research-team").record
-    record = Aikido.Ash.inspect!(reference.resource, reference)
+
+    record =
+      reference.resource
+      |> Ash.ActionInput.for_action(:inspect, %{agent: reference})
+      |> Ash.run_action!()
+
     assert record.system_prompt == "User-provided orchestration"
     assert record.max_iterations == 4
 

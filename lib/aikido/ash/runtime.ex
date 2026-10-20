@@ -2,8 +2,6 @@ defmodule Aikido.Ash.Runtime do
   @moduledoc false
   alias Aikido.AgentServer
 
-  def option(resource, key), do: Spark.Dsl.Extension.get_opt(resource, [:agent], key)
-
   def start(resource, input, context \\ %{}) do
     with {:ok, topology} <- startup_topology(resource, input.arguments[:topology]) do
       start_process(resource, input, topology, context)
@@ -23,31 +21,26 @@ defmodule Aikido.Ash.Runtime do
   end
 
   defp start_process(resource, input, topology, context) do
-    attributes =
-      Map.new(Ash.Resource.Info.attributes(resource), fn attr ->
-        {attr.name, Map.get_lazy(input.arguments, attr.name, fn -> default(attr.default) end)}
-      end)
-
-    record = struct(resource, attributes)
+    id = input.arguments.id
 
     runtime_options =
       input.context
       |> Map.get(:aikido_runtime_options, [])
       |> Keyword.take([:parent, :partition, :on_parent_death, :restart?])
 
-    pool = Aikido.durable_supervisor_name(option(resource, :instance))
+    pool = Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource))
 
     safe(fn ->
       with {:ok, pid} <-
-             Aikido.Durable.start(pool, record.id,
+             Aikido.Durable.start(pool, id,
                agent: resource,
-               initial_state: initial_state(resource, record),
+               initial_state: initial_state(resource, input.arguments),
                partition: runtime_options[:partition],
                agent_opts: runtime_options,
                permanent: Keyword.get(runtime_options, :restart?, true)
              ) do
         restored? =
-          Process.whereis(pool) && Aikido.Durable.restored?(pool, record.id, runtime_options)
+          Process.whereis(pool) && Aikido.Durable.restored?(pool, id, runtime_options)
 
         result =
           if !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)) && !restored?,
@@ -62,19 +55,19 @@ defmodule Aikido.Ash.Runtime do
 
         case result do
           {:ok, _} ->
-            {:ok, reference(resource, record.id, pid)}
+            {:ok, reference(resource, id, pid)}
 
           error ->
-            Aikido.Durable.stop(Aikido.durable_supervisor_name(option(resource, :instance)), pid)
+            Aikido.Durable.stop(
+              Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource)),
+              pid
+            )
+
             error
         end
       end
     end)
   end
-
-  defp default(fun) when is_function(fun, 0), do: fun.()
-  defp default({module, function, args}), do: apply(module, function, args)
-  defp default(value), do: value
 
   def signal(resource, input, context \\ %{}) do
     definition =
@@ -121,7 +114,10 @@ defmodule Aikido.Ash.Runtime do
     safe(fn ->
       with {:ok, {id, pid}} <- resolve(resource, agent),
            :ok <-
-             Aikido.Durable.stop(Aikido.durable_supervisor_name(option(resource, :instance)), pid) do
+             Aikido.Durable.stop(
+               Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource)),
+               pid
+             ) do
         {:ok, %{id: id, resource: resource, status: :stopped}}
       end
     end)
@@ -157,7 +153,7 @@ defmodule Aikido.Ash.Runtime do
   end
 
   defp delete_process(resource, id) do
-    instance = option(resource, :instance)
+    instance = Aikido.Dsl.Agent.Info.agent_instance!(resource)
     pool = Aikido.durable_supervisor_name(instance)
 
     Aikido.Durable.delete(pool, id, agent: resource)
@@ -174,7 +170,9 @@ defmodule Aikido.Ash.Runtime do
   def list(resource, arguments \\ %{}) do
     safe(fn ->
       Enum.reduce_while(
-        Aikido.Durable.members(Aikido.durable_supervisor_name(option(resource, :instance))),
+        Aikido.Durable.members(
+          Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource))
+        ),
         {:ok, []},
         fn
           {_id, pid}, {:ok, records} ->
@@ -213,7 +211,10 @@ defmodule Aikido.Ash.Runtime do
   defp resolve(resource, %{id: id}), do: resolve(resource, id)
 
   defp resolve(resource, id) when is_binary(id) do
-    case Aikido.Durable.lookup(Aikido.durable_supervisor_name(option(resource, :instance)), id) do
+    case Aikido.Durable.lookup(
+           Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource)),
+           id
+         ) do
       :error -> {:error, "Agent #{id} is not running"}
       {:ok, pid} -> resolve(resource, pid)
     end
@@ -257,7 +258,9 @@ defmodule Aikido.Ash.Runtime do
               agent.id
 
             attr.name in Aikido.Dsl.Agent.Info.state_fields(resource) ->
-              agent.state |> Map.get(option(resource, :path), %{}) |> Map.get(attr.name)
+              agent.state
+              |> Map.get(Aikido.Dsl.Agent.Info.agent_path!(resource), %{})
+              |> Map.get(attr.name)
 
             true ->
               Map.get(agent.state, attr.name)
@@ -274,13 +277,8 @@ defmodule Aikido.Ash.Runtime do
     struct(resource, attributes)
   end
 
-  defp initial_state(resource, record) do
-    resource
-    |> Ash.Resource.Info.attributes()
-    |> Map.new(fn attr ->
-      value = Map.get(record, attr.name)
-      {attr.name, value}
-    end)
+  defp initial_state(resource, attributes) do
+    attributes
     |> Map.delete(:id)
     |> then(fn attributes ->
       {own_state, slices} = Map.split(attributes, Aikido.Dsl.Agent.Info.state_fields(resource))
@@ -313,7 +311,7 @@ defmodule Aikido.Ash.Runtime do
           slices
         end
 
-      Map.put(slices, option(resource, :path), own_state)
+      Map.put(slices, Aikido.Dsl.Agent.Info.agent_path!(resource), own_state)
     end)
   end
 

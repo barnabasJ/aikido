@@ -31,7 +31,7 @@ defmodule AgentExamples.AI.Demo do
         #{answer}
         """)
 
-        team = Aikido.Ash.inspect!(AgentExamples.ResearchTeam, team.id)
+        team = AgentExamples.Agents.research_team_inspect!(team.id)
         IO.inspect(Map.keys(team.team.members), label: "Fixed and dynamic workers")
         IO.inspect(team.team.topology.nodes["analyst-helper"].owner, label: "Helper's owner")
       end
@@ -79,7 +79,9 @@ defmodule AgentExamples.AI.Demo do
     try do
       fun.(resource)
     after
-      Aikido.Ash.stop!(resource)
+      (Map.get(resource, :resource) || resource.__struct__)
+      |> Ash.ActionInput.for_action(:stop, %{agent: resource})
+      |> Ash.run_action!()
     end
   end
 end

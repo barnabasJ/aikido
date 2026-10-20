@@ -9,7 +9,7 @@ defmodule Aikido.Dsl.Instance do
 
   Spark validates and stores the configuration. Read it through
   `Aikido.Dsl.Instance.Info`. Supervision entry points come from the instance
-  host; lifecycle, persistence and debugging use the shared runtime APIs.
+  host. Agent lifecycle and persistence are exposed through domain actions.
   """
 
   @instance_section %Spark.Dsl.Section{

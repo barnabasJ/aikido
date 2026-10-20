@@ -146,24 +146,33 @@ defmodule AikidoTest.AshTest do
            ] = Enum.reject(action.arguments, &(&1.name == :agent))
 
     assert constraints[:min] == 1
-    record = snapshot_result(Aikido.Ash.start!(resource))
+    record = snapshot_result(AikidoTest.AshFixtures.Domain.generated_counter_start!())
 
     assert {:ok, %{count: 3} = record} =
-             snapshot_result(Aikido.Ash.command(record, %{amount: "3"}, action: :add))
+             snapshot_result(
+               AikidoTest.AshFixtures.Domain.generated_counter_add(record, %{amount: "3"})
+             )
 
     assert {:ok, %{count: 5} = record} =
-             snapshot_result(Aikido.Ash.command(record, %{}, action: :add))
+             snapshot_result(AikidoTest.AshFixtures.Domain.generated_counter_add(record, %{}))
 
     assert {:error, %Ash.Error.Invalid{}} =
-             snapshot_result(Aikido.Ash.command(record, %{amount: 0}, action: :add))
+             snapshot_result(
+               AikidoTest.AshFixtures.Domain.generated_counter_add(record, %{amount: 0})
+             )
 
     assert {:ok, %{count: 7}} =
-             snapshot_result(Aikido.Ash.command(record, %{amount: nil}, action: :add))
+             snapshot_result(
+               AikidoTest.AshFixtures.Domain.generated_counter_add(record, %{amount: nil})
+             )
 
     assert {:ok, %{count: 11}} =
-             snapshot_result(Aikido.Ash.command(record, %{amount: "4"}, action: :with_data))
+             snapshot_result(
+               AikidoTest.AshFixtures.Domain.generated_counter_with_data(record, %{amount: "4"})
+             )
 
-    assert {:ok, %{status: :stopped}} = Aikido.Ash.stop(record)
+    assert {:ok, %{status: :stopped}} =
+             AikidoTest.AshFixtures.Domain.generated_counter_stop(record)
   end
 
   test "resource agents reuse their attributes without a generated schema resource" do
@@ -188,26 +197,22 @@ defmodule AikidoTest.AshTest do
     start_supervised!(Aikido)
 
     assert {:ok, record} =
-             snapshot_result(
-               Aikido.Ash.start(AikidoTest.AshFixtures.DefaultCounter, %{count: "5"})
-             )
+             snapshot_result(AikidoTest.AshFixtures.Domain.default_counter_start(%{count: "5"}))
 
     assert record.count == 5
     assert record.origin == "local"
 
     assert {:error, _} =
              snapshot_result(
-               Aikido.Ash.start(AikidoTest.AshFixtures.DefaultCounter, %{origin: "override"})
+               AikidoTest.AshFixtures.Domain.default_counter_start(%{origin: "override"})
              )
 
     assert is_pid(AikidoTest.Case.agent_pid(Aikido.Default, record.id))
 
     assert {:error, _} =
-             snapshot_result(
-               Aikido.Ash.start(AikidoTest.AshFixtures.DefaultCounter, %{count: -1})
-             )
+             snapshot_result(AikidoTest.AshFixtures.Domain.default_counter_start(%{count: -1}))
 
-    assert {:ok, %{status: :stopped}} = Aikido.Ash.stop(record)
+    assert {:ok, %{status: :stopped}} = AikidoTest.AshFixtures.Domain.default_counter_stop(record)
   end
 
   test "domain interfaces drive the complete process lifecycle" do
@@ -508,7 +513,7 @@ defmodule AikidoTest.AshTest do
   end
 
   defp snapshot_result({:ok, %{resource: resource, id: id}}) do
-    Aikido.Ash.inspect(resource, id)
+    resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action()
   end
 
   defp snapshot_result({:error, _} = error) do
@@ -516,6 +521,6 @@ defmodule AikidoTest.AshTest do
   end
 
   defp snapshot_result(%{resource: resource, id: id}) do
-    Aikido.Ash.inspect!(resource, id)
+    resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action!()
   end
 end

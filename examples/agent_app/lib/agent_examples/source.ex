@@ -62,8 +62,7 @@ defmodule AgentExamples.Source do
                          ] ->
                            :slice
 
-                         String.contains?(file, "/actions/") ||
-                             String.starts_with?(name, "Aikido.Slices.AiWorker.") ->
+                         String.starts_with?(name, "Aikido.Slices.AiWorker.") ->
                            :action
 
                          String.contains?(file, "/directives/") || module == Aikido.Hooks.Execute ->

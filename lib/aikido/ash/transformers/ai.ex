@@ -2,7 +2,6 @@ defmodule Aikido.Ash.Transformers.AI do
   @moduledoc false
   use Spark.Dsl.Transformer
   alias Ash.Resource.Builder
-  alias Ash.Resource.Actions.Argument
   alias Spark.Dsl.Transformer
 
   def before?(Aikido.Ash.Transformers.Agent), do: true
@@ -96,10 +95,8 @@ defmodule Aikido.Ash.Transformers.AI do
     )
   end
 
-  defp arg(name, type, opts \\ []),
-    do:
-      struct(
-        Argument,
-        Keyword.merge([name: name, type: Ash.Type.get_type(type), public?: true], opts)
-      )
+  defp arg(name, type, opts \\ []) do
+    {:ok, argument} = Builder.build_action_argument(name, type, opts)
+    argument
+  end
 end

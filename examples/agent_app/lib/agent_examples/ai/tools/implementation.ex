@@ -29,19 +29,24 @@ defmodule AgentExamples.AI.Tools.Implementation do
 
   @impl true
   def run(input, [action: :spawn_worker], context) do
+    ash_opts = Ash.Scope.to_opts(context, context: input.context)
+
     with {:ok, team, owner, caller} <- scope(input, context),
          {:ok, template, resource} <- resolve_template(team, input.arguments.template),
          {:ok, _started} <-
-           Aikido.Ash.command(
-             team,
+           team.__struct__
+           |> Ash.ActionInput.for_action(
+             :add_member,
              %{
+               agent: team.id,
                member: input.arguments.name,
                template: template,
                owner: owner,
                initial_state: initial_state(caller, resource, input.arguments.specialty)
              },
-             Ash.Scope.to_opts(context, context: input.context, action: :add_member)
-           ) do
+             ash_opts
+           )
+           |> Ash.run_action(ash_opts) do
       {:ok, %{member: input.arguments.name, status: "started", owner: owner}}
     end
   end
@@ -94,17 +99,17 @@ defmodule AgentExamples.AI.Tools.Implementation do
   end
 
   defp manage(input, context, action) do
+    ash_opts = Ash.Scope.to_opts(context, context: input.context)
+
     with {:ok, team, caller, _record} <- scope(input, context),
          {:ok, member} <- resolve_topology_member(team, input.arguments.member),
          true <-
            owned_by?(team.team.topology.nodes, member, caller) ||
              {:error, "You may only manage your own descendants"},
          {:ok, _} <-
-           Aikido.Ash.command(
-             team,
-             %{member: member},
-             Ash.Scope.to_opts(context, context: input.context, action: action)
-           ) do
+           team.__struct__
+           |> Ash.ActionInput.for_action(action, %{agent: team.id, member: member}, ash_opts)
+           |> Ash.run_action(ash_opts) do
       {:ok,
        %{
          member: input.arguments.member,
@@ -156,18 +161,23 @@ defmodule AgentExamples.AI.Tools.Implementation do
     with true <-
            (is_atom(resource) && not is_nil(resource)) ||
              {:error, "Agent management requires agent runtime context"},
-         {:ok, record} <- Aikido.Ash.inspect(resource, caller.agent_id, opts) do
+         {:ok, record} <-
+           resource
+           |> Ash.ActionInput.for_action(:inspect, %{agent: caller.agent_id}, opts)
+           |> Ash.run_action(opts) do
       cond do
         !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)) ->
           {:ok, record, nil, record}
 
         caller.parent && caller.parent.meta[:team_resource] ->
           with {:ok, team} <-
-                 Aikido.Ash.inspect(
-                   caller.parent.meta.team_resource,
-                   caller.parent.meta.team_id,
+                 caller.parent.meta.team_resource
+                 |> Ash.ActionInput.for_action(
+                   :inspect,
+                   %{agent: caller.parent.meta.team_id},
                    opts
-                 ) do
+                 )
+                 |> Ash.run_action(opts) do
             {:ok, team, caller.parent.meta.member, record}
           end
 

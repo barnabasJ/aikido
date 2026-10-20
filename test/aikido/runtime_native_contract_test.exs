@@ -164,10 +164,12 @@ defmodule Aikido.RuntimeNativeContractTest do
     start_supervised!({Aikido, name: Aikido.Default, durable: AikidoTest.Case.durable_options()})
 
     assert {:ok, team} =
-             Aikido.Ash.start(Aikido.RuntimeNativeContractTest.ScopedTeam, %{},
+             Aikido.RuntimeNativeContractTest.ScopedTeam
+             |> Ash.ActionInput.for_action(:start, %{},
                actor: %{id: "team-owner"},
                authorize?: true
              )
+             |> Ash.run_action(actor: %{id: "team-owner"}, authorize?: true)
 
     assert {:ok, runtime} = Aikido.AgentServer.state(team.pid, &{:ok, &1})
     assert is_pid(runtime.agent.state.team.members.worker)

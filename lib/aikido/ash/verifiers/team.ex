@@ -18,7 +18,7 @@ defmodule Aikido.Ash.Verifiers.Team do
       Enum.any?(names, &Map.has_key?(raw, &1)) ->
         error("Duplicate topology member")
 
-      Enum.any?(entities, &(Aikido.Ash.Runtime.option(&1.resource, :instance) != instance)) ->
+      Enum.any?(entities, &(Aikido.Dsl.Agent.Info.agent_instance!(&1.resource) != instance)) ->
         error("All team members must use the team's Aikido instance")
 
       true ->

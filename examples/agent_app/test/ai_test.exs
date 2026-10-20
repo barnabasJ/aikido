@@ -20,10 +20,20 @@ defmodule AgentExamples.AITest do
   end
 
   defp track(%{resource: resource} = reference),
-    do: track(Aikido.Ash.inspect!(resource, reference))
+    do:
+      track(
+        resource
+        |> Ash.ActionInput.for_action(:inspect, %{agent: reference})
+        |> Ash.run_action!()
+      )
 
   defp track(record) do
-    on_exit(fn -> Aikido.Ash.stop(record) end)
+    on_exit(fn ->
+      (Map.get(record, :resource) || record.__struct__)
+      |> Ash.ActionInput.for_action(:stop, %{agent: record})
+      |> Ash.run_action()
+    end)
+
     record
   end
 
@@ -156,7 +166,7 @@ defmodule AgentExamples.AITest do
     assert answer =~ "specialist:"
     refute answer =~ "Tool error:"
 
-    current = Aikido.Ash.inspect!(AgentExamples.ResearchTeam, team.id)
+    current = AgentExamples.Agents.research_team_inspect!(team.id)
     assert current.team.topology.nodes["specialist"].owner == nil
     assert current.team.topology.nodes["analyst-helper"].owner == :analyst
     assert map_size(current.team.members) == 4
@@ -168,7 +178,7 @@ defmodule AgentExamples.AITest do
     for {name, pid} <- current.team.members do
       resource = current.team.topology.nodes[name].resource
       {:ok, id} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.id})
-      member = Aikido.Ash.inspect!(resource, id)
+      member = resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action!()
       assert member.tools == tools
       assert member.client == AI.ScriptedClient
       assert member.model == "offline"
@@ -221,7 +231,7 @@ defmodule AgentExamples.AITest do
     assert {:ok, answer} = AI.ask(team, "orchestrate: Signals carry results", timeout: 30_000)
     refute answer =~ "Tool error:"
     assert answer =~ "Words: 3"
-    current = Aikido.Ash.inspect!(AgentExamples.ResearchTeam, team.id)
+    current = AgentExamples.Agents.research_team_inspect!(team.id)
     assert current.team.topology.nodes["specialist"].owner == nil
     assert current.team.topology.nodes["analyst-helper"].owner == :analyst
     assert map_size(current.team.members) == 4
@@ -241,7 +251,7 @@ defmodule AgentExamples.AITest do
                "return assert(agents.spawn({input = {name = 'squad-a', template = 'squad'}}))"
              )
 
-    current = Aikido.Ash.inspect!(AgentExamples.ResearchTeam, team.id)
+    current = AgentExamples.Agents.research_team_inspect!(team.id)
     squad = member(current, "squad-a")
     assert squad.__struct__ == AgentExamples.ResearchSquad
     assert squad.tools == team.tools
@@ -254,11 +264,11 @@ defmodule AgentExamples.AITest do
     assert {:ok, %{error: nil}} =
              lua(squad, "return assert(agents.spawn({input = {name = 'squad-worker'}}))")
 
-    squad = Aikido.Ash.inspect!(AgentExamples.ResearchSquad, squad.id)
+    squad = AgentExamples.Agents.research_squad_inspect!(squad.id)
     assert Map.has_key?(squad.team.members, "squad-worker")
 
     refute Map.has_key?(
-             Aikido.Ash.inspect!(AgentExamples.ResearchTeam, team.id).team.members,
+             AgentExamples.Agents.research_team_inspect!(team.id).team.members,
              "squad-worker"
            )
 
@@ -272,7 +282,7 @@ defmodule AgentExamples.AITest do
     assert {:ok, %{error: nil}} =
              lua(analyst, "return assert(agents.spawn({input = {name = 'lua-helper'}}))")
 
-    current = Aikido.Ash.inspect!(AgentExamples.ResearchTeam, team.id)
+    current = AgentExamples.Agents.research_team_inspect!(team.id)
     assert current.team.topology.nodes["lua-helper"].owner == :analyst
     helper = current.team.members["lua-helper"]
     ref = Process.monitor(helper)
@@ -281,7 +291,7 @@ defmodule AgentExamples.AITest do
              lua(analyst, "return assert(agents.stop({input = {member = 'lua-helper'}}))")
 
     assert_receive {:DOWN, ^ref, :process, ^helper, _}, 5_000
-    current = Aikido.Ash.inspect!(AgentExamples.ResearchTeam, team.id)
+    current = AgentExamples.Agents.research_team_inspect!(team.id)
     assert Map.has_key?(current.team.topology.nodes, "lua-helper")
     refute Map.has_key?(current.team.members, "lua-helper")
 
@@ -289,7 +299,7 @@ defmodule AgentExamples.AITest do
              lua(analyst, "return assert(agents.remove({input = {member = 'lua-helper'}}))")
 
     refute Map.has_key?(
-             Aikido.Ash.inspect!(AgentExamples.ResearchTeam, team.id).team.topology.nodes,
+             AgentExamples.Agents.research_team_inspect!(team.id).team.topology.nodes,
              "lua-helper"
            )
 
@@ -299,14 +309,17 @@ defmodule AgentExamples.AITest do
     refute is_nil(error)
 
     assert Map.has_key?(
-             Aikido.Ash.inspect!(AgentExamples.ResearchTeam, team.id).team.members,
+             AgentExamples.Agents.research_team_inspect!(team.id).team.members,
              :reviewer
            )
   end
 
   defp member(team, name) do
     {:ok, id} = Aikido.AgentServer.state(team.team.members[name], &{:ok, &1.id})
-    Aikido.Ash.inspect!(team.team.topology.nodes[name].resource, id)
+
+    team.team.topology.nodes[name].resource
+    |> Ash.ActionInput.for_action(:inspect, %{agent: id})
+    |> Ash.run_action!()
   end
 
   defp lua(record, script) do
@@ -370,10 +383,10 @@ defmodule AgentExamples.AITest do
 
   # Commands return receipts; state assertions opt into a separate inspection.
   defp snapshot_result({:ok, %{resource: resource, id: id}}),
-    do: Aikido.Ash.inspect(resource, id)
+    do: resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action()
 
   defp snapshot_result({:error, _} = error), do: error
 
   defp snapshot_result(%{resource: resource, id: id}),
-    do: Aikido.Ash.inspect!(resource, id)
+    do: resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action!()
 end

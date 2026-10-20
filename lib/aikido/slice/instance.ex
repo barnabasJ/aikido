@@ -11,7 +11,6 @@ defmodule Aikido.Slice.Instance do
   - `path` - The agent-declared mount path
   """
 
-  alias Aikido.Dsl.Slice.Info, as: SliceInfo
   alias Aikido.Slice.Config
 
   use Ash.TypedStruct
@@ -52,33 +51,6 @@ defmodule Aikido.Slice.Instance do
       config: resolved_config,
       path: path
     }
-  end
-
-  @doc """
-  Expands the slice's signal routes for the agent's combined route table.
-
-  Slice routes use absolute signal types from `Aikido.Dsl.Slice.Info`.
-  The output shape is the 3-tuple format `{path, target, opts}` used by
-  the agent's route table.
-  """
-  @spec expand_routes(t()) :: [tuple()]
-  def expand_routes(%__MODULE__{module: module}) do
-    module
-    |> SliceInfo.signal_routes()
-    |> Enum.map(&normalize_route/1)
-  end
-
-  defp normalize_route({path, match, target, priority}) when is_function(match, 1),
-    do: {path, match, target, priority}
-
-  defp normalize_route({path, match, target}) when is_function(match, 1),
-    do: {path, match, target, -10}
-
-  defp normalize_route({path, target}), do: {path, target, []}
-  defp normalize_route({path, target, opts}) when is_list(opts), do: {path, target, opts}
-
-  defp normalize_route({path, target, priority}) when is_integer(priority) do
-    {path, target, [priority: priority]}
   end
 
   defp normalize_declaration(module) when is_atom(module) do

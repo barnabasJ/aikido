@@ -17,10 +17,11 @@ defmodule AgentExamples.AI do
     request_id = Ash.UUIDv7.generate()
     timeout = Keyword.get(opts, :timeout, 30_000)
     resource = Map.get(record, :resource) || record.__struct__
+    ash_opts = Keyword.get(opts, :ash, [])
 
     pid =
       case Aikido.Durable.lookup(
-             Aikido.durable_supervisor_name(Aikido.Ash.Runtime.option(resource, :instance)),
+             Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource)),
              record.id
            ) do
         {:ok, pid} -> pid
@@ -41,11 +42,13 @@ defmodule AgentExamples.AI do
     Aikido.AgentServer.call_until(
       pid,
       fn ->
-        Aikido.Ash.command(
-          record,
-          %{query: query, request_id: request_id},
-          Keyword.put(Keyword.get(opts, :ash, []), :action, :ask)
+        resource
+        |> Ash.ActionInput.for_action(
+          :ask,
+          %{agent: record.id, query: query, request_id: request_id},
+          ash_opts
         )
+        |> Ash.run_action(ash_opts)
       end,
       "**",
       observe,
@@ -57,9 +60,14 @@ defmodule AgentExamples.AI do
   def delegate(team, member, text, opts \\ []) do
     task_id = Ash.UUIDv7.generate()
     timeout = Keyword.get(opts, :timeout, 20_000)
+    resource = Map.get(team, :resource) || team.__struct__
+    ash_opts = Keyword.get(opts, :ash, [])
 
     pid =
-      case Aikido.Durable.lookup(Aikido.durable_supervisor_name(Aikido.Default), team.id) do
+      case Aikido.Durable.lookup(
+             Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource)),
+             team.id
+           ) do
         {:ok, pid} -> pid
         :error -> nil
       end
@@ -75,16 +83,19 @@ defmodule AgentExamples.AI do
     Aikido.AgentServer.call_until(
       pid,
       fn ->
-        Aikido.Ash.command(
-          team,
+        resource
+        |> Ash.ActionInput.for_action(
+          :assign_task,
           %{
+            agent: team.id,
             member: member,
             task_id: task_id,
             payload: %{text: text},
             timeout_ms: timeout
           },
-          Keyword.put(Keyword.get(opts, :ash, []), :action, :assign_task)
+          ash_opts
         )
+        |> Ash.run_action(ash_opts)
       end,
       "aikido.ash.team.**",
       observe,

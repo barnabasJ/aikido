@@ -371,7 +371,7 @@ defmodule AikidoTest.DurableTest do
   end
 
   defp snapshot_result({:ok, %{resource: resource, id: id}}) do
-    Aikido.Ash.inspect(resource, id)
+    resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action()
   end
 
   defp snapshot_result({:error, _} = error) do
@@ -379,6 +379,6 @@ defmodule AikidoTest.DurableTest do
   end
 
   defp snapshot_result(%{resource: resource, id: id}) do
-    Aikido.Ash.inspect!(resource, id)
+    resource |> Ash.ActionInput.for_action(:inspect, %{agent: id}) |> Ash.run_action!()
   end
 end
