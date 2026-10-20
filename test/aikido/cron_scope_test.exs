@@ -1,33 +1,38 @@
-defmodule Aikido.CronScopeTest.Reducer do
+defmodule Aikido.CronScopeTest.Register do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _, _context) do
+    Aikido.Types.ActionResult.new(
+      state: input.arguments.state,
+      directives: [
+        %Aikido.Directives.Cron{
+          cron: "@yearly",
+          message: input.arguments.message,
+          job_id: input.arguments.job_id
+        }
+      ]
+    )
+  end
+end
+
+defmodule Aikido.CronScopeTest.Observe do
   use Ash.Resource.Actions.Implementation
 
   @impl true
   def run(input, _, context) do
-    if input.action.name == :register do
-      Aikido.Types.ActionResult.new(
-        state: input.arguments.state,
-        directives: [
-          %Aikido.Directives.Cron{
-            cron: "@yearly",
-            message: input.arguments.message,
-            job_id: input.arguments.job_id
-          }
-        ]
-      )
-    else
-      observation = %{
-        actor_id: context.actor && context.actor.id,
-        tenant: context.tenant,
-        marker: input.context[:marker],
-        authorize?: context.authorize?,
-        tracers: List.wrap(context.tracer),
-        data: input.arguments.data
-      }
+    observation = %{
+      actor_id: context.actor && context.actor.id,
+      tenant: context.tenant,
+      marker: input.context[:marker],
+      authorize?: context.authorize?,
+      tracers: List.wrap(context.tracer),
+      data: input.arguments.data
+    }
 
-      Aikido.Types.ActionResult.new(
-        state: %{observations: input.arguments.state.observations ++ [observation]}
-      )
-    end
+    Aikido.Types.ActionResult.new(
+      state: %{observations: input.arguments.state.observations ++ [observation]}
+    )
   end
 end
 
@@ -58,13 +63,13 @@ defmodule Aikido.CronScopeTest.Resource do
       argument :state, :term
       argument :message, :term, allow_nil?: false
       argument :job_id, :atom, allow_nil?: false
-      run Aikido.CronScopeTest.Reducer
+      run Aikido.CronScopeTest.Register
     end
 
     action :observe, Aikido.Types.ActionResult do
       argument :state, :term
       argument :data, :map, default: %{}
-      run Aikido.CronScopeTest.Reducer
+      run Aikido.CronScopeTest.Observe
     end
   end
 end

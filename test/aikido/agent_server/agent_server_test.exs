@@ -1119,14 +1119,6 @@ defmodule AikidoTest.AgentServerTest do
   end
 
   describe("mounted slice schedules") do
-    (
-      nil
-      nil
-    )
-
-    nil
-    nil
-
     test("registers slice schedules on startup", %{aikido: aikido}) do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(
