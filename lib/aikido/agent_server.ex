@@ -236,9 +236,25 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  @typedoc "Selector for `call/4` and `state/3`. Receives the full\n`%AgentServer.State{}`; the slice the user cares about lives at\n`state.agent.state` (or under the agent's declared `path/0`). Must\nreturn a tagged `{:ok, _}` or `{:error, _}` tuple.\n\nSelectors run synchronously in the agent process. A raising selector is\ncaught and surfaces to the caller as\n`{:error, {:selector_raised, exception, stacktrace}}`.\n\nNo `:skip` return — the caller is blocking, so \"skip\" has no meaning.\nUse `subscribe/4` for the ambient pattern that supports `:skip`.\n"
+  @typedoc """
+  Selector for `call/4` and `state/3`. Receives the full
+  `%AgentServer.State{}`; the slice the user cares about lives at
+  `state.agent.state` (or under the agent's declared `path/0`). Must
+  return a tagged `{:ok, _}` or `{:error, _}` tuple.
+
+  Selectors run synchronously in the agent process. A raising selector is
+  caught and surfaces to the caller as
+  `{:error, {:selector_raised, exception, stacktrace}}`.
+
+  No `:skip` return — the caller is blocking, so "skip" has no meaning.
+  Use `subscribe/4` for the ambient pattern that supports `:skip`.
+  """
   @type call_selector :: (State.t() -> {:ok, term()} | {:error, term()})
-  @typedoc "Selector for `subscribe/4`. Same calling convention as `call_selector/0`,\nwith one extra return value: `:skip` keeps the subscription alive and\ndelivers nothing to the subscriber.\n"
+  @typedoc """
+  Selector for `subscribe/4`. Same calling convention as `call_selector/0`,
+  with one extra return value: `:skip` keeps the subscription alive and
+  delivers nothing to the subscriber.
+  """
   @type subscribe_selector :: (State.t() -> {:ok, term()} | {:error, term()} | :skip)
   @doc """
   Synchronously sends a signal, runs the pipeline, and projects the
