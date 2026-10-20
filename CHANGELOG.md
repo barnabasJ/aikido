@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Remove the misleading misuse warning for intentional normal Stop directives.
+  Distinguish asynchronous task completion from process shutdown and show the
+  opening AI signal in the external subscription example. Shutdown semantics
+  and clean stopping lifecycle handling remain unchanged.
+
 - Show the actual team slice and individual action definitions in all team
   example source panels, with slices expanded and implementation panels closed.
 

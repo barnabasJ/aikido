@@ -75,40 +75,54 @@ defmodule Aikido.AgentServer do
   Agent processes are supervised independently of the process that invokes the
   domain action.
 
-  ## Completion Detection
+  ## Waiting for asynchronous work
 
-  Agents signal completion via **state**, not process death:
+  Handling a command can start asynchronous work. Its processing receipt does
+  not mean that work has finished. For an AI agent, the opening signal starts
+  a run; later model and tool result signals let its actions update the run state.
 
-      # In an action, return the terminal status as part of slice state:
-      slice = %{slice | status: :completed, last_answer: answer}
-      Aikido.Types.ActionResult.new(state: slice, directives: [])
+  This external-caller example assumes `server` is a running agent with
+  `Aikido.Ash.AI` and a configured model. It waits for one particular AI run:
 
-      # Subscribe before sending the command, then await its terminal state:
+      request_id = Ash.UUIDv7.generate()
+
+      signal =
+        Aikido.Signal.new!("ai.react.ask", %{
+          query: "Summarize this document...",
+          request_id: request_id
+        })
+
       selector = fn runtime ->
-        path = Spark.Dsl.Extension.get_opt(runtime.agent_module, [:agent], :path)
-        slice = Map.fetch!(runtime.agent.state, path)
+        case runtime.agent.state.ai do
+          %{request_id: ^request_id, status: :completed, result: answer} ->
+            {:ok, answer}
 
-        case slice.status do
-          :completed -> {:ok, slice.last_answer}
-          :failed -> {:error, slice.error}
-          _ -> :skip
+          %{request_id: ^request_id, status: :failed, error: reason} ->
+            {:error, reason}
+
+          _ ->
+            :skip
         end
       end
 
       {:ok, answer} =
-        Aikido.AgentServer.call_until(server, signal, "**", selector, timeout: 30_000)
+        AgentServer.call_until(server, signal, "ai.react.**", selector, timeout: 30_000)
 
-  `call_until/5` registers a one-shot subscription before dispatching `signal`.
-  The selector runs after matching signals are processed; `:skip` keeps the
-  subscription waiting. There are no repeated state queries. For concurrent
-  requests, also match the request identifier in the selector.
+  `call_until/5` subscribes before dispatching the opening signal. After matching
+  signals are processed, the selector reads their resulting state. `:skip` keeps
+  waiting; a tagged result finishes the one-shot subscription. There are no
+  repeated state queries. Matching the request ID keeps other runs separate.
 
-  This follows Elm/Redux semantics where completion is a state concern.
-  The process stays alive until explicitly stopped or supervised.
+  Other workflows can expose their own completion state and selectors; the AI
+  fields above are not required on every agent. Waiting is optional and belongs
+  in an external caller, never inside a reducer or directive callback.
 
-  **Do NOT** use `{:stop, ...}` from a directive for normal completion—this
-  causes race conditions with async work and skips lifecycle hooks.
-  See `Aikido.Directive` for details.
+  Completing work does not stop the agent process. Intentional shutdown is a
+  separate operation, supported by `%Aikido.Directives.Stop{reason: :normal}`.
+  Its `exec/3` returns `{:stop, reason}`, ending the process and the remaining
+  directive batch. Shutdown does not wait for outstanding work to finish; a
+  waiting caller may receive `{:error, {:server_stopped, reason}}` instead of a
+  task result. Clean shutdown still runs the stopping lifecycle path.
 
   ## Debugging
 
@@ -1537,7 +1551,6 @@ defmodule Aikido.AgentServer do
         execute_directives(rest, signal, state)
 
       {:stop, reason} ->
-        warn_if_normal_stop(reason, directive, state)
         {:stop, reason, state}
 
       {:error, reason} ->
@@ -2456,28 +2469,5 @@ defmodule Aikido.AgentServer do
 
   defp emit_telemetry(event, measurements, metadata) do
     :telemetry.execute(event, measurements, metadata)
-  end
-
-  # Warn when {:stop, ...} is used with normal-looking reasons.
-  # This indicates likely misuse - normal completion should use state.status instead.
-  defp warn_if_normal_stop(reason, directive, state)
-       when reason in [:normal, :completed, :ok, :done, :success] do
-    directive_type = directive.__struct__ |> Module.split() |> List.last()
-
-    Logger.warning(
-      "AgentServer #{state.id} received {:stop, #{inspect(reason)}, ...} from directive #{directive_type}.
-
-This is a HARD STOP: pending directives and async work will be lost,
-
-For normal completion, set state.status to :completed/:failed instead and avoid returning {:stop, ...}.
-External code should subscribe before dispatch, using AgentServer.call_until/5 to await terminal state.
-
-{:stop, ...} should only be used for abnormal/framework-level termination.
-"
-    )
-  end
-
-  defp warn_if_normal_stop(_reason, _directive, _state) do
-    :ok
   end
 end
