@@ -55,7 +55,6 @@ defmodule Aikido.Directives.Reply do
           {module :: module(), fun :: atom(), extra_args :: [term()]}
 
   alias Jido.Signal
-  alias Jido.Signal.Dispatch
 
   require Logger
 
@@ -86,7 +85,13 @@ defmodule Aikido.Directives.Reply do
 
     case Signal.new(type, data, subject: input.id) do
       {:ok, reply_signal} ->
-        _ = Dispatch.dispatch(Aikido.SignalCtx.inherit(reply_signal, input), input.jido_dispatch)
+        _ =
+          Aikido.Directives.Emit.exec(
+            %Aikido.Directives.Emit{signal: reply_signal, dispatch: input.jido_dispatch},
+            input,
+            state
+          )
+
         :ok
 
       {:error, reason} ->

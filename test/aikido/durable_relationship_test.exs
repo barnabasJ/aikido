@@ -123,4 +123,40 @@ defmodule AikidoTest.DurableRelationshipTest do
     assert {:ok, %{parent_id: "parent"}} =
              Aikido.Durable.parent_binding(Aikido.durable_supervisor_name(instance), "child")
   end
+
+  test "restored team metadata resolves the same partition as its parent", %{
+    instance: instance,
+    durable: durable
+  } do
+    {:ok, default_team} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "team")
+
+    {:ok, blue_team} =
+      AikidoTest.Case.start_test_agent(instance, Minimal, id: "team", partition: :blue)
+
+    {:ok, parent} =
+      AikidoTest.Case.start_test_agent(instance, Minimal, id: "owner", partition: :blue)
+
+    {:ok, child} =
+      AikidoTest.Case.start_test_agent(instance, Minimal,
+        id: "member",
+        partition: :blue,
+        parent: %{
+          pid: parent,
+          id: "owner",
+          partition: :blue,
+          tag: :member,
+          meta: %{team_id: "team", team_resource: Minimal, team_pid: blue_team, member: :member}
+        }
+      )
+
+    assert :ok = Aikido.Durable.stop(durable, child)
+
+    {:ok, restored} =
+      AikidoTest.Case.start_test_agent(instance, Minimal, id: "member", partition: :blue)
+
+    assert {:ok, %{pid: ^parent, meta: %{team_pid: ^blue_team}}} =
+             AgentServer.state(restored, &{:ok, &1.parent})
+
+    refute blue_team == default_team
+  end
 end

@@ -156,6 +156,89 @@ defmodule AikidoTest.SchedulerTest do
     end
   end
 
+  test "forced scheduler death also stops its active callback workers" do
+    parent = self()
+
+    {:ok, job} =
+      Aikido.Scheduler.run_every(
+        fn ->
+          send(parent, {:blocked_callback, self()})
+
+          receive do
+            :release -> :ok
+          end
+        end,
+        "@hourly"
+      )
+
+    send(job, :tick)
+    assert_receive {:blocked_callback, worker}
+    on_exit(fn -> if Process.alive?(worker), do: Process.exit(worker, :kill) end)
+    job_ref = Process.monitor(job)
+    worker_ref = Process.monitor(worker)
+    Process.exit(job, :kill)
+    assert_receive {:DOWN, ^job_ref, :process, ^job, :killed}
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, :killed}
+  end
+
+  test "a killed callback is removed while the scheduler handles later ticks" do
+    parent = self()
+
+    {:ok, job} =
+      Aikido.Scheduler.run_every(
+        fn ->
+          send(parent, {:blocked_callback, self()})
+
+          receive do
+            :release -> :ok
+          end
+        end,
+        "@hourly"
+      )
+
+    on_exit(fn -> Aikido.Scheduler.cancel(job) end)
+    send(job, :tick)
+    assert_receive {:blocked_callback, worker}
+    worker_ref = Process.monitor(worker)
+    Process.exit(worker, :kill)
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, :killed}
+    send(job, :tick)
+    assert_receive {:blocked_callback, replacement}
+    refute replacement == worker
+    refute worker in Map.values(:sys.get_state(job).callback_workers)
+    assert Process.alive?(job)
+  end
+
+  test "worker EXIT is isolated whether it precedes or queues behind DOWN" do
+    worker =
+      spawn(fn ->
+        receive do
+          :stop -> :ok
+        end
+      end)
+
+    on_exit(fn -> send(worker, :stop) end)
+    ref = make_ref()
+    state = %{callback_workers: %{ref => worker}, owner_ref: nil, owner_pid: nil}
+
+    assert {:noreply, ^state} =
+             Aikido.Scheduler.Job.handle_info({:EXIT, worker, :shutdown}, state)
+
+    send(self(), {:EXIT, worker, :shutdown})
+
+    assert {:noreply, %{callback_workers: workers}} =
+             Aikido.Scheduler.Job.handle_info({:DOWN, ref, :process, worker, :shutdown}, state)
+
+    assert workers == %{}
+    refute_receive {:EXIT, ^worker, _}
+
+    assert {:stop, :shutdown, _} =
+             Aikido.Scheduler.Job.handle_info({:EXIT, self(), :shutdown}, %{
+               state
+               | callback_workers: workers
+             })
+  end
+
   describe("cancel/1") do
     test "cancels a running cron job" do
       {:ok, pid} = Aikido.Scheduler.run_every(fn -> :ok end, "* * * * *")

@@ -89,7 +89,7 @@ defmodule Aikido.Signal.Call do
 
     with {:ok, pid} <- AgentServer.resolve(server) do
       ref = Process.monitor(pid)
-      :ok = GenServer.cast(pid, {:signal, query})
+      :ok = AgentServer.cast(pid, query)
 
       try do
         await_reply(correlation_id, ref, timeout)

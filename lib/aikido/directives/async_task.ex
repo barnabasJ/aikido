@@ -73,29 +73,33 @@ defmodule Aikido.Directives.AsyncTask do
   @spec exec(directive :: AsyncTask.t(), input_signal :: Signal.t(), state :: State.t()) :: :ok
   @impl true
   def exec(%AsyncTask{} = directive, input_signal, %State{} = state) do
-    agent_pid = self()
-    task_sup = Aikido.task_supervisor_name(state.aikido)
-
-    tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
-    transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
-
-    case Task.Supervisor.start_child(task_sup, fn ->
-           Ash.ProcessHelpers.transfer_context(transfer)
-
-           Ash.Tracer.span {:custom, :aikido_async_task}, "aikido.async_task", tracers do
-             run_and_dispatch(directive, input_signal, state, agent_pid)
-           end
-         end) do
+    case start(directive, input_signal, state) do
       {:ok, _pid} ->
         :ok
 
       {:error, reason} ->
         directive
         |> error_signal(reason, state)
-        |> dispatch_signals(input_signal, reply_target(directive, agent_pid), state)
+        |> dispatch_signals(input_signal, reply_target(directive, self()), state)
     end
 
     :ok
+  end
+
+  @doc false
+  @spec start(AsyncTask.t(), Signal.t(), State.t()) :: {:ok, pid()} | {:error, term()}
+  def start(%AsyncTask{} = directive, %Signal{} = input_signal, %State{} = state) do
+    agent_pid = self()
+    tracers = Aikido.SignalCtx.tracers(input_signal, state.aikido)
+    transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
+
+    Task.Supervisor.start_child(Aikido.task_supervisor_name(state.aikido), fn ->
+      Ash.ProcessHelpers.transfer_context(transfer)
+
+      Ash.Tracer.span {:custom, :aikido_async_task}, "aikido.async_task", tracers do
+        run_and_dispatch(directive, input_signal, state, agent_pid)
+      end
+    end)
   end
 
   @spec run_and_dispatch(

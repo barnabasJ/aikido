@@ -44,6 +44,8 @@ defmodule Aikido.Directives.Emit do
       description: "Dispatch config: {adapter, opts} or list"
   end
 
+  require Logger
+
   @impl true
   def exec(%{signal: signal, dispatch: dispatch}, input_signal, state) do
     cfg = dispatch || state.default_dispatch
@@ -62,12 +64,38 @@ defmodule Aikido.Directives.Emit do
     send(self(), {:signal, signal})
   end
 
-  defp dispatch_signal(signal, cfg, state) do
+  defp dispatch_signal(signal, {:pid, opts} = cfg, state) when is_list(opts) do
+    if Keyword.keyword?(opts) && Keyword.get(opts, :delivery_mode, :async) == :async &&
+         not Keyword.has_key?(opts, :message_format) do
+      # Plain asynchronous PID delivery cannot wait or run application callbacks.
+      # Preserve sender ordering when a reply is followed by the agent stopping.
+      Jido.Signal.Dispatch.dispatch(signal, cfg)
+    else
+      dispatch_async(signal, cfg, state)
+    end
+  end
+
+  defp dispatch_signal(signal, cfg, state), do: dispatch_async(signal, cfg, state)
+
+  defp dispatch_async(signal, cfg, state) do
     transfer = Aikido.SignalCtx.tracer_context(signal)
 
-    Task.Supervisor.start_child(Aikido.task_supervisor_name(state.aikido), fn ->
-      Ash.ProcessHelpers.transfer_context(transfer)
-      Jido.Signal.Dispatch.dispatch(signal, cfg)
-    end)
+    case Task.Supervisor.start_child(Aikido.task_supervisor_name(state.aikido), fn ->
+           Ash.ProcessHelpers.transfer_context(transfer)
+
+           case Jido.Signal.Dispatch.dispatch(signal, cfg) do
+             {:error, reason} ->
+               Logger.error("Signal dispatch failed: #{inspect(reason)}", signal_id: signal.id)
+
+             _ ->
+               :ok
+           end
+         end) do
+      {:ok, _pid} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error("Could not start signal dispatch: #{inspect(reason)}", signal_id: signal.id)
+    end
   end
 end

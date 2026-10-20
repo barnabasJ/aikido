@@ -1,28 +1,18 @@
 defmodule Aikido.AgentServer.Signal.CronCancelled do
   @moduledoc """
-  Synthesized by the `Aikido.Directives.CronCancel` impl after the
-  scheduler job is cancelled, then cast
-  back to the agent so the cascade callback
-  `maybe_track_cron_cancelled/2` can drop the entry from
-  `state.cron_specs`, `state.cron_jobs`, `state.cron_monitors`,
-  `state.cron_monitor_refs`, and `state.cron_runtime_specs`.
+  Completion of an intentional cron scheduler shutdown.
 
-  Directives mutate no state. The directive does the I/O (cancel the
-  scheduler job + `Process.demonitor`); the
-  cascade callback observes this synthetic signal and rewrites the
-  runtime maps. DurableServer persists the resulting schedule definitions.
+  The runtime retires the cancelled job's monitor, timers and saved definition
+  before the shutdown task starts. This signal reports completion and never
+  removes current ownership, so a late acknowledgment cannot affect a replacement.
 
-  Note: this is distinct from `aikido.agent.cron.died` — `cron.cancelled`
-  fires when the directive intentionally cancels a job; `cron.died` fires
-  when the cron-job process exits (normal or abnormal) and is observed
-  by the parent's `:DOWN` monitor.
+  `aikido.agent.cron.died` instead reports an unintentional tracked process exit.
 
   ## Fields
 
   - `:job_id` - Logical cron job id within the agent
-  - `:pid` - PID of the cron-job process that was cancelled (or `nil` if
-    no runtime job was tracked)
-  - `:monitor_ref` - Monitor reference that was cleared (or `nil`)
+  - `:pid` - Retired scheduler PID, or `nil` when no job was tracked
+  - `:monitor_ref` - Retired monitor reference, or `nil`
   """
 
   use Jido.Signal,

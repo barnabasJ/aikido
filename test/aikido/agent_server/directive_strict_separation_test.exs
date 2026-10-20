@@ -180,7 +180,9 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
   end
 
   describe("CronCancel") do
-    test("directive does not write state.cron_*; cascade does", %{aikido: aikido}) do
+    test("runtime retires ownership before the supervised cancellation completes", %{
+      aikido: aikido
+    }) do
       pid =
         start_server(
           %{aikido: aikido},
@@ -207,16 +209,10 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
 
       directive = %Aikido.Directives.CronCancel{job_id: :cancel_target}
 
-      {:ok, %{before: before_state, after: after_state}} =
-        Aikido.AgentServer.state(pid, fn s ->
-          before_state = %{specs: s.cron_specs, jobs: s.cron_jobs, monitors: s.cron_monitors}
-          input_signal = Jido.Signal.new!(%{type: "test.harness", source: "/test", data: %{}})
-          :ok = Aikido.Directive.exec(directive, input_signal, s)
-          after_state = %{specs: s.cron_specs, jobs: s.cron_jobs, monitors: s.cron_monitors}
-          {:ok, %{before: before_state, after: after_state}}
-        end)
-
-      assert before_state == after_state
+      assert {:ok, _} =
+               Aikido.AgentServer.call(pid, signal_carrying_directive(directive), fn runtime ->
+                 {:ok, runtime.cron_jobs}
+               end)
 
       true =
         await_state_value(

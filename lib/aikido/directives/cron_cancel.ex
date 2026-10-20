@@ -1,16 +1,11 @@
 defmodule Aikido.Directives.CronCancel do
   @moduledoc """
-  Cancel a previously registered cron job for this agent by job_id.
+  Cancel a recurring cron job in supervised work without blocking the agent.
 
-  ## Fields
-
-  - `job_id` - The logical job id to cancel
-
-  ## Examples
-
-      %CronCancel{job_id: :heartbeat}
+  The runtime retires job ownership before executing this descriptor. Shutdown
+  completion publishes `aikido.agent.cron.cancelled`; it cannot remove a newer
+  job registered under the same ID.
   """
-
   use Aikido.Directive
 
   typed_struct do
@@ -18,50 +13,41 @@ defmodule Aikido.Directives.CronCancel do
   end
 
   require Logger
-  alias Aikido.AgentServer
-
-  alias Aikido.AgentServer.Signal.CronCancelled
-  alias Aikido.AgentServer.State
 
   @impl true
-  def exec(%{job_id: logical_id}, input_signal, %State{} = state) do
+  def exec(%{job_id: logical_id}, input_signal, state) do
     pid = Map.get(state.cron_jobs, logical_id)
-    monitor_ref = Map.get(state.cron_monitors, logical_id)
 
-    cancel_io(pid, monitor_ref)
+    task = %Aikido.Directives.AsyncTask{
+      work: fn ->
+        if is_pid(pid), do: Aikido.Scheduler.cancel(pid)
+        Aikido.AgentServer.emit_cron_telemetry_event(state, :cancel, %{job_id: logical_id})
 
-    emit_cancellation(state, logical_id, pid, monitor_ref, input_signal)
+        Aikido.AgentServer.Signal.CronCancelled.new!(
+          %{job_id: logical_id, pid: pid, monitor_ref: state.cron_monitors[logical_id]},
+          source: "/agent/#{state.id}"
+        )
+      end,
+      error_type: "aikido.agent.cron.cancel.failed",
+      payload: %{job_id: logical_id, pid: pid}
+    }
 
-    :ok
-  end
+    case Aikido.Directives.AsyncTask.start(task, input_signal, state) do
+      {:ok, _task} ->
+        :ok
 
-  defp cancel_io(pid, monitor_ref) do
-    if is_pid(pid) and Process.alive?(pid) do
-      Aikido.Scheduler.cancel(pid)
-    end
+      {:error, reason} ->
+        # Ownership is already detached. Even a saturated task supervisor must
+        # not leave the retired scheduler running indefinitely.
+        if is_pid(pid), do: Process.exit(pid, :kill)
+        Logger.warning("Forced cron shutdown after task startup failed: #{inspect(reason)}")
 
-    if is_reference(monitor_ref) do
-      Process.demonitor(monitor_ref, [:flush])
-    end
-
-    :ok
-  end
-
-  defp emit_cancellation(%State{} = state, logical_id, pid, monitor_ref, input_signal) do
-    signal =
-      CronCancelled.new!(
-        %{
+        Aikido.AgentServer.emit_cron_telemetry_event(state, :cancel_failed, %{
           job_id: logical_id,
-          pid: pid,
-          monitor_ref: monitor_ref
-        },
-        source: "/agent/#{state.id}"
-      )
+          reason: reason
+        })
+    end
 
-    _ = AgentServer.cast(self(), Aikido.SignalCtx.inherit(signal, input_signal))
-
-    Logger.debug("AgentServer #{state.id} cancelled cron job #{inspect(logical_id)}")
-
-    AgentServer.emit_cron_telemetry_event(state, :cancel, %{job_id: logical_id})
+    :ok
   end
 end

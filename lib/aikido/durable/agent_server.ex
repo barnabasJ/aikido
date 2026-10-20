@@ -206,7 +206,8 @@ defmodule Aikido.Durable.AgentServer do
                   :team_pid,
                   case Aikido.Durable.lookup(
                          Aikido.durable_supervisor_name(options[:aikido]),
-                         meta.team_id
+                         meta.team_id,
+                         partition: Map.get(parent, :partition)
                        ) do
                     {:ok, pid} -> pid
                     :error -> nil

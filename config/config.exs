@@ -26,14 +26,12 @@ config :logger, :default_formatter,
     :action,
     :directive_count,
     :directive_type,
-    :duration_μs,
     :error,
     :queue_size,
     :result,
+    :signal_id,
     :signal_type,
-    :span_id,
-    :stacktrace,
-    :trace_id
+    :stacktrace
   ]
 
 # Git hooks and git_ops configuration for conventional commits

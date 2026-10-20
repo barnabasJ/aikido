@@ -813,8 +813,21 @@ defmodule Aikido.AgentServer do
   @spec track_cron_job(State.t(), term(), pid(), keyword()) :: State.t()
   def track_cron_job(%State{} = state, logical_id, pid, opts \\ []) when is_pid(pid) do
     runtime_spec = Keyword.get(opts, :runtime_spec)
-    {_old_pid, state} = untrack_cron_job(state, logical_id, cancel?: true)
-    monitor_ref = Process.monitor(pid)
+    previous_pid = Map.get(state.cron_jobs, logical_id)
+    monitor_ref = Keyword.get(opts, :monitor_ref) || Process.monitor(pid)
+
+    state =
+      if previous_pid == pid && state.cron_monitors[logical_id] == monitor_ref do
+        state
+      else
+        {_old_pid, cleaned} =
+          untrack_cron_job(state, logical_id,
+            cancel?: previous_pid != pid,
+            input_signal: opts[:input_signal]
+          )
+
+        cleaned
+      end
 
     state =
       if is_struct(runtime_spec, CronRuntimeSpec) do
@@ -840,10 +853,6 @@ defmodule Aikido.AgentServer do
     pid = Map.get(state.cron_jobs, logical_id)
     monitor_ref = Map.get(state.cron_monitors, logical_id)
     timer_ref = Map.get(state.cron_restart_timers, logical_id)
-
-    if cancel? and is_pid(pid) and Process.alive?(pid) do
-      Aikido.Scheduler.cancel(pid)
-    end
 
     if is_reference(monitor_ref) do
       Process.demonitor(monitor_ref, [:flush])
@@ -876,8 +885,21 @@ defmodule Aikido.AgentServer do
             Map.delete(state.cron_runtime_specs, logical_id)
           else
             state.cron_runtime_specs
-          end
+          end,
+        cron_specs:
+          if(drop_runtime_spec?,
+            do: Map.delete(state.cron_specs, logical_id),
+            else: state.cron_specs
+          )
     }
+
+    if cancel? and is_pid(pid) and Process.alive?(pid) do
+      Aikido.Directives.CronCancel.exec(
+        %Aikido.Directives.CronCancel{job_id: logical_id},
+        opts[:input_signal] || Jido.Signal.new!("aikido.agent.cron.cancel", %{job_id: logical_id}),
+        state
+      )
+    end
 
     {pid, new_state}
   end
@@ -989,7 +1011,7 @@ defmodule Aikido.AgentServer do
     try do
       case process_signal(state, signal) do
         {:ok, new_state, _directives} ->
-          {:reply, invoke_call_selector(selector, new_state), new_state}
+          {:reply, invoke_selector(selector, new_state), new_state}
 
         {:error, committed_state, reason} ->
           # A chain error short-circuits selector evaluation;
@@ -1000,7 +1022,7 @@ defmodule Aikido.AgentServer do
           # A directive returned :stop. Run the selector against the
           # post-directive state so the caller still gets a tagged tuple,
           # then stop after replying.
-          reply = invoke_call_selector(selector, executed_state)
+          reply = invoke_selector(selector, executed_state)
           {:stop, stop_reason, reply, %{executed_state | status: :stopping}}
       end
     catch
@@ -1019,7 +1041,7 @@ defmodule Aikido.AgentServer do
     # Pure read — no signal pipeline runs. Selector projects %State{}
     # to whatever the caller asked for. Wrap in try/rescue so a raising
     # selector doesn't crash the agent.
-    {:reply, invoke_call_selector(selector, state), state}
+    {:reply, invoke_selector(selector, state), state}
   end
 
   def handle_call({:set_debug, enabled}, _from, %State{} = state) do
@@ -1316,7 +1338,6 @@ defmodule Aikido.AgentServer do
       |> State.record_debug_event(:signal_received, %{type: signal.type, id: signal.id})
       |> maybe_track_child_started(signal)
       |> maybe_track_cron_registered(signal)
-      |> maybe_track_cron_cancelled(signal)
 
     emit_telemetry(
       [:aikido, :agent_server, :signal, :start],
@@ -1365,12 +1386,13 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  # Invokes a `call/4` / `state/3` selector in a try/rescue so a raising
+  # Invokes a call, state or subscription selector in a try/rescue so a raising
   # selector doesn't crash the agent. Returns the selector's tagged tuple
   # on success or `{:error, {:selector_raised, exception, stacktrace}}` on
   # rescue.
-  @spec invoke_call_selector(call_selector(), State.t()) :: {:ok, term()} | {:error, term()}
-  defp invoke_call_selector(selector, %State{} = state) when is_function(selector, 1) do
+  @spec invoke_selector(subscribe_selector(), State.t()) ::
+          {:ok, term()} | {:error, term()} | :skip
+  defp invoke_selector(selector, %State{} = state) when is_function(selector, 1) do
     selector.(state)
   rescue
     exception -> {:error, {:selector_raised, exception, __STACKTRACE__}}
@@ -1450,10 +1472,9 @@ defmodule Aikido.AgentServer do
   # propagates as `{:stop, reason, state}` to the GenServer.
   #
   # The directive contract has no state slot in its return value:
-  # directives mutate no state, so there's no slot for a returned state
-  # to land in. `state` threads through unchanged here; the cascade
-  # callbacks invoked by `process_signal/2` are the only legal channel
-  # for runtime-state writes that follow directive I/O.
+  # directives mutate no state. This runtime loop records debug events and
+  # retires cron cancellation ownership before I/O; cascade callbacks install
+  # runtime results received through subsequent signals.
   @spec execute_directives([struct()], Signal.t(), State.t()) ::
           {:ok, State.t()} | {:stop, term(), State.t()}
   def execute_directives(directives, signal, state)
@@ -1463,15 +1484,33 @@ defmodule Aikido.AgentServer do
   end
 
   def execute_directives([directive | rest], signal, state) do
+    state =
+      State.record_debug_event(state, :directive_started, %{
+        type: directive.__struct__ |> Module.split() |> List.last(),
+        signal_type: signal.type
+      })
+
+    # Retire ownership before asynchronous shutdown can deliver its DOWN.
+    # The descriptor still receives the old snapshot to address that incarnation.
+    next_state =
+      case directive do
+        %Aikido.Directives.CronCancel{job_id: job_id} ->
+          {_pid, next} = untrack_cron_job(state, job_id, drop_runtime_spec?: true)
+          next
+
+        _ ->
+          state
+      end
+
     result = exec_directive_with_telemetry(directive, signal, state)
 
     case result do
       :ok ->
-        execute_directives(rest, signal, state)
+        execute_directives(rest, signal, next_state)
 
       {:stop, reason} ->
-        warn_if_normal_stop(reason, directive, state)
-        {:stop, reason, state}
+        warn_if_normal_stop(reason, directive, next_state)
+        {:stop, reason, next_state}
     end
   end
 
@@ -1552,98 +1591,23 @@ defmodule Aikido.AgentServer do
     State.add_child(state, tag, child_info)
   end
 
-  # Cascade for `Aikido.Directives.Cron`'s synthetic
-  # `aikido.agent.cron.registered` signal. The directive does all the I/O
-  # (start the scheduler job, monitor it, persist the spec) and casts
-  # this signal carrying the resulting pid + monitor_ref + spec; the
-  # cascade is the sole writer of the runtime cron maps. Existing
-  # entries under the same `job_id` are demonitored before being
-  # overwritten so we don't leak monitor refs on upserts.
+  # Registration and recovery use the same runtime ownership installer.
   defp maybe_track_cron_registered(
          %State{} = state,
-         %Signal{type: "aikido.agent.cron.registered", data: data}
+         %Signal{type: "aikido.agent.cron.registered", data: data} = signal
        )
        when is_map(data) do
     case data do
-      %{
-        job_id: job_id,
-        pid: pid,
-        monitor_ref: monitor_ref,
-        cron_spec: cron_spec,
-        runtime_spec: runtime_spec
-      }
+      %{job_id: _, pid: pid, monitor_ref: monitor_ref, cron_spec: _, runtime_spec: _}
       when is_pid(pid) and is_reference(monitor_ref) ->
-        cleaned = drop_existing_cron_entry(state, job_id)
-
-        %{
-          cleaned
-          | cron_specs: Map.put(cleaned.cron_specs, job_id, cron_spec),
-            cron_runtime_specs: Map.put(cleaned.cron_runtime_specs, job_id, runtime_spec),
-            cron_jobs: Map.put(cleaned.cron_jobs, job_id, pid),
-            cron_monitors: Map.put(cleaned.cron_monitors, job_id, monitor_ref),
-            cron_monitor_refs: Map.put(cleaned.cron_monitor_refs, monitor_ref, job_id),
-            cron_restart_attempts: Map.delete(cleaned.cron_restart_attempts, job_id)
-        }
+        commit_cron_io_result(state, data, signal)
 
       _ ->
         state
     end
   end
 
-  defp maybe_track_cron_registered(state, _signal) do
-    state
-  end
-
-  # Companion to `maybe_track_cron_registered/2`: drops the entry on
-  # cancellation. Mirrors the I/O the directive already performed (the
-  # scheduler job is cancelled and the monitor flushed before this
-  # signal lands). Idempotent — a cancel for an unknown job_id is a
-  # no-op.
-  defp maybe_track_cron_cancelled(
-         %State{} = state,
-         %Signal{type: "aikido.agent.cron.cancelled", data: %{job_id: job_id} = data}
-       ) do
-    monitor_ref = Map.get(data, :monitor_ref)
-
-    %{
-      state
-      | cron_specs: Map.delete(state.cron_specs, job_id),
-        cron_runtime_specs: Map.delete(state.cron_runtime_specs, job_id),
-        cron_jobs: Map.delete(state.cron_jobs, job_id),
-        cron_monitors: Map.delete(state.cron_monitors, job_id),
-        cron_monitor_refs:
-          if is_reference(monitor_ref) do
-            Map.delete(state.cron_monitor_refs, monitor_ref)
-          else
-            state.cron_monitor_refs
-          end,
-        cron_restart_attempts: Map.delete(state.cron_restart_attempts, job_id)
-    }
-  end
-
-  defp maybe_track_cron_cancelled(state, _signal) do
-    state
-  end
-
-  # Drop a stale cron entry under `job_id` before the cascade installs
-  # the new pid+ref. Demonitors the previous entry's BEAM ref so we
-  # don't leak monitors on `Cron` upserts.
-  defp drop_existing_cron_entry(%State{} = state, job_id) do
-    previous_ref = Map.get(state.cron_monitors, job_id)
-
-    if is_reference(previous_ref) do
-      Process.demonitor(previous_ref, [:flush])
-
-      %{
-        state
-        | cron_monitor_refs: Map.delete(state.cron_monitor_refs, previous_ref),
-          cron_jobs: Map.delete(state.cron_jobs, job_id),
-          cron_monitors: Map.delete(state.cron_monitors, job_id)
-      }
-    else
-      state
-    end
-  end
+  defp maybe_track_cron_registered(state, _signal), do: state
 
   # ---------------------------------------------------------------------------
   # Internal: subscriber dispatch
@@ -1672,7 +1636,7 @@ defmodule Aikido.AgentServer do
   end
 
   defp fire_matching_subscriber(acc_state, sub_ref, entry, signal) do
-    case entry.selector.(acc_state) do
+    case invoke_selector(entry.selector, acc_state) do
       :skip ->
         acc_state
 
@@ -1685,7 +1649,7 @@ defmodule Aikido.AgentServer do
   end
 
   defp dispatch_and_maybe_remove(acc_state, sub_ref, entry, signal, fire) do
-    dispatch_subscriber(entry.dispatch, sub_ref, signal, fire)
+    dispatch_subscriber(entry.dispatch, sub_ref, signal, fire, acc_state)
 
     if entry.once do
       remove_subscriber(acc_state, sub_ref)
@@ -1694,13 +1658,13 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  defp dispatch_subscriber({:pid, target: target}, sub_ref, %Signal{type: type}, result)
+  defp dispatch_subscriber({:pid, target: target}, sub_ref, %Signal{type: type}, result, _state)
        when is_pid(target) do
     send(target, {:aikido_subscription, sub_ref, %{signal_type: type, result: result}})
     :ok
   end
 
-  defp dispatch_subscriber(dispatch, sub_ref, %Signal{type: type} = signal, result) do
+  defp dispatch_subscriber(dispatch, sub_ref, %Signal{type: type} = signal, result, state) do
     payload = %{signal_type: type, result: result, sub_ref: sub_ref, source_signal: signal}
 
     case Jido.Signal.new(%{
@@ -1709,10 +1673,11 @@ defmodule Aikido.AgentServer do
            data: payload
          }) do
       {:ok, fire_signal} ->
-        case Jido.Signal.Dispatch.dispatch(fire_signal, dispatch) do
-          :ok -> :ok
-          {:error, _} -> :ok
-        end
+        Aikido.Directives.Emit.exec(
+          %Aikido.Directives.Emit{signal: fire_signal, dispatch: dispatch},
+          signal,
+          state
+        )
 
       {:error, _} ->
         :ok
@@ -1985,7 +1950,7 @@ defmodule Aikido.AgentServer do
   defp register_restored_cron_runtime(state, job_id, cron_expr, message, timezone) do
     case Directives.Cron.register_io(state, cron_expr, message, job_id, timezone) do
       {:ok, io_result} ->
-        commit_cron_io_result(state, io_result, cron_expr)
+        commit_cron_io_result(state, io_result)
 
       {:error, reason} ->
         Logger.error(
@@ -1999,7 +1964,9 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  defp commit_cron_io_result(%State{} = state, io_result, cron_expr) do
+  defp commit_cron_io_result(state, io_result, input_signal \\ nil)
+
+  defp commit_cron_io_result(%State{} = state, io_result, input_signal) do
     %{
       job_id: job_id,
       pid: pid,
@@ -2008,19 +1975,14 @@ defmodule Aikido.AgentServer do
       runtime_spec: runtime_spec
     } = io_result
 
-    committed = %{
-      state
-      | cron_specs: Map.put(state.cron_specs, job_id, cron_spec),
-        cron_runtime_specs: Map.put(state.cron_runtime_specs, job_id, runtime_spec),
-        cron_jobs: Map.put(state.cron_jobs, job_id, pid),
-        cron_monitors: Map.put(state.cron_monitors, job_id, monitor_ref),
-        cron_monitor_refs: Map.put(state.cron_monitor_refs, monitor_ref, job_id),
-        cron_restart_attempts: Map.delete(state.cron_restart_attempts, job_id)
-    }
+    committed =
+      track_cron_job(state, job_id, pid,
+        runtime_spec: runtime_spec,
+        monitor_ref: monitor_ref,
+        input_signal: input_signal
+      )
 
-    Logger.debug("AgentServer #{state.id} registered cron job #{inspect(job_id)}: #{cron_expr}")
-    emit_cron_telemetry_event(committed, :register, %{job_id: job_id, cron_expression: cron_expr})
-    committed
+    %{committed | cron_specs: Map.put(committed.cron_specs, job_id, cron_spec)}
   end
 
   defp register_schedule(%State{} = state, schedule_spec) do
@@ -2417,13 +2379,6 @@ defmodule Aikido.AgentServer do
   defp exec_directive_with_telemetry(directive, signal, state) do
     start_time = System.monotonic_time()
     directive_type = directive.__struct__ |> Module.split() |> List.last()
-
-    # Record debug event for directive execution
-    state =
-      State.record_debug_event(state, :directive_started, %{
-        type: directive_type,
-        signal_type: signal.type
-      })
 
     metadata =
       %{

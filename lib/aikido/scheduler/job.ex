@@ -70,6 +70,7 @@ defmodule Aikido.Scheduler.Job do
 
   @impl true
   def init(%{fun: fun, cron_expr: cron_expr, cron: cron, timezone: timezone} = init_state) do
+    Process.flag(:trap_exit, true)
     owner_pid = Map.get(init_state, :owner_pid)
     owner_ref = if is_pid(owner_pid), do: Process.monitor(owner_pid), else: nil
 
@@ -109,8 +110,30 @@ defmodule Aikido.Scheduler.Job do
     {:stop, {:owner_down, reason}, state}
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
-    {:noreply, %{state | callback_workers: Map.delete(state.callback_workers, ref)}}
+  def handle_info({:DOWN, ref, :process, pid, _reason}, state) do
+    if state.callback_workers[ref] == pid do
+      # Unlink suppresses in-flight exit signals; flush an EXIT already queued
+      # before forgetting this worker's identity.
+      Process.unlink(pid)
+
+      receive do
+        {:EXIT, ^pid, _reason} -> :ok
+      after
+        0 -> :ok
+      end
+
+      {:noreply, %{state | callback_workers: Map.delete(state.callback_workers, ref)}}
+    else
+      {:noreply, state}
+    end
+  end
+
+  def handle_info({:EXIT, _pid, :normal}, state), do: {:noreply, state}
+
+  def handle_info({:EXIT, pid, reason}, state) do
+    if Enum.any?(state.callback_workers, fn {_ref, worker} -> worker == pid end),
+      do: {:noreply, state},
+      else: {:stop, reason, state}
   end
 
   def handle_info(_other, state), do: {:noreply, state}
@@ -232,7 +255,7 @@ defmodule Aikido.Scheduler.Job do
 
   @spec spawn_callback_worker(state()) :: state()
   defp spawn_callback_worker(%{fun: fun, callback_workers: callback_workers} = state) do
-    {pid, ref} = spawn_monitor(fn -> safe_execute(fun) end)
+    {pid, ref} = :erlang.spawn_opt(fn -> safe_execute(fun) end, [:link, :monitor])
     %{state | callback_workers: Map.put(callback_workers, ref, pid)}
   end
 

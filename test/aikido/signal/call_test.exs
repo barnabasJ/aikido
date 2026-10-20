@@ -4,9 +4,24 @@ defmodule AikidoTest.Signal.CallTest.EchoAction.Implementation do
   @impl true
   def run(input, _opts, _context) do
     signal = input.context.aikido.signal
-    directive = Aikido.Signal.Call.reply(signal, "aikido.test.echo.reply", %{ok: true})
-    Aikido.Types.ActionResult.new(state: %{}, directives: List.wrap(directive))
+
+    directive =
+      Aikido.Signal.Call.reply_from_state(
+        signal,
+        "aikido.test.echo.reply",
+        "aikido.test.echo.error",
+        {__MODULE__, :build_reply, []}
+      )
+
+    directives = List.wrap(directive)
+
+    directives =
+      if signal.data[:stop], do: directives ++ [%Aikido.Directives.Stop{}], else: directives
+
+    Aikido.Types.ActionResult.new(state: %{}, directives: directives)
   end
+
+  def build_reply(_runtime), do: {:ok, %{ok: true}}
 end
 
 defmodule AikidoTest.Signal.CallTest.SilentAction.Implementation do
@@ -56,7 +71,145 @@ defmodule AikidoTest.Signal.CallTest do
   * `{:error, :not_found}` — server name/via does not resolve.
   * `{:error, :invalid_server}` — unsupported server reference type.
   """
-  use AikidoTest.Case, async: true
+  use AikidoTest.Case, async: false
+  require Ash.Tracer
+
+  test "signal calls retain native Ash ancestry through query processing and reply", %{
+    aikido: aikido
+  } do
+    tracer = AikidoTest.Support.TestTracer
+    start_supervised!(tracer)
+
+    {:ok, pid} =
+      AikidoTest.Case.start_test_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent,
+        id: "traced-query"
+      )
+
+    :ok = Aikido.AgentServer.await_ready(pid)
+
+    query =
+      Jido.Signal.new!("aikido.agent.query.children", %{})
+      |> Aikido.SignalCtx.put(:tracer, tracer)
+
+    Ash.Tracer.span :custom, "outside.query", tracer do
+      parent = tracer.get_span_context()
+      assert {:ok, reply} = Aikido.Signal.Call.call(pid, query)
+      spans = tracer.get_spans()
+
+      assert {:start, processing, _, "aikido.agent.query.children"} =
+               Enum.find(spans, &match?({:start, _, _, "aikido.agent.query.children"}, &1))
+
+      assert {:parent, processing, parent, pid} in spans
+      assert Map.has_key?(Aikido.SignalCtx.tracer_context(reply), tracer)
+    end
+  end
+
+  test "a synchronous reply recipient does not block the agent mailbox", %{aikido: aikido} do
+    {:ok, pid} =
+      AikidoTest.Case.start_test_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent,
+        id: "sync-reply"
+      )
+
+    test_pid = self()
+
+    recipient =
+      spawn(fn ->
+        receive do
+          {:"$gen_call", from, {:signal, reply}} ->
+            send(test_pid, {:reply_waiting, self(), reply})
+
+            receive do
+              :release -> GenServer.reply(from, :ok)
+            end
+        end
+      end)
+
+    on_exit(fn -> Process.exit(recipient, :kill) end)
+
+    query = %{
+      Jido.Signal.new!("aikido.agent.query.children", %{})
+      | jido_dispatch: {:pid, target: recipient, delivery_mode: :sync}
+    }
+
+    assert :ok = Aikido.AgentServer.cast(pid, query)
+    assert_receive {:reply_waiting, ^recipient, reply}, 1_000
+    assert reply.subject == query.id
+
+    assert {:ok, :responsive} =
+             Aikido.AgentServer.state(pid, fn _ -> {:ok, :responsive} end, timeout: 500)
+
+    send(recipient, :release)
+  end
+
+  test "custom reply formatters execute outside the agent", %{aikido: aikido} do
+    {:ok, pid} =
+      AikidoTest.Case.start_test_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent,
+        id: "formatted-reply"
+      )
+
+    test_pid = self()
+
+    format = fn signal ->
+      send(test_pid, {:formatter_waiting, self()})
+
+      receive do
+        :release -> {:signal, signal}
+      end
+    end
+
+    query = %{
+      Jido.Signal.new!("aikido.agent.query.children", %{})
+      | jido_dispatch: {:pid, target: test_pid, message_format: format}
+    }
+
+    assert :ok = Aikido.AgentServer.cast(pid, query)
+    assert_receive {:formatter_waiting, worker}, 1_000
+    assert worker != pid
+
+    assert {:ok, :responsive} =
+             Aikido.AgentServer.state(pid, fn _ -> {:ok, :responsive} end, timeout: 500)
+
+    send(worker, :release)
+    assert_receive {:signal, %Jido.Signal{subject: id}}, 1_000
+    assert id == query.id
+  end
+
+  test "an ordinary PID reply arrives before an immediately following stop", %{aikido: aikido} do
+    for n <- 1..20 do
+      {:ok, pid} =
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent,
+          id: "reply-stop-#{n}"
+        )
+
+      query = Jido.Signal.new!("aikido.test.echo", %{stop: true})
+      assert {:ok, %Jido.Signal{subject: id}} = Aikido.Signal.Call.call(pid, query)
+      assert id == query.id
+    end
+  end
+
+  test "supervised dispatch rejection is observable without running the adapter" do
+    instance = AikidoTest.Signal.CallTest.FullRuntime
+
+    start_supervised!(
+      {Aikido, name: instance, max_tasks: 0, durable: AikidoTest.Case.durable_options()}
+    )
+
+    signal = Jido.Signal.new!("test.dispatch", %{})
+    agent = Aikido.Agent.new!(id: "full", agent_module: AikidoTest.Signal.CallTest.CallTestAgent)
+
+    runtime = %Aikido.AgentServer.State{
+      aikido: instance,
+      id: "full",
+      agent_module: agent.agent_module,
+      agent: agent
+    }
+
+    directive = %Aikido.Directives.Emit{signal: signal, dispatch: {:noop, []}}
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert :ok = Aikido.Directive.exec(directive, signal, runtime)
+           end) =~ "Could not start signal dispatch: :max_children"
+  end
 
   describe("call/3") do
     test("the built-in children action replies without changing domain state", %{aikido: aikido}) do

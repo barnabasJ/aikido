@@ -125,20 +125,20 @@ defmodule Aikido.Scheduler do
   """
   @spec cancel(pid()) :: :ok
   def cancel(pid) when is_pid(pid) do
-    if Process.alive?(pid) do
+    GenServer.stop(pid, :normal, 5_000)
+    :ok
+  catch
+    :exit, _ ->
       ref = Process.monitor(pid)
+      Process.exit(pid, :kill)
 
-      try do
-        GenServer.stop(pid, :normal, 5_000)
-      catch
-        :exit, _ ->
-          if Process.alive?(pid), do: Process.exit(pid, :kill)
+      receive do
+        {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+      after
+        1_000 -> Process.demonitor(ref, [:flush])
       end
 
-      wait_for_shutdown(pid, ref)
-    end
-
-    :ok
+      :ok
   end
 
   @spec normalize_cron_spec(term()) :: {:ok, cron_spec()} | {:error, term()}
@@ -159,26 +159,6 @@ defmodule Aikido.Scheduler do
       Map.has_key?(map, key) -> Map.get(map, key)
       Map.has_key?(map, string_key) -> Map.get(map, string_key)
       true -> nil
-    end
-  end
-
-  defp wait_for_shutdown(pid, ref) do
-    receive do
-      {:DOWN, ^ref, :process, ^pid, _reason} ->
-        :ok
-    after
-      250 ->
-        if Process.alive?(pid) do
-          Process.exit(pid, :kill)
-
-          receive do
-            {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
-          after
-            1_000 -> :ok
-          end
-        else
-          Process.demonitor(ref, [:flush])
-        end
     end
   end
 

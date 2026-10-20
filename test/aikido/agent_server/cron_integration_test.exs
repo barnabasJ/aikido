@@ -101,6 +101,196 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
   @moduletag :integration
   @moduletag capture_log: true
 
+  test "cancelling a suspended job stays responsive and cannot remove a replacement", context do
+    pid = start_server(context, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent)
+    first = register_job(pid, :reused)
+    first_monitor = Process.monitor(first.pid)
+    parent = self()
+    # Hold a scheduler callback without changing its state, so even OTP stop
+    # must wait. Suspending alone still permits system termination messages.
+    blocked =
+      Task.async(fn ->
+        :sys.replace_state(first.pid, fn state ->
+          send(parent, :scheduler_blocked)
+
+          receive do
+            :release_scheduler -> state
+          end
+        end)
+      end)
+
+    assert_receive :scheduler_blocked
+    on_exit(fn -> send(first.pid, :release_scheduler) end)
+
+    {:ok, cancelled} =
+      Aikido.AgentServer.subscribe(pid, "aikido.agent.cron.cancelled", &{:ok, &1.cron_jobs},
+        once: true
+      )
+
+    assert {:ok, false} =
+             Aikido.AgentServer.call(
+               pid,
+               signal("cancel_cron", %{job_id: :reused}),
+               &{:ok, Map.has_key?(&1.cron_jobs, :reused)}
+             )
+
+    # The old scheduler is still blocked, but the next native command completes.
+    second = register_job(pid, :reused)
+    refute first.pid == second.pid
+    send(first.pid, :release_scheduler)
+    Task.await(blocked)
+    assert_receive {:DOWN, ^first_monitor, :process, _, _}
+    assert_receive {:aikido_subscription, ^cancelled, %{result: {:ok, %{reused: replacement}}}}
+    assert replacement == second.pid
+    assert Process.alive?(second.pid)
+    assert {:ok, %{reused: ^replacement}} = Aikido.AgentServer.state(pid, &{:ok, &1.cron_jobs})
+  end
+
+  for command <- [:upsert, :cancel] do
+    test "#{command} clears pending restart ownership and ignores an already queued timer",
+         context do
+      pid = start_server(context, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent)
+      first = register_job(pid, :pending)
+      parent = self()
+      handler = "restart-cleanup-#{System.unique_integer([:positive])}"
+      {:ok, agent_id} = Aikido.AgentServer.state(pid, &{:ok, &1.id})
+
+      :telemetry.attach(
+        handler,
+        [:aikido, :agent_server, :cron, :restart_scheduled],
+        fn _, _, metadata, _ ->
+          if metadata.agent_id == agent_id, do: send(parent, :restart_scheduled)
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+      Process.exit(first.pid, :kill)
+      assert_receive :restart_scheduled
+
+      {:ok, timer} =
+        Aikido.AgentServer.state(pid, &{:ok, Map.fetch!(&1.cron_restart_timers, :pending)})
+
+      replacement =
+        case unquote(command) do
+          :upsert ->
+            register_job(pid, :pending).pid
+
+          :cancel ->
+            assert {:ok, _} =
+                     Aikido.AgentServer.call(
+                       pid,
+                       signal("cancel_cron", %{job_id: :pending}),
+                       &{:ok, &1.cron_jobs}
+                     )
+
+            nil
+        end
+
+      send(pid, {:timeout, timer, {:cron_restart, :pending}})
+
+      assert {:ok, {^replacement, 0, 0}} =
+               Aikido.AgentServer.state(
+                 pid,
+                 &{:ok,
+                  {&1.cron_jobs[:pending], map_size(&1.cron_restart_timers),
+                   map_size(&1.cron_restart_timer_refs)}}
+               )
+    end
+  end
+
+  test "duplicate registration of the same incarnation retains one live monitor", context do
+    pid = start_server(context, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent)
+    job = register_job(pid, :duplicate)
+
+    duplicate =
+      signal("aikido.agent.cron.registered", %{
+        job_id: :duplicate,
+        pid: job.pid,
+        monitor_ref: job.ref,
+        cron_spec: job.spec,
+        runtime_spec: job.runtime_spec
+      })
+
+    Aikido.AgentServer.cast(pid, duplicate)
+
+    assert {:ok, {true, 1, 1}} =
+             Aikido.AgentServer.state(
+               pid,
+               &{:ok,
+                {Process.alive?(job.pid), map_size(&1.cron_monitors),
+                 map_size(&1.cron_monitor_refs)}}
+             )
+  end
+
+  test "saturated task supervision cannot leave a retired scheduler running", _context do
+    instance = __MODULE__.Limited
+
+    start_supervised!(
+      {Aikido, name: instance, max_tasks: 1, durable: AikidoTest.Case.durable_options()}
+    )
+
+    pid =
+      start_server(%{aikido: instance}, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent)
+
+    job = register_job(pid, :limited)
+    monitor = Process.monitor(job.pid)
+    parent = self()
+
+    {:ok, blocker} =
+      Task.Supervisor.start_child(Aikido.task_supervisor_name(instance), fn ->
+        send(parent, :task_slot_taken)
+
+        receive do
+          :release -> :ok
+        end
+      end)
+
+    on_exit(fn -> if Process.alive?(blocker), do: send(blocker, :release) end)
+    assert_receive :task_slot_taken
+    replacement = register_job(pid, :limited)
+    assert_receive {:DOWN, ^monitor, :process, _, :killed}
+    assert Process.alive?(replacement.pid)
+    replacement_monitor = Process.monitor(replacement.pid)
+
+    assert {:ok, false} =
+             Aikido.AgentServer.call(
+               pid,
+               signal("cancel_cron", %{job_id: :limited}),
+               &{:ok, Map.has_key?(&1.cron_jobs, :limited)}
+             )
+
+    assert_receive {:DOWN, ^replacement_monitor, :process, _, :killed}
+
+    assert {:ok, {0, 0}} =
+             Aikido.AgentServer.state(
+               pid,
+               &{:ok, {map_size(&1.cron_runtime_specs), map_size(&1.cron_specs)}}
+             )
+
+    send(blocker, :release)
+  end
+
+  defp register_job(pid, name) do
+    {:ok, job} =
+      Aikido.AgentServer.call_until(
+        pid,
+        signal("register_cron", %{job_id: name, cron: "@hourly"}),
+        "aikido.agent.cron.registered",
+        fn runtime ->
+          {:ok,
+           %{
+             pid: runtime.cron_jobs[name],
+             ref: runtime.cron_monitors[name],
+             spec: runtime.cron_specs[name],
+             runtime_spec: runtime.cron_runtime_specs[name]
+           }}
+        end
+      )
+
+    job
+  end
+
   describe("cron job registration") do
     test("agent can register a cron job", %{aikido: aikido}) do
       {:ok, pid} =
@@ -180,6 +370,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       :ok = Aikido.AgentServer.cast(pid, register_signal1)
       first_job_pid = await_state_value(pid, fn s -> Map.get(s.cron_jobs, :updatable) end)
       assert is_pid(first_job_pid)
+      first_monitor = Process.monitor(first_job_pid)
 
       register_signal2 =
         Jido.Signal.new!(%{
@@ -201,7 +392,11 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
       second_job_pid = cron_jobs[:updatable]
       assert is_pid(second_job_pid)
       refute first_job_pid == second_job_pid
+      assert_receive {:DOWN, ^first_monitor, :process, ^first_job_pid, _}
+      assert Process.alive?(second_job_pid)
+      second_monitor = Process.monitor(second_job_pid)
       GenServer.stop(pid)
+      assert_receive {:DOWN, ^second_monitor, :process, ^second_job_pid, _}
     end
 
     test("failed upsert preserves the existing runtime job and durable spec", %{aikido: aikido}) do
