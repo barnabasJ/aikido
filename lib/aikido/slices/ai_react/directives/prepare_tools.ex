@@ -34,6 +34,7 @@ defmodule Aikido.Slices.AiReact.Directives.PrepareTools do
                 directive.tool_options
                 |> Keyword.merge(Ash.Scope.to_opts(scope))
                 |> Keyword.put(:tools, directive.tools)
+                |> Keyword.drop([:tracer, :authorize?])
                 |> AshAi.build_tools_and_registry()
 
               {:ok, prepared}

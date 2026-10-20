@@ -78,7 +78,7 @@ defmodule Aikido.Slices.AiReact do
 
       attribute :previous_tool_signature, :term, public?: true, allow_nil?: true, default: nil
       attribute :model, :term, public?: true, allow_nil?: true, default: nil
-      attribute :client, :atom, public?: true, allow_nil?: false, default: ReqLLM.Generation
+      attribute :client, :module, public?: true, allow_nil?: false, default: ReqLLM.Generation
       attribute :tools, {:array, :atom}, public?: true, allow_nil?: false, default: []
 
       attribute :tool_options, {:array, :tuple},
@@ -107,7 +107,7 @@ defmodule Aikido.Slices.AiReact do
       attribute :options, Aikido.AI.Options, public?: true, default: %{}, allow_nil?: false
       attribute :hooks, {:array, Aikido.Hooks.Hook}, public?: true, allow_nil?: false, default: []
       attribute :model, :term, public?: true, allow_nil?: true
-      attribute :client, :atom, public?: true, allow_nil?: false, default: ReqLLM.Generation
+      attribute :client, :module, public?: true, allow_nil?: false, default: ReqLLM.Generation
       attribute :tools, {:array, :atom}, public?: true, allow_nil?: false, default: []
 
       attribute :tool_options, {:array, :tuple},
@@ -209,7 +209,7 @@ defmodule Aikido.Slices.AiReact do
       argument :query, :string, allow_nil?: false
       argument :request_id, :string, allow_nil?: false
       argument :model, :term
-      argument :client, :atom
+      argument :client, :module
       argument :tools, {:array, :atom}
       argument :system_prompt, :string
       argument :max_iterations, :integer, constraints: [min: 1]
@@ -286,7 +286,7 @@ defmodule Aikido.Slices.AiReact do
       argument :state, :term
       argument :tool_call_id, :string, allow_nil?: false
       argument :name, :string, allow_nil?: false
-      argument :content, :string, allow_nil?: false
+      argument :content, :term, allow_nil?: true
       argument :request_id, :string, allow_nil?: false
       description "Process one tool result and fan-in to the next LLM turn."
       run {Aikido.Slices.AiReact.Implementation, action: :tool_result}

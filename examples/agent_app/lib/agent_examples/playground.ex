@@ -46,7 +46,12 @@ defmodule AgentExamples.Playground do
           task =
             Task.Supervisor.async_nolink(
               AgentExamples.WebTasks,
-              fn -> AI.ask(run.record, query, timeout: 180_000) end
+              fn ->
+                AI.ask(run.record, query,
+                  timeout: 180_000,
+                  metadata: %{playground: %{owner: owner, slug: slug}}
+                )
+              end
             )
 
           run = %{
@@ -211,8 +216,8 @@ defmodule AgentExamples.Playground do
             for {_ref, {^key, task}} <- state.tasks, do: Task.shutdown(task, :brutal_kill)
             tasks = Map.reject(state.tasks, fn {_, {task_key, _}} -> task_key == key end)
 
-            subscriptions =
-              Map.reject(state.subscriptions, fn {_, subscription} -> subscription.key == key end)
+            state = retire_subscriptions(state, fn subscription -> subscription.key == key end)
+            subscriptions = state.subscriptions
 
             run = %{run | status: :stopped, requests: []}
 
@@ -249,18 +254,19 @@ defmodule AgentExamples.Playground do
       nil ->
         {:noreply, state}
 
-      %{key: key, member: member} ->
+      %{key: key, member: member, pid: pid} ->
         run = state.runs[key]
 
         path = Enum.flat_map(member || [], &[:children, &1])
         previous = if path == [], do: run.snapshot, else: get_in(run.snapshot, path)
 
-        if is_nil(previous) || run.status == :stopped do
+        if is_nil(previous) || run.status == :stopped || snapshot_pid(run, member || []) != pid do
           {:noreply, state}
         else
           snapshot = Map.put(snapshot, :children, previous.children)
           snapshot = if path == [], do: snapshot, else: put_in(run.snapshot, path, snapshot)
           {snapshot, state} = watch_children(key, snapshot, [], state)
+          state = reconcile_subscriptions(key, snapshot, state)
 
           type = if member, do: "#{Enum.join(member, "/")} · #{type}", else: type
           event = %{type: type, time: Calendar.strftime(DateTime.utc_now(), "%H:%M:%S")}
@@ -290,12 +296,11 @@ defmodule AgentExamples.Playground do
            example.resource |> Ash.ActionInput.for_action(:start, attributes) |> Ash.run_action() do
       pid = record.pid
 
-      {:ok, ref} = Aikido.AgentServer.subscribe(pid, "**", &snapshot/1)
-      {:ok, snapshot} = Aikido.AgentServer.state(pid, &{:ok, elem(snapshot(&1), 1)})
+      {:ok, ref, snapshot} = subscribe_snapshot(pid)
 
       state = %{
         state
-        | subscriptions: Map.put(state.subscriptions, ref, %{key: key, member: nil})
+        | subscriptions: Map.put(state.subscriptions, ref, %{key: key, member: nil, pid: pid})
       }
 
       {snapshot, state} = watch_children(key, snapshot, [], state)
@@ -335,12 +340,13 @@ defmodule AgentExamples.Playground do
         if known? do
           {snapshot.children[member.name], state}
         else
-          with {:ok, ref} <- Aikido.AgentServer.subscribe(member.pid, "**", &snapshot/1),
-               {:ok, child} <- Aikido.AgentServer.state(member.pid, &snapshot/1) do
-            {child,
-             put_in(state.subscriptions[ref], %{key: key, member: child_path, pid: member.pid})}
-          else
-            _ -> {nil, state}
+          case subscribe_snapshot(member.pid) do
+            {:ok, ref, child} ->
+              {child,
+               put_in(state.subscriptions[ref], %{key: key, member: child_path, pid: member.pid})}
+
+            _ ->
+              {nil, state}
           end
         end
 
@@ -348,13 +354,89 @@ defmodule AgentExamples.Playground do
         {child, state} = watch_children(key, child, child_path, state)
         {put_in(snapshot.children[member.name], child), state}
       else
-        {snapshot, state}
+        {%{snapshot | children: Map.delete(snapshot.children, member.name)}, state}
       end
     end)
   end
 
-  defp with_request_callback(%{resource: AgentExamples.InteractiveAssistant}, attributes, key) do
-    callback = fn request, context -> request(key, request, context) end
+  defp subscribe_snapshot(pid) do
+    with {:ok, ref} <- Aikido.AgentServer.subscribe(pid, "**", &snapshot/1) do
+      try do
+        case Aikido.AgentServer.state(pid, &snapshot/1) do
+          {:ok, snapshot} ->
+            {:ok, ref, snapshot}
+
+          error ->
+            unsubscribe(pid, ref)
+            error
+        end
+      catch
+        :exit, reason ->
+          unsubscribe(pid, ref)
+          {:error, reason}
+      end
+    end
+  catch
+    :exit, reason -> {:error, reason}
+  end
+
+  defp reconcile_subscriptions(key, snapshot, state) do
+    desired = child_pids(snapshot, [])
+
+    retire_subscriptions(state, fn sub ->
+      sub.key == key && sub.member != nil && Map.get(desired, sub.member) != sub.pid
+    end)
+  end
+
+  defp child_pids(snapshot, path) do
+    Enum.reduce(snapshot.members, %{}, fn member, pids ->
+      child_path = path ++ [member.name]
+      pids = Map.put(pids, child_path, member.pid)
+
+      case snapshot.children[member.name] do
+        nil -> pids
+        child -> Map.merge(pids, child_pids(child, child_path))
+      end
+    end)
+  end
+
+  defp retire_subscriptions(state, retired?) do
+    {retired, retained} = Enum.split_with(state.subscriptions, fn {_, sub} -> retired?.(sub) end)
+    Enum.each(retired, fn {ref, sub} -> unsubscribe(sub.pid, ref) end)
+    %{state | subscriptions: Map.new(retained)}
+  end
+
+  defp unsubscribe(pid, ref) do
+    Aikido.AgentServer.unsubscribe(pid, ref)
+  catch
+    :exit, _ -> :ok
+  end
+
+  defp snapshot_pid(run, []), do: run.record.pid
+
+  defp snapshot_pid(run, path) do
+    case subtree(run.snapshot, Enum.drop(path, -1)) do
+      nil ->
+        nil
+
+      parent ->
+        case Enum.find(parent.members, &(&1.name == List.last(path))) do
+          nil -> nil
+          member -> member.pid
+        end
+    end
+  end
+
+  @doc "Portable hook callback; per-run browser identity arrives in event metadata."
+  def request(
+        request,
+        %{event: %{metadata: %{playground: %{owner: owner, slug: slug}}}} = context
+      ) do
+    request({owner, slug}, request, context)
+  end
+
+  defp with_request_callback(%{resource: AgentExamples.InteractiveAssistant}, attributes, _key) do
+    callback = &__MODULE__.request/2
     hooks = Ash.Resource.Info.attribute(AgentExamples.InteractiveAssistant, :hooks).default
     Map.put(attributes, :hooks, Enum.map(hooks, &Map.put(&1, :request, callback)))
   end
@@ -510,11 +592,8 @@ defmodule AgentExamples.Playground do
     if(parent, do: ownership_path(members, parent), else: []) ++ [member.name]
   end
 
-  defp normalize_member_input(:send, %{data: %{member: name} = data} = input, snapshot),
-    do: %{input | data: %{data | member: member_key(snapshot, name)}}
-
   defp normalize_member_input(action, %{member: name} = input, snapshot)
-       when action in [:remove_member, :stop_member, :ensure_member],
+       when action in [:send, :remove_member, :stop_member, :ensure_member],
        do: %{input | member: member_key(snapshot, name)}
 
   defp normalize_member_input(_, input, _), do: input

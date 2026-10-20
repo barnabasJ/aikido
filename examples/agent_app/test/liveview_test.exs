@@ -328,6 +328,63 @@ defmodule AgentExamplesWeb.LiveViewTest do
              11
   end
 
+  test "retired subtree subscriptions cannot update a replacement at the same path", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/nested-teams")
+    owner = start(view, "nested-teams")
+    key = {owner, "nested-teams"}
+    baseline = playground_subscriptions(key)
+
+    spawn_squad = fn ->
+      assert :ok =
+               Playground.command(owner, "nested-teams", :add_member, %{
+                 member: "again",
+                 template: :squad
+               })
+
+      await(owner, "nested-teams", fn run ->
+        child = run.snapshot.children["again"]
+        child && map_size(child.children) == 3
+      end)
+    end
+
+    spawn_squad.()
+
+    retired =
+      Enum.filter(playground_subscriptions(key), fn {_, sub} ->
+        List.first(sub.member || []) == "again"
+      end)
+
+    assert length(retired) == 4
+
+    assert :ok = Playground.command(owner, "nested-teams", :remove_member, %{member: "again"})
+    await(owner, "nested-teams", fn run -> not Map.has_key?(run.snapshot.children, "again") end)
+    assert map_size(playground_subscriptions(key)) == map_size(baseline)
+
+    spawn_squad.()
+    run = Playground.get(owner, "nested-teams")
+    replacement = run.snapshot.children["again"]
+    assert map_size(playground_subscriptions(key)) == map_size(baseline) + 4
+
+    for {ref, _} <- retired do
+      send(
+        Playground,
+        {:aikido_subscription, ref,
+         %{result: {:ok, %{replacement | own: %{title: "stale"}}}, signal_type: "stale"}}
+      )
+    end
+
+    assert Playground.get(owner, "nested-teams").snapshot.children["again"] == replacement
+    assert :ok = Playground.stop(owner, "nested-teams")
+    assert playground_subscriptions(key) == %{}
+  end
+
+  defp playground_subscriptions(key) do
+    Playground
+    |> :sys.get_state()
+    |> Map.fetch!(:subscriptions)
+    |> Map.filter(fn {_, sub} -> sub.key == key end)
+  end
+
   test "one tree mixes agent-owned agents and teams with recursively nested dynamic teams", %{
     conn: conn
   } do

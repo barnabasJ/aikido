@@ -304,7 +304,9 @@ defmodule AikidoTest.AshTest do
     assert {:ok, _} =
              snapshot_result(
                AikidoTest.AshFixtures.Domain.team_send(team, %{
-                 data: %{member: :worker, type: "counter.increment", payload: %{amount: 4}}
+                 member: :worker,
+                 type: "counter.increment",
+                 payload: %{amount: 4}
                })
              )
 
@@ -422,7 +424,8 @@ defmodule AikidoTest.AshTest do
     assert {:error, _} =
              snapshot_result(
                AikidoTest.AshFixtures.Domain.team_send(team, %{
-                 data: %{member: :unknown, type: "counter.increment"}
+                 member: :unknown,
+                 type: "counter.increment"
                })
              )
 

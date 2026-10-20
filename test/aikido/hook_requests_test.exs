@@ -26,9 +26,41 @@ defmodule Aikido.HookRequestsTest.Client do
   end
 end
 
+defmodule Aikido.HookRequestsTest.PublicAgent do
+  use Aikido.Agent, extensions: [Aikido.Ash.AI]
+
+  agent do
+    name "hook_requests_public"
+  end
+end
+
+defmodule Aikido.HookRequestsTest.Callbacks do
+  @moduledoc false
+
+  def blue(_request, _context), do: {:ok, %{value: "blue"}}
+  def configured(_request, %{event: %{metadata: %{value: value}}}), do: {:ok, %{value: value}}
+  def timeout(_request, _context), do: {:error, :timeout}
+  def unexpected(_request, _context), do: :unexpected
+  def fail(_request, _context), do: raise("callback failed")
+
+  def wait(request, %{event: %{metadata: %{observer: observer}}} = context) do
+    send(observer, {:question, self(), request, context})
+
+    receive do
+      {:answer, response} -> {:ok, response}
+    end
+  end
+
+  def observe(request, %{event: %{metadata: %{observer: observer}}}) do
+    send(observer, {:observed_request, request.type})
+    {:ok, %{value: "blue"}}
+  end
+end
+
 defmodule Aikido.HookRequestsTest do
   use AikidoTest.Case, async: true
   @moduletag capture_log: true
+  alias Aikido.HookRequestsTest.Callbacks
 
   @script """
   local answer, err = aikido.request("pick.color", {choices = {"blue", "red"}})
@@ -53,11 +85,7 @@ defmodule Aikido.HookRequestsTest do
     return {context = prefix .. answer.value}
     """
 
-    callback = fn request, context ->
-      assert request == %{type: "pick.color", payload: %{"choices" => ["blue", "red"]}}
-      assert context == %{hook: "question", request_id: "run", event: %{type: :before_model}}
-      {:ok, %{value: "blue"}}
-    end
+    callback = &Callbacks.blue/2
 
     # No AgentServer or transport exists at this PID: the binding only calls our function.
     assert {:ok, %Aikido.Hooks.Decision{context: "same Lua stack: blue"}} =
@@ -74,7 +102,7 @@ defmodule Aikido.HookRequestsTest do
     # full suite, concurrent fixture compilation can delay BEAM module loading.
     assert {:ok, _} =
              Aikido.Hooks.Execute.evaluate(
-               hook(fn _, _ -> {:ok, %{value: "blue"}} end),
+               hook(&Callbacks.blue/2),
                %{type: :before_model},
                self(),
                "warmup"
@@ -83,23 +111,27 @@ defmodule Aikido.HookRequestsTest do
     pid = start_server(ctx, Aikido.HookRequestsTest.Agent)
     observer = self()
 
-    callback = fn request, context ->
-      send(observer, {:question, self(), request, context})
-
-      receive do
-        {:answer, response} -> {:ok, response}
-      end
-    end
+    callback = &Callbacks.wait/2
 
     options = [
       model: "offline",
       client: Aikido.HookRequestsTest.Client,
       timeout: 5_000,
-      hooks: [hook(callback)]
+      hooks: [hook(callback)],
+      metadata: %{observer: observer}
     ]
 
     task = Task.async(fn -> Aikido.AI.ask_sync(pid, "hello", options) end)
-    assert_receive {:question, waiter, %{type: "pick.color"}, %{request_id: run_id}}, 2_000
+
+    assert_receive {:question, waiter,
+                    %{type: "pick.color", payload: %{"choices" => ["blue", "red"]}},
+                    %{
+                      hook: "question",
+                      request_id: run_id,
+                      event: %{metadata: %{observer: ^observer}}
+                    }},
+                   2_000
+
     assert is_binary(run_id)
     assert {:ok, :setup} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.status})
     send(waiter, {:answer, %{value: "blue"}})
@@ -126,7 +158,7 @@ defmodule Aikido.HookRequestsTest do
 
     assert {:ok, %Aikido.Hooks.Decision{context: "handled :timeout"}} =
              Aikido.Hooks.Execute.evaluate(
-               hook(fn _, _ -> {:error, :timeout} end, script),
+               hook(&Callbacks.timeout/2, script),
                %{},
                self(),
                "run"
@@ -136,8 +168,10 @@ defmodule Aikido.HookRequestsTest do
              Aikido.Hooks.Execute.evaluate(hook(nil, script), %{}, self(), "run")
   end
 
-  test "Ash's function type validates the callback arity" do
-    for callback <- ["not a function", fn _ -> :ok end] do
+  test "native function constraints reject invalid arity and captured environments" do
+    captured = make_ref()
+
+    for callback <- ["not a function", fn _ -> :ok end, fn _, _ -> {:ok, captured} end] do
       assert {:error, _} =
                Ash.Type.cast_input(Aikido.Hooks.Hook, %{
                  name: "bad",
@@ -156,7 +190,7 @@ defmodule Aikido.HookRequestsTest do
 
     assert {:ok, %Aikido.Hooks.Decision{decision: :deny, message: message}} =
              Aikido.Hooks.Execute.evaluate(
-               hook(fn _, _ -> :unexpected end, script),
+               hook(&Callbacks.unexpected/2, script),
                %{},
                self(),
                "run"
@@ -168,7 +202,7 @@ defmodule Aikido.HookRequestsTest do
   test "callback exceptions become hook failures" do
     assert {:error, message} =
              Aikido.Hooks.Execute.evaluate(
-               hook(fn _, _ -> raise "callback failed" end),
+               hook(&Callbacks.fail/2),
                %{},
                self(),
                "run"
@@ -180,14 +214,98 @@ defmodule Aikido.HookRequestsTest do
   test "asynchronous hooks can use the same application callback" do
     observer = self()
 
-    callback = fn request, _ ->
-      send(observer, {:observed_request, request.type})
-      {:ok, %{value: "blue"}}
-    end
+    callback = &Callbacks.observe/2
 
     assert {:ok, nil} =
-             Aikido.Hooks.Execute.evaluate(hook(callback, @script, :async), %{}, self(), "run")
+             Aikido.Hooks.Execute.evaluate(
+               hook(callback, @script, :async),
+               %{metadata: %{observer: observer}},
+               self(),
+               "run"
+             )
 
     assert_receive {:observed_request, "pick.color"}
+  end
+
+  test "portable callbacks survive initial Durable startup and checkpoint reactivation", ctx do
+    callback = &Callbacks.configured/2
+    id = unique_id("portable-hook")
+
+    pid =
+      start_server(ctx, Aikido.HookRequestsTest.Agent,
+        id: id,
+        initial_state: %{
+          ai: %{hooks: [hook(callback)], model: "offline", client: Aikido.HookRequestsTest.Client}
+        }
+      )
+
+    assert {:ok, first} = Aikido.AI.ask_sync(pid, "first", metadata: %{value: "initial"})
+    assert first =~ "Lua received initial"
+
+    supervisor = Aikido.durable_supervisor_name(ctx.aikido)
+
+    {key, _} =
+      Enum.find(DurableServer.Supervisor.global_members(supervisor), fn {_, {owner, _}} ->
+        owner == pid
+      end)
+
+    assert {:ok, info} = DurableServer.Supervisor.get_server_info(supervisor, key)
+    saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
+    assert {:agent, agent} = saved.agent
+    saved_callback = hd(agent.state.ai.hooks).request
+    assert Function.info(saved_callback, :type) == {:type, :external}
+    assert Function.info(saved_callback, :env) == {:env, []}
+    assert saved_callback == callback
+
+    assert :ok = Aikido.Durable.stop(supervisor, id)
+
+    assert {:ok, restored} =
+             Aikido.Durable.ensure_started(supervisor, id, agent: Aikido.HookRequestsTest.Agent)
+
+    refute restored == pid
+    assert {:ok, second} = Aikido.AI.ask_sync(restored, "second", metadata: %{value: "restored"})
+    assert second =~ "Lua received restored"
+  end
+
+  test "native public ask forwards serializable metadata to portable hook callbacks", ctx do
+    resource = Aikido.HookRequestsTest.PublicAgent
+
+    invalid_start =
+      Ash.ActionInput.for_action(resource, :start, %{client: AikidoTest.UnknownHookClient})
+
+    refute invalid_start.valid?
+
+    pid =
+      start_server(ctx, resource,
+        initial_state: %{
+          ai: %{
+            model: "offline",
+            client: Aikido.HookRequestsTest.Client,
+            hooks: [hook(&Callbacks.configured/2)]
+          }
+        }
+      )
+
+    assert {:ok, answer} =
+             Aikido.AgentServer.call_until(
+               pid,
+               fn ->
+                 resource
+                 |> Ash.ActionInput.for_action(:ask, %{
+                   agent: pid,
+                   query: "public",
+                   metadata: %{value: "native metadata"}
+                 })
+                 |> Ash.run_action()
+               end,
+               "ai.react.**",
+               fn runtime ->
+                 if runtime.agent.state.ai.status == :completed,
+                   do: {:ok, runtime.agent.state.ai.result},
+                   else: :skip
+               end
+             )
+
+    assert answer =~ "Lua received native metadata"
   end
 end

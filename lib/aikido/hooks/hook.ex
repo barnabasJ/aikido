@@ -9,12 +9,14 @@ defmodule Aikido.Hooks.Hook do
   can write agent state directly.
 
   Both modes can call `aikido.request(type, payload)` and receive a response
-  inside Lua. Supply `request: fn request, context -> {:ok, response} end`.
+  inside Lua. Supply an external capture such as `request: &MyApp.Hooks.request/2`.
   The callback receives `%{type: type, payload: payload}` and context containing
   `hook`, `request_id`, and the lifecycle `event`. It runs in the Lua task and
   may return `{:ok, response}` or `{:error, reason}`. The application owns any
-  waiting, deadlines, cancellation and UI communication. Without a callback,
-  `aikido.request` returns an error to Lua.
+  waiting, deadlines, cancellation and UI communication. Callbacks must be portable
+  external captures without a captured environment; put serializable per-run
+  configuration in `event.metadata`. The callback survives checkpoint and restore.
+  Without a callback, `aikido.request` returns an error to Lua.
   """
   use Ash.Resource, data_layer: :embedded
 
@@ -46,10 +48,10 @@ defmodule Aikido.Hooks.Hook do
     attribute :script, :string, allow_nil?: false, public?: true
 
     attribute :request, :function,
-      constraints: [arity: 2],
+      constraints: [arity: 2, mfa: true],
       public?: true,
       description:
-        "Application callback for Lua requests; returns {:ok, response} or {:error, reason}."
+        "Portable external callback for Lua requests; returns {:ok, response} or {:error, reason}."
 
     attribute :max_instructions, :integer,
       constraints: [min: 1],

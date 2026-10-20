@@ -187,25 +187,26 @@ Configure the callback at startup or on a per-run hook:
   name: "review_tool",
   event: :before_tool,
   script: script,
-  request: fn request, context ->
-    MyApp.Interactions.request(current_user, request, context)
-  end
+  request: &MyApp.Interactions.request/2
 }
 ```
 
 The callback receives `%{type: type, payload: payload}` and a context map with
 `hook`, `request_id` (the AI run ID), and `event` (the hook's event snapshot).
 It returns `{:ok, response}` or `{:error, reason}`. Ash's function type validates
-that it accepts two arguments. Without a callback, Lua receives
+that it is an external capture (`&Module.function/2`) accepting two arguments.
+Anonymous closures are rejected so checkpoints cannot retain captured runtime values.
+Pass serializable per-run configuration in the ask action's `metadata`; the callback
+reads it from `context.event.metadata`. Without a callback, Lua receives
 `nil, {message = ":request_callback_not_configured"}`. Errors become the second
 Lua return value; callback exceptions fail the hook normally.
 
 The callback runs in the hook task and may wait without blocking the agent
 mailbox. The application owns authorization, UI communication, deadlines and
 cancellation. Aikido does not wait for a special approval signal, inspect the
-agent for pending interactions, or add a response action. Closures can capture
-application context such as the current user or browser session. As with other
-runtime callbacks, a saved function does not restore a waiting Lua continuation.
+agent for pending interactions, or add a response action. External captures are
+portable callback references; they do not capture a user or browser session.
+Saving a callback reference does not restore a waiting Lua continuation.
 
 The example app supplies a callback when starting `InteractiveAssistant`. Its
 existing `Playground` process holds the pending UI card and the callback caller,

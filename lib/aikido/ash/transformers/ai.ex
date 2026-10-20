@@ -19,7 +19,7 @@ defmodule Aikido.Ash.Transformers.AI do
       hooks: [{:array, Aikido.Hooks.Hook}, [], false],
       tool_context: [:map, %{}, false],
       model: [:term, nil, true],
-      client: [:atom, ReqLLM.Generation, false],
+      client: [:module, ReqLLM.Generation, false],
       llm_opts: [{:array, :tuple}, [], false],
       system_prompt: [:string, nil, true],
       max_iterations: [:integer, 10, false]
@@ -60,6 +60,7 @@ defmodule Aikido.Ash.Transformers.AI do
          {:ok, dsl} <-
            add_action(dsl, :ask, [
              arg(:query, :string, allow_nil?: false),
+             arg(:metadata, :map, default: %{}),
              arg(:request_id, :string, allow_nil?: false, default: &Ash.UUIDv7.generate/0)
            ]),
          {:ok, dsl} <- add_action(dsl, :cancel, [arg(:request_id, :string)]) do

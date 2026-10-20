@@ -221,4 +221,64 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
       assert returned == slice
     end
   end
+
+  test "tool finishes with no executable calls settle once, including terminal hooks and queued messages" do
+    for calls <- [[], [ReqLLM.ToolCall.new_builtin("builtin", "web_search", "{}")]] do
+      message =
+        Context.assistant("provider answer",
+          tool_calls: calls,
+          metadata: %{response_id: "native"}
+        )
+
+      response =
+        struct!(ReqLLM.Response,
+          id: "empty",
+          model: "offline",
+          context: Context.new(),
+          message: message,
+          finish_reason: :tool_calls
+        )
+
+      {:ok, hook} =
+        Ash.Type.cast_input(Aikido.Hooks.Hook, %{
+          name: "terminal",
+          event: :run_completed,
+          mode: :async,
+          script: "return nil"
+        })
+
+      for queued <- [[], ["follow up"]] do
+        state = Map.merge(running_slice(), %{queued_messages: queued, hooks: [hook]})
+
+        result =
+          Aikido.Slices.AiReact
+          |> Ash.ActionInput.for_action(
+            :llm_turn,
+            %{state: state, request_id: "req_1", turn: response},
+            context: %{aikido: %{signal: signal("req_1", response)}}
+          )
+          |> Ash.run_action!()
+
+        assert result.state.iteration == 1
+        assert result.state.pending_tool_calls == []
+        assert Enum.count(result.state.context.messages, &(&1 == message)) == 1
+
+        assert result.state.estimated_tokens ==
+                 Aikido.AI.Context.estimate_tokens(result.state.context)
+
+        refute Enum.any?(result.directives, &match?(%ToolExec{}, &1))
+
+        if queued == [] do
+          assert result.state.status == :completed
+          assert result.state.result == "provider answer"
+          assert [%Aikido.Hooks.Execute{event: %{type: :run_completed}}] = result.directives
+        else
+          assert result.state.status == :running
+          assert result.state.queued_messages == []
+          assert [%Aikido.Slices.AiReact.Directives.LLMCall{iteration: 2}] = result.directives
+          assert List.last(result.state.context.messages) == Context.user("follow up")
+        end
+      end
+    end
+  end
 end

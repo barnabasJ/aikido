@@ -41,7 +41,7 @@ defmodule Aikido.Slices.AiWorker do
       argument :metadata, :map, default: %{}
       argument :text, :string, allow_nil?: false
       argument :model, :term
-      argument :client, :atom
+      argument :client, :module
       argument :tool_context, :map
       argument :tools, {:array, :atom}
       argument :tool_options, {:array, :tuple}, constraints: @keyword_constraints

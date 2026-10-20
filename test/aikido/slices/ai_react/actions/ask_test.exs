@@ -152,4 +152,49 @@ defmodule Aikido.Slices.AiReact.AskTest do
         |> Ash.run_action()
       end)
   end
+
+  test "native module contracts accept loaded modules and reject unknown modules before setup" do
+    for client <- [ReqLLM.Generation, __MODULE__] do
+      input =
+        Ash.ActionInput.for_action(
+          Aikido.Slices.AiReact,
+          :ask,
+          Map.merge(ask_signal().data, %{state: idle_slice(), client: client})
+        )
+
+      assert input.valid?
+      assert input.arguments.client == client
+
+      assert %{client: ^client} =
+               Aikido.Slice.Config.resolve_config!(Aikido.Slices.AiReact, %{client: client})
+    end
+
+    invalid =
+      Ash.ActionInput.for_action(
+        Aikido.Slices.AiReact,
+        :ask,
+        Map.merge(ask_signal().data, %{state: idle_slice(), client: AikidoTest.NonexistentClient})
+      )
+
+    refute invalid.valid?
+
+    assert_raise ArgumentError, fn ->
+      Aikido.Slice.Config.resolve_config!(Aikido.Slices.AiReact, %{
+        client: AikidoTest.NonexistentClient
+      })
+    end
+
+    worker =
+      Ash.ActionInput.for_action(Aikido.Slices.AiWorker, :accept, %{
+        state: %{},
+        task_id: "task",
+        member: :worker,
+        attempt: "attempt",
+        reply_to: self(),
+        text: "work",
+        client: AikidoTest.NonexistentClient
+      })
+
+    refute worker.valid?
+  end
 end

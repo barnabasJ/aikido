@@ -5,7 +5,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   Emitted by the ReAct action, one per requested tool call. The executor
   spawns a Task that invokes the named callback in the run's prepared
   Ash AI registry and casts an
-  `"ai.react.tool.completed"` signal carrying Ash AI's serialized result.
+  `"ai.react.tool.completed"` signal carrying Ash AI's native result.
 
   Native tool errors pass through as model content; runtime failures become
   error JSON inside the same `tool.completed` envelope. Tool failures are conversational

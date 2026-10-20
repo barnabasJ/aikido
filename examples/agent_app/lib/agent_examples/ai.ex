@@ -45,7 +45,12 @@ defmodule AgentExamples.AI do
         resource
         |> Ash.ActionInput.for_action(
           :ask,
-          %{agent: record.id, query: query, request_id: request_id},
+          %{
+            agent: record.id,
+            query: query,
+            request_id: request_id,
+            metadata: Keyword.get(opts, :metadata, %{})
+          },
           ash_opts
         )
         |> Ash.run_action(ash_opts)

@@ -44,6 +44,12 @@ spawn dynamic workers in the same tree. The nearest team's `add_member` action
 manages creation, with the selected agent recorded as `owner`. Agents need no
 spawning slice or additional signal declaration. Stopping the root stops every descendant.
 
+The hook-request page uses the portable `&AgentExamples.Playground.request/2`
+callback. Each ask supplies the browser/run identity in `metadata`; the callback
+reads `context.event.metadata` to route the card. Checkpoints retain the exported
+function reference without capturing browser state. Pending UI cards and waiting
+Lua executions remain temporary application state.
+
 Runs belong to a signed browser session and survive navigation and reloads.
 They are held in memory until you stop them or stop the server. The Stop button
 releases the example's processes, including team descendants. The server binds

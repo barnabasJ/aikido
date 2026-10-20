@@ -1,18 +1,3 @@
-defmodule Aikido.TeamDeliveryTest.Worker do
-  use Ash.Resource,
-    domain: Aikido.TeamDeliveryTest.Domain,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
-
-  agent do
-    name "delivery_worker"
-  end
-
-  ai do
-    model "offline"
-    client Aikido.TeamDeliveryTest.Client
-  end
-end
-
 defmodule Aikido.TeamDeliveryTest.Client do
   def generate_text(_, messages, opts) do
     if observer = opts[:observer] do
@@ -37,6 +22,21 @@ defmodule Aikido.TeamDeliveryTest.Client do
        message: ReqLLM.Context.assistant(text, tool_calls: []),
        finish_reason: :stop
      )}
+  end
+end
+
+defmodule Aikido.TeamDeliveryTest.Worker do
+  use Ash.Resource,
+    domain: Aikido.TeamDeliveryTest.Domain,
+    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+
+  agent do
+    name "delivery_worker"
+  end
+
+  ai do
+    model "offline"
+    client Aikido.TeamDeliveryTest.Client
   end
 end
 

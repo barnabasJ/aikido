@@ -23,7 +23,7 @@ defmodule Aikido.Hooks.Execute do
     task = %Aikido.Directives.AsyncTask{
       work: fn ->
         result =
-          evaluate(directive.hook, directive.event, pid, directive.request_id)
+          evaluate(directive.hook, directive.event, pid, directive.request_id, signal)
 
         Jido.Signal.new!("ai.react.hook.completed", Map.put(payload, :result, result))
       end,
@@ -35,7 +35,7 @@ defmodule Aikido.Hooks.Execute do
   end
 
   @doc false
-  def evaluate(hook, event, pid, request_id) do
+  def evaluate(hook, event, pid, request_id, source_signal \\ nil) do
     lua =
       Lua.new(
         max_instructions: hook.max_instructions,
@@ -47,7 +47,11 @@ defmodule Aikido.Hooks.Execute do
 
     # Only async hooks get fire-and-forget signal helpers. Both modes can
     # request a response; the owning action still applies the final decision.
-    lua = if hook.mode == :async, do: install_signals(lua, pid, request_id, hook.name), else: lua
+    lua =
+      if hook.mode == :async,
+        do: install_signals(lua, pid, request_id, hook.name, source_signal),
+        else: lua
+
     {values, _lua} = Lua.eval!(lua, hook.script)
     values = Enum.map(values, &AshLua.Encoder.decode_input/1)
 
@@ -67,21 +71,21 @@ defmodule Aikido.Hooks.Execute do
     kind, reason -> {:error, "#{kind}: #{inspect(reason)}"}
   end
 
-  defp install_signals(lua, pid, request_id, name) do
+  defp install_signals(lua, pid, request_id, name, source_signal) do
     lua
     |> Lua.set!([:aikido, :send_context], fn args, state ->
       [text] = Lua.decode_list!(state, args)
       true = is_binary(text)
 
-      :ok =
-        Aikido.AgentServer.cast(
-          pid,
-          Jido.Signal.new!("ai.react.hook.context", %{
-            request_id: request_id,
-            name: name,
-            text: text
-          })
-        )
+      signal =
+        Jido.Signal.new!("ai.react.hook.context", %{
+          request_id: request_id,
+          name: name,
+          text: text
+        })
+
+      signal = if source_signal, do: Aikido.SignalCtx.inherit(signal, source_signal), else: signal
+      :ok = Aikido.AgentServer.cast(pid, signal)
 
       {[true], state}
     end)
@@ -93,7 +97,9 @@ defmodule Aikido.Hooks.Execute do
       # tool or gate completions through this capability.
       false = String.starts_with?(type, "ai.react.")
       payload = data |> Map.delete("request_id") |> Map.put(:request_id, request_id)
-      :ok = Aikido.AgentServer.cast(pid, Jido.Signal.new!(type, payload))
+      signal = Jido.Signal.new!(type, payload)
+      signal = if source_signal, do: Aikido.SignalCtx.inherit(signal, source_signal), else: signal
+      :ok = Aikido.AgentServer.cast(pid, signal)
       {[true], state}
     end)
   end

@@ -607,20 +607,24 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
   defp llm_turn_handle_turn(
          response,
-         %{type: :tool_calls, tool_calls: tool_calls},
+         %{type: :tool_calls, tool_calls: tool_calls, text: text},
          slice
        ) do
     iteration = slice.iteration + 1
 
     msg_calls = Enum.reject(tool_calls, &ReqLLM.ToolCall.flagged_builtin?/1)
 
-    slice = Conversation.append_message(slice, response.message)
-    new_context = slice.context
-
-    if iteration >= slice.max_iterations do
-      llm_turn_truncate(slice, new_context, iteration)
+    if msg_calls == [] do
+      llm_turn_handle_turn(response, %{type: :final_answer, text: text}, slice)
     else
-      llm_turn_dispatch_tools(slice, new_context, iteration, msg_calls)
+      slice = Conversation.append_message(slice, response.message)
+      new_context = slice.context
+
+      if iteration >= slice.max_iterations do
+        llm_turn_truncate(slice, new_context, iteration)
+      else
+        llm_turn_dispatch_tools(slice, new_context, iteration, msg_calls)
+      end
     end
   end
 
