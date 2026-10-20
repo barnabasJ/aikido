@@ -14,9 +14,9 @@ defmodule Aikido.Slices.FSM do
         initial_state: String.t()
       }
 
-  The slice owns the native Ash `:transition` action, implemented by
-  `Aikido.Slices.FSM.Transition`.
-  Send a `aikido.fsm.transition` signal with `data: %{to: "<next_state>"}` to
+  The slice owns the native Ash `:transition` action and delegates its pure
+  transition logic to a separate implementation module.
+  Send an `aikido.fsm.transition` signal with `data: %{to: "<next_state>"}` to
   attempt a transition.
 
   ## Configuration

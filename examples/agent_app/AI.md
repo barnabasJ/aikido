@@ -40,7 +40,7 @@ flowchart TD
 `Aikido.Ash.AI` contributes the same `ask` and `cancel` generic Ash actions to a
 single agent and a team. `ai do` supplies defaults, and callers can override
 `model`, `client`, `system_prompt`, `max_iterations`, `tools`, and `tool_context`
-through ordinary Ash create input. `client` defaults to `ReqLLM.Generation`,
+through the generic `start` action arguments. `client` defaults to `ReqLLM.Generation`,
 so normal callers only need a model and tools. Custom clients remain optional.
 The scripted client is selected explicitly by `AI.offline/1` in demos, tests,
 and the playground's offline mode. For example:
@@ -164,9 +164,9 @@ orchestrator can manage all its members. Both calls go through the team's
 ordinary Ash lifecycle actions. No spawning slice is added to the agents.
 
 This exercises the actual Lua runtime, generated Ash actions, Ash AI callbacks,
-and the ReAct loop. AshLua is pinned to the upstream revision used by the
-reference application; Ash AI and AshLua are example dependencies, not new
-mandatory Aikido dependencies.
+and the ReAct loop. Aikido depends on Ash AI and AshLua; the example declares
+those dependencies too because it uses their APIs directly. See `mix.exs` and
+`mix.lock` for the selected versions and AshLua revision.
 
 ## Tools and model configuration during delegation
 
@@ -180,7 +180,8 @@ With Lua selected, the playground and demos supply Lua management tools rather
 than separate spawn/delegate model tools. Direct Ash action tools remain usable
 when callers supply them instead. The demo's scripted model deterministically exercises orchestration; it is not
 a language model. A live model chooses its own tool calls. Each worker accepts
-one active task at a time; busy workers return a correlated task failure.
+one active task at a time and queues additional task deliveries. Task deadlines
+also apply while waiting in that queue.
 Delegation is bounded by a timeout and rejects self-delegation. Callers should
 break work into bounded subtasks and inspect failures rather than retrying
 unboundedly.

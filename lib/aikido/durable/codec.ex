@@ -7,8 +7,8 @@ defmodule Aikido.Durable.Codec do
   these callbacks retain their state unchanged. Both callbacks must be provided
   together, and the stored value must contain everything needed for restoration.
 
-  Agent-wide snapshot customization uses `Aikido.Agent.checkpoint/2` and
-  `Aikido.Agent.restore/2`. Path codecs run before checkpoint and after restore.
+  Agent-wide snapshot customization uses `c:Aikido.Agent.checkpoint/2` and
+  `c:Aikido.Agent.restore/2`. Path codecs run before checkpoint and after restore.
   """
 
   @callback externalize(term()) :: term()

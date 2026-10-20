@@ -116,12 +116,25 @@ Add `Aikido.Ash.Team` for fixed members, dynamic workers, ownership, dependencie
 and nested teams. A team can accept its initial `topology` in the start call.
 Add `Aikido.Ash.AI` for model turns; pass the model, tools, and optional prompt and
 iteration settings at runtime. AshAI and AshLua tools can expose management and
-delegation capabilities to AI agents.
+delegation capabilities to AI agents. Supply Ash AI tool names in `tools` and
+native builder options in `tool_options`. Each request enters `:setup`, prepares
+tools once, then runs model/tool turns through actions, directives and result
+signals. Messages can queue during setup; cancellation stops pending work.
 
 The default runtime uses DurableServer. Configure a persistent data directory or
 backend for the deployment. Snapshot recovery preserves logical agent state and
 team topology; it rebuilds runtime membership and monitors. IDs remain stable
-when PIDs change. Agent and slice serialization callbacks remain available.
+when PIDs change. Agent and slice serialization callbacks control snapshot
+content. The default local EKV backend stores data under `_build/aikido_durable`;
+use a stable directory for deployment, for example
+`{Aikido, durable: [data_dir: "priv/agent-state"]}`. Local storage requires the
+same disk to remain available.
+
+With `persistence :permanent` (the default), `stop` retains the snapshot and
+starting the same ID restores it. `persistence :temporary` deletes it on stop.
+Both checkpoint while running. The separate `delete` action stops an agent and
+removes its snapshot regardless of retention, including by ID after stop.
+Recovery does not replay in-flight tools or resume a waiting Lua VM.
 
 `Aikido.Ash.Agent` is a resource extension. Choosing a separate Ash data layer does
 not automatically persist live agent state or make process effects transactional.

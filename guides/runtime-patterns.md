@@ -34,8 +34,10 @@ those options; `Aikido.config/2` combines application configuration and runtime
 overrides. Instance modules do not generate lifecycle, persistence, debug or
 configuration accessor wrappers. Use `Aikido.Debug` for runtime diagnostics.
 
-`Aikido.Agent` remains the pure action/signal engine. `Aikido.AgentServer` is the
-runtime callback implementation hosted by DurableServer. Configure
+`Aikido.Agent` holds immutable identity and state and offers a convenience macro
+for the Ash resource host. AgentServer routes signals to native Ash reducers and
+applies their returned state before executing directives. `Aikido.AgentServer`
+is the runtime callback implementation hosted by DurableServer. Configure
 `persistence :temporary` to delete snapshots on stop. Actions are pure: they
 return state transitions and directives without performing side effects. All
 side effects belong in directives; results return through signals.
@@ -221,12 +223,21 @@ runtime's `durable` options. Per-path serialization can implement
 a separate store. A codec must retain enough data for `reinstate/1` to rebuild
 the value.
 
+The current snapshot envelope contains the serialized agent, logical parent
+binding, cron definitions, restart configuration and selected runtime boot
+options. It encodes compressed Erlang terms as a Base64 payload inside a map;
+it does not automatically dump all attributes to JSON through Ash types.
+Ash types validate action and state contracts; application codecs decide the
+persistent representation. Prepared AI tool callbacks and live run scope are
+excluded by the ReAct slice codec and tools are rebuilt for each new run.
+
 Both first activation and later durable snapshots apply slice `externalize/1`
 and agent `checkpoint/2`; loading applies `restore/2` and `reinstate/1`. Startup
-state is not saved a second time in process options. Persist credentials and
-identities only through application-owned codecs. Explicit middleware and dispatch
-configuration is retained for restoration; keep credentials out of that configuration
-and resolve them through application providers instead.
+state is not saved a second time in process options. Keep credentials out of
+snapshots; persist application identity only through application-owned codecs.
+Explicit middleware and dispatch configuration is retained for restoration;
+keep credentials out of that configuration and resolve them through application
+providers instead.
 
 Native Ash commands carry the caller's actor, tenant and application context
 through signal processing and follow-up effects. They do not turn an outer

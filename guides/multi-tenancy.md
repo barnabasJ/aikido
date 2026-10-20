@@ -13,7 +13,7 @@ Aikido.stop_agent(MyApp.Aikido, "worker", partition: :beta)
 
 DurableServer keys include the partition. Snapshots and activation therefore
 remain independent for those identities. Separately configured `Aikido.Durable`
-pools also accept `partition:` on `ensure_started`, `lookup`, and `stop`.
+namespaces also accept `partition:` on `ensure_started`, `lookup`, and `stop`.
 
 Teams use Ash resources, and their members inherit the runtime partition from
 the parent. Keep an ownership tree in one partition. The nested-team examples

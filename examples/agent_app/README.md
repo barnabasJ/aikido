@@ -17,7 +17,7 @@ live signal inspector. Each page also includes the exact source definitions,
 with independent code accordions: agents and slices open initially, actions,
 directives, and supporting modules closed. The headers show module names and
 source paths; live updates preserve your open/closed choices.
-The index links to all ten pages. No Node installation,
+The index links to every example page. No Node installation,
 asset build, database, or API key is needed for offline mode.
 
 | Page | Browser interaction |
@@ -29,6 +29,9 @@ asset build, database, or API key is needed for offline mode.
 | `/examples/team` | Inspect fixed members and send signals to the counter |
 | `/examples/nested-teams` | Inspect the fixed home squad, spawn/remove subteams, and signal their counters |
 | `/examples/assistant` | Chat with a tool-equipped assistant |
+| `/examples/hooks` | Run synchronous and asynchronous Lua lifecycle hooks |
+| `/examples/hook-requests` | Answer a request from a waiting Lua hook through the example callback |
+| `/examples/conversation` | Stream responses, retain history, and try todo-gated completion |
 | `/examples/researcher` | Try the research role independently |
 | `/examples/reviewer` | Try the review role independently |
 | `/examples/research-team` | Run orchestration and watch dynamic workers appear |
@@ -81,7 +84,7 @@ offline or `mix ai.live` with a z.ai key.
 | `AgentExamples.Worker` | An action returns AsyncTask; a result signal routes to another action | `worker_run` |
 | `AgentExamples.Team` | Child agents, asynchronous signals, and lifecycle cleanup | `team_start`, `team_send`, `team_stop` |
 
-Every generated interface also has a bang version. The resource's update
+Every generated interface also has a bang version. The resource's signal action
 arguments are Ash types, so invalid inputs fail before producing a signal.
 Agent state uses `schema do` blocks with native Ash `attribute` declarations.
 The transformer installs them as resource attributes; no separate state module is needed.
@@ -133,10 +136,10 @@ Agents.team_stop!(team.id)
 
 Start with [the domain](lib/agent_examples/agents.ex), then
 [Counter](lib/agent_examples/agents/counter.ex) and its
-[pure action](lib/agent_examples/actions/add.ex). Compare
+[pure action](lib/agent_examples/counter/implementation.ex). Compare
 [Notebook](lib/agent_examples/agents/notebook.ex) with its
 [embedded Journal](lib/agent_examples/slices/journal.ex).
-[Work](lib/agent_examples/actions/work.ex) shows the complete asynchronous
+[Work](lib/agent_examples/worker/implementation.ex) shows the complete asynchronous
 signal chain; its uppercase task is a local stand-in for one blocking tool call.
 [Demo](lib/agent_examples/demo.ex) subscribes before sending work so it can
 observe completion through subscriptions. The tests cover these behaviors.
@@ -146,8 +149,9 @@ Results return as signals; a receiving action decides the next transition.
 The demo and tests make synchronous calls as external clients, never inside
 directive execution.
 
-Agent state changes run in processes. Stop terminates a process; it does not
-permanently delete its durable identity. Live snapshots can become stale as new
+Agent state changes run in processes. With the default `persistence :permanent`,
+stop retains the snapshot; `persistence :temporary` deletes it on stop. The
+separate `delete` action removes saved state in either mode. Live snapshots can become stale as new
 signals arrive. See the repository's
 [Ash integration guide](../../guides/ash-integration.md) and
 [runtime patterns](../../guides/runtime-patterns.md).

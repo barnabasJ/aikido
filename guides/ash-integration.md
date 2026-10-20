@@ -21,7 +21,7 @@ and middleware configuration are reused directly; no companion resource is gener
 Own-state fields, AI flags and team configuration live in Spark and are read through
 `Aikido.Dsl.Agent.Info.state_fields/1`, `ai?/1` and `team_config/1`.
 
-A private `:initialize` generic action uses `Aikido.Agent.Initialize`, configured
+A private `:initialize` generic action uses a shared implementation, configured
 by the transformer with the state path and slice mounts. Ash changesets apply the
 original resource's defaults and validation without writing its data layer. Mounted
 embedded resources are initialized through their native create actions. The native
@@ -42,7 +42,7 @@ native resource options and defaults to the embedded data layer.
 
 ## An agent resource
 
-Start a Aikido instance in your application supervision tree:
+Start an Aikido instance in your application supervision tree:
 
 ```elixir
 children = [
@@ -99,7 +99,9 @@ validation. Mounted slices become additional attributes. Internally the runtime
 groups the agent's own fields under `:state`; `path :other_name` changes that path.
 
 The generated public actions are all generic Ash actions: `start`, `stop`,
-`delete`, `inspect`, `list`, and the declared signals. No CRUD actions are generated.
+`delete`, `inspect`, `list`, and the declared signals. These public commands do
+not use CRUD actions; internal create/update actions handle typed state
+initialization and changes.
 
 Adding `Aikido` to your supervision tree starts `Aikido.Default`. Resources use this
 runtime automatically. Set `instance MyApp.AgentRuntime` only when using another
@@ -215,6 +217,14 @@ accepts `filter`, `sort`, `offset` and `limit`. Snapshots are taken independentl
 they do not provide a transaction across processes. Native Ash defaults apply to
 arguments, including defaulted values passed as nil.
 
+The public command runs in the caller's process and sends a signal to the agent.
+The reducer runs as a separate native Ash action inside AgentServer. Each is an
+Ash authorization boundary when configured with authorizers and policies. Caller
+scope propagates through signals and directives to reducers and tools; an outer
+command's `authorize?: false` does not disable downstream tool authorization.
+Use normal Ash `tracer:` options to follow the chain across processes; see
+[native Ash tracing](runtime-patterns.md#native-ash-tracing).
+
 ## Embedded slice resources
 
 Slices package state and the Ash actions that operate on it:
@@ -224,10 +234,6 @@ defmodule MyApp.CounterSlice do
   use Ash.Resource,
     data_layer: :embedded,
     extensions: [Aikido.Ash.Slice]
-
-  attributes do
-    attribute :count, :integer, public?: true, default: 0
-  end
 
   actions do
     action :increment, Aikido.Types.ActionResult do
@@ -241,7 +247,7 @@ defmodule MyApp.CounterSlice do
   slice do
     name "counter_slice"
     schema do
-      attribute :count, :integer, default: 0
+      attribute :count, :integer, default: 0, public?: true
     end
     route "counter.increment", :increment
   end
@@ -264,15 +270,17 @@ Register `agent :composed, MyApp.ComposedAgent` in the domain. Then:
 
 ```elixir
 {:ok, agent} = MyApp.Agents.composed_start(%{})
-{:ok, agent} = MyApp.Agents.composed_increment(agent, %{data: %{amount: 2}})
+{:ok, agent} = MyApp.Agents.composed_increment(agent, %{amount: 2})
 agent = MyApp.Agents.composed_inspect!(agent)
 agent.counter.count # => 2
 ```
 
-Slice actions receive their current slice map as `state` and the signal payload
-as `data`. They return `%{state: new_slice_map, directives: list}`; `directives`
-may be omitted. The agent pipeline applies the returned state and executes the
-directives. Runtime action context is available under `input.context.aikido`.
+Slice actions receive their current slice value as `state`. Declared arguments
+such as `amount` are cast from the signal payload and exposed directly in
+`input.arguments`; actions declaring a `data` map instead receive that map.
+They return `Aikido.Types.ActionResult.new(state: new_state, directives: directives)`;
+`directives` defaults to `[]`. The agent pipeline applies the returned state
+and executes the directives. Runtime action context is available under `input.context.aikido`.
 Keep these action implementations pure.
 
 Resource slices support a `schedules` section. Schedules reference generic Ash
@@ -356,13 +364,6 @@ observe its result. Members can return the existing emit/notify-parent directive
 to communicate through the signal pipeline. Stopping the team stops its children
 through the normal parent-death lifecycle. Startup failures stop the new team;
 process side effects cannot be rolled back as a database transaction.
-
-## Migration
-
-`Aikido.Agent` and `Aikido.Slice` are convenience macros over
-native Ash resource hosts. Their state declarations become resource attributes.
-Use `Ash.Resource` with `Aikido.Ash.Agent` and domain interfaces for the public
-agent API. AgentServer invokes the original resource's native Ash actions directly.
 
 ## Native contracts and tools
 
