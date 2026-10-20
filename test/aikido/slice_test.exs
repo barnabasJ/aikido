@@ -9,7 +9,7 @@ defmodule AikidoTest.SliceTest.MinimalSlice do
       attribute :value, :term, allow_nil?: true
     end
 
-    route "minimal.noop", {AikidoTest.TestActions, :plugin_test_action}
+    route "minimal.noop", {AikidoTest.TestActions, :noop}
   end
 end
 
@@ -29,7 +29,7 @@ defmodule AikidoTest.SliceTest.FullSlice do
       attribute :enabled, :boolean, allow_nil?: false, default: true
     end
 
-    route "send", {AikidoTest.TestActions, :plugin_test_action}
+    route "send", {AikidoTest.TestActions, :noop}
   end
 end
 
@@ -44,7 +44,7 @@ defmodule AikidoTest.SliceTest.SchemaSlice do
       attribute :counter, :integer, allow_nil?: false, default: 0
     end
 
-    route "schema.noop", {AikidoTest.TestActions, :plugin_test_action}
+    route "schema.noop", {AikidoTest.TestActions, :noop}
   end
 end
 
@@ -72,18 +72,18 @@ defmodule AikidoTest.SliceTest do
   end
 
   describe("accessors") do
-    test "minimal slice exposes name and path via Info" do
+    test "minimal slice exposes its name, actions and routes via Info" do
       assert Map.get(
                Aikido.Dsl.Slice.Info.slice_options(AikidoTest.SliceTest.MinimalSlice),
                :name
              ) == "minimal"
 
       assert Aikido.Dsl.Slice.Info.actions(AikidoTest.SliceTest.MinimalSlice) == [
-               {AikidoTest.TestActions, :plugin_test_action}
+               {AikidoTest.TestActions, :noop}
              ]
 
       assert Aikido.Dsl.Slice.Info.signal_routes(AikidoTest.SliceTest.MinimalSlice) == [
-               {"minimal.noop", {AikidoTest.TestActions, :plugin_test_action}}
+               {"minimal.noop", {AikidoTest.TestActions, :noop}}
              ]
     end
 
@@ -97,7 +97,7 @@ defmodule AikidoTest.SliceTest do
              ) == "A test slice"
 
       assert Aikido.Dsl.Slice.Info.signal_routes(AikidoTest.SliceTest.FullSlice) == [
-               {"send", {AikidoTest.TestActions, :plugin_test_action}}
+               {"send", {AikidoTest.TestActions, :noop}}
              ]
 
       assert Ash.Type.ash_type?(Aikido.Dsl.Slice.Info.schema(AikidoTest.SliceTest.FullSlice))

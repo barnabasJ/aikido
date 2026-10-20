@@ -140,7 +140,9 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
            }
   end
 
-  test "encodes a 'tool not found' error when no module matches", %{aikido: aikido} do
+  test "encodes a 'tool not found' error when the prepared registry has no matching name", %{
+    aikido: aikido
+  } do
     test_pid = self()
     agent = spawn_agent_stub(test_pid)
 

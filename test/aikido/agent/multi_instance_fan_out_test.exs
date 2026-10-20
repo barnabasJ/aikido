@@ -135,8 +135,8 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
        iteration.
     4. Atomicity — first mount's success rolls back when a later mount
        errors (the turn is all-or-nothing).
-    5. Edge case: action declared in BOTH a slice's `signal_routes` AND
-       the agent's own `signal_routes` fans out across slice mounts AND
+    5. Edge case: action declared in BOTH a slice's routes AND
+       the agent's own routes fans out across slice mounts AND
        the agent path.
   """
   use ExUnit.Case, async: true

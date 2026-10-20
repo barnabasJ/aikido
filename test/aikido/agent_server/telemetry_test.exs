@@ -42,14 +42,13 @@ defmodule AikidoTest.AgentServer.TelemetryTest.TelemetryAgent do
   actions do
     action :emit_directive, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementation, action: :run}
+      run AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementation
     end
 
     action :schedule_directive, Aikido.ActionResult do
       argument :state, :term
 
-      run {AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implementation
     end
   end
 end

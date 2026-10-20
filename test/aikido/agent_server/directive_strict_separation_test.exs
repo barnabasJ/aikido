@@ -32,8 +32,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.HarnessAgent do
       argument :state, :term
       argument :directive, :term, allow_nil?: false
 
-      run {AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveAction.Implementation
     end
   end
 end

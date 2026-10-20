@@ -27,7 +27,7 @@ defmodule AikidoTest.Case do
 
   The module also provides helper functions:
 
-  - `start_test_agent/2` - Starts an agent under the test's Aikido instance
+  - `start_test_agent/3` - Starts an agent under the test's Aikido instance
   - `unique_id/1` - Generates a unique ID with optional prefix
   - `signal/3` - Creates a test signal with sensible defaults
   - `start_server/3` - Starts an agent server with automatic cleanup
@@ -98,7 +98,7 @@ defmodule AikidoTest.Case do
     ExUnit.Callbacks.on_exit(fn ->
       if Process.alive?(pid) do
         try do
-          GenServer.stop(pid, :normal, 100)
+          Aikido.stop_agent(context.aikido, pid)
         catch
           :exit, _ -> :ok
         end

@@ -32,7 +32,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent do
   actions do
     action :emit_test, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation, action: :run}
+      run AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation
     end
   end
 end

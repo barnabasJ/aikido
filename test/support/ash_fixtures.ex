@@ -68,7 +68,7 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter do
         constraints: [min: 1],
         description: "Amount to add"
 
-      run {AikidoTest.AshFixtures.GeneratedIncrement.Implementation, action: :run}
+      run AikidoTest.AshFixtures.GeneratedIncrement.Implementation
     end
   end
 
@@ -80,7 +80,7 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter do
         allow_nil?: false,
         constraints: [fields: [amount: [type: :integer, allow_nil?: false]]]
 
-      run {AikidoTest.AshFixtures.DataIncrement.Implementation, action: :run}
+      run AikidoTest.AshFixtures.DataIncrement.Implementation
     end
   end
 end
@@ -104,7 +104,7 @@ defmodule AikidoTest.AshFixtures.Counter do
     action :reduce_increment, Aikido.ActionResult do
       argument :state, :term
       argument :amount, :integer, default: 1
-      run {AikidoTest.AshFixtures.Increment.Implementation, action: :run}
+      run AikidoTest.AshFixtures.Increment.Implementation
     end
   end
 end
@@ -260,7 +260,7 @@ defmodule AikidoTest.AshFixtures.TaskWorker do
       argument :member, :term, allow_nil?: false
       argument :attempt, :string, allow_nil?: false
       argument :reply_to, :term, allow_nil?: false
-      run {AikidoTest.AshFixtures.TaskAction.Implementation, action: :run}
+      run AikidoTest.AshFixtures.TaskAction.Implementation
     end
   end
 end

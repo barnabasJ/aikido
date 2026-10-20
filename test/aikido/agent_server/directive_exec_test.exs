@@ -31,8 +31,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.TestAgent do
       argument :state, :term
       argument :directive, :term, allow_nil?: false
 
-      run {AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction.Implementation
     end
   end
 end
@@ -86,8 +85,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent do
       argument :state, :term
       argument :reason, :term, default: :normal
 
-      run {AikidoTest.AgentServer.DirectiveExecTest.StopOnSignalAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.DirectiveExecTest.StopOnSignalAction.Implementation
     end
   end
 end

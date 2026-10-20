@@ -1,30 +1,9 @@
-defmodule AikidoTest.AgentServer.SignalRouterTest.TestAction.Implementation do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(_input, _opts, _context) do
-    Aikido.ActionResult.new(state: %{}, directives: [])
-  end
-end
-
-defmodule AikidoTest.AgentServer.SignalRouterTest.AnotherAction.Implementation do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(_input, _opts, _context) do
-    Aikido.ActionResult.new(state: %{}, directives: [])
-  end
-end
-
 defmodule AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes do
   @moduledoc false
   use Aikido.Slice
 
   slice do
     name "slice_with_routes"
-
-    schema do
-    end
 
     route "slice.custom", {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}
 
@@ -35,12 +14,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes do
   actions do
     action :test_action, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServer.SignalRouterTest.TestAction.Implementation, action: :run}
-    end
-
-    action :another_action, Aikido.ActionResult do
-      argument :state, :term
-      run {AikidoTest.AgentServer.SignalRouterTest.AnotherAction.Implementation, action: :run}
+      run AikidoTest.TestActions.Noop.Implementation
     end
   end
 end
@@ -71,7 +45,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.AgentWithConfiguredRoutes do
 end
 
 defmodule AikidoTest.AgentServer.SignalRouterTest.AgentWithoutRoutes do
-  @moduledoc "Agent that does NOT export signal_routes/1"
+  @moduledoc "Agent with no declared signal routes"
   use Aikido.Agent
 
   agent do
@@ -93,38 +67,17 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
   use ExUnit.Case, async: true
 
   defp build_state(agent_module) do
-    %Aikido.AgentServer.State{
+    Aikido.AgentServer.State.new!(
       id: "router-test-#{System.unique_integer([:positive])}",
       agent_module: agent_module,
       agent: agent_module.initialize!(),
       status: :idle,
-      parent: nil,
-      orphaned_from: nil,
-      children: %{},
-      on_parent_death: :stop,
-      aikido: Aikido,
-      partition: nil,
-      default_dispatch: nil,
-      middleware_chain: nil,
-      cron_jobs: %{},
-      cron_monitors: %{},
-      cron_monitor_refs: %{},
-      cron_restart_attempts: %{},
-      cron_restart_timers: %{},
-      cron_restart_timer_refs: %{},
-      cron_specs: %{},
-      cron_runtime_specs: %{},
-      skip_schedules: false,
-      signal_subscribers: %{},
-      ready_waiters: %{},
-      debug: false,
-      debug_events: [],
-      debug_max_events: 500
-    }
+      aikido: Aikido
+    )
   end
 
   describe("build/1 — agent routes") do
-    test "collects routes declared via use Aikido.Agent, signal_routes:" do
+    test "collects routes declared in the agent block" do
       router =
         Aikido.AgentServer.SignalRouter.build(
           build_state(AikidoTest.AgentServer.SignalRouterTest.AgentWithConfiguredRoutes)
@@ -134,7 +87,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
                Jido.Signal.Router.route(router, signal("agent.configured"))
     end
 
-    test "collects routes from agent_module.signal_routes/1" do
+    test "collects native route declarations and priorities" do
       router =
         Aikido.AgentServer.SignalRouter.build(
           build_state(AikidoTest.AgentServer.SignalRouterTest.AgentWithRoutes)

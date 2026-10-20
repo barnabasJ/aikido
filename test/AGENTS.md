@@ -11,14 +11,14 @@ Provide stable, reusable testing patterns for pure agents, AgentServer runtime b
 - `mix test`
 - `mix test test/path/to/file_test.exs`
 - `mix test --cover`
-- `mix test --include example`
+- `cd examples/agent_app && mix test`
 
 ## Support Modules
 - `AikidoTest.Case`: isolated Aikido instance per test (`aikido`, `aikido_pid` context)
 - `AikidoTest.AgentWait`: subscription-based state assertions
 - `AikidoTest.LifecycleWait`: process monitors and supervised recovery events
 - `AikidoTest.Support.TestTracer`: lightweight span capture for runtime assertions
-- `AikidoTest.TestAgents` and `AikidoTest.TestActions`: canonical fixtures for behavior-level tests
+- Fixtures in `test_agents.ex` and `AikidoTest.TestActions`: native resources and action implementations for behavior-level tests
 
 ## Standards
 - Prefer behavior assertions over implementation/log assertions
@@ -29,16 +29,17 @@ Provide stable, reusable testing patterns for pure agents, AgentServer runtime b
 ## High-Value Coverage
 - Native Ash action immutability and directive emission semantics
 - AgentServer signal routing and runtime directive execution
+- DurableServer activation, snapshot retention, codec round trips and recovery
 - Parent-child lifecycle (`SpawnAgent`, `StopChild`) and state synchronization
-- Slice-return action shapes — single slice via `path:`, multi-slice via `%Aikido.Agent.SliceUpdate{}`
+- Action result shapes — state for the resolved mount path, multiple slices via `%Aikido.Agent.SliceUpdate{}`
 
 ## Release Hygiene
 - Keep test fixtures aligned with current directive/slice-return/tool contracts
 - Use Conventional Commits
-- Update examples in `test/examples/` when behavior contracts change
+- Update examples in `examples/agent_app/` when behavior contracts change
 
 ## References
 - `test/support/`
-- `test/examples/`
+- `examples/agent_app/test/`
 - `../README.md`
 - https://github.com/barnabasJ/aikido

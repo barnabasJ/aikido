@@ -74,7 +74,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CronAgent do
       argument :state, :term
       argument :data, :map, default: %{}
 
-      run {AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementation, action: :run}
+      run AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementation
     end
 
     action :register_cron, Aikido.ActionResult do
@@ -84,16 +84,14 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CronAgent do
       argument :timezone, :string
       argument :message, :term
 
-      run {AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Implementation,
-           action: :run}
+      run AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Implementation
     end
 
     action :cancel_cron, Aikido.ActionResult do
       argument :state, :term
       argument :job_id, :term, allow_nil?: false
 
-      run {AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction.Implementation,
-           action: :run}
+      run AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction.Implementation
     end
   end
 end

@@ -1,17 +1,3 @@
-defmodule AikidoTest.TelemetryTest.TestAgent do
-  @moduledoc false
-  use Aikido.Agent
-
-  agent do
-    name "telemetry_test_agent"
-    path :domain
-
-    schema do
-      attribute :counter, :integer, default: 0
-    end
-  end
-end
-
 defmodule AikidoTest.TelemetryTest do
   use ExUnit.Case, async: false
   import ExUnit.CaptureLog

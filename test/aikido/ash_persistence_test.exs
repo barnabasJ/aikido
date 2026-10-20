@@ -59,7 +59,7 @@ defmodule AikidoTest.AshPersistenceTest do
     )
 
     on_exit(fn -> File.rm_rf!(directory) end)
-    %{pool: Aikido.durable_supervisor_name(instance), instance: instance}
+    %{durable: Aikido.durable_supervisor_name(instance), instance: instance}
   end
 
   test "permanent is the default and stop preserves saved state" do
@@ -109,16 +109,16 @@ defmodule AikidoTest.AshPersistenceTest do
     assert %{value: 7} = Domain.permanent_inspect!(restarted)
   end
 
-  test "low-level and pool stop honour the temporary resource's retention", %{
+  test "low-level and durable stop honour the temporary resource's retention", %{
     instance: instance,
-    pool: pool
+    durable: durable
   } do
     ref = Domain.temporary_start!(%{id: "low-level", value: 7})
     assert :ok = Aikido.stop_agent(instance, ref.pid)
     restarted = Domain.temporary_start!(%{id: "low-level", value: 8})
     assert %{value: 8} = Domain.temporary_inspect!(restarted)
 
-    assert :ok = Aikido.Durable.stop(pool, restarted.id)
+    assert :ok = Aikido.Durable.stop(durable, restarted.id)
     fresh = Domain.temporary_start!(%{id: "low-level", value: 9})
     assert %{value: 9} = Domain.temporary_inspect!(fresh)
   end
@@ -140,7 +140,7 @@ defmodule AikidoTest.AshPersistenceTest do
     assert %{value: 99} = Domain.temporary_inspect!(restarted)
   end
 
-  test "deleting a partitioned PID does not delete the default partition", %{pool: pool} do
+  test "deleting a partitioned PID does not delete the default partition", %{durable: durable} do
     main = Domain.permanent_start!(%{id: "partitioned", value: 1})
 
     alpha =
@@ -152,7 +152,7 @@ defmodule AikidoTest.AshPersistenceTest do
     assert %{value: 1} = Domain.permanent_inspect!(main)
 
     assert {:ok, fresh} =
-             Aikido.Durable.ensure_started(pool, "partitioned",
+             Aikido.Durable.ensure_started(durable, "partitioned",
                agent: Permanent,
                partition: :alpha,
                initial_state: %{state: %{value: 3}}

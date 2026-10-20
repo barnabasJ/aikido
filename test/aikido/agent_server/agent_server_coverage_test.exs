@@ -60,7 +60,7 @@ defmodule AikidoTest.AgentServerCoverageTest.ManyDirectivesAgent do
     action :many_directives, Aikido.ActionResult do
       argument :state, :term
       argument :count, :integer, default: 10
-      run {AikidoTest.AgentServerCoverageTest.ManyDirectivesAction.Implementation, action: :run}
+      run AikidoTest.AgentServerCoverageTest.ManyDirectivesAction.Implementation
     end
   end
 end
@@ -125,33 +125,26 @@ defmodule AikidoTest.AgentServerCoverageTest.CompletionAgent do
   actions do
     action :complete, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServerCoverageTest.CompleteAction.Implementation, action: :run}
+      run AikidoTest.AgentServerCoverageTest.CompleteAction.Implementation
     end
 
     action :fail, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServerCoverageTest.FailAction.Implementation, action: :run}
+      run AikidoTest.AgentServerCoverageTest.FailAction.Implementation
     end
 
     action :delay_complete, Aikido.ActionResult do
       argument :state, :term
       argument :delay_ms, :integer, default: 50
-      run {AikidoTest.AgentServerCoverageTest.DelayCompleteAction.Implementation, action: :run}
+      run AikidoTest.AgentServerCoverageTest.DelayCompleteAction.Implementation
     end
   end
 end
 
 defmodule AikidoTest.AgentServerCoverageTest do
   @moduledoc """
-  Additional tests to improve AgentServer coverage.
-
-  Tests uncovered paths including:
-  - resolve_server with {:via, ...} that returns nil
-  - Agent resolution with new/0 vs new/1
-  - Pre-built struct with agent_module option
-  - Queue overflow scenario
-  - Multiple await_completion waiters
-  - Invalid signal handling
+  AgentServer boundary coverage for process references, native initialization,
+  call selectors, signal validation and scheduled delivery.
   """
   use AikidoTest.Case, async: true
   @moduletag :capture_log

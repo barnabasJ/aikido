@@ -21,26 +21,26 @@ defmodule AikidoTest.DurableRelationshipTest do
     )
 
     on_exit(fn -> File.rm_rf!(directory) end)
-    %{instance: instance, pool: Aikido.durable_supervisor_name(instance), directory: directory}
+    %{instance: instance, durable: Aikido.durable_supervisor_name(instance), directory: directory}
   end
 
   test "adopted parent bindings are saved without PIDs and restored on activation", %{
     instance: instance,
-    pool: pool
+    durable: durable
   } do
     {:ok, parent} = Aikido.start_agent(instance, Minimal, id: "parent")
     {:ok, child} = Aikido.start_agent(instance, Minimal, id: "child")
     assert {:ok, ^child} = AgentServer.adopt_child(parent, child, :worker, %{role: "analysis"})
 
     {key, _entry} =
-      Enum.find(DurableServer.Supervisor.global_members(pool), fn {_key, {pid, _metadata}} ->
+      Enum.find(DurableServer.Supervisor.global_members(durable), fn {_key, {pid, _metadata}} ->
         pid == child
       end)
 
     assert :ok = Aikido.stop_agent(instance, child)
     assert {:ok, %{parent_id: "parent", tag: :worker}} = Aikido.parent_binding(instance, "child")
 
-    {:ok, info} = DurableServer.Supervisor.get_server_info(pool, key)
+    {:ok, info} = DurableServer.Supervisor.get_server_info(durable, key)
     saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
     refute Map.has_key?(saved.parent, :pid)
     assert saved.parent.meta == %{role: "analysis"}
@@ -100,7 +100,7 @@ defmodule AikidoTest.DurableRelationshipTest do
 
   test "SpawnAgent children use DurableServer and recover their relationship after a crash", %{
     instance: instance,
-    pool: pool
+    durable: durable
   } do
     {:ok, parent} = Aikido.start_agent(instance, Minimal, id: "parent")
     {:ok, runtime} = AgentServer.state(parent, &{:ok, &1})
@@ -108,7 +108,7 @@ defmodule AikidoTest.DurableRelationshipTest do
     directive = Aikido.Directives.spawn_agent(Minimal, :worker, opts: %{id: "child"})
     assert :ok = Aikido.Directive.exec(directive, signal, runtime)
     assert {:ok, child} = AgentServer.await_child(parent, :worker)
-    assert {:ok, ^child} = Aikido.Durable.lookup(pool, "child")
+    assert {:ok, ^child} = Aikido.Durable.lookup(durable, "child")
     restored = AikidoTest.LifecycleWait.restart(child)
 
     assert {:ok, %{id: "parent", pid: ^parent}} = AgentServer.state(restored, &{:ok, &1.parent})

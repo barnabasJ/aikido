@@ -1,4 +1,4 @@
-defmodule AikidoTest.Plugin.FSMTest.DefaultFSMAgent do
+defmodule AikidoTest.Slices.FSMTest.DefaultFSMAgent do
   @moduledoc false
   use Aikido.Agent
 
@@ -8,7 +8,7 @@ defmodule AikidoTest.Plugin.FSMTest.DefaultFSMAgent do
   end
 end
 
-defmodule AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent do
+defmodule AikidoTest.Slices.FSMTest.ConfiguredFSMAgent do
   @moduledoc false
   use Aikido.Agent
 
@@ -29,7 +29,7 @@ defmodule AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent do
   end
 end
 
-defmodule AikidoTest.Plugin.FSMTest do
+defmodule AikidoTest.Slices.FSMTest do
   use ExUnit.Case, async: true
 
   describe("Slice.Info surface") do
@@ -46,7 +46,7 @@ defmodule AikidoTest.Plugin.FSMTest do
     test "the slice action runs directly through Ash with its declared arguments" do
       assert Ash.Resource.Info.resource?(Aikido.Slices.FSM)
       assert Aikido.Ash.Slice in Spark.extensions(Aikido.Slices.FSM)
-      state = AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.initialize!().state.fsm
+      state = AikidoTest.Slices.FSMTest.ConfiguredFSMAgent.initialize!().state.fsm
 
       input =
         Ash.ActionInput.for_action(Aikido.Slices.FSM, :transition, %{state: state, to: "working"})
@@ -60,7 +60,7 @@ defmodule AikidoTest.Plugin.FSMTest do
 
   describe("default FSM (no per-agent config)") do
     test "agent boots with the default initial_state" do
-      agent = AikidoTest.Plugin.FSMTest.DefaultFSMAgent.initialize!()
+      agent = AikidoTest.Slices.FSMTest.DefaultFSMAgent.initialize!()
       assert agent.state.fsm.state == "idle"
       assert agent.state.fsm.initial_state == "idle"
       assert agent.state.fsm.history == []
@@ -68,7 +68,7 @@ defmodule AikidoTest.Plugin.FSMTest do
     end
 
     test "an allowed transition mutates state" do
-      agent = AikidoTest.Plugin.FSMTest.DefaultFSMAgent.initialize!()
+      agent = AikidoTest.Slices.FSMTest.DefaultFSMAgent.initialize!()
 
       {:ok, %{agent: agent}, _} =
         Aikido.AgentServer.apply_actions(
@@ -78,7 +78,7 @@ defmodule AikidoTest.Plugin.FSMTest do
               struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
             ),
             Map.merge(%{}, %{
-              agent_module: AikidoTest.Plugin.FSMTest.DefaultFSMAgent,
+              agent_module: AikidoTest.Slices.FSMTest.DefaultFSMAgent,
               agent: agent,
               agent_id: agent.id
             })
@@ -91,7 +91,7 @@ defmodule AikidoTest.Plugin.FSMTest do
     end
 
     test "transitioning into a terminal state flips terminal?" do
-      agent = AikidoTest.Plugin.FSMTest.DefaultFSMAgent.initialize!()
+      agent = AikidoTest.Slices.FSMTest.DefaultFSMAgent.initialize!()
 
       {:ok, %{agent: agent}, _} =
         Aikido.AgentServer.apply_actions(
@@ -101,7 +101,7 @@ defmodule AikidoTest.Plugin.FSMTest do
               struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
             ),
             Map.merge(%{}, %{
-              agent_module: AikidoTest.Plugin.FSMTest.DefaultFSMAgent,
+              agent_module: AikidoTest.Slices.FSMTest.DefaultFSMAgent,
               agent: agent,
               agent_id: agent.id
             })
@@ -117,7 +117,7 @@ defmodule AikidoTest.Plugin.FSMTest do
               struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
             ),
             Map.merge(%{}, %{
-              agent_module: AikidoTest.Plugin.FSMTest.DefaultFSMAgent,
+              agent_module: AikidoTest.Slices.FSMTest.DefaultFSMAgent,
               agent: agent,
               agent_id: agent.id
             })
@@ -130,16 +130,37 @@ defmodule AikidoTest.Plugin.FSMTest do
     end
   end
 
+  test "history records successful native transitions in chronological order" do
+    initial = AikidoTest.Slices.FSMTest.DefaultFSMAgent.initialize!().state.fsm
+
+    final =
+      Enum.reduce(["processing", "idle", "processing"], initial, fn to, state ->
+        input =
+          Ash.ActionInput.for_action(Aikido.Slices.FSM, :transition, %{state: state, to: to})
+
+        assert {:ok, %Aikido.ActionResult{state: next, directives: []}} = Ash.run_action(input)
+        next
+      end)
+
+    assert final.history == [
+             %{from: "idle", to: "processing"},
+             %{from: "processing", to: "idle"},
+             %{from: "idle", to: "processing"}
+           ]
+
+    assert initial.history == []
+  end
+
   describe("configured FSM") do
-    test "per-agent config seeds the slice through the schema's transform" do
-      agent = AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.initialize!()
+    test "mount options initialize the configured FSM state" do
+      agent = AikidoTest.Slices.FSMTest.ConfiguredFSMAgent.initialize!()
       assert agent.state.fsm.state == "ready"
       assert agent.state.fsm.terminal_states == ["done", "errored"]
       assert agent.state.fsm.terminal? == false
     end
 
     test "respects the configured transitions map" do
-      agent = AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.initialize!()
+      agent = AikidoTest.Slices.FSMTest.ConfiguredFSMAgent.initialize!()
 
       {:ok, %{agent: agent}, _} =
         Aikido.AgentServer.apply_actions(
@@ -149,7 +170,7 @@ defmodule AikidoTest.Plugin.FSMTest do
               struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
             ),
             Map.merge(%{}, %{
-              agent_module: AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent,
+              agent_module: AikidoTest.Slices.FSMTest.ConfiguredFSMAgent,
               agent: agent,
               agent_id: agent.id
             })
@@ -167,7 +188,7 @@ defmodule AikidoTest.Plugin.FSMTest do
               struct!(Jido.Signal, id: nil, type: "test.action", data: %{}, source: "/test")
             ),
             Map.merge(%{}, %{
-              agent_module: AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent,
+              agent_module: AikidoTest.Slices.FSMTest.ConfiguredFSMAgent,
               agent: agent,
               agent_id: agent.id
             })
@@ -180,7 +201,7 @@ defmodule AikidoTest.Plugin.FSMTest do
     end
 
     test "rejects a transition not in the allowed list" do
-      agent = AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent.initialize!()
+      agent = AikidoTest.Slices.FSMTest.ConfiguredFSMAgent.initialize!()
 
       assert {:error, _, _reason} =
                Aikido.AgentServer.apply_actions(
@@ -195,7 +216,7 @@ defmodule AikidoTest.Plugin.FSMTest do
                      )
                    ),
                    Map.merge(%{}, %{
-                     agent_module: AikidoTest.Plugin.FSMTest.ConfiguredFSMAgent,
+                     agent_module: AikidoTest.Slices.FSMTest.ConfiguredFSMAgent,
                      agent: agent,
                      agent_id: agent.id
                    })

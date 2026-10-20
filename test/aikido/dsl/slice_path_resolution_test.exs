@@ -16,17 +16,17 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.CounterSlice do
   actions do
     action :bump, Aikido.ActionResult do
       argument :state, :term
-      run {Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation, action: :run}
+      run Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation
     end
 
     action :escape, Aikido.ActionResult do
       argument :state, :term
-      run {Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation, action: :run}
+      run Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation
     end
 
     action :unbound, Aikido.ActionResult do
       argument :state, :term
-      run {Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation, action: :run}
+      run Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation
     end
   end
 end
@@ -83,28 +83,14 @@ end
 
 defmodule Aikido.Dsl.SlicePathResolutionTest do
   @moduledoc """
-  Targeted coverage for the `__resolve_slice_paths__/1` resolution
-  order:
-
-    1. Every mount that routes to the action via its `signal_routes`
-       (the compile-time `:slice_paths_for_action` lookup table). Returns
-       a list — multi-instance mounts contribute multiple entries; the
-       agent's own path is appended when the agent's own `signal_routes`
-       also declares the action.
-    2. Fallback (when the table has no entry for the action): the
-       action's own `path :foo` escape valve (for ad-hoc actions on the
-       agent's own `signal_routes` that aren't owned by any slice).
-    3. Final fallback: the agent's own `path :foo` (its `agent do … end`
-       slice).
-
-  Steps 2 and 3 yield a single-element list so the runtime fan-out fold
-  in the native action pipeline is uniform across single-mount and
-  multi-mount cases.
+  Actions routed by mounted slices write to every matching mount path. Actions
+  also routed by the agent include its own state path. An action absent from
+  the mount table writes to the agent's own state path.
   """
   use ExUnit.Case, async: true
 
   describe("slice that routes to the action wins") do
-    test "BumpAction (in CounterSlice's signal_routes) writes to :counter, not :domain" do
+    test "a mounted slice action updates its own state path" do
       agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.initialize!()
       assert %{count: 0} = agent.state.counter
 
@@ -126,13 +112,6 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
 
       assert %{count: 1} = agent.state.counter
       assert agent.state.domain == %{last_action: nil}
-    end
-
-    test "BumpAction has no `path :foo` of its own — resolution comes from the slice mount" do
-      assert Map.get(
-               Ash.Resource.Info.action(Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :bump),
-               :path
-             ) == nil
     end
   end
 
@@ -171,7 +150,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
   end
 
   describe("fall back to agent's own path") do
-    test "UnboundAction (no slice routes, no own path) writes to the agent's :domain slice" do
+    test "an action absent from the mount table writes to the agent state path" do
       agent = Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent.initialize!()
 
       {:ok, %{agent: agent}, _dirs} =
@@ -196,7 +175,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
   end
 
   describe("compile-time lookup table shape") do
-    test "slice_paths_for_action maps each slice action module to a list of mount paths" do
+    test "slice_paths_for_action maps resource/action pairs to mount paths" do
       table =
         Aikido.Dsl.Agent.Info.slice_paths_for_action(
           Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent

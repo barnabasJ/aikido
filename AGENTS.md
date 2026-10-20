@@ -25,8 +25,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - OTP `28+` (release QA baseline)
 
 ## Commands
-- `mix test` (default alias excludes `:flaky`)
-- `mix test --include flaky` (full suite)
+- `mix test` (full suite; no default tag exclusions)
 - `mix test --cover` (coverage gate)
 - `mix q` or `mix quality` (`format --check-formatted`, `compile --warnings-as-errors`, `credo`, `dialyzer`)
 - `mix docs` (local docs)

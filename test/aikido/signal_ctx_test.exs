@@ -19,7 +19,7 @@ defmodule AikidoTest.SignalCtxTest.TraceProbe do
   actions do
     action :trace_probe, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.SignalCtxTest.TraceProbe.Implementation, action: :run}
+      run AikidoTest.SignalCtxTest.TraceProbe.Implementation
     end
   end
 end

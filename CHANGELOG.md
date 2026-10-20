@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Align test fixtures with native Ash action implementations and DurableServer
+  supervision. Remove unused resources, adapter options and duplicate schema
+  wrapper tests; consolidate FSM coverage and run the full suite without default
+  tag exclusions.
+
 - Remove the local LM Studio ReAct test suite and its unused echo fixture; retain
   deterministic mock integration coverage for answers, tools and subscriptions.
 

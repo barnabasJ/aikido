@@ -31,12 +31,12 @@ defmodule AikidoTest.Signal.CallTest.CallTestAgent do
   actions do
     action :echo_action, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.Signal.CallTest.EchoAction.Implementation, action: :run}
+      run AikidoTest.Signal.CallTest.EchoAction.Implementation
     end
 
     action :silent_action, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.Signal.CallTest.SilentAction.Implementation, action: :run}
+      run AikidoTest.Signal.CallTest.SilentAction.Implementation
     end
   end
 end

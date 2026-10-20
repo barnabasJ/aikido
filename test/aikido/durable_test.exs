@@ -73,7 +73,7 @@ defmodule AikidoTest.DurableTest do
     start_supervised!({Aikido, name: instance, durable: []})
 
     opts = [
-      name: AikidoTest.DurablePool,
+      name: AikidoTest.DurableSupervisor,
       agent: AikidoTest.TestAgents.Counter,
       aikido: instance,
       data_dir: directory,
@@ -82,31 +82,37 @@ defmodule AikidoTest.DurableTest do
 
     start_supervised!({Aikido.Durable, opts})
     on_exit(fn -> File.rm_rf!(directory) end)
-    %{pool: AikidoTest.DurablePool, options: opts, directory: directory, instance: instance}
+
+    %{
+      durable: AikidoTest.DurableSupervisor,
+      options: opts,
+      directory: directory,
+      instance: instance
+    }
   end
 
-  test("concurrent activation uses one native DurableServer", %{pool: pool}) do
+  test("concurrent activation uses one native DurableServer", %{durable: durable}) do
     pids =
       1..12
-      |> Task.async_stream(fn _ -> Aikido.Durable.ensure_started(pool, "shared") end)
+      |> Task.async_stream(fn _ -> Aikido.Durable.ensure_started(durable, "shared") end)
       |> Enum.map(fn {:ok, {:ok, pid}} -> pid end)
 
     assert length(Enum.uniq(pids)) == 1
     assert %DurableServer{} = :sys.get_state(hd(pids))
-    assert Aikido.Durable.lookup(pool, "shared") == {:ok, hd(pids)}
+    assert Aikido.Durable.lookup(durable, "shared") == {:ok, hd(pids)}
   end
 
-  test("partitioned identities are independent", %{pool: pool}) do
-    assert {:ok, alpha} = Aikido.Durable.ensure_started(pool, "shared", partition: :alpha)
-    assert {:ok, beta} = Aikido.Durable.ensure_started(pool, "shared", partition: :beta)
+  test("partitioned identities are independent", %{durable: durable}) do
+    assert {:ok, alpha} = Aikido.Durable.ensure_started(durable, "shared", partition: :alpha)
+    assert {:ok, beta} = Aikido.Durable.ensure_started(durable, "shared", partition: :beta)
     refute alpha == beta
-    assert Aikido.Durable.lookup(pool, "shared", partition: :alpha) == {:ok, alpha}
-    assert Aikido.Durable.lookup(pool, "shared", partition: :beta) == {:ok, beta}
-    assert Aikido.Durable.lookup(pool, "shared") == :error
+    assert Aikido.Durable.lookup(durable, "shared", partition: :alpha) == {:ok, alpha}
+    assert Aikido.Durable.lookup(durable, "shared", partition: :beta) == {:ok, beta}
+    assert Aikido.Durable.lookup(durable, "shared") == :error
   end
 
-  test("explicit stop restores acknowledged state from disk", %{pool: pool}) do
-    {:ok, first} = Aikido.Durable.ensure_started(pool, {:conversation, 42})
+  test("explicit stop restores acknowledged state from disk", %{durable: durable}) do
+    {:ok, first} = Aikido.Durable.ensure_started(durable, {:conversation, 42})
 
     assert {:ok, 7} =
              Aikido.AgentServer.call(
@@ -115,14 +121,14 @@ defmodule AikidoTest.DurableTest do
                &{:ok, &1.agent.state.domain.counter}
              )
 
-    assert :ok = Aikido.Durable.stop(pool, {:conversation, 42})
-    assert {:ok, second} = Aikido.Durable.ensure_started(pool, {:conversation, 42})
+    assert :ok = Aikido.Durable.stop(durable, {:conversation, 42})
+    assert {:ok, second} = Aikido.Durable.ensure_started(durable, {:conversation, 42})
     refute first == second
     assert {:ok, 7} = Aikido.AgentServer.state(second, &{:ok, &1.agent.state.domain.counter})
   end
 
-  test("an untrappable process crash recovers the last acknowledged state", %{pool: pool}) do
-    {:ok, first} = Aikido.Durable.ensure_started(pool, "crash")
+  test("an untrappable process crash recovers the last acknowledged state", %{durable: durable}) do
+    {:ok, first} = Aikido.Durable.ensure_started(durable, "crash")
 
     assert {:ok, 9} =
              Aikido.AgentServer.call(
@@ -137,10 +143,10 @@ defmodule AikidoTest.DurableTest do
   end
 
   test("restarting storage and supervision restores the disk checkpoint", %{
-    pool: pool,
+    durable: durable,
     options: opts
   }) do
-    {:ok, first} = Aikido.Durable.ensure_started(pool, "disk")
+    {:ok, first} = Aikido.Durable.ensure_started(durable, "disk")
 
     assert {:ok, 4} =
              Aikido.AgentServer.call(
@@ -149,20 +155,20 @@ defmodule AikidoTest.DurableTest do
                &{:ok, &1.agent.state.domain.counter}
              )
 
-    stop_supervised!(pool)
+    stop_supervised!(durable)
     start_supervised!({Aikido.Durable, opts})
-    assert {:ok, second} = Aikido.Durable.ensure_started(pool, "disk")
+    assert {:ok, second} = Aikido.Durable.ensure_started(durable, "disk")
     assert {:ok, 4} = Aikido.AgentServer.state(second, &{:ok, &1.agent.state.domain.counter})
   end
 
-  test("missing identities keep tagged error contracts", %{pool: pool}) do
-    assert :error = Aikido.Durable.lookup(pool, "missing")
-    assert {:error, :not_found} = Aikido.Durable.stop(pool, "missing")
+  test("missing identities keep tagged error contracts", %{durable: durable}) do
+    assert :error = Aikido.Durable.lookup(durable, "missing")
+    assert {:error, :not_found} = Aikido.Durable.stop(durable, "missing")
   end
 
-  test "thread history survives durable stop and activation", %{pool: pool} do
+  test "thread history survives durable stop and activation", %{durable: durable} do
     {:ok, first} =
-      Aikido.Durable.ensure_started(pool, "thread-history",
+      Aikido.Durable.ensure_started(durable, "thread-history",
         agent: AikidoTest.DurableTest.ThreadAgent
       )
 
@@ -176,10 +182,10 @@ defmodule AikidoTest.DurableTest do
       )
 
     assert length(thread.entries) == 1
-    assert :ok = Aikido.Durable.stop(pool, "thread-history")
+    assert :ok = Aikido.Durable.stop(durable, "thread-history")
 
     {:ok, second} =
-      Aikido.Durable.ensure_started(pool, "thread-history",
+      Aikido.Durable.ensure_started(durable, "thread-history",
         agent: AikidoTest.DurableTest.ThreadAgent
       )
 
@@ -197,16 +203,16 @@ defmodule AikidoTest.DurableTest do
     assert length(entries) == 2
   end
 
-  test "dynamic cron definitions restore and cancellation persists", %{pool: pool} do
+  test "dynamic cron definitions restore and cancellation persists", %{durable: durable} do
     alias AikidoTest.Support.SchedulerIntegrationHarness
 
     opts = [agent: AikidoTest.Support.SchedulerIntegrationHarness.CronAgent]
-    {:ok, first} = Aikido.Durable.ensure_started(pool, "scheduled", opts)
+    {:ok, first} = Aikido.Durable.ensure_started(durable, "scheduled", opts)
     :ok = SchedulerIntegrationHarness.register_cron(first, "0 0 0 1 1 *", job_id: :annual)
     old_job = SchedulerIntegrationHarness.wait_for_job(first, :annual)
 
-    :ok = Aikido.Durable.stop(pool, "scheduled")
-    {:ok, second} = Aikido.Durable.ensure_started(pool, "scheduled", opts)
+    :ok = Aikido.Durable.stop(durable, "scheduled")
+    {:ok, second} = Aikido.Durable.ensure_started(durable, "scheduled", opts)
     new_job = SchedulerIntegrationHarness.wait_for_job(second, :annual)
     refute old_job == new_job
     refute Process.alive?(old_job)
@@ -217,36 +223,40 @@ defmodule AikidoTest.DurableTest do
       !Map.has_key?(state.cron_specs, :annual)
     end)
 
-    :ok = Aikido.Durable.stop(pool, "scheduled")
-    {:ok, third} = Aikido.Durable.ensure_started(pool, "scheduled", opts)
+    :ok = Aikido.Durable.stop(durable, "scheduled")
+    {:ok, third} = Aikido.Durable.ensure_started(durable, "scheduled", opts)
     assert :ok = Aikido.AgentServer.await_ready(third)
 
     assert {:ok, {%{}, %{}}} =
              Aikido.AgentServer.state(third, &{:ok, {&1.cron_jobs, &1.cron_specs}})
   end
 
-  test("agent and slice codecs compose with custom checkpoint/restore", %{pool: pool}) do
+  test("agent and slice codecs compose with custom checkpoint/restore", %{durable: durable}) do
     {:ok, first} =
-      Aikido.Durable.ensure_started(pool, "codec", agent: AikidoTest.DurableTest.CodecAgent)
+      Aikido.Durable.ensure_started(durable, "codec", agent: AikidoTest.DurableTest.CodecAgent)
 
-    durable = :sys.get_state(first)
-    %{"payload" => encoded} = Aikido.Durable.AgentServer.dump_state(durable.user_state)
-    snapshot = encoded |> Base.decode64!() |> :erlang.binary_to_term([:safe])
+    {key, _} =
+      Enum.find(DurableServer.Supervisor.global_members(durable), fn {_key, {pid, _}} ->
+        pid == first
+      end)
+
+    assert {:ok, info} = DurableServer.Supervisor.get_server_info(durable, key)
+    snapshot = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
 
     assert {:checkpoint, %{custom_state: %{domain: %{encoded: "5"}, codec: %{encoded: "3"}}}} =
              snapshot.agent
 
-    assert :ok = Aikido.Durable.stop(pool, "codec")
+    assert :ok = Aikido.Durable.stop(durable, "codec")
 
     {:ok, restored} =
-      Aikido.Durable.ensure_started(pool, "codec", agent: AikidoTest.DurableTest.CodecAgent)
+      Aikido.Durable.ensure_started(durable, "codec", agent: AikidoTest.DurableTest.CodecAgent)
 
     assert {:ok, %{domain: %{value: 5}, codec: %{value: 3}}} =
              Aikido.AgentServer.state(restored, &{:ok, &1.agent.state})
   end
 
   test "initial and live snapshots both apply codecs to the only copy of startup state", %{
-    pool: pool
+    durable: durable
   } do
     module = AikidoTest.DurableTest.CodecAgent
 
@@ -257,23 +267,28 @@ defmodule AikidoTest.DurableTest do
     ]
 
     dumped = Aikido.Durable.AgentServer.dump_state(%{options: options, permanent: true})
-    saved = dumped["payload"] |> Base.decode64!() |> :erlang.binary_to_term([:safe])
+    saved = Aikido.Durable.AgentServer.load_state(1, dumped)
     refute inspect(saved) =~ "private-marker"
     refute Keyword.has_key?(saved.options, :initial_state)
     assert {:checkpoint, %{custom_state: %{domain: %{encoded: "7"}}}} = saved.agent
 
     {:ok, pid} =
-      Aikido.Durable.ensure_started(pool, "safe",
+      Aikido.Durable.ensure_started(durable, "safe",
         agent: module,
         initial_state: %{domain: %{value: 7, credential: "private-marker"}}
       )
 
-    dumped = Aikido.Durable.AgentServer.dump_state(:sys.get_state(pid).user_state)
-    saved = dumped["payload"] |> Base.decode64!() |> :erlang.binary_to_term([:safe])
+    {key, _} =
+      Enum.find(DurableServer.Supervisor.global_members(durable), fn {_key, {member, _}} ->
+        member == pid
+      end)
+
+    assert {:ok, info} = DurableServer.Supervisor.get_server_info(durable, key)
+    saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
     refute inspect(saved) =~ "private-marker"
     refute Keyword.has_key?(saved.options, :initial_state)
-    assert :ok = Aikido.Durable.stop(pool, "safe")
-    {:ok, restored} = Aikido.Durable.ensure_started(pool, "safe", agent: module)
+    assert :ok = Aikido.Durable.stop(durable, "safe")
+    {:ok, restored} = Aikido.Durable.ensure_started(durable, "safe", agent: module)
     assert {:ok, 7} = Aikido.AgentServer.state(restored, &{:ok, &1.agent.state.domain.value})
   end
 

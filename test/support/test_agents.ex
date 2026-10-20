@@ -12,11 +12,11 @@ defmodule AikidoTest.TestAgents.Counter do
   Standard test agent with counter and messages state.
 
   Routes:
-    - "increment" -> IncrementAction
-    - "decrement" -> DecrementAction
-    - "record" -> RecordAction
-    - "slow" -> SlowAction
-    - "fail" -> FailingAction
+    - "increment" -> TestActions.increment
+    - "decrement" -> TestActions.decrement
+    - "record" -> TestActions.record
+    - "slow" -> TestActions.slow
+    - "fail" -> TestActions.failing
   """
   use Aikido.Agent
 
@@ -67,53 +67,4 @@ defmodule AikidoTest.TestAgents.AshSchema do
       attribute :count, :integer, allow_nil?: false, default: 0
     end
   end
-end
-
-defmodule AikidoTest.TestAgents.TestSliceWithRoutes do
-  @moduledoc false
-  use Aikido.Slice
-
-  slice do
-    name "test_routes_slice"
-
-    schema do
-      attribute :value, :term, allow_nil?: true
-    end
-
-    route "post", {AikidoTest.TestActions, :plugin_test_action}
-    route "list", {AikidoTest.TestActions, :plugin_test_action}
-  end
-end
-
-defmodule AikidoTest.TestAgents.TestSliceWithPriority do
-  @moduledoc false
-  use Aikido.Slice
-
-  slice do
-    name "priority_slice"
-
-    schema do
-      attribute :value, :term, allow_nil?: true
-    end
-
-    route "action", {AikidoTest.TestActions, :plugin_test_action}, priority: 5
-  end
-end
-
-defmodule AikidoTest.TestAgents.AgentWithSliceRoutes do
-  @moduledoc false
-  use Aikido.Agent
-
-  agent do
-    name "agent_with_slice_routes"
-    slice :test_routes, AikidoTest.TestAgents.TestSliceWithRoutes
-  end
-end
-
-defmodule AikidoTest.TestAgents do
-  @moduledoc """
-  Shared test agents for Aikido test suite.
-  """
-  Code.ensure_compiled!(AikidoTest.TestActions)
-  Code.ensure_compiled!(AikidoTest.TestActions)
 end

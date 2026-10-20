@@ -4,7 +4,7 @@ defmodule AikidoTest.AgentTest.ConfiguredRoutesAgent do
 
   agent do
     name "configured_routes_agent"
-    route "configured.route", {AikidoTest.TestActions, :no_schema}
+    route "configured.route", {AikidoTest.TestActions, :optional_input}
   end
 end
 
@@ -14,7 +14,7 @@ defmodule AikidoTest.AgentTest.ExtendingRoutesAgent do
 
   agent do
     name "extending_routes_agent"
-    route "base.route", {AikidoTest.TestActions, :no_schema}
+    route "base.route", {AikidoTest.TestActions, :optional_input}
     route "extended.route", {AikidoTest.TestActions, :basic_action}
   end
 end
@@ -47,14 +47,14 @@ defmodule AikidoTest.AgentTest do
   end
 
   describe("signal routes configuration") do
-    test "agent's signal_routes section is exposed via Agent.Info.signal_routes/1" do
+    test "agent route declarations are exposed via Agent.Info.signal_routes/1" do
       routes = Aikido.Dsl.Agent.Info.signal_routes(AikidoTest.AgentTest.ConfiguredRoutesAgent)
-      assert routes == [{"configured.route", {AikidoTest.TestActions, :no_schema}, 0}]
+      assert routes == [{"configured.route", {AikidoTest.TestActions, :optional_input}, 0}]
     end
 
     test "Agent.Info.signal_routes/1 returns configured routes for agents with multiple routes" do
       routes = Aikido.Dsl.Agent.Info.signal_routes(AikidoTest.AgentTest.ExtendingRoutesAgent)
-      assert {"base.route", {AikidoTest.TestActions, :no_schema}, 0} in routes
+      assert {"base.route", {AikidoTest.TestActions, :optional_input}, 0} in routes
       assert {"extended.route", {AikidoTest.TestActions, :basic_action}, 0} in routes
       assert length(routes) == 2
     end
@@ -125,7 +125,7 @@ defmodule AikidoTest.AgentTest do
               agent_id: agent.id
             })
           ),
-          [{{AikidoTest.TestActions, :no_schema}, %{}}]
+          [{{AikidoTest.TestActions, :optional_input}, %{}}]
         )
 
       assert updated.state.domain.result == "No params"
@@ -317,7 +317,7 @@ defmodule AikidoTest.AgentTest do
       assert agent.name == "ash_schema_agent"
     end
 
-    test "validate works with Ash field contract" do
+    test "initialization casts state through the Ash field contract" do
       agent = AikidoTest.TestAgents.AshSchema.initialize!(%{state: %{status: :running, count: 5}})
       assert agent.state.domain.status == :running
       assert agent.state.domain.count == 5

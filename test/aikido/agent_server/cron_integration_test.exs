@@ -73,8 +73,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent do
       argument :state, :term
       argument :data, :map, allow_nil?: false, default: %{}
 
-      run {AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementation
     end
 
     action :register_cron, Aikido.ActionResult do
@@ -84,16 +83,14 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent do
       argument :message, :term
       argument :timezone, :string
 
-      run {AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implementation
     end
 
     action :cancel_cron, Aikido.ActionResult do
       argument :state, :term
       argument :job_id, :term, allow_nil?: false
 
-      run {AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction.Implementation
     end
   end
 end

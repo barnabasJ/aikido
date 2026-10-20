@@ -182,9 +182,6 @@ defmodule Aikido.MixProject do
       )
 
     [
-      # Helper to run tests with trace when needed
-      # test: "test --trace --exclude flaky",
-      test: "test --exclude flaky",
       bench: ["run bench/run.exs"],
 
       # Helper to run docs

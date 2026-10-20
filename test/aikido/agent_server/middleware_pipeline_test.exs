@@ -45,8 +45,7 @@ defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.MiddlewareAgent do
     action :reduce_inspect, Aikido.ActionResult do
       argument :state, :term
 
-      run {AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction.Implementation
     end
   end
 end

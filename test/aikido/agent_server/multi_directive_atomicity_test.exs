@@ -61,15 +61,13 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent do
     action :set_multiple, Aikido.ActionResult do
       argument :state, :term
 
-      run {AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysAction.Implementation
     end
 
     action :observe, Aikido.ActionResult do
       argument :state, :term
 
-      run {AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Implementation
     end
   end
 end

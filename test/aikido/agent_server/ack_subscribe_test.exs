@@ -41,12 +41,12 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.TestAgent do
     action :write, Aikido.ActionResult do
       argument :state, :term
       argument :value, :integer, allow_nil?: false
-      run {AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation, action: :run}
+      run AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation
     end
 
     action :fail, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServer.AckSubscribeTest.FailingAction.Implementation, action: :run}
+      run AikidoTest.AgentServer.AckSubscribeTest.FailingAction.Implementation
     end
   end
 end

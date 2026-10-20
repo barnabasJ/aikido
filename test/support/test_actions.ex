@@ -1,27 +1,9 @@
-defmodule AikidoTest.PluginTestAction.Implementation do
+defmodule AikidoTest.TestActions.Noop.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
     Aikido.ActionResult.new(state: %{}, directives: [])
-  end
-end
-
-defmodule AikidoTest.PluginTestAnotherAction.Implementation do
-  @moduledoc false
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(input, _opts, _context) do
-    value = input.arguments.value
-
-    Aikido.ActionResult.new(state: %{value: value}, directives: [])
-  end
-end
-
-defmodule AikidoTest.NotAnActionModule do
-  @moduledoc false
-  def some_function do
-    :ok
   end
 end
 
@@ -36,7 +18,7 @@ defmodule AikidoTest.TestActions.BasicAction.Implementation do
   end
 end
 
-defmodule AikidoTest.TestActions.NoSchema.Implementation do
+defmodule AikidoTest.TestActions.OptionalInput.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -194,29 +176,23 @@ defmodule AikidoTest.TestActions do
   end
 
   actions do
-    action :plugin_test_action, Aikido.ActionResult do
+    action :noop, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.PluginTestAction.Implementation, action: :run}
-    end
-
-    action :plugin_test_another_action, Aikido.ActionResult do
-      argument :state, :term
-      argument :value, :integer, default: 0
-      run {AikidoTest.PluginTestAnotherAction.Implementation, action: :run}
+      run AikidoTest.TestActions.Noop.Implementation
     end
 
     action :basic_action, Aikido.ActionResult do
       argument :state, :term
       argument :value, :integer, allow_nil?: false
       description "A basic action for testing"
-      run {AikidoTest.TestActions.BasicAction.Implementation, action: :run}
+      run AikidoTest.TestActions.BasicAction.Implementation
     end
 
-    action :no_schema, Aikido.ActionResult do
+    action :optional_input, Aikido.ActionResult do
       argument :state, :term
       argument :value, :integer
       description "Optional typed input"
-      run {AikidoTest.TestActions.NoSchema.Implementation, action: :run}
+      run AikidoTest.TestActions.OptionalInput.Implementation
     end
 
     action :add, Aikido.ActionResult do
@@ -224,55 +200,55 @@ defmodule AikidoTest.TestActions do
       argument :value, :integer, allow_nil?: false
       argument :amount, :integer, default: 1
       description "Adds amount to value"
-      run {AikidoTest.TestActions.Add.Implementation, action: :run}
+      run AikidoTest.TestActions.Add.Implementation
     end
 
     action :emit_action, Aikido.ActionResult do
       argument :state, :term
       description "Action that returns an emit effect"
-      run {AikidoTest.TestActions.EmitAction.Implementation, action: :run}
+      run AikidoTest.TestActions.EmitAction.Implementation
     end
 
     action :multi_effect_action, Aikido.ActionResult do
       argument :state, :term
       description "Action that returns multiple effects"
-      run {AikidoTest.TestActions.MultiEffectAction.Implementation, action: :run}
+      run AikidoTest.TestActions.MultiEffectAction.Implementation
     end
 
     action :multi_slice_action, Aikido.ActionResult do
       argument :state, :term
       description "Action that returns a SliceUpdate writing two slices in one turn"
-      run {AikidoTest.TestActions.MultiSliceAction.Implementation, action: :run}
+      run AikidoTest.TestActions.MultiSliceAction.Implementation
     end
 
     action :increment, Aikido.ActionResult do
       argument :state, :term
       argument :amount, :integer, default: 1
-      run {AikidoTest.TestActions.IncrementAction.Implementation, action: :run}
+      run AikidoTest.TestActions.IncrementAction.Implementation
     end
 
     action :decrement, Aikido.ActionResult do
       argument :state, :term
       argument :amount, :integer, default: 1
-      run {AikidoTest.TestActions.DecrementAction.Implementation, action: :run}
+      run AikidoTest.TestActions.DecrementAction.Implementation
     end
 
     action :record, Aikido.ActionResult do
       argument :state, :term
       argument :data, :map, default: %{}
-      run {AikidoTest.TestActions.RecordAction.Implementation, action: :run}
+      run AikidoTest.TestActions.RecordAction.Implementation
     end
 
     action :slow, Aikido.ActionResult do
       argument :state, :term
       argument :delay_ms, :integer, default: 100
-      run {AikidoTest.TestActions.SlowAction.Implementation, action: :run}
+      run AikidoTest.TestActions.SlowAction.Implementation
     end
 
     action :failing, Aikido.ActionResult do
       argument :state, :term
       argument :reason, :string, default: "intentional failure"
-      run {AikidoTest.TestActions.FailingAction.Implementation, action: :run}
+      run AikidoTest.TestActions.FailingAction.Implementation
     end
   end
 end

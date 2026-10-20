@@ -30,7 +30,7 @@ defmodule AikidoTest.AgentServer.TracePropagationTest.TracedAgent do
   actions do
     action :emit, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServer.TracePropagationTest.EmitAction.Implementation, action: :run}
+      run AikidoTest.AgentServer.TracePropagationTest.EmitAction.Implementation
     end
   end
 end

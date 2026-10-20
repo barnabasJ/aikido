@@ -19,7 +19,7 @@ defmodule AikidoTest.AgentServerStopLogTest.TestAgent do
   actions do
     action :stop_test, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServerStopLogTest.StopTestAction.Implementation, action: :run}
+      run AikidoTest.AgentServerStopLogTest.StopTestAction.Implementation
     end
   end
 end

@@ -30,7 +30,7 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent do
   actions do
     action :tick, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.Agent.SchedulesIntegrationTest.TickAction.Implementation, action: :run}
+      run AikidoTest.Agent.SchedulesIntegrationTest.TickAction.Implementation
     end
   end
 end
@@ -94,7 +94,7 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest do
       assert String.contains?(rendered, "|")
     end
 
-    test "schedules/0 includes agent schedules" do
+    test "Info.schedules/1 includes agent schedules" do
       schedules =
         Aikido.Dsl.Agent.Info.schedules(AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent)
 

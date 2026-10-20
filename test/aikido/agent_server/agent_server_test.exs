@@ -68,28 +68,28 @@ defmodule AikidoTest.AgentServerTest.TestAgent do
     route "schedule_test", {AikidoTest.AgentServerTest.TestAgent, :schedule_test}
     route "stop_test", {AikidoTest.AgentServerTest.TestAgent, :stop_test}
     route "error_test", {AikidoTest.AgentServerTest.TestAgent, :error_test}
-    route "noop", {AikidoTest.TestActions, :no_schema}
+    route "noop", {AikidoTest.TestActions, :optional_input}
   end
 
   actions do
     action :emit_test, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServerTest.EmitTestAction.Implementation, action: :run}
+      run AikidoTest.AgentServerTest.EmitTestAction.Implementation
     end
 
     action :schedule_test, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServerTest.ScheduleTestAction.Implementation, action: :run}
+      run AikidoTest.AgentServerTest.ScheduleTestAction.Implementation
     end
 
     action :stop_test, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServerTest.StopTestAction.Implementation, action: :run}
+      run AikidoTest.AgentServerTest.StopTestAction.Implementation
     end
 
     action :error_test, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServerTest.ErrorTestAction.Implementation, action: :run}
+      run AikidoTest.AgentServerTest.ErrorTestAction.Implementation
     end
   end
 end
@@ -109,9 +109,6 @@ defmodule AikidoTest.AgentServerTest.ScheduledSlice do
 
   slice do
     name "scheduled_slice"
-
-    schema do
-    end
   end
 
   schedules do
@@ -121,7 +118,7 @@ defmodule AikidoTest.AgentServerTest.ScheduledSlice do
   actions do
     action :scheduled_action, Aikido.ActionResult do
       argument :state, :term
-      run {AikidoTest.AgentServerTest.ScheduledAction.Implementation, action: :run}
+      run AikidoTest.AgentServerTest.ScheduledAction.Implementation
     end
   end
 end
@@ -334,7 +331,7 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :inline_slow, Aikido.ActionResult do
             argument :state, :term
-            run {AikidoTest.AgentServerTest.InlineSlowAction.Implementation, action: :run}
+            run AikidoTest.AgentServerTest.InlineSlowAction.Implementation
           end
         end
       end
@@ -414,13 +411,13 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :buffered_slow, Aikido.ActionResult do
             argument :state, :term
-            run {AikidoTest.AgentServerTest.BufferedSlowAction.Implementation, action: :run}
+            run AikidoTest.AgentServerTest.BufferedSlowAction.Implementation
           end
 
           action :buffered_increment, Aikido.ActionResult do
             argument :state, :term
 
-            run {AikidoTest.AgentServerTest.BufferedIncrementAction.Implementation, action: :run}
+            run AikidoTest.AgentServerTest.BufferedIncrementAction.Implementation
           end
         end
       end
@@ -868,12 +865,12 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :start_schedule, Aikido.ActionResult do
             argument :state, :term
-            run {AikidoTest.AgentServerTest.StartScheduleAction.Implementation, action: :run}
+            run AikidoTest.AgentServerTest.StartScheduleAction.Implementation
           end
 
           action :scheduled_ping, Aikido.ActionResult do
             argument :state, :term
-            run {AikidoTest.AgentServerTest.ScheduledPingAction.Implementation, action: :run}
+            run AikidoTest.AgentServerTest.ScheduledPingAction.Implementation
           end
         end
       end
@@ -955,13 +952,13 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :schedule_many, Aikido.ActionResult do
             argument :state, :term
-            run {AikidoTest.AgentServerTest.ScheduleManyAction.Implementation, action: :run}
+            run AikidoTest.AgentServerTest.ScheduleManyAction.Implementation
           end
 
           action :tick, Aikido.ActionResult do
             argument :state, :term
             argument :n, :integer, allow_nil?: false
-            run {AikidoTest.AgentServerTest.TickAction.Implementation, action: :run}
+            run AikidoTest.AgentServerTest.TickAction.Implementation
           end
         end
       end
@@ -1039,13 +1036,13 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :schedule_atom, Aikido.ActionResult do
             argument :state, :term
-            run {AikidoTest.AgentServerTest.ScheduleAtomAction.Implementation, action: :run}
+            run AikidoTest.AgentServerTest.ScheduleAtomAction.Implementation
           end
 
           action :aikido_scheduled, Aikido.ActionResult do
             argument :state, :term
             argument :message, :term, allow_nil?: false
-            run {AikidoTest.AgentServerTest.AikidoScheduledAction.Implementation, action: :run}
+            run AikidoTest.AgentServerTest.AikidoScheduledAction.Implementation
           end
         end
       end
@@ -1300,7 +1297,7 @@ defmodule AikidoTest.AgentServerTest do
         actions do
           action :slow, Aikido.ActionResult do
             argument :state, :term
-            run {AikidoTest.AgentServerTest.SlowAction2.Implementation, action: :run}
+            run AikidoTest.AgentServerTest.SlowAction2.Implementation
           end
         end
       end
@@ -1330,7 +1327,7 @@ defmodule AikidoTest.AgentServerTest do
     end
   end
 
-  describe("plugin schedules") do
+  describe("mounted slice schedules") do
     (
       nil
       nil
@@ -1394,7 +1391,7 @@ defmodule AikidoTest.AgentServerTest do
       refute Process.alive?(cron_pid)
     end
 
-    test "agent exposes schedules/0 accessor" do
+    test "Info.schedules/1 exposes mounted slice schedules" do
       schedules =
         Aikido.Dsl.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
 
@@ -1410,7 +1407,7 @@ defmodule AikidoTest.AgentServerTest do
       assert spec.signal_type == "scheduled_slice.__schedule__.scheduled_action"
     end
 
-    test "schedule routes are included in routes/0" do
+    test "schedule routes are included in Info.routes/1" do
       routes = Aikido.Dsl.Agent.Info.routes(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
 
       schedule_route =

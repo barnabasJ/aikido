@@ -35,7 +35,7 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAgent do
     action :identity_watcher, Aikido.ActionResult do
       argument :state, :term
       argument :data, :map, allow_nil?: false, default: %{}
-      run {AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementation, action: :run}
+      run AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementation
     end
   end
 end

@@ -14,7 +14,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice do
         constraints: [trim?: false, allow_empty?: true]
     end
 
-    route "simple.noop", {AikidoTest.TestActions, :plugin_test_action}
+    route "simple.noop", {AikidoTest.TestActions, :noop}
   end
 end
 
@@ -29,8 +29,8 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest.RoutedSlice do
       attribute :count, :integer, allow_nil?: false, default: 0
     end
 
-    route "absolute.path.one", {AikidoTest.TestActions, :plugin_test_action}
-    route "absolute.path.two", {AikidoTest.TestActions, :plugin_test_action}
+    route "absolute.path.one", {AikidoTest.TestActions, :noop}
+    route "absolute.path.two", {AikidoTest.TestActions, :noop}
   end
 end
 
@@ -45,7 +45,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest.OtherSlice do
       attribute :value, :term, allow_nil?: true
     end
 
-    route "other.noop", {AikidoTest.TestActions, :plugin_test_action}
+    route "other.noop", {AikidoTest.TestActions, :noop}
   end
 end
 
@@ -56,8 +56,8 @@ end
 defmodule AikidoTest.Agent.SlicesAttachmentTest do
   use ExUnit.Case, async: true
 
-  describe("bare slice attachment") do
-    test "use Aikido.Agent, slices: [SomeSlice] mounts the slice at its path() with seeded defaults" do
+  describe("explicit slice mounts") do
+    test "an agent-declared mount initializes native slice defaults" do
       defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.AgentBareSlice do
         use Aikido.Agent
 
@@ -75,7 +75,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
              )
     end
 
-    test "use Aikido.Agent, slices: [{SomeSlice, key: value}] seeds the config into slice state" do
+    test "mount options seed the config into slice state" do
       defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.AgentConfiguredSlice do
         use Aikido.Agent
 
@@ -91,21 +91,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
       assert %{counter: 42, label: "from_config"} = agent.state.simple
     end
 
-    test "slice config in keyword form is also accepted" do
-      defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.AgentKeywordSlice do
-        use Aikido.Agent
-
-        agent do
-          name "keyword_slice_agent"
-          slice :simple, AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice, options: [counter: 7]
-        end
-      end
-
-      agent = AikidoTest.Agent.SlicesAttachmentTest.AgentKeywordSlice.initialize!()
-      assert agent.state.simple.counter == 7
-    end
-
-    test "slice's signal_routes register at the agent with absolute paths (no prefix)" do
+    test "slice routes register at the agent with absolute paths (no prefix)" do
       defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.AgentRoutedSlice do
         use Aikido.Agent
 
@@ -124,7 +110,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
       assert "absolute.path.two" in route_paths
     end
 
-    test "multiple bare slices compose at distinct paths" do
+    test "multiple explicit slices compose at distinct paths" do
       defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.AgentMultipleSlices do
         use Aikido.Agent
 
@@ -147,7 +133,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
   end
 
   describe("path conflict detection") do
-    test "path collision between agent's path: and a slices: entry emits a warning" do
+    test "a slice sharing the agent state path emits a warning" do
       stderr =
         ExUnit.CaptureIO.capture_io(:stderr, fn ->
           defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.AgentPathConflict do
@@ -164,7 +150,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
       assert stderr =~ ~r/[Dd]uplicate.*paths/
     end
 
-    test "path collision between two slices: entries emits a warning" do
+    test "duplicate slice mount paths emit a warning" do
       defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.SimpleSliceDuplicate do
         @moduledoc false
         use Aikido.Slice
@@ -176,7 +162,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
             attribute :value, :term, allow_nil?: true
           end
 
-          route "simple_dup.noop", {AikidoTest.TestActions, :plugin_test_action}
+          route "simple_dup.noop", {AikidoTest.TestActions, :noop}
         end
       end
 
@@ -197,8 +183,8 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
     end
   end
 
-  describe("slices do … end validation") do
-    test "non-slice module in `slices do …` raises a clear message" do
+  describe("agent slice mount validation") do
+    test "mounting a non-slice module raises a clear message" do
       assert_raise Spark.Error.DslError,
                    ~r/Resource slices must be embedded Ash resources/,
                    fn ->

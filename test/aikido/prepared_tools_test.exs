@@ -57,8 +57,15 @@ defmodule Aikido.PreparedToolsTest do
              Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.prepared_tools})
 
     assert is_function(callback, 2)
-    saved = Aikido.Durable.AgentServer.dump_state(:sys.get_state(pid).user_state)
-    snapshot = Aikido.Durable.AgentServer.load_state(1, saved)
+    durable = Aikido.durable_supervisor_name(ctx.aikido)
+
+    {key, _} =
+      Enum.find(DurableServer.Supervisor.global_members(durable), fn {_key, {member, _}} ->
+        member == pid
+      end)
+
+    assert {:ok, info} = DurableServer.Supervisor.get_server_info(durable, key)
+    snapshot = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
     refute functions?(snapshot)
 
     send(first, :continue)

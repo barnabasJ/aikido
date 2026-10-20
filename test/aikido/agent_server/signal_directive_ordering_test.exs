@@ -67,22 +67,19 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent do
     action :step1, Aikido.ActionResult do
       argument :state, :term
 
-      run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Implementation
     end
 
     action :set_followup_key, Aikido.ActionResult do
       argument :state, :term
 
-      run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction.Implementation
     end
 
     action :step2, Aikido.ActionResult do
       argument :state, :term
 
-      run {AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Implementation,
-           action: :run}
+      run AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Implementation
     end
   end
 end
@@ -94,8 +91,8 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest do
 
   Directives mutate no state; the cascade-driven
   state changes happen on whatever turn observes the resulting signal.
-  Signal A emits an `Emit` directive whose dispatched signal routes via
-  `signal_routes` to a state-mutating action; signal A also returns a
+  Signal A emits an `Emit` directive whose dispatched signal routes through
+  its declared signal routes to a state-mutating action; signal A also returns a
   action-returned slice change. Signal B is cast immediately after.
 
   When two async signals are cast, signal A runs fully — action *and*

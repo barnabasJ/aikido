@@ -36,8 +36,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice do
     action :slice_tick, Aikido.ActionResult do
       argument :state, :term
 
-      run {AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implementation,
-           action: :run}
+      run AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implementation
     end
   end
 end
