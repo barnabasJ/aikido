@@ -8,10 +8,12 @@ defmodule AikidoTest.TracePropagation.Work do
   end
 end
 
-defmodule AikidoTest.TracePropagation.Reducer do
+defmodule AikidoTest.TracePropagation.Pipeline.Actions.BeginWork do
+  @moduledoc false
   use Ash.Resource.Actions.Implementation
 
-  def run(%{action: %{name: :begin_work}} = input, _, _) do
+  @impl true
+  def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
       state: %{input.arguments.state | status: :working},
       directives: [
@@ -22,8 +24,14 @@ defmodule AikidoTest.TracePropagation.Reducer do
       ]
     )
   end
+end
 
-  def run(%{action: %{name: :accept_result}} = input, _, _) do
+defmodule AikidoTest.TracePropagation.Pipeline.Actions.AcceptResult do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _opts, _context) do
     value = input.arguments.result.value
 
     Aikido.Types.ActionResult.new(
@@ -41,14 +49,26 @@ defmodule AikidoTest.TracePropagation.Reducer do
       ]
     )
   end
+end
 
-  def run(%{action: %{name: :finish}} = input, _, _) do
+defmodule AikidoTest.TracePropagation.Pipeline.Actions.Finish do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
       state: %{input.arguments.state | status: :completed, value: input.arguments.value}
     )
   end
+end
 
-  def run(%{action: %{name: :fail}} = _input, _, _) do
+defmodule AikidoTest.TracePropagation.Pipeline.Actions.Fail do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(_input, _opts, _context) do
     raise "trace failure"
   end
 end
@@ -84,24 +104,24 @@ defmodule AikidoTest.TracePropagation.Pipeline do
     action :begin_work, Aikido.Types.ActionResult do
       argument :state, :term
       argument :amount, :integer, allow_nil?: false
-      run AikidoTest.TracePropagation.Reducer
+      run AikidoTest.TracePropagation.Pipeline.Actions.BeginWork
     end
 
     action :accept_result, Aikido.Types.ActionResult do
       argument :state, :term
       argument :result, :map, allow_nil?: false
-      run AikidoTest.TracePropagation.Reducer
+      run AikidoTest.TracePropagation.Pipeline.Actions.AcceptResult
     end
 
     action :finish, Aikido.Types.ActionResult do
       argument :state, :term
       argument :value, :integer, allow_nil?: false
-      run AikidoTest.TracePropagation.Reducer
+      run AikidoTest.TracePropagation.Pipeline.Actions.Finish
     end
 
     action :fail, Aikido.Types.ActionResult do
       argument :state, :term
-      run AikidoTest.TracePropagation.Reducer
+      run AikidoTest.TracePropagation.Pipeline.Actions.Fail
     end
   end
 end

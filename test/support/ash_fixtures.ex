@@ -119,35 +119,34 @@ defmodule AikidoTest.AshFixtures.Counter do
   end
 end
 
-defmodule AikidoTest.AshFixtures.CounterSlice.Implementation do
+defmodule AikidoTest.AshFixtures.CounterSlice.Actions.Increment do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
+
   @impl true
-  def run(
-        %Ash.ActionInput{action: %{name: :increment}} = input,
-        _opts,
-        _context
-      ) do
+  def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
       state: %{count: input.arguments.state.count + Map.get(input.arguments.data, :amount, 1)}
     )
   end
+end
+
+defmodule AikidoTest.AshFixtures.CounterSlice.Actions.Internal do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(
-        %Ash.ActionInput{action: %{name: :internal}} = input,
-        _opts,
-        _context
-      ) do
+  def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(state: input.arguments.state)
   end
+end
+
+defmodule AikidoTest.AshFixtures.CounterSlice.Actions.Tick do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(
-        %Ash.ActionInput{action: %{name: :tick}} = input,
-        _opts,
-        _context
-      ) do
+  def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
       state: %{count: input.arguments.state.count + Map.get(input.arguments.data, :amount, 1)}
     )
@@ -169,20 +168,20 @@ defmodule AikidoTest.AshFixtures.CounterSlice do
     action :increment, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :data, :map, allow_nil?: false
-      run AikidoTest.AshFixtures.CounterSlice.Implementation
+      run AikidoTest.AshFixtures.CounterSlice.Actions.Increment
     end
 
     action :internal, Aikido.Types.ActionResult do
       public? false
       argument :state, :map, allow_nil?: false
       argument :data, :map, allow_nil?: false
-      run AikidoTest.AshFixtures.CounterSlice.Implementation
+      run AikidoTest.AshFixtures.CounterSlice.Actions.Internal
     end
 
     action :tick, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :data, :map, allow_nil?: false
-      run AikidoTest.AshFixtures.CounterSlice.Implementation
+      run AikidoTest.AshFixtures.CounterSlice.Actions.Tick
     end
   end
 

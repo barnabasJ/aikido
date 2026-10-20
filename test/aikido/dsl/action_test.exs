@@ -11,55 +11,56 @@ defmodule Aikido.NativeActionTest.CustomDirective do
   def exec(_directive, _signal, _runtime), do: :ok
 end
 
-defmodule Aikido.NativeActionTest.Actions.Implementation do
+defmodule Aikido.NativeActionTest.Actions.Increment do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
+
   @impl true
-  def run(
-        %Ash.ActionInput{action: %{name: :increment}} = input,
-        _opts,
-        _context
-      ) do
+  def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
       state: %{count: input.arguments.state.count + input.arguments.amount}
     )
   end
+end
+
+defmodule Aikido.NativeActionTest.Actions.Emit do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(
-        %Ash.ActionInput{action: %{name: :emit}} = input,
-        _opts,
-        _context
-      ) do
+  def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(state: %{count: 100}, directives: [input.arguments.directive])
   end
+end
+
+defmodule Aikido.NativeActionTest.Actions.Prepared do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(
-        %Ash.ActionInput{action: %{name: :prepared}} = input,
-        _opts,
-        _context
-      ) do
+  def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(state: input.arguments.state)
   end
+end
+
+defmodule Aikido.NativeActionTest.Actions.Runtime do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(
-        %Ash.ActionInput{action: %{name: :runtime}} = input,
-        _opts,
-        _context
-      ) do
+  def run(input, _opts, _context) do
     runtime = input.context.aikido
 
     Aikido.Types.ActionResult.new(state: Map.take(runtime, [:agent_id, :signal, :slice_config]))
   end
+end
+
+defmodule Aikido.NativeActionTest.Actions.InvalidResult do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(
-        %Ash.ActionInput{action: %{name: :invalid_result}} = _input,
-        _opts,
-        _context
-      ) do
+  def run(_input, _opts, _context) do
     Aikido.Types.ActionResult.new(state: %{}, directives: :invalid)
   end
 end
@@ -72,13 +73,13 @@ defmodule Aikido.NativeActionTest.Actions do
       description "Increment typed state."
       argument :state, :map, allow_nil?: false
       argument :amount, :integer, allow_nil?: false, default: 1, constraints: [min: 1]
-      run Aikido.NativeActionTest.Actions.Implementation
+      run Aikido.NativeActionTest.Actions.Increment
     end
 
     action :emit, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :directive, :term, allow_nil?: false
-      run Aikido.NativeActionTest.Actions.Implementation
+      run Aikido.NativeActionTest.Actions.Emit
     end
 
     action :prepared, Aikido.Types.ActionResult do
@@ -90,17 +91,17 @@ defmodule Aikido.NativeActionTest.Actions do
         end)
       end
 
-      run Aikido.NativeActionTest.Actions.Implementation
+      run Aikido.NativeActionTest.Actions.Prepared
     end
 
     action :runtime, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
-      run Aikido.NativeActionTest.Actions.Implementation
+      run Aikido.NativeActionTest.Actions.Runtime
     end
 
     action :invalid_result, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
-      run Aikido.NativeActionTest.Actions.Implementation
+      run Aikido.NativeActionTest.Actions.InvalidResult
     end
   end
 end

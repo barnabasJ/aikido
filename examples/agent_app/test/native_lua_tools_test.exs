@@ -19,24 +19,36 @@ defmodule AgentExamples.NativeLuaToolsTest.Echo do
   end
 end
 
-defmodule AgentExamples.NativeLuaToolsTest.LuaImplementation do
+defmodule AgentExamples.NativeLuaToolsTest.Lua.Actions.Eval do
+  @moduledoc false
   use Ash.Resource.Actions.Implementation
 
-  def run(input, _, context) do
+  @impl true
+  def run(input, _opts, context) do
     options = [
       otp_app: :agent_examples_native_lua,
       action_entrypoints: input.context.shared.entrypoints
     ]
 
-    if input.action.name == :docs do
-      AshLua.Eval.docs(options, name: "full")
-    else
-      AshLua.Eval.run(
-        input.arguments.script,
-        options ++
-          [actor: context.actor, tenant: context.tenant, context: context.source_context]
-      )
-    end
+    AshLua.Eval.run(
+      input.arguments.script,
+      options ++ [actor: context.actor, tenant: context.tenant, context: context.source_context]
+    )
+  end
+end
+
+defmodule AgentExamples.NativeLuaToolsTest.Lua.Actions.Docs do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _opts, _context) do
+    options = [
+      otp_app: :agent_examples_native_lua,
+      action_entrypoints: input.context.shared.entrypoints
+    ]
+
+    AshLua.Eval.docs(options, name: "full")
   end
 end
 
@@ -48,11 +60,11 @@ defmodule AgentExamples.NativeLuaToolsTest.Lua do
   actions do
     action :eval, :map do
       argument :script, :string, allow_nil?: false
-      run AgentExamples.NativeLuaToolsTest.LuaImplementation
+      run AgentExamples.NativeLuaToolsTest.Lua.Actions.Eval
     end
 
     action :docs, :string do
-      run AgentExamples.NativeLuaToolsTest.LuaImplementation
+      run AgentExamples.NativeLuaToolsTest.Lua.Actions.Docs
     end
   end
 end

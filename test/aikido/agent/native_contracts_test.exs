@@ -1,17 +1,17 @@
-defmodule AikidoTest.Agent.NativeContractsTest.ToolResource.Implementation do
+defmodule AikidoTest.Agent.NativeContractsTest.ToolResource.Actions.CheckEnabled do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(
-        %Ash.ActionInput{action: %{name: :check_enabled}} = input,
-        _opts,
-        _context
-      ) do
-    {:ok, input.arguments.enabled}
-  end
 
-  def run(%Ash.ActionInput{action: %{name: :check_schema}} = input, _opts, _context),
-    do: {:ok, input.arguments}
+  @impl true
+  def run(input, _opts, _context), do: {:ok, input.arguments.enabled}
+end
+
+defmodule AikidoTest.Agent.NativeContractsTest.ToolResource.Actions.CheckSchema do
+  @moduledoc false
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _opts, _context), do: {:ok, input.arguments}
 end
 
 defmodule AikidoTest.Agent.NativeContractsTest.ToolResource do
@@ -20,14 +20,14 @@ defmodule AikidoTest.Agent.NativeContractsTest.ToolResource do
   actions do
     action :check_enabled, :boolean do
       argument :enabled, :boolean, allow_nil?: false
-      run AikidoTest.Agent.NativeContractsTest.ToolResource.Implementation
+      run AikidoTest.Agent.NativeContractsTest.ToolResource.Actions.CheckEnabled
     end
 
     action :check_schema, :map do
       argument :name, :string, allow_nil?: false, constraints: [min_length: 2]
       argument :mode, :atom, constraints: [one_of: [:fast, :slow]]
       argument :count, :integer
-      run AikidoTest.Agent.NativeContractsTest.ToolResource.Implementation
+      run AikidoTest.Agent.NativeContractsTest.ToolResource.Actions.CheckSchema
     end
   end
 end
