@@ -70,6 +70,14 @@ with `aikido.agent.cron.cancelled`; subscribe before triggering it when completi
 matters. A subsequent replacement keeps its own process and definition even if
 shutdown of the previous process finishes later.
 
+Live dynamic cron occurrences inherit the registering signal's native caller
+scope and trace context. This implicit context stays in the transient runtime
+specification; the saved cron definition retains the original configured message.
+Restarting only the scheduler preserves the live context. Reactivating the agent
+from durable storage rebuilds the job without that implicit caller context, as do
+static DSL schedules. Explicit scope supplied in a configured message remains
+application-owned configuration and must be safe to persist.
+
 `SpawnAgent` starts durable child agents and snapshots their current logical parent. Teams add desired topology,
 dependencies, ownership, lazy activation, dynamic worker templates, and task
 receipts. A team resource can itself be a member or a worker template.

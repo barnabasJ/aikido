@@ -72,17 +72,26 @@ defmodule Aikido.Directives.Cron do
   # maps. It does not mutate `%AgentServer.State{}`; runtime field writes
   # flow through the cascade callbacks.
   @doc false
-  @spec register_io(State.t(), term(), term(), term() | nil, term() | nil) ::
+  @spec register_io(
+          State.t(),
+          term(),
+          term(),
+          term() | nil,
+          term() | nil,
+          Aikido.Signal.t() | nil
+        ) ::
           {:ok, io_result()} | {:error, term()}
-  def register_io(%State{} = state, cron_expr, message, logical_id, tz) do
+  def register_io(%State{} = state, cron_expr, message, logical_id, tz, origin \\ nil) do
     logical_id = if is_nil(logical_id), do: make_ref(), else: logical_id
 
     with {:ok, cron_spec} <- Aikido.Scheduler.validate_and_build_cron_spec(cron_expr, message, tz),
+         # Keep inherited authority transient; cron_spec is persisted outside agent codecs.
          runtime_spec =
            CronRuntimeSpec.dynamic(
              cron_spec.cron_expression,
              cron_spec.message,
-             cron_spec.timezone
+             cron_spec.timezone,
+             origin
            ),
          {:ok, pid} <- AgentServer.start_runtime_cron_job(state, logical_id, runtime_spec) do
       {:ok, build_io_result(logical_id, pid, cron_spec, runtime_spec)}
@@ -107,7 +116,9 @@ defmodule Aikido.Directives.Cron do
         input_signal,
         state
       ) do
-    case Aikido.Directives.Cron.register_io(state, cron_expr, message, logical_id, tz) do
+    origin = Aikido.Signal.capture_tracing(input_signal)
+
+    case Aikido.Directives.Cron.register_io(state, cron_expr, message, logical_id, tz, origin) do
       {:ok, io_result} ->
         signal =
           CronRegistered.new!(

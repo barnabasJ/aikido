@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Carry native caller scope and trace ancestry through live dynamic cron ticks,
+  including wrapped scalar messages. Keep inherited credentials out of durable
+  cron definitions; agent reactivation does not restore implicit caller context.
+
 - Correlate cancellation with native cast arguments, including string keys and
   omitted request IDs. Serialize synchronous hook continuations so parallel tool
   results cannot bypass an earlier gate or discard its denial or context.
