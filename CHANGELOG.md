@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Show the actual team slice and individual action definitions in all team
+  example source panels, with slices expanded and implementation panels closed.
+
 - Rename the idle conversation-history setter to `replace_context`, including its
   signal and generated interfaces. Describe it explicitly and propagate typed
   signal descriptions into native reducer and public command metadata. Keep

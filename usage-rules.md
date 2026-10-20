@@ -13,6 +13,8 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 
 ## Core Contracts
 - Define reducers as native Ash actions returning `Aikido.Types.ActionResult`.
+- Native ReqLLM normalization of caller-supplied replacement history may generate tool-call IDs as an explicitly accepted exception for now; this does not authorize other reducer effects.
+- Give distinct actions dedicated owner-local implementation modules, bound directly from their declarations. Share pure mechanics without a central action-name, signal-type or selector dispatcher; intentional union actions and wildcard observers still use one implementation each.
 - Keep agent logic pure. Actions must not send messages, perform network or database I/O, spawn processes, or schedule timers. Return directives for all side effects; directives never mutate state of any kind.
 - Use **Ash types** for data contracts and **Spark.Options** for DSL/configuration validation.
 - Use `Aikido.Signal` for internal envelopes and its Spark `signal`/`schema` DSL for typed payloads. Native scope and tracer context travel with the signal; pure reducers return literals and leave ID/time generation to execution boundaries. Deliver directly to agent PIDs, and return `Notify` directives for native Ash notifications and broadcasts.

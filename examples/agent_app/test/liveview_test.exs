@@ -32,6 +32,19 @@ defmodule AgentExamplesWeb.LiveViewTest do
       assert Enum.any?(definitions, &(&1.module == example.resource))
       assert length(Enum.uniq_by(definitions, & &1.id)) == length(definitions)
 
+      if example.slug in ["team", "nested-teams", "research-team"] do
+        for {module, category, open?} <- [
+              {Aikido.Ash.Team.State, :slice, true},
+              {Aikido.Ash.Team.Actions.Start, :action, false},
+              {Aikido.Ash.Team.Actions.AssignTask, :action, false}
+            ] do
+          definition = Enum.find(definitions, &(&1.module == module))
+          assert definition, "Missing #{inspect(module)} on #{example.slug}"
+          assert definition.category == category
+          assert definition.open? == open?
+        end
+      end
+
       for definition <- definitions do
         assert has_element?(view, "##{definition.id} summary", definition.name)
         assert has_element?(view, "##{definition.id} summary", definition.path)

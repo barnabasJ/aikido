@@ -44,6 +44,12 @@ native resource options and defaults to the embedded data layer.
 
 ## Source organization
 
+Each distinct action has its own native implementation module, such as
+`Aikido.Slices.AiReact.Actions.Ask`. Its route binds that module directly. Shared
+helpers contain reusable mechanics rather than selecting another action by name.
+Signal declarations generate the native Ash actions on the existing resource;
+the implementation modules provide their callbacks without creating resources.
+
 Place each resource beside its owned implementations and signal definitions.
 For example, `counter.ex`, `counter/implementation.ex` and `counter/signals.ex`
 keep the example counter's state, reducers and payload contracts together.

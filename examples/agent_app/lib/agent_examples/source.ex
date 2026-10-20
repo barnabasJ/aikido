@@ -12,7 +12,9 @@ defmodule AgentExamples.Source do
              "lib/aikido/slices/todo.ex",
              "lib/aikido/slices/todo/**/*.ex",
              "lib/aikido/ash/ai.ex",
-             "lib/aikido/ash/team/engine.ex"
+             "lib/aikido/ash/team.ex",
+             "lib/aikido/ash/team/*.ex",
+             "lib/aikido/ash/team/actions/*.ex"
            ],
            &Path.wildcard(Path.join(@root, &1))
          )
@@ -104,8 +106,6 @@ defmodule AgentExamples.Source do
           AgentExamples.Agents
         ]
 
-    modules = modules ++ Enum.map(modules, &Module.concat(&1, Implementation))
-
     Enum.filter(@definitions, fn entry ->
       entry.module in modules ||
         Enum.any?(modules, &String.starts_with?(entry.name, inspect(&1) <> ".")) ||
@@ -127,8 +127,7 @@ defmodule AgentExamples.Source do
 
   defp modules("hook-requests"), do: [AgentExamples.Playground]
 
-  defp modules("conversation"),
-    do: [Aikido.Slices.Todo, Aikido.Slices.Todo.Item, Aikido.Slices.Todo.Implementation]
+  defp modules("conversation"), do: [Aikido.Slices.Todo]
 
   defp modules("counter"), do: []
   defp modules("checklist"), do: []
@@ -137,6 +136,7 @@ defmodule AgentExamples.Source do
 
   defp modules("team"),
     do: [
+      Aikido.Ash.Team,
       AgentExamples.Counter,
       AgentExamples.Notebook,
       AgentExamples.Worker,
@@ -148,7 +148,7 @@ defmodule AgentExamples.Source do
       AgentExamples.Researcher,
       AgentExamples.Reviewer,
       AgentExamples.ResearchSquad,
-      Aikido.Ash.Team.Engine
+      Aikido.Ash.Team
     ]
 
   defp modules("nested-teams"),

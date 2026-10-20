@@ -10,6 +10,10 @@ Build reliable agent systems by separating pure decision logic from runtime side
 
 Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/effect separation rules in this file are canonical.
 
+Accepted ID-generation exception: native ReqLLM normalization of caller-supplied
+replacement history may generate tool-call IDs for now. Keep its current input contract; this
+does not permit other runtime effects inside reducers.
+
 ## Action/Directive Design Rules
 - Side effects belong only in directives. Actions must not send messages, perform network or database I/O, spawn processes, or schedule timers; return directives for that work.
 - Actions are the only place that decides and applies agent state transitions. If another process needs state changed, send it a signal and let that process route the signal to an action.
@@ -43,6 +47,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - `Aikido.Durable`: keyed activation and persistence through DurableServer; the default backend is local EKV
 
 ## Native Ash and Spark Contracts
+- Give each distinct action its own implementation module under its owner and bind it directly from the route or action declaration. Do not redispatch business actions by `input.action.name`, signal type or selector options inside a shared implementation. Share reusable pure mechanics through ordinary helper functions. A single union action or wildcard observer remains one action.
 - Pass an `Ash.Resource.Actions.Implementation` module to `signal :name, SignalDefinition, Implementation` or `route SignalDefinition, Implementation`. Aikido generates native reducer actions returning `Aikido.Types.ActionResult`; state uses the owning resource's schema and payload arguments use the signal's schema. Explicit native Ash action references remain available when an application owns the action contract.
 - Signal lists generate a native Ash union payload selected by the matched signal type; wildcard routes receive generic `data` for observers. Mounted slices contribute their routed public signals; do not redeclare them on the agent. Mark internal typed routes `public?: false`.
 - Let native Ash changesets and action inputs apply types, constraints and defaults. Use Spark Info modules for DSL metadata, transformers for expansion and verifiers for validation. Avoid generated companion resources, custom validation bridges and redundant accessor functions.
