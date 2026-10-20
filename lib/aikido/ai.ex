@@ -27,14 +27,22 @@ defmodule Aikido.AI do
   ## Example
 
       defmodule MyApp.SupportAgent do
-        use Ash.Resource, extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+        use Ash.Resource, domain: MyApp.Agents, extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
 
         agent do
           name "support"
         end
       end
 
-      {:ok, reference} = Aikido.Ash.start(MyApp.SupportAgent, %{
+      defmodule MyApp.Agents do
+        use Ash.Domain, extensions: [Aikido.Ash.Domain]
+
+        agents do
+          agent :support, MyApp.SupportAgent
+        end
+      end
+
+      {:ok, reference} = MyApp.Agents.support_start(%{
         model: "anthropic:claude-haiku-4-5-20251001",
         tools: [:lookup_order, :refund_order],
         tool_options: [otp_app: :my_app],

@@ -29,7 +29,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
       constraints: [one_of: [:normal, :handoff, :resume]]
 
     field :handoff_id, :integer
-    field :options, :term, default: %{}
+    field :options, Aikido.AI.Options, default: %Aikido.AI.Options{}, allow_nil?: false
     field :iteration, :integer, default: 1
     field :model, :term, allow_nil?: false
     field :client, :module, allow_nil?: false, default: ReqLLM.Generation
@@ -76,7 +76,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   end
 
   defp run_and_dispatch(%LLMCall{} = d, agent_pid, source, scope, supervisor) do
-    options = Aikido.AI.Options.resolve(d.options)
+    options = d.options
 
     llm_opts = Keyword.put(d.llm_opts, :tools, d.tools)
     llm_opts = if d.mode == :handoff, do: Keyword.delete(llm_opts, :tool_choice), else: llm_opts

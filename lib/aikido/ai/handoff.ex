@@ -25,7 +25,7 @@ defmodule Aikido.AI.Handoff do
   @doc false
   def plan({:ok, result}) do
     state = result.state
-    options = Aikido.AI.Options.resolve(Map.get(state, :options))
+    options = Map.get(state, :options) || %Aikido.AI.Options{}
 
     if state.status == :running && is_nil(Map.get(state, :handoff_pending)) &&
          Map.get(state, :pending_tool_calls, []) == [] && options.handoff &&
@@ -96,7 +96,7 @@ defmodule Aikido.AI.Handoff do
 
           replacement = Conversation.replace_context(state, context)
           tokens = replacement.estimated_tokens
-          options = Aikido.AI.Options.resolve(state.options)
+          options = state.options
 
           if tokens >= options.context_max_tokens do
             fail(state, Map.put(data, :reason, :document_exceeds_context_limit))

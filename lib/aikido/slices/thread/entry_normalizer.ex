@@ -21,16 +21,14 @@ defmodule Aikido.Slices.Thread.EntryNormalizer do
     do: normalize(Map.from_struct(entry), seq, now, opts)
 
   def normalize(attrs, seq, now, opts) when is_map(attrs) do
+    attrs = Map.reject(attrs, fn {_, value} -> is_nil(value) end)
     id_generator = Keyword.get(opts, :id_generator, &generate_entry_id/0)
 
-    Entry.new!(
-      id: fetch_entry_attr(attrs, :id, fn -> generate_id(id_generator, seq) end),
-      seq: seq,
-      at: fetch_entry_attr(attrs, :at, fn -> now end),
-      kind: fetch_entry_attr(attrs, :kind, fn -> :note end),
-      payload: fetch_entry_attr(attrs, :payload, fn -> %{} end),
-      refs: fetch_entry_attr(attrs, :refs, fn -> %{} end)
-    )
+    attrs
+    |> Map.put(:seq, seq)
+    |> Map.put_new_lazy(:id, fn -> Map.get(attrs, "id") || generate_id(id_generator, seq) end)
+    |> Map.put_new(:at, Map.get(attrs, "at", now))
+    |> Entry.new!()
   end
 
   @doc """
@@ -43,13 +41,6 @@ defmodule Aikido.Slices.Thread.EntryNormalizer do
     |> Enum.map(fn {entry, idx} ->
       normalize(entry, base_seq + idx, now, opts)
     end)
-  end
-
-  defp fetch_entry_attr(attrs, key, default_fun) when is_function(default_fun, 0) do
-    case Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key)) do
-      nil -> default_fun.()
-      value -> value
-    end
   end
 
   defp generate_id(generator, seq) when is_function(generator, 1), do: generator.(seq)

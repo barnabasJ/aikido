@@ -16,7 +16,10 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
   setup :verify_on_exit!
 
   defp directive(opts \\ []) do
-    %LLMCall{
+    LLMCall.new!(
+      mode: Keyword.get(opts, :mode, :normal),
+      handoff_id: Keyword.get(opts, :handoff_id),
+      options: Keyword.get(opts, :options, %{}),
       model: Keyword.get(opts, :model, "anthropic:claude-haiku-4-5-20251001"),
       context: Keyword.get(opts, :context, Context.new([Context.user("hi")])),
       tools:
@@ -27,7 +30,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
         |> elem(0),
       request_id: Keyword.get(opts, :request_id, "req_1"),
       llm_opts: Keyword.get(opts, :llm_opts, max_tokens: 64)
-    }
+    )
   end
 
   defp fake_state(aikido), do: %{id: "stub-agent", aikido: aikido}
@@ -73,6 +76,19 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
     after
       1_000 -> :timeout
     end
+  end
+
+  test "casts execution options before starting model work" do
+    assert %Aikido.AI.Options{streaming: true, model_timeout_ms: 5_000} =
+             directive(options: %{streaming: "true", model_timeout_ms: "5000"}).options
+
+    assert {:error, _} =
+             LLMCall.new(
+               model: "offline",
+               context: Context.new(),
+               request_id: "invalid-options",
+               options: %{model_timeout_ms: 0}
+             )
   end
 
   test "spawns a task, calls ReqLLM, and casts ai.react.llm.completed back", %{aikido: aikido} do
@@ -128,13 +144,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
 
     agent = spawn_agent_stub(self())
 
-    handoff = %{
-      directive()
-      | mode: :handoff,
-        handoff_id: 7,
-        tools: [],
-        options: %{streaming: true}
-    }
+    handoff = directive(mode: :handoff, handoff_id: 7, tools: [], options: %{streaming: true})
 
     assert :ok =
              run_in(agent, fn ->

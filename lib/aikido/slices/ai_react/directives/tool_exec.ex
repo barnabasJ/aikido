@@ -17,7 +17,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   require Ash.Tracer
 
   typed_struct do
-    field :options, :term, default: %{}
+    field :options, Aikido.AI.Options, default: %Aikido.AI.Options{}, allow_nil?: false
     field :tool_call, :map, allow_nil?: false
     field :registry, :map, allow_nil?: false, default: %{}
 
@@ -78,7 +78,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   end
 
   defp run_and_dispatch(%ToolExec{} = d, agent_pid, source, context, supervisor) do
-    options = Aikido.AI.Options.resolve(d.options)
+    options = d.options
 
     result =
       Aikido.AI.Execution.run(

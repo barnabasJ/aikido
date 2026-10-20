@@ -12,7 +12,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
         arguments: %{"input" => %{"a" => 1, "b" => 2}}
       })
 
-    %ToolExec{
+    ToolExec.new!(
       tool_call: call,
       registry:
         AshAi.build_tools_and_registry(
@@ -21,7 +21,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExecTest do
         )
         |> elem(1),
       request_id: Keyword.get(opts, :request_id, "req_1")
-    }
+    )
   end
 
   defp fake_state(aikido), do: %{id: "stub-agent", aikido: aikido}

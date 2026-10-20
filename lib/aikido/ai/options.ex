@@ -62,7 +62,4 @@ defmodule Aikido.AI.Options do
 
     field :handoff_prompt, :string
   end
-
-  @doc false
-  def resolve(options), do: new!(options || %{})
 end

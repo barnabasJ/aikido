@@ -3,7 +3,7 @@ defmodule Aikido.Slices.AiReact.Directives.PrepareTools do
   use Aikido.Directive
 
   typed_struct do
-    field :options, :term, default: %{}
+    field :options, Aikido.AI.Options, default: %Aikido.AI.Options{}, allow_nil?: false
     field :tools, {:array, :atom}, default: [], allow_nil?: false
 
     field :tool_options, {:array, :tuple},
@@ -22,7 +22,7 @@ defmodule Aikido.Slices.AiReact.Directives.PrepareTools do
 
     task = %Aikido.Directives.AsyncTask{
       work: fn ->
-        options = Aikido.AI.Options.resolve(directive.options)
+        options = directive.options
 
         result =
           Aikido.AI.Execution.run(

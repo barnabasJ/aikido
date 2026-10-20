@@ -98,7 +98,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   @impl true
   def run(input, [action: :put_space], _context) do
     name = input.arguments[:space]
-    (%Aikido.Slices.Memory.Space{} = space) = input.arguments[:value]
+    space = input.arguments.value
     slice = input.arguments.state
     memory = ensure_memory(slice, input)
 
@@ -111,7 +111,7 @@ defmodule Aikido.Slices.Memory.Implementation do
   @impl true
   def run(input, [action: :update_space], _context) do
     name = input.arguments[:space]
-    (%Aikido.Slices.Memory.Space{} = new_space) = input.arguments[:value]
+    new_space = input.arguments.value
     slice = input.arguments.state
     memory = ensure_memory(slice, input)
 

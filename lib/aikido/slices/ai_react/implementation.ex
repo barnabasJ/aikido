@@ -351,7 +351,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     slice = input.arguments.state
 
     cond do
-      failed_stale?(slice, id) ->
+      slice.request_id != id ->
         Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       slice.status not in [:setup, :running] || not is_nil(Map.get(slice, :handoff_pending)) ->
@@ -376,7 +376,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     slice = input.arguments.state
 
     cond do
-      not is_nil(Map.get(slice, :handoff_pending)) || llm_turn_stale?(slice, request_id) ||
+      not is_nil(Map.get(slice, :handoff_pending)) || slice.request_id != request_id ||
           (input.arguments[:iteration] && input.arguments.iteration != slice.iteration + 1) ->
         Aikido.Types.ActionResult.new(state: slice, directives: [])
 
@@ -410,7 +410,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     slice = input.arguments.state
 
     cond do
-      tool_result_stale?(slice, data.request_id) ->
+      slice.request_id != data.request_id ->
         Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       slice.status != :running || not is_nil(Map.get(slice, :handoff_pending)) ->
@@ -426,25 +426,20 @@ defmodule Aikido.Slices.AiReact.Implementation do
   end
 
   defp ask_open_run(data, slice) do
-    model = data[:model] || ask_slice_field(slice, :model)
+    slice = slice || %{}
+    model = data[:model] || Map.get(slice, :model)
+    tools = data[:tools] || Map.get(slice, :tools) || []
 
-    tools =
-      if is_nil(data[:tools]) do
-        ask_slice_field(slice, :tools) || []
-      else
-        data[:tools]
-      end
-
-    system_prompt = data[:system_prompt] || ask_slice_field(slice, :system_prompt)
-    max_iter = data[:max_iterations] || ask_slice_field(slice, :max_iterations) || 10
-    llm_opts = Keyword.merge(ask_slice_field(slice, :llm_opts) || [], data[:llm_opts] || [])
-    client = Map.get(data, :client) || ask_slice_field(slice, :client) || ReqLLM.Generation
+    system_prompt = data[:system_prompt] || Map.get(slice, :system_prompt)
+    max_iter = data[:max_iterations] || Map.get(slice, :max_iterations) || 10
+    llm_opts = Keyword.merge(Map.get(slice, :llm_opts) || [], data[:llm_opts] || [])
+    client = Map.get(data, :client) || Map.get(slice, :client) || ReqLLM.Generation
 
     if is_nil(model) do
       {:error, :no_model}
     else
       ask_build_run(
-        Map.put(data, :hooks, data[:hooks] || ask_slice_field(slice, :hooks) || []),
+        Map.put(data, :hooks, data[:hooks] || Map.get(slice, :hooks) || []),
         slice,
         system_prompt,
         model,
@@ -452,7 +447,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
         max_iter,
         llm_opts,
         client,
-        Map.merge(ask_slice_field(slice, :tool_context) || %{}, data[:tool_context] || %{})
+        Map.merge(Map.get(slice, :tool_context) || %{}, data[:tool_context] || %{})
       )
     end
   end
@@ -498,7 +493,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
     context = base.context
 
-    options = Aikido.AI.Options.resolve(data[:options] || Map.get(slice || %{}, :options))
+    options = data[:options] || Map.get(slice || %{}, :options) || %Aikido.AI.Options{}
 
     new_slice = %{
       status: :setup,
@@ -562,22 +557,6 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
   defp ask_running?(_) do
     false
-  end
-
-  defp ask_slice_field(nil, _key) do
-    nil
-  end
-
-  defp ask_slice_field(slice, key) when is_map(slice) do
-    Map.get(slice, key)
-  end
-
-  defp failed_stale?(%{request_id: current}, id) do
-    current != id
-  end
-
-  defp llm_turn_stale?(%{request_id: current}, request_id) do
-    current != request_id
   end
 
   defp llm_turn_handle_turn(response, %{type: :final_answer, text: text}, slice) do
@@ -679,10 +658,6 @@ defmodule Aikido.Slices.AiReact.Implementation do
     Aikido.Types.ActionResult.new(state: new_slice, directives: directives)
   end
 
-  defp tool_result_stale?(%{request_id: current}, request_id) do
-    current != request_id
-  end
-
   defp tool_result_append_and_maybe_dispatch(data, slice) do
     msg = ReqLLM.Context.tool_result(data.tool_call_id, data.name, data.content)
     slice = Conversation.append_message(slice, msg)
@@ -705,7 +680,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
   defp tool_result_finalize_batch(slice) do
     current_signature = Aikido.Slices.AiReact.tool_call_signature(slice.pending_tool_calls)
 
-    {slice, _} =
+    slice =
       tool_result_maybe_append_cycle_warning(
         slice,
         slice.previous_tool_signature,
@@ -744,18 +719,18 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
   defp tool_result_maybe_append_cycle_warning(state, previous_signature, current_signature)
        when is_binary(previous_signature) and previous_signature == current_signature do
-    {Conversation.append_message(
-       state,
-       ReqLLM.Context.user(Aikido.Slices.AiReact.cycle_warning())
-     ), :warned}
+    Conversation.append_message(
+      state,
+      ReqLLM.Context.user(Aikido.Slices.AiReact.cycle_warning())
+    )
   end
 
   defp tool_result_maybe_append_cycle_warning(state, _previous, _current) do
-    {state, :no_warning}
+    state
   end
 
   defp apply_todo_gate(state, agent_state) do
-    options = Aikido.AI.Options.resolve(Map.get(state, :options))
+    options = Map.get(state, :options) || %Aikido.AI.Options{}
 
     if options.completion == :todos do
       case Map.get(agent_state, options.todo_path) do

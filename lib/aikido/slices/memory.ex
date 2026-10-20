@@ -158,7 +158,7 @@ defmodule Aikido.Slices.Memory do
       argument :state, :term
       argument :space, :atom, description: "Space name to set.", allow_nil?: false
 
-      argument :value, :term,
+      argument :value, Aikido.Slices.Memory.Space,
         description: "%Aikido.Slices.Memory.Space{} to install at the named key.",
         allow_nil?: false
 
@@ -170,7 +170,7 @@ defmodule Aikido.Slices.Memory do
       argument :state, :term
       argument :space, :atom, description: "Space name to update.", allow_nil?: false
 
-      argument :value, :term,
+      argument :value, Aikido.Slices.Memory.Space,
         description: "Replacement %Aikido.Slices.Memory.Space{} value.",
         allow_nil?: false
 

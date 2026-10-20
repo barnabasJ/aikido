@@ -42,7 +42,7 @@ defmodule AikidoTest.Memory.SliceTest do
     end
 
     test "schema is bound to the memory resource" do
-      assert Ash.Resource.Info.attribute_names(Aikido.Dsl.Slice.Info.schema(Aikido.Slices.Memory)) ==
+      assert Ash.Resource.Info.attribute_names(Aikido.Slices.Memory) ==
                Ash.Resource.Info.attribute_names(Aikido.Slices.Memory)
     end
 
@@ -89,6 +89,35 @@ defmodule AikidoTest.Memory.SliceTest do
     assert %Ash.Union{type: :kv, value: %{}} = input.arguments.default
     assert {:ok, result} = Ash.run_action(input)
     assert result.state.spaces.example.data == %{}
+  end
+
+  test "space arguments use Ash casting and reject invalid space values before execution" do
+    for action <- [:put_space, :update_space] do
+      input =
+        Ash.ActionInput.for_action(Aikido.Slices.Memory, action, %{
+          state: Aikido.Slices.Memory.new(now: 0),
+          space: :world,
+          value: %{data: %{count: 1}}
+        })
+
+      assert input.valid?
+
+      assert %Aikido.Slices.Memory.Space{data: %{count: 1}, rev: 0, metadata: %{}} =
+               input.arguments.value
+
+      assert {:ok, result} = Ash.run_action(input)
+      assert result.state.spaces.world.data == %{count: 1}
+
+      invalid =
+        Ash.ActionInput.for_action(Aikido.Slices.Memory, action, %{
+          state: Aikido.Slices.Memory.new(now: 0),
+          space: :world,
+          value: %{rev: -1, metadata: "invalid"}
+        })
+
+      refute invalid.valid?
+      assert {:error, %Ash.Error.Invalid{}} = Ash.run_action(invalid)
+    end
   end
 
   describe("agent integration") do
