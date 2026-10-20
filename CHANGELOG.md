@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Correlate cancellation with native cast arguments, including string keys and
+  omitted request IDs. Serialize synchronous hook continuations so parallel tool
+  results cannot bypass an earlier gate or discard its denial or context.
+
 - Ignore obsolete expiry signals for removed todos while retaining revision
   protection when an ID is reused and errors for unknown user commands.
 

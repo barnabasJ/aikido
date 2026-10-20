@@ -361,9 +361,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
   end
 
   defp decide(input, :cancel, _context) do
-    signal = input.context.aikido.signal
     slice = input.arguments.state
-    requested = Map.get(signal.data, :request_id)
+    requested = Map.get(input.arguments, :request_id)
 
     if slice.status in [:setup, :running, :waiting] &&
          (is_nil(requested) || requested == slice.request_id) do

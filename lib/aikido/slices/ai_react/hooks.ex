@@ -4,8 +4,9 @@ defmodule Aikido.Slices.AiReact.Hooks do
   `Aikido.Slices.AiReact.Directives.ExecuteHook` evaluates one script outside the agent mailbox.
 
   Hooks run in declaration order at each event. Sync hooks hold that event's
-  continuation; async hooks observe it independently. A sync denial or error
-  fails the run. Async errors are recorded without stopping the run.
+  continuation; incoming event continuations queue behind a pending sync hook.
+  Async hooks observe independently. A sync denial or error fails the run.
+  Async errors are recorded without stopping the run.
   """
   alias Aikido.Slices.AiReact.Directives.ExecuteHook
   alias Aikido.Slices.AiReact.Directives.{LLMCall, ToolExec}
@@ -36,7 +37,20 @@ defmodule Aikido.Slices.AiReact.Hooks do
           do: queue ++ [{:event, :run_failed, %{reason: state.error}}],
           else: queue
 
-      advance(state, queue, state.status, [])
+      case {state.status, Map.to_list(state.hooks_pending)} do
+        {status, [{token, continuation}]} when status != :failed ->
+          continuation = %{continuation | queue: continuation.queue ++ queue, status: status}
+
+          Aikido.Types.ActionResult.new(
+            state:
+              state
+              |> Map.put(:hooks_pending, %{token => continuation})
+              |> Map.put(:status, if(status == :setup, do: :setup, else: :running))
+          )
+
+        _ ->
+          advance(Map.put(state, :hooks_pending, %{}), queue, state.status, [])
+      end
     end
   end
 
