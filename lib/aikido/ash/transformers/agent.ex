@@ -11,6 +11,12 @@ defmodule Aikido.Ash.Transformers.Agent do
 
   @impl true
   def transform(dsl) do
+    with {:ok, dsl} <- Aikido.Ash.SignalRoutes.expand(dsl, :agent) do
+      build(dsl)
+    end
+  end
+
+  defp build(dsl) do
     dsl = Transformer.eval(dsl, [], quote(do: @behaviour(Aikido.Agent)))
     resource = Transformer.get_persisted(dsl, :module)
     team_slice = Transformer.get_persisted(dsl, :aikido_team_slice)
@@ -113,7 +119,20 @@ defmodule Aikido.Ash.Transformers.Agent do
         {resolved, Transformer.replace_entity(dsl, [:agent], resolved, &(&1 == signal))}
       end)
 
-    {dsl, signals, aliases}
+    flat_reducers =
+      Enum.map(
+        Transformer.get_persisted(dsl, :aikido_flat_reducers, []),
+        &Map.get(aliases, &1, &1)
+      )
+
+    union_reducers =
+      Map.new(Transformer.get_persisted(dsl, :aikido_union_reducers, %{}), fn {name, variants} ->
+        {Map.get(aliases, name, name), variants}
+      end)
+
+    {dsl
+     |> Transformer.persist(:aikido_flat_reducers, flat_reducers)
+     |> Transformer.persist(:aikido_union_reducers, union_reducers), signals, aliases}
   end
 
   defp resolve_local_target(name, aliases, resource) when is_atom(name),
@@ -132,15 +151,29 @@ defmodule Aikido.Ash.Transformers.Agent do
         {resource, name} = Aikido.Dsl.Slice.Info.target(mount.module, route.action),
         action = Ash.Resource.Info.action(resource, name),
         match?(%{public?: true}, action),
-        !Enum.any?(declared, &(&1.name == action.name)) do
+        command_name = inherited_name(route, resource, action.name),
+        !Enum.any?(declared, &(&1.name == command_name)) do
       %Aikido.Ash.Agent.Signal{
-        name: action.name,
+        name: command_name,
         type: route.type,
-        target: {resource, action.name}
+        target: {resource, action.name},
+        signal_module: route.signal_module,
+        implementation: route.implementation
       }
     end
     |> Enum.uniq_by(&{&1.name, &1.target})
   end
+
+  defp inherited_name(%{signal_module: module}, resource, action) when not is_nil(module) do
+    if Map.has_key?(
+         Spark.Dsl.Extension.get_persisted(resource, :aikido_union_reducers, %{}),
+         action
+       ),
+       do: module |> Module.split() |> List.last() |> Macro.underscore() |> String.to_atom(),
+       else: action
+  end
+
+  defp inherited_name(_route, _resource, action), do: action
 
   # Mounted slices already own these routes and state paths. Exposing their
   # public actions must not install a second route against the agent's own state.
@@ -296,6 +329,9 @@ defmodule Aikido.Ash.Transformers.Agent do
       end
     )
   end
+
+  defp signal_arguments(_dsl, %{signal_module: module}) when not is_nil(module),
+    do: {Aikido.Ash.SignalRoutes.arguments(module), :flat}
 
   defp signal_arguments(dsl, %{target: {resource, name}}) do
     action =

@@ -25,6 +25,9 @@ defmodule Aikido.Ash.Slice do
       :type,
       :action,
       :match,
+      :signal_module,
+      :implementation,
+      public?: true,
       priority: 0,
       __spark_metadata__: nil
     ]
@@ -40,8 +43,9 @@ defmodule Aikido.Ash.Slice do
     target: Route,
     args: [:type, :action],
     schema: [
-      type: [type: :string, required: true],
+      type: [type: :any, required: true],
       action: [type: :any, required: true],
+      public?: [type: :boolean, default: true],
       priority: [type: :integer, default: 0],
       match: [type: {:fun, 1}]
     ]

@@ -9,8 +9,20 @@ defmodule Aikido.Ash.Verifiers.Slice do
     schedules = Verifier.get_entities(dsl, [:schedules])
 
     resource = Verifier.get_persisted(dsl, :module)
+    generated = Verifier.get_persisted(dsl, :aikido_generated_handlers, %{})
+    reserved_handler = Enum.find([:create, :update], &Map.has_key?(generated, &1))
 
     cond do
+      reserved_handler ->
+        error(
+          "Generated reducer action #{inspect(reserved_handler)} is reserved for native slice initialization actions; use a different signal definition or implementation name"
+        )
+
+      Enum.any?(routes, &invalid_signal_reference?/1) ->
+        error(
+          "Typed routes require Aikido.Signal definitions and native Ash action implementations"
+        )
+
       function_exported?(resource, :externalize, 1) != function_exported?(resource, :reinstate, 1) ->
         error("Slice externalize/1 and reinstate/1 must be implemented together")
 
@@ -25,6 +37,14 @@ defmodule Aikido.Ash.Verifiers.Slice do
       true ->
         :ok
     end
+  end
+
+  defp invalid_signal_reference?(entity) do
+    definition = Map.get(entity, :signal_module)
+    implementation = Map.get(entity, :implementation)
+
+    (!is_nil(definition) && !Aikido.Ash.SignalRoutes.valid_definition?(definition)) ||
+      (!is_nil(implementation) && !Aikido.Ash.SignalRoutes.valid_implementation?(implementation))
   end
 
   defp invalid_action?(dsl, name) do

@@ -3,6 +3,16 @@ defmodule Aikido.Ash.Verifiers.Agent do
   use Spark.Dsl.Verifier
   alias Spark.Dsl.Verifier
 
+  @reserved_handlers [
+    :start,
+    :stop,
+    :delete,
+    :list,
+    :inspect,
+    :initialize,
+    :__aikido_initialize_state__
+  ]
+
   @impl true
   def verify(dsl) do
     path = Verifier.get_option(dsl, [:agent], :path)
@@ -16,8 +26,30 @@ defmodule Aikido.Ash.Verifiers.Agent do
     resource = Verifier.get_persisted(dsl, :module)
     schedules = Verifier.get_persisted(dsl, :expanded_agent_schedules, [])
     job_ids = Enum.map(schedules, & &1.job_id)
+    generated = Verifier.get_persisted(dsl, :aikido_generated_handlers, %{})
+    reserved_handler = Enum.find(@reserved_handlers, &Map.has_key?(generated, &1))
+
+    reserved_signal =
+      Enum.find(signals, &(!is_nil(&1.implementation) && &1.name in @reserved_handlers))
 
     cond do
+      reserved_signal ->
+        error(
+          "Generated public signal #{inspect(reserved_signal.name)} is reserved for agent lifecycle or initialization; use a different public signal name",
+          resource
+        )
+
+      reserved_handler ->
+        error(
+          "Generated reducer action #{inspect(reserved_handler)} is reserved for agent lifecycle or initialization; use a different signal definition or implementation name",
+          resource
+        )
+
+      Enum.any?(signals ++ routes, &invalid_signal_reference?/1) ->
+        error(
+          "Typed routes require Aikido.Signal definitions and native Ash action implementations"
+        )
+
       length(job_ids) != length(Enum.uniq(job_ids)) ->
         error(
           "Agent schedules require unique job IDs; use distinct job_id options for schedules sharing a signal",
@@ -53,6 +85,14 @@ defmodule Aikido.Ash.Verifiers.Agent do
       true ->
         :ok
     end
+  end
+
+  defp invalid_signal_reference?(entity) do
+    definition = Map.get(entity, :signal_module)
+    implementation = Map.get(entity, :implementation)
+
+    (!is_nil(definition) && !Aikido.Ash.SignalRoutes.valid_definition?(definition)) ||
+      (!is_nil(implementation) && !Aikido.Ash.SignalRoutes.valid_implementation?(implementation))
   end
 
   defp invalid_action?(dsl, {resource, name}) do

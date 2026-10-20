@@ -3,7 +3,7 @@ defmodule AikidoTest.AshNativeOptionsTest do
 
   test "AI options retain defaults, casting and constraints as an Ash type" do
     input =
-      Ash.ActionInput.for_action(Aikido.Slices.AiReact, :ask, %{
+      ask_input(%{
         query: "Hello",
         request_id: "typed-options",
         options: %{model_timeout_ms: "5000"}
@@ -14,7 +14,7 @@ defmodule AikidoTest.AshNativeOptionsTest do
     assert input.arguments.options.streaming == false
 
     invalid =
-      Ash.ActionInput.for_action(Aikido.Slices.AiReact, :ask, %{
+      ask_input(%{
         query: "Hello",
         request_id: "invalid-typed-options",
         options: %{model_timeout_ms: 0}
@@ -27,7 +27,7 @@ defmodule AikidoTest.AshNativeOptionsTest do
     options = [provider_specific: [nested: true], observer: self(), repeat: 1, repeat: nil]
 
     input =
-      Ash.ActionInput.for_action(Aikido.Slices.AiReact, :ask, %{
+      ask_input(%{
         query: "Hello",
         request_id: "options",
         tool_options: options,
@@ -50,7 +50,7 @@ defmodule AikidoTest.AshNativeOptionsTest do
   test "native tuple fields reject malformed option entries" do
     for options <- [[:not_a_pair], [{123, :value}], [{:key, :value, :extra}]] do
       input =
-        Ash.ActionInput.for_action(Aikido.Slices.AiReact, :ask, %{
+        ask_input(%{
           query: "Hello",
           request_id: "invalid-options",
           tool_options: options
@@ -86,5 +86,14 @@ defmodule AikidoTest.AshNativeOptionsTest do
 
       refute input.valid?
     end
+  end
+
+  defp ask_input(arguments) do
+    state =
+      Aikido.Slices.AiReact
+      |> Ash.Changeset.for_create(:create, %{})
+      |> Ash.create!()
+
+    Ash.ActionInput.for_action(Aikido.Slices.AiReact, :ask, Map.put(arguments, :state, state))
   end
 end

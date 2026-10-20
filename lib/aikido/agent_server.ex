@@ -1828,10 +1828,20 @@ defmodule Aikido.AgentServer do
     definition = Ash.Resource.Info.action(resource, name)
     state = Map.get(ctx.agent.state, path, %{})
 
+    payload =
+      case get_in(Spark.Dsl.Extension.get_persisted(resource, :aikido_union_reducers, %{}), [
+             name,
+             signal.type
+           ]) do
+        nil -> params
+        variant -> %Ash.Union{type: variant, value: params}
+      end
+
     arguments =
-      if Enum.any?(definition.arguments, &(&1.name == :data)),
-        do: %{data: params, state: state},
-        else: Map.put(params || %{}, :state, state)
+      if Enum.any?(definition.arguments, &(&1.name == :data)) &&
+           name not in Spark.Dsl.Extension.get_persisted(resource, :aikido_flat_reducers, []),
+         do: %{data: payload, state: state},
+         else: Map.put(params || %{}, :state, state)
 
     runtime =
       Map.merge(ctx, %{

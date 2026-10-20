@@ -17,7 +17,15 @@ defmodule Aikido.Ash.Agent do
 
   defmodule Signal do
     @moduledoc false
-    defstruct [:name, :type, :target, __identifier__: nil, __spark_metadata__: nil]
+    defstruct [
+      :name,
+      :type,
+      :target,
+      :signal_module,
+      :implementation,
+      __identifier__: nil,
+      __spark_metadata__: nil
+    ]
   end
 
   @slice %Spark.Dsl.Entity{
@@ -38,11 +46,11 @@ defmodule Aikido.Ash.Agent do
     identifier: :name,
     schema: [
       name: [type: :atom, required: true],
-      type: [type: :string, required: true],
+      type: [type: :any, required: true],
       target: [
         type: :any,
         required: true,
-        doc: "Native Ash action name or {resource, action}, supplied positionally."
+        doc: "Native Ash action implementation module, or an explicit native action reference."
       ]
     ]
   }
@@ -54,8 +62,9 @@ defmodule Aikido.Ash.Agent do
     target: Aikido.Dsl.Agent.Route,
     args: [:type, :action],
     schema: [
-      type: [type: :string, required: true],
+      type: [type: :any, required: true],
       action: [type: :any, required: true],
+      public?: [type: :boolean, default: true],
       priority: [type: :integer, default: 0],
       match: [type: {:fun, 1}]
     ]
@@ -66,7 +75,7 @@ defmodule Aikido.Ash.Agent do
     args: [:cron, :signal_type],
     schema: [
       cron: [type: :string, required: true],
-      signal_type: [type: :string, required: true],
+      signal_type: [type: :any, required: true],
       data: [type: :map, default: %{}],
       job_id: [type: :any],
       timezone: [type: :string]

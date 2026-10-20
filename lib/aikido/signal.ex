@@ -59,40 +59,12 @@ defmodule Aikido.Signal do
 
   @doc false
   def from_definition(module, data, opts) do
-    case Ash.Type.cast_input(:map, data, []) do
-      {:ok, data} when is_map(data) -> cast_definition(module, data, opts)
-      _ -> {:error, Ash.Error.to_error_class("Signal definition data must be a map")}
-    end
-  end
-
-  defp cast_definition(module, data, opts) do
-    attributes = Aikido.Signal.Info.schema(module)
-
-    data =
-      Enum.reduce(attributes, data, fn attribute, values ->
-        if !is_nil(attribute.default) && !Map.has_key?(values, attribute.name) &&
-             !Map.has_key?(values, Atom.to_string(attribute.name)) do
-          Map.put(values, attribute.name, Ash.Helpers.resolve_default(attribute.default))
-        else
-          values
-        end
-      end)
-
-    fields =
-      Enum.map(attributes, fn attribute ->
-        {attribute.name,
-         [
-           type: attribute.type,
-           allow_nil?: attribute.allow_nil?,
-           constraints: attribute.constraints
-         ]}
-      end)
-
-    with {:ok, constraints} <- Ash.Type.init(:map, fields: fields, preserve_nil_values?: true),
-         {:ok, cast} <- Ash.Type.cast_input(:map, data, constraints),
-         {:ok, cast} <- Ash.Type.apply_constraints(:map, cast, constraints) do
+    with {:ok, cast} <- Ash.Type.cast_input(module, data, []) do
       opts = Map.put_new(Map.new(opts), :source, Aikido.Signal.Info.signal_source!(module))
       new(Aikido.Signal.Info.signal_type!(module), cast, opts)
+    else
+      {:error, errors} -> {:error, Ash.Error.to_error_class(errors)}
+      :error -> {:error, Ash.Error.to_error_class("Signal definition data must be a map")}
     end
   end
 
