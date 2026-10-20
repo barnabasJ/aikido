@@ -238,14 +238,14 @@ defmodule Aikido.Ash.Transformers.Agent do
 
         Builder.add_new_action(dsl, :action, signal.name,
           returns: :map,
-          run: {Aikido.Ash.Action, []},
+          run: {Aikido.Ash.Actions.Signal, []},
           arguments: [reference_argument() | arguments]
         )
 
       %{type: :action, run: nil} = action ->
         updated = %{
           action
-          | run: {Aikido.Ash.Action, []},
+          | run: {Aikido.Ash.Actions.Signal, []},
             arguments: [reference_argument() | action.arguments]
         }
 
@@ -304,11 +304,12 @@ defmodule Aikido.Ash.Transformers.Agent do
 
     Enum.reduce_while(
       [
-        {:start, :map, arguments},
-        {:inspect, :term, [reference_argument(), build_argument!(:fields, {:array, :atom}, [])]},
-        {:stop, :map, [reference_argument()]},
-        {:delete, :map, [reference_argument()]},
-        {:list, {:array, :term},
+        {:start, Aikido.Ash.Actions.Start, :map, arguments},
+        {:inspect, Aikido.Ash.Actions.Inspect, :term,
+         [reference_argument(), build_argument!(:fields, {:array, :atom}, [])]},
+        {:stop, Aikido.Ash.Actions.Stop, :map, [reference_argument()]},
+        {:delete, Aikido.Ash.Actions.Delete, :map, [reference_argument()]},
+        {:list, Aikido.Ash.Actions.List, {:array, :term},
          [
            build_argument!(:filter, :term, []),
            build_argument!(:sort, :term, default: []),
@@ -317,10 +318,10 @@ defmodule Aikido.Ash.Transformers.Agent do
          ]}
       ],
       {:ok, dsl},
-      fn {name, returns, arguments}, {:ok, dsl} ->
+      fn {name, implementation, returns, arguments}, {:ok, dsl} ->
         case Builder.add_new_action(dsl, :action, name,
                returns: returns,
-               run: {Aikido.Ash.Action, []},
+               run: {implementation, []},
                arguments: arguments
              ) do
           {:ok, dsl} -> {:cont, {:ok, dsl}}
