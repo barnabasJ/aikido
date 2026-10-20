@@ -2,7 +2,7 @@
 
 A team is an Ash agent resource with `Aikido.Ash.Team`. It can run its own actions
 and AI turns while managing named agents and nested teams through the same
-Ash domain interface. The former pod API has been removed.
+Ash domain interface.
 
 ```elixir
 defmodule MyApp.ResearchTeam do

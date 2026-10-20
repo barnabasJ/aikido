@@ -72,7 +72,7 @@ Both resource kinds accept runtime configuration and tools:
 ```elixir
 alias AgentExamples.{Agents, AI}
 
-tools = AI.Tools.for_assistant() ++ AI.Tools.from_ash_ai()
+tools = AI.Tools.for_assistant() ++ AI.Tools.for_lua()
 team = Agents.research_team_start!(AI.offline(%{tools: tools}))
 {:ok, answer} = AI.ask(team, "orchestrate: Signals carry results")
 

@@ -9,15 +9,15 @@ defmodule Aikido.Agent.SliceUpdate do
 
   ## Usage
 
-      def run(signal, _slice, _opts, _ctx) do
-        {:ok,
-         %Aikido.Agent.SliceUpdate{
-           slices: %{
-             team: %{topology: ..., operation: ...},
-             audit: %{last_event: ...}
-           }
-         },
-         []}
+      def run(input, _opts, _context) do
+        Aikido.ActionResult.new(
+          state: %Aikido.Agent.SliceUpdate{
+            slices: %{
+              team: input.arguments.team,
+              audit: %{last_event: "topology.updated"}
+            }
+          }
+        )
       end
 
   Actions are pure: state changes flow only through their return values.

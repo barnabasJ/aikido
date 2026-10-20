@@ -6,6 +6,25 @@
 
 ### Changed
 
+- Standardize agent and slice declarations on native Ash resources. Remove the
+  parallel DSL hosts, implicit default mounts, contributed-section machinery,
+  single-action fixture resources and action-module inference. Use Spark entity
+  identifiers, native argument builders and Ash errors.
+
+- Standardize process activation and recovery on DurableServer. Remove Poolboy,
+  the local registry path and unused managed-spawn APIs. Use `restart?` for
+  automatic recovery and `persistence` for snapshot retention. Reads and runtime
+  subscriptions no longer dump durable snapshots.
+
+- Preserve native ReqLLM responses and message metadata; reuse Ash AI's pending
+  tool-call and error helpers. Remove ChildBus and obsolete schema/option helpers.
+  Use `Ash.Tracer` for tracing and Ash TypedStruct constructors for contracts.
+
+- Validate raw action results and directive fields before applying state or
+  effects. Keep adoption asynchronous, preserve caller scope in team startup,
+  retain scheduled payloads and route predicates, and remove unused configuration,
+  telemetry, dependencies and test adapters.
+
 - Replace the Native validation wrapper with native Ash atom constraints and
   typed arrays of key/value tuples for open keyword options. Preserve arbitrary
   tool/provider keys without a custom cast implementation.

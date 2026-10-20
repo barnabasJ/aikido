@@ -6,8 +6,13 @@ teams. Add `Aikido.Ash.AI` for model turns and dynamically supplied tools.
 
 The default `Aikido` supervision tree uses DurableServer for activation, snapshots,
 and recovery. Configure its backend with `durable: [...]`. Use `Aikido.Durable`
-for a separately configured keyed pool; it delegates process ownership and storage
-to DurableServer.
+for a separately configured DurableServer namespace; it delegates process ownership
+and storage to DurableServer.
+
+Activate agents through their generated domain `start` action. `AgentServer.start_link/1`
+provides linked activation through the same DurableServer namespace; the runtime
+supervision tree owns the agent process. `restart?` controls automatic crash recovery,
+while the agent's `persistence` setting controls whether stopping retains its snapshot.
 
 For a named runtime, declare `use Aikido, otp_app: :my_app` on a module and put
 that module in your supervision tree. It supplies only `child_spec/1` and
@@ -37,8 +42,8 @@ Emit, Schedule and Cron complete missing envelope IDs and timestamps during
 execution. Constructing the directive performs no I/O. Identity, memory and
 thread actions use the input signal's timestamp and deterministic state/entry
 IDs rather than reading the clock or generating random IDs. Direct calls without
-an input signal use timestamp zero; standalone slice constructors retain their
-convenience defaults outside the reducer pipeline.
+an input signal use timestamp zero. Mounted slice resources apply their native
+attribute defaults during initialization.
 
 `SpawnAgent` starts durable child agents and snapshots their current logical parent. Teams add desired topology,
 dependencies, ownership, lazy activation, dynamic worker templates, and task
@@ -55,7 +60,7 @@ and the runnable `examples/agent_app` application.
 
 AI agents and teams accept `hooks` at startup. `Aikido.AI.ask/3` also accepts a
 per-request `hooks:` override; `[]` disables configured hooks for that run.
-The `ai` and `react` DSL sections can declare defaults using the same hook maps.
+The `ai` DSL section can declare defaults using the same hook maps.
 
 ```elixir
 hooks = [

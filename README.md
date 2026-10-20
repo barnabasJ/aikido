@@ -106,7 +106,9 @@ Start returns a reference containing the stable ID, current PID, and resource.
 Signal actions accept a reference, ID, or PID and return processing receipts.
 Inspect state explicitly; asynchronous effects and AI answers complete through
 signals and subscriptions. Mounted embedded Ash slices contribute their routed
-public actions automatically.
+public actions automatically. Mount each slice explicitly in `agent do`;
+`use Aikido.Agent` and `use Aikido.Slice` are conveniences for these same Ash
+resource extensions.
 
 ## Teams, AI, and persistence
 
