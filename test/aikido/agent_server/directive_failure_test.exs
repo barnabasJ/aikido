@@ -84,7 +84,9 @@ defmodule AikidoTest.DirectiveFailureTest do
         Aikido.AgentServer.subscribe(
           pid,
           "test.directive_failure",
-          &{:ok, &1.agent.state.state.count}, once: true)
+          &{:ok, &1.agent.state.state.count},
+          once: true
+        )
 
       input = AikidoTest.DirectiveFailure.Signal.new!(%{target: self()})
 
