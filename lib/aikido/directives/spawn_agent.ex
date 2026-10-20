@@ -114,7 +114,7 @@ defmodule Aikido.Directives.SpawnAgent do
   end
 
   defp spawn_child(state, parent_pid, agent, tag, opts, meta, restart?) do
-    child_id = opts[:id] || "#{state.id}/#{tag}"
+    child_id = opts[:id] || "#{state.id}/#{tag_component(tag)}"
     child_partition = Map.get(opts, :partition, state.partition)
 
     parent_ref = %{
@@ -161,5 +161,15 @@ defmodule Aikido.Directives.SpawnAgent do
 
         :ok
     end
+  end
+
+  defp tag_component(tag) do
+    to_string(tag)
+  rescue
+    _error in [Protocol.UndefinedError, ArgumentError] ->
+      encoded =
+        tag |> :erlang.term_to_binary([:deterministic]) |> Base.url_encode64(padding: false)
+
+      "term:" <> encoded
   end
 end

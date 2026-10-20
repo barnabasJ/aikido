@@ -139,6 +139,44 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest do
     assert Process.alive?(parent)
   end
 
+  test "term tags start tracked children without requiring a string protocol", context do
+    parent = start_server(context, __MODULE__.Harness)
+    assert {:ok, parent_id} = Aikido.AgentServer.state(parent, &{:ok, &1.id})
+
+    for tag <- [{:worker, 1}, %{worker: 2}, [1, :not_a_character], :named, "text"] do
+      directive = %Aikido.Directives.SpawnAgent{
+        agent: __MODULE__.Harness,
+        tag: tag,
+        restart?: false
+      }
+
+      assert {:ok, :accepted} = send_directive(parent, directive)
+      assert {:ok, child} = Aikido.AgentServer.await_child(parent, tag)
+
+      assert {:ok, {child_id, ^tag, ^parent}} =
+               Aikido.AgentServer.state(child, &{:ok, {&1.id, &1.parent.tag, &1.parent.pid}})
+
+      if tag in [:named, "text"] do
+        assert child_id == "#{parent_id}/#{tag}"
+      else
+        assert String.starts_with?(child_id, parent_id <> "/term:")
+      end
+    end
+
+    tag = {:explicit, 3}
+
+    directive = %Aikido.Directives.SpawnAgent{
+      agent: __MODULE__.Harness,
+      tag: tag,
+      opts: %{id: "explicit-term-child"},
+      restart?: false
+    }
+
+    assert {:ok, :accepted} = send_directive(parent, directive)
+    assert {:ok, child} = Aikido.AgentServer.await_child(parent, tag)
+    assert {:ok, "explicit-term-child"} = Aikido.AgentServer.state(child, &{:ok, &1.id})
+  end
+
   test "agent startup is supervised work with the original agent as parent", context do
     parent = start_server(context, __MODULE__.Harness)
     assert {:ok, :accepted} = send_directive(parent, slow_directive(:stop))
