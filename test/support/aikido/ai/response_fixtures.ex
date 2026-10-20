@@ -36,25 +36,6 @@ defmodule Aikido.AI.Test.ResponseFixtures do
     )
   end
 
-  @doc """
-  Builds a `ReqLLM.Response` with both leading text and tool calls.
-  """
-  @spec mixed_response(
-          String.t(),
-          [{String.t(), map()} | {String.t(), map(), String.t()}],
-          keyword()
-        ) ::
-          Response.t()
-  def mixed_response(text, calls, opts \\ []) when is_binary(text) and is_list(calls) do
-    tool_calls = build_tool_calls(calls)
-    message = Context.assistant(text, tool_calls: tool_calls)
-
-    build_response(message,
-      finish_reason: :tool_calls,
-      usage: Keyword.get(opts, :usage, %{input_tokens: 14, output_tokens: 8})
-    )
-  end
-
   defp build_tool_calls(calls) do
     calls
     |> Enum.with_index()

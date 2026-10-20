@@ -161,11 +161,11 @@ defmodule AikidoTest.InstanceTest do
     test "shared active membership count returns count of running agents" do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
 
-      assert Enum.count(
+      assert Enum.empty?(
                Aikido.Durable.members(
                  Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance)
                )
-             ) == 0
+             )
 
       {:ok, _} =
         AikidoTest.Case.start_test_agent(

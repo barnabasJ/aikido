@@ -37,8 +37,7 @@ defmodule Aikido.MixProject do
 
       # Dialyzer
       dialyzer: [
-        plt_add_apps: [:mix],
-        ignore_warnings: ".dialyzer_ignore.exs"
+        plt_add_apps: [:mix]
       ]
     ]
   end
@@ -198,7 +197,7 @@ defmodule Aikido.MixProject do
       quality: [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "credo --min-priority higher",
+        "credo --min-priority high",
         "dialyzer"
       ]
     ]

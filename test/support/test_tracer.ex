@@ -5,7 +5,6 @@ defmodule AikidoTest.Support.TestTracer do
 
   def start_link(_opts \\ []), do: Agent.start_link(fn -> [] end, name: __MODULE__)
   def get_spans, do: Agent.get(__MODULE__, & &1)
-  def clear, do: Agent.update(__MODULE__, fn _ -> [] end)
 
   @impl true
   def start_span(type, name) do

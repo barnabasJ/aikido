@@ -322,7 +322,7 @@ defmodule AikidoTest.SchedulerTest do
       assert {:ok, ^expected} =
                Aikido.Scheduler.Job.next_scheduled_at(schedule.cron, timezone, now)
 
-      assert DateTime.diff(expected, now, :millisecond) == 30000
+      assert DateTime.diff(expected, now, :millisecond) == 30_000
     end
   end
 

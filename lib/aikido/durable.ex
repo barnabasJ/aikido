@@ -167,9 +167,8 @@ defmodule Aikido.Durable do
     partition = Keyword.get(opts, :partition, config.partition)
     storage_key = key(logical_key, partition)
 
-    with :ok <- validate_delete_target(name, storage_key, opts[:agent]),
-         :ok <- DurableServer.Supervisor.terminate_and_delete_child(name, storage_key) do
-      :ok
+    with :ok <- validate_delete_target(name, storage_key, opts[:agent]) do
+      DurableServer.Supervisor.terminate_and_delete_child(name, storage_key)
     end
   end
 

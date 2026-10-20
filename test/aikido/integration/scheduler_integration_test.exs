@@ -73,7 +73,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
   @moduletag :integration
   @moduletag :scheduler_integration
   @moduletag capture_log: true
-  @moduletag timeout: 20000
+  @moduletag timeout: 20_000
 
   defp slice_job_id do
     [spec] =

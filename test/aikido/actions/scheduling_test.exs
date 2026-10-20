@@ -56,7 +56,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
 
   describe("ScheduleTimeout") do
     test "creates schedule directive for timeout" do
-      data = %{timeout_ms: 30000, timeout_id: :work_deadline, signal_type: "agent.timeout"}
+      data = %{timeout_ms: 30_000, timeout_id: :work_deadline, signal_type: "agent.timeout"}
 
       {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(sig("schedule_timeout", data), fn signal ->
@@ -72,7 +72,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
 
       assert result == %{}
       assert %Directives.Schedule{} = directive
-      assert directive.delay_ms == 30000
+      assert directive.delay_ms == 30_000
       assert directive.message.type == "agent.timeout"
       assert directive.message.data == %{timeout_id: :work_deadline}
     end

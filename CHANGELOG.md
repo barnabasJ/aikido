@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Run the configured high-priority Credo checks instead of an empty priority
+  selection. Simplify the local constructs they flag, remove obsolete Dialyzer
+  suppression and unused test helpers, and refresh native-action test descriptions.
+
 - Compute deterministic Memory/Thread initialization IDs only when creating missing
   state; existing-state mutations retain identities and use signal timestamps
   without serializing and hashing the full history.

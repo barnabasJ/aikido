@@ -23,7 +23,7 @@ defmodule AikidoTest.Thread.SliceTest do
       assert Map.get(Aikido.Dsl.Slice.Info.slice_options(Aikido.Slices.Thread), :name) == "thread"
     end
 
-    test "exposes Thread.Actions.{Ensure,Append,Clear} via actions/1" do
+    test "exposes native thread action references via actions/1" do
       action_set = MapSet.new(Aikido.Dsl.Slice.Info.actions(Aikido.Slices.Thread))
 
       assert MapSet.equal?(

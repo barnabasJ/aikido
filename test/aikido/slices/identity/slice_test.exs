@@ -24,7 +24,7 @@ defmodule AikidoTest.Identity.SliceTest do
                "identity"
     end
 
-    test "exposes Identity.Actions.{Ensure,Evolve,UpdateProfile} via actions/1" do
+    test "exposes native identity action references via actions/1" do
       action_set = MapSet.new(Aikido.Dsl.Slice.Info.actions(Aikido.Slices.Identity))
 
       assert MapSet.equal?(

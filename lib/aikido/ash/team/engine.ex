@@ -542,21 +542,22 @@ defmodule Aikido.Ash.Team.Engine do
     id = Map.get(data, :task_id) || signal.id
 
     with true <- !Map.has_key?(state.tasks, id) || {:error, {:task_exists, id}},
-         {:ok, pid} <- fetch_member(state, data.member),
-         outgoing =
-           struct!(Signal,
-             id: nil,
-             type: Map.get(data, :type, "harness.task"),
-             data:
-               Map.merge(Map.get(data, :payload, %{}), %{
-                 metadata: data[:metadata] || %{},
-                 task_id: id,
-                 member: data.member,
-                 reply_to: context.agent_pid,
-                 attempt: state.incarnations[data.member]
-               }),
-             source: "/ash/team"
-           ) do
+         {:ok, pid} <- fetch_member(state, data.member) do
+      outgoing =
+        struct!(Signal,
+          id: nil,
+          type: Map.get(data, :type, "harness.task"),
+          data:
+            Map.merge(Map.get(data, :payload, %{}), %{
+              metadata: data[:metadata] || %{},
+              task_id: id,
+              member: data.member,
+              reply_to: context.agent_pid,
+              attempt: state.incarnations[data.member]
+            }),
+          source: "/ash/team"
+        )
+
       task = %{
         id: id,
         member: data.member,

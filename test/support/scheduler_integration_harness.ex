@@ -219,13 +219,6 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
     )
   end
 
-  def tick_count(pid) do
-    {:ok, count} =
-      Aikido.AgentServer.state(pid, fn s -> {:ok, s.agent.state.domain.tick_count} end)
-
-    count
-  end
-
   def ticks(pid) do
     {:ok, ticks} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.agent.state.domain.ticks} end)
     ticks

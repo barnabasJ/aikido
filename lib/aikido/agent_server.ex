@@ -205,7 +205,7 @@ defmodule Aikido.AgentServer do
   alias Aikido.Telemetry.Formatter
   @type server :: pid() | atom() | {:via, module(), term()} | String.t()
   @cron_restart_base_ms 500
-  @cron_restart_max_ms 30000
+  @cron_restart_max_ms 30_000
   # ---------------------------------------------------------------------------
   # Public API
   # ---------------------------------------------------------------------------
