@@ -170,7 +170,7 @@ defmodule Aikido.AgentServer.State do
     field :debug_events, {:array, :term} do
       allow_nil? false
       default []
-      description "Ring buffer of debug events (max 500)"
+      description "Debug events retained up to the configured debug_max_events capacity."
     end
 
     field :debug_max_events, :integer do
@@ -257,7 +257,8 @@ defmodule Aikido.AgentServer.State do
   @doc """
   Records a debug event if debug mode is enabled.
 
-  Events are stored in a ring buffer (max 500 entries).
+  Events are retained up to the configured `debug_max_events` capacity
+  (default: 500 entries).
   Each event includes a monotonic timestamp for relative timing.
   """
   @spec record_debug_event(t(), atom(), map()) :: t()

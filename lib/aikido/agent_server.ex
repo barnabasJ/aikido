@@ -112,8 +112,9 @@ defmodule Aikido.AgentServer do
 
   ## Debugging
 
-  AgentServer can record recent events in an in-memory ring buffer (max 50)
-  to help diagnose what happened inside a running agent.
+  AgentServer can record recent events in an in-memory ring buffer to help
+  diagnose what happened inside a running agent. Capacity is configurable through
+  `debug_max_events` and defaults to 500 events.
 
   Enable on a running agent:
 
@@ -661,7 +662,7 @@ defmodule Aikido.AgentServer do
 
   ## Options
 
-  - `:limit` - Maximum number of events to return (default: all, max 50)
+  - `:limit` - Maximum number of retained events to return (default: all retained events)
 
   ## Examples
 

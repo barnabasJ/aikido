@@ -151,8 +151,6 @@ defmodule Aikido.MixProject do
     [
       {:durable_server, "~> 0.1.6"},
       {:ekv, "~> 0.4"},
-      # External signal transport
-
       # Aikido Deps
       {:ash, "~> 3.36"},
       {:ash_ai, "~> 1.3"},
