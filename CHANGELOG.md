@@ -6,6 +6,16 @@
 
 ### Changed
 
+- Run all Argus BEAM analyses in the quality and CI checks, with strict failure
+  handling and documented exclusions for reviewed framework/runtime patterns.
+  Report AI cleanup callback failures while preserving the primary task result
+  and running the remaining cleanup callbacks.
+
+- Preserve explicit `false` child tags and cron identifiers instead of treating
+  them as absent. Deliver internal worker cancellation and Todo notifications
+  directly to their owning agent regardless of external default dispatch.
+
+
 - Process logical cron cancellation in registration order before retiring ownership
   and starting supervised shutdown. Replacement cleanup targets the captured old
   process directly, so late shutdown cannot cancel a newly registered job.

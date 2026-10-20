@@ -77,16 +77,8 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest do
   describe("agent with schedules") do
     test "Info.schedules/1 typespec includes slice and agent schedule specs" do
       module = Aikido.Dsl.Agent.Info
-      beam_path = :code.which(module) |> List.to_string()
-
-      {:ok, {_module, abstract_code: {:raw_abstract_v1, abstract_code}}} =
-        :beam_lib.chunks(String.to_charlist(beam_path), [:abstract_code])
-
-      {{:schedules, 1}, [spec]} =
-        Enum.find_value(abstract_code, fn
-          {:attribute, _line, :spec, {{:schedules, 1}, _} = spec} -> spec
-          _other -> nil
-        end)
+      {:ok, specs} = Code.Typespec.fetch_specs(module)
+      {{:schedules, 1}, [spec]} = List.keyfind(specs, {:schedules, 1}, 0)
 
       rendered = :schedules |> Code.Typespec.spec_to_quoted(spec) |> Macro.to_string()
       assert String.contains?(rendered, "Aikido.Slice.Schedules.schedule_spec()")

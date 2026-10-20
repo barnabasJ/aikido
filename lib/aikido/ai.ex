@@ -2,10 +2,10 @@ defmodule Aikido.AI do
   @moduledoc """
   Public API for ReAct agents built on `Aikido.Slices.AiReact`.
 
-  Works against any `pid` whose agent attached `Aikido.Slices.AiReact` via
-  `slices:`. The slice is the source of truth for run config (model,
-  tools, system_prompt, max_iterations, llm_opts) seeded from the
-  agent's `slices:` declaration; per-call opts override.
+  Works against any `pid` whose agent uses `Aikido.Ash.AI` or explicitly
+  mounts `Aikido.Slices.AiReact` at `:ai`. The slice owns run configuration
+  (model, tools, system_prompt, max_iterations, llm_opts), seeded from the
+  AI configuration or slice mount options; per-call opts override.
 
   ## API shape
 

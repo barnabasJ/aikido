@@ -274,7 +274,13 @@ defmodule AikidoTest.SchedulerTest do
         spawn(fn ->
           {:ok, pid} =
             Aikido.Scheduler.run_every(
-              fn -> Process.exit(self(), :kill) end,
+              fn ->
+                send(test_pid, {:callback_started, self()})
+
+                receive do
+                  :release -> Process.exit(self(), :kill)
+                end
+              end,
               "* * * * * * *"
             )
 
@@ -285,11 +291,15 @@ defmodule AikidoTest.SchedulerTest do
           end
         end)
 
+      on_exit(fn -> if Process.alive?(owner), do: send(owner, :stop) end)
       ref = Process.monitor(owner)
       assert_receive {:owner_started, ^owner, pid}, 1000
-      assert Process.alive?(owner)
-      assert Process.alive?(pid)
-      refute_receive {:DOWN, ^ref, :process, ^owner, _reason}, 1500
+      send(pid, :tick)
+      assert_receive {:callback_started, callback}, 2000
+      callback_ref = Process.monitor(callback)
+      send(callback, :release)
+      assert_receive {:DOWN, ^callback_ref, :process, ^callback, :killed}, 2000
+      assert is_map(:sys.get_state(pid))
       assert Process.alive?(owner)
       send(owner, :stop)
       assert_receive {:DOWN, ^ref, :process, ^owner, _reason}, 2000
