@@ -145,7 +145,7 @@ defmodule Aikido.Slices.AiReact do
       end
 
       attribute :max_iterations, :integer do
-        description "Maximum model turns allowed before the run fails its iteration limit."
+        description "Maximum number of model turns permitted in the current run."
         public? true
         allow_nil? false
         default 10
