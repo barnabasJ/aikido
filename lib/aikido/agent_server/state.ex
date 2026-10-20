@@ -96,7 +96,7 @@ defmodule Aikido.AgentServer.State do
     field :skip_schedules, :boolean,
       allow_nil?: false,
       default: false,
-      description: "Skip registering plugin schedules"
+      description: "Skip registering slice schedules"
 
     field :aikido, :atom, allow_nil?: false, description: "Aikido instance name (required)"
 
@@ -155,14 +155,9 @@ defmodule Aikido.AgentServer.State do
       description: "Max debug events in ring buffer"
   end
 
-  @schema __MODULE__
   defoverridable new!: 1
 
   @type t :: %__MODULE__{}
-
-  @doc false
-  @spec schema() :: Ash.Type.t()
-  def schema, do: @schema
 
   @doc """
   Creates a new State from validated Options, agent module, and agent struct.
@@ -179,17 +174,6 @@ defmodule Aikido.AgentServer.State do
   @spec from_options(Options.t(), module(), struct(), keyword()) ::
           {:ok, t()} | {:error, term()}
   def from_options(%Options{} = opts, agent_module, agent, extra \\ []) do
-    {agent, staged_cron_specs} = Aikido.Scheduler.extract_staged_cron_specs(agent)
-
-    {restored_cron_specs, invalid_cron_specs} =
-      Aikido.Scheduler.classify_cron_specs(staged_cron_specs)
-
-    Enum.each(invalid_cron_specs, fn {job_id, spec, reason} ->
-      Logger.error(
-        "AgentServer #{opts.id} dropped malformed persisted cron spec #{inspect(job_id)}: #{inspect(spec)} (#{inspect(reason)})"
-      )
-    end)
-
     lifecycle_opts = [
       pool: opts.pool,
       pool_key: opts.pool_key
@@ -217,7 +201,7 @@ defmodule Aikido.AgentServer.State do
         cron_restart_attempts: %{},
         cron_restart_timers: %{},
         cron_restart_timer_refs: %{},
-        cron_specs: restored_cron_specs,
+        cron_specs: %{},
         cron_runtime_specs: %{},
         skip_schedules: opts.skip_schedules,
         error_count: 0,

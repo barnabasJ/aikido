@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Use DurableServer as the sole persistence path. Remove Storage adapters,
+  explicit hibernate/thaw, persistence middleware, separate thread stores and
+  scheduler manifests embedded in domain state. Keep agent and slice codecs
+  under `Aikido.Durable.Codec`, and retain complete thread history in snapshots.
+
 - Remove the outdated installer and agent generator, their templates and tests,
   and the direct Igniter dependency. Start the default runtime with `Aikido`, or
   define a custom runtime module with `use Aikido, otp_app: :my_app`.

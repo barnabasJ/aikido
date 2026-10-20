@@ -90,11 +90,10 @@ defmodule Aikido do
   """
   defmacro __using__(opts) do
     otp_app = Keyword.fetch!(opts, :otp_app)
-    storage = Keyword.get(opts, :storage)
     default_slices = Keyword.get(opts, :default_slices)
 
     instance_options =
-      [{:otp_app, otp_app}, {:storage, storage}, {:default_slices, default_slices}]
+      [{:otp_app, otp_app}, {:default_slices, default_slices}]
       |> Enum.filter(fn {key, val} -> key == :otp_app or val != nil end)
       |> Enum.map(fn {key, val} ->
         quote do: unquote(key)(unquote(val))
@@ -518,42 +517,6 @@ defmodule Aikido do
     |> length()
   end
 
-  # ---------------------------------------------------------------------------
-  # Persistence
-  # ---------------------------------------------------------------------------
-
-  @doc "Hibernate an agent using the given Aikido instance."
-  @spec hibernate(atom(), Aikido.Agent.t()) :: :ok | {:error, term()}
-  def hibernate(aikido_instance, agent) when is_atom(aikido_instance) do
-    hibernate(aikido_instance, agent, [])
-  end
-
-  @spec hibernate(atom(), Aikido.Agent.t(), keyword()) :: :ok | {:error, term()}
-  def hibernate(aikido_instance, agent, opts) when is_atom(aikido_instance) and is_list(opts) do
-    partition = Keyword.get(opts, :partition)
-    agent_module = agent_module_for(agent)
-
-    Aikido.Persist.hibernate(
-      aikido_instance,
-      agent_module,
-      partition_key(agent.id, partition),
-      agent
-    )
-  end
-
-  @doc "Thaw an agent using the given Aikido instance."
-  @spec thaw(atom(), module(), term()) :: {:ok, Aikido.Agent.t()} | {:error, term()}
-  def thaw(aikido_instance, agent_module, key) when is_atom(aikido_instance) do
-    thaw(aikido_instance, agent_module, key, [])
-  end
-
-  @spec thaw(atom(), module(), term(), keyword()) :: {:ok, Aikido.Agent.t()} | {:error, term()}
-  def thaw(aikido_instance, agent_module, key, opts)
-      when is_atom(aikido_instance) and is_list(opts) do
-    partition = Keyword.get(opts, :partition)
-    Aikido.Persist.thaw(aikido_instance, agent_module, partition_key(key, partition))
-  end
-
   defp filter_agent_registry_entries(entries, partition) do
     Enum.flat_map(entries, fn {registry_key, pid} ->
       case unwrap_partition_key(registry_key) do
@@ -569,8 +532,6 @@ defmodule Aikido do
     end)
   end
 
-  defp agent_module_for(%{agent_module: mod}) when is_atom(mod) and not is_nil(mod), do: mod
-  defp agent_module_for(%mod{}), do: mod
 
   defp normalize_parent_binding(%{parent_id: parent_id, tag: _tag} = binding)
        when is_binary(parent_id) do

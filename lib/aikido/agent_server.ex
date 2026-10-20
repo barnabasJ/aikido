@@ -532,7 +532,7 @@ defmodule Aikido.AgentServer do
   @doc """
   Block until the AgentServer has emitted `aikido.agent.lifecycle.ready`.
 
-  Useful when callers spawn an agent and need to assert that thaw +
+  Useful when callers spawn an agent and need to assert that restoration and
   reconcile + slice start has completed before sending signals or
   reading agent state. If the agent is already past `:idle` (ready
   fired before the call), replies immediately.
@@ -1007,19 +1007,11 @@ defmodule Aikido.AgentServer do
          :ok <- maybe_register_global(options, state) do
       state = maybe_monitor_parent(state)
 
-      # Build the signal router before we emit lifecycle signals. The
-      # Persister middleware (if declared) blocks on thaw IO during the
-      # starting signal and replaces ctx.agent with the rehydrated struct;
-      # downstream state.agent reflects post-thaw state. Cron jobs still
-      # bring up in handle_continue/2.
+      # Lifecycle observers see restored domain state before schedules start.
       signal_router = SignalRouter.build(state)
       state = %{state | signal_router: signal_router}
       state = emit_through_chain(state, lifecycle_starting_signal(state))
-      # Persister middleware may have thawed an agent with staged cron specs
-      # in its state. Extract them onto state.cron_specs so the post_init
-      # phase can register them.
-      state = extract_thawed_cron_specs(state)
-      state = %{state | cron_specs: Map.merge(state.cron_specs, restored_cron)}
+      state = restore_cron_specs(state, restored_cron)
       state = emit_through_chain(state, partition_assigned_signal(state))
       {:ok, state, {:continue, :post_init}}
     else
@@ -1413,9 +1405,7 @@ defmodule Aikido.AgentServer do
 
   @impl true
   def terminate(reason, state) do
-    # Emit lifecycle.stopping at the top so middleware (notably
-    # Aikido.Middlewares.Persister) can perform synchronous hibernate IO
-    # before any other shutdown work runs.
+    # Notify lifecycle observers before shutting down owned runtime processes.
     state =
       if clean_shutdown?(reason) do
         emit_through_chain(state, lifecycle_stopping_signal(state, reason))
@@ -1542,7 +1532,7 @@ defmodule Aikido.AgentServer do
   #
   # The chain returns either branch with a fresh ctx; this function
   # commits ctx.agent to state.agent unconditionally so middleware-staged
-  # state mutations (e.g. Persister's thaw) land regardless of whether
+  # changes land regardless of whether
   # the action errored downstream. Action-level rollback already happened
   # before accepting the action results.
   #
@@ -1563,8 +1553,7 @@ defmodule Aikido.AgentServer do
 
   # Routes a lifecycle / identity signal through the middleware chain.
   # Mirrors the agent-state sync in `run_chain/2` and runs any returned
-  # directives inline so middleware-emitted side-effect signals (e.g.
-  # `aikido.persist.thaw.completed`) reach observers.
+  # directives inline so emitted signals reach observers.
   #
   # Like the user-signal path, subscribers fire after the outermost
   # middleware unwinds and directives have executed.
@@ -2105,29 +2094,16 @@ defmodule Aikido.AgentServer do
     end)
   end
 
-  # Pulls staged cron specs (from a thawed agent's state) up onto state.cron_specs
-  # and classifies them. Invalid specs are logged and dropped.
-  defp extract_thawed_cron_specs(%State{agent: agent} = state) do
-    {cleaned_agent, staged} = Aikido.Scheduler.extract_staged_cron_specs(agent)
+  defp restore_cron_specs(state, specs) do
+    {valid, invalid} = Aikido.Scheduler.classify_cron_specs(specs)
 
-    case staged do
-      empty when empty == %{} or empty == nil ->
-        state
+    Enum.each(invalid, fn {job_id, spec, reason} ->
+      Logger.error(
+        "AgentServer #{state.id} dropped malformed persisted cron spec #{inspect(job_id)}: #{inspect(spec)} (#{inspect(reason)})"
+      )
+    end)
 
-      staged ->
-        {valid, invalid} = Aikido.Scheduler.classify_cron_specs(staged)
-
-        Enum.each(invalid, fn {job_id, spec, reason} ->
-          require Logger
-
-          Logger.error(
-            "AgentServer #{state.id} dropped malformed persisted cron spec #{inspect(job_id)}: #{inspect(spec)} (#{inspect(reason)})"
-          )
-        end)
-
-        merged = Map.merge(state.cron_specs, valid)
-        %{state | agent: cleaned_agent, cron_specs: merged}
-    end
+    %{state | cron_specs: Map.merge(state.cron_specs, valid)}
   end
 
   defp register_restored_cron_specs(%State{cron_specs: cron_specs} = state)

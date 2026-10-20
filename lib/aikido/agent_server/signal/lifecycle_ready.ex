@@ -1,17 +1,8 @@
 defmodule Aikido.AgentServer.Signal.LifecycleReady do
   @moduledoc """
-  Emitted by the AgentServer once `handle_continue(:post_init, ...)` has
-  finished bringing the agent up: signal router built, plugin children
-  started, plugin subscriptions live, schedules registered, parent
-  binding persisted, parent notified.
-
-  Routed through the middleware chain. By the time `lifecycle.ready`
-  fires, any thaw IO performed by the Persister middleware on
-  `lifecycle.starting` has completed — observers see the post-thaw
-  agent state.
-
-  Slices and plugins can subscribe via `signal_routes:` to perform any
-  one-shot post-boot work (warming caches, broadcasting presence, etc).
+  Emitted after AgentServer finishes post-init work: schedules are registered
+  and the parent is notified. Observers see the restored agent state and the
+  active runtime. Routed actions may return directives for post-boot I/O.
   """
 
   use Jido.Signal,

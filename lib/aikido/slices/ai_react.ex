@@ -62,10 +62,10 @@ defmodule Aikido.Slices.AiReact do
       user message before the next LLMCall.
     * `:model`, `:tools`, `:system_prompt`, `:llm_opts` — run config
       seeded from the slice's `slices:` config (validated through
-      `config_schema/0`); `Aikido.Slices.AiReact.Ask` falls back to these
+      the configuration contract); the `:ask` action falls back to these
       values when the opening signal omits them.
 
-  ## Config keys (`config_schema/0`)
+  ## Config keys (the configuration contract)
 
     * `:model` — any value accepted by `ReqLLM.Generation.generate_text/3`.
       Optional; the floor enforced by the `Ask` action is `{:error, :no_model}`
@@ -295,7 +295,7 @@ defmodule Aikido.Slices.AiReact do
     |> Enum.join("|")
   end
 
-  @behaviour Aikido.Persist.Transform
+  @behaviour Aikido.Durable.Codec
 
   actions do
     action :handoff_completed, Aikido.ActionResult do

@@ -5,7 +5,7 @@ defmodule Aikido.Dsl.Instance do
 
   Defines a single host-owned section:
 
-    * `instance do … end` — `otp_app`, `storage`, `default_slices`.
+    * `instance do … end` — `otp_app`, `default_slices`.
 
   Spark validates and stores the configuration. Read it through
   `Aikido.Dsl.Instance.Info`. Supervision entry points come from the instance
@@ -17,11 +17,6 @@ defmodule Aikido.Dsl.Instance do
     describe: "Application instance configuration.",
     schema: [
       otp_app: [type: :atom, required: true, doc: "The otp_app for this Aikido instance."],
-      storage: [
-        type: :any,
-        default: {Aikido.Storage.ETS, [table: :aikido_storage]},
-        doc: "Storage adapter spec; defaults to ETS."
-      ],
       default_slices: [type: :any, doc: "Override default slices; nil keeps framework defaults."]
     ]
   }

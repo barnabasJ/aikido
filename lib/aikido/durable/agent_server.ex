@@ -2,12 +2,11 @@ defmodule Aikido.Durable.AgentServer do
   @moduledoc false
   use DurableServer, vsn: 1
   alias Aikido.AgentServer
-  alias Aikido.Middlewares.Persister
 
   @impl true
   def dump_state(%{runtime: runtime} = state) do
     agent = %{runtime.agent | state: durable_domain_state(runtime.agent.state)}
-    agent = Persister.transform_agent(agent, runtime.agent_module, :externalize)
+    agent = Aikido.Durable.Codec.transform_agent(agent, runtime.agent_module, :externalize)
 
     encode(%{
       options: boot_options(state.options),
@@ -30,7 +29,7 @@ defmodule Aikido.Durable.AgentServer do
       })
       |> Ash.run_action!(authorize?: false)
 
-    agent = Persister.transform_agent(agent, module, :externalize)
+    agent = Aikido.Durable.Codec.transform_agent(agent, module, :externalize)
 
     encode(%{
       options: boot_options(options),
@@ -220,7 +219,7 @@ defmodule Aikido.Durable.AgentServer do
   defp restore_agent({:checkpoint, checkpoint}, agent_module) do
     case agent_module.restore(checkpoint, %{}) do
       {:ok, %Aikido.Agent{} = agent} ->
-        Persister.transform_agent(agent, agent_module, :reinstate)
+        Aikido.Durable.Codec.transform_agent(agent, agent_module, :reinstate)
 
       other ->
         raise ArgumentError,
@@ -229,7 +228,7 @@ defmodule Aikido.Durable.AgentServer do
   end
 
   defp restore_agent({:agent, agent}, agent_module),
-    do: Persister.transform_agent(agent, agent_module, :reinstate)
+    do: Aikido.Durable.Codec.transform_agent(agent, agent_module, :reinstate)
 
   defp durable_domain_state(state) do
     case state[:team] do

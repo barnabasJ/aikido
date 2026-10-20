@@ -162,28 +162,6 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
     {:agent_schedule, "scheduler_integration_scheduled_agent", :scheduled_heartbeat}
   end
 
-  def unique_table(prefix \\ "scheduler_integration") do
-    :"#{prefix}_#{System.unique_integer([:positive])}"
-  end
-
-  def cleanup_storage_tables(table) do
-    Enum.each([:"#{table}_checkpoints", :"#{table}_threads", :"#{table}_thread_meta"], fn t ->
-      try do
-        :ets.delete(t)
-      rescue
-        _ -> :ok
-      end
-    end)
-  end
-
-  def checkpoint_key(agent_module, manager, key) do
-    {agent_module, {manager, key}}
-  end
-
-  def stage_cron_specs(agent, cron_specs) when is_map(cron_specs) do
-    Aikido.Scheduler.attach_staged_cron_specs(agent, cron_specs)
-  end
-
   def register_cron(pid, cron_expr, opts \\ []) do
     message =
       Keyword.get(

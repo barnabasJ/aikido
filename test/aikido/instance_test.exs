@@ -6,83 +6,14 @@ defmodule AikidoTest.InstanceTest.OverrideInstance do
   use Aikido, otp_app: :aikido_test_instance, default_slices: %{thread: false}
 end
 
-defmodule AikidoTest.InstanceTest.RedisTestAgent do
-  use Aikido.Agent
-
-  agent do
-    name "redis_test_agent"
-    path :domain
-
-    schema do
-      attribute :counter, :integer, default: 0
-    end
-  end
-end
-
-defmodule AikidoTest.InstanceTest.RedisMock do
-  def child_spec(opts) do
-    %{id: __MODULE__, start: {__MODULE__, :start_link, [opts]}}
-  end
-
-  def start_link(_opts \\ []) do
-    Agent.start_link(fn -> %{} end, name: __MODULE__)
-  end
-
-  def command(command) do
-    Agent.get_and_update(__MODULE__, fn state ->
-      case command do
-        ["GET", key] ->
-          {{:ok, Map.get(state, key)}, state}
-
-        ["SET", key, value] ->
-          {{:ok, "OK"}, Map.put(state, key, value)}
-
-        ["SET", key, value, "PX", _ttl] ->
-          {{:ok, "OK"}, Map.put(state, key, value)}
-
-        ["DEL" | keys] ->
-          deleted = Enum.count(keys, &Map.has_key?(state, &1))
-          {{:ok, deleted}, Map.drop(state, keys)}
-
-        _ ->
-          {{:ok, {:echo, command}}, state}
-      end
-    end)
-  end
-end
-
 defmodule AikidoTest.InstanceTest do
   use ExUnit.Case, async: false
-
-  defp compile_inline_redis_instance(prefix) do
-    module =
-      Module.concat(__MODULE__, :"InlineRedisInstance#{System.unique_integer([:positive])}")
-
-    source = "defmodule #{inspect(module)} do
-  use Aikido,
-    otp_app: :aikido_test_instance,
-    storage: {Aikido.Storage.Redis, [
-      command_fn: &AikidoTest.InstanceTest.RedisMock.command/1,
-      prefix: #{inspect(prefix)}
-    ]}
-end
-"
-    Code.compile_string(source)
-    module
-  end
-
-  defp unload_module(module) do
-    :code.purge(module)
-    :code.delete(module)
-  end
 
   setup do
     Application.put_env(:aikido_test_instance, AikidoTest.InstanceTest.TestInstance,
       max_tasks: 500,
       durable: AikidoTest.Case.durable_options()
     )
-
-    {:ok, _pid} = start_supervised({AikidoTest.InstanceTest.RedisMock, []})
 
     on_exit(fn ->
       Application.delete_env(:aikido_test_instance, AikidoTest.InstanceTest.TestInstance)
@@ -160,81 +91,6 @@ end
       assert Aikido.Agent.DefaultSlices.for_instance(instance) == [memory: Aikido.Slices.Memory]
     end
 
-    test "Spark Info preserves Redis command function captures" do
-      module = compile_inline_redis_instance("inline-storage")
-      on_exit(fn -> unload_module(module) end)
-
-      assert {Aikido.Storage.Redis, opts} =
-               Aikido.Dsl.Instance.Info.instance_options(module).storage
-
-      assert is_function(opts[:command_fn], 1)
-      assert {:ok, {:echo, ["PING"]}} = opts[:command_fn].(["PING"])
-      assert opts[:prefix] == "inline-storage"
-    end
-
-    test "hibernate and thaw work through a dynamically compiled Redis instance" do
-      module = compile_inline_redis_instance("inline-persist")
-      on_exit(fn -> unload_module(module) end)
-
-      agent =
-        AikidoTest.InstanceTest.RedisTestAgent.initialize!(%{id: "redis-instance-agent"})
-        |> then(fn agent ->
-          %{agent | state: %{agent.state | domain: %{agent.state.domain | counter: 42}}}
-        end)
-        |> then(fn agent ->
-          thread =
-            Aikido.Slices.Thread.new(id: "redis-thread")
-            |> Aikido.Slices.Thread.append(%{kind: :note, payload: %{text: "saved"}})
-
-          %{agent | state: Map.put(agent.state, :thread, thread)}
-        end)
-
-      assert :ok = Aikido.hibernate(module, agent)
-
-      assert {:ok, thawed} =
-               Aikido.thaw(module, AikidoTest.InstanceTest.RedisTestAgent, "redis-instance-agent")
-
-      assert thawed.state.domain.counter == 42
-      assert thawed.state[:thread].id == "redis-thread"
-      assert Aikido.Slices.Thread.entry_count(thawed.state[:thread]) == 1
-    end
-
-    test "partitioned and unpartitioned checkpoints coexist through an instance module" do
-      module = compile_inline_redis_instance("inline-partition-persist")
-      on_exit(fn -> unload_module(module) end)
-
-      unpartitioned =
-        AikidoTest.InstanceTest.RedisTestAgent.initialize!(%{id: "shared-partition-key"})
-        |> then(fn agent ->
-          %{agent | state: %{agent.state | domain: %{agent.state.domain | counter: 10}}}
-        end)
-
-      partitioned =
-        AikidoTest.InstanceTest.RedisTestAgent.initialize!(%{id: "shared-partition-key"})
-        |> then(fn agent ->
-          %{
-            agent
-            | state:
-                agent.state |> put_in([:domain, :counter], 20) |> Map.put(:__partition__, :blue)
-          }
-        end)
-
-      assert :ok = Aikido.hibernate(module, unpartitioned)
-      assert :ok = Aikido.hibernate(module, partitioned, partition: :blue)
-
-      assert {:ok, thawed_unpartitioned} =
-               Aikido.thaw(module, AikidoTest.InstanceTest.RedisTestAgent, "shared-partition-key")
-
-      assert {:ok, thawed_partitioned} =
-               Aikido.thaw(module, AikidoTest.InstanceTest.RedisTestAgent, "shared-partition-key",
-                 partition: :blue
-               )
-
-      assert thawed_unpartitioned.state.domain.counter == 10
-      assert Map.get(thawed_unpartitioned.state, :__partition__) == nil
-      assert thawed_partitioned.state.domain.counter == 20
-      assert thawed_partitioned.state.__partition__ == :blue
-    end
   end
 
   describe("instance lifecycle") do

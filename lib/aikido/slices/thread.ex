@@ -5,22 +5,20 @@ defmodule Aikido.Slices.Thread do
 
   ## State shape
 
-  Bound to `Aikido.Slices.Thread.schema/0`. The slice starts as `nil` (lazy-init);
+  Declared by the embedded resource attributes. The slice starts as `nil` (lazy-init);
   the first inbound `aikido.thread.*` signal materializes a fresh
   `%Aikido.Slices.Thread{}` via the relevant action.
 
   ## Routes
 
-      route "aikido.thread.ensure", Actions.Ensure
-      route "aikido.thread.append", Actions.Append
-      route "aikido.thread.clear",  Actions.Clear
+      route "aikido.thread.ensure", :ensure
+      route "aikido.thread.append", :append
+      route "aikido.thread.clear", :clear
 
   ## Persistence
 
-  This slice implements `Aikido.Persist.Transform` to externalize the thread
-  to its small pointer (`%{id, rev}`) on checkpoint. `reinstate/1` is a
-  passthrough — actual rehydration happens via the existing
-  `Aikido.Persist.thaw/3` path.
+  DurableServer snapshots retain the complete thread and its entries with the
+  rest of the agent state.
 
   ## Default slice
 
@@ -99,25 +97,6 @@ defmodule Aikido.Slices.Thread do
     sections: [@thread_section],
     transformers: [Aikido.Slices.Thread.Transformers.RegisterContribution]
 
-  @behaviour Aikido.Persist.Transform
-  @impl Aikido.Persist.Transform
-  def externalize(%{__struct__: __MODULE__, id: id, rev: rev}) do
-    %{id: id, rev: rev}
-  end
-
-  def externalize(nil) do
-    nil
-  end
-
-  def externalize(other) do
-    other
-  end
-
-  @impl Aikido.Persist.Transform
-  def reinstate(value) do
-    value
-  end
-
   actions do
     action :append, Aikido.ActionResult do
       argument :state, :term
@@ -155,15 +134,8 @@ defmodule Aikido.Slices.Thread do
   alias Aikido.Slices.Thread.Entry
   alias Aikido.Slices.Thread.EntryNormalizer
   @type t :: map()
-  @schema __MODULE__
   def new!(value) do
     value |> then(&Ash.Type.cast_input(__MODULE__, &1)) |> Ash.Helpers.unwrap_or_raise!()
-  end
-
-  @doc "Returns the Ash type for Thread."
-  @spec schema() :: Ash.Type.t()
-  def schema do
-    @schema
   end
 
   @doc "Create a new empty thread"

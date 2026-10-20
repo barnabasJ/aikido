@@ -1,13 +1,8 @@
 defmodule Aikido.AgentServer.Signal.LifecycleStopping do
   @moduledoc """
-  Emitted at the top of `terminate/2` before any other shutdown work.
-
-  Routed through the middleware chain. `Aikido.Middlewares.Persister`, when
-  configured, observes this signal and synchronously hibernates the
-  current agent state to storage. Hibernate IO must complete within the
-  supervisor's `shutdown:` timeout (default 5_000 ms) — slow storage
-  backends require raising the timeout, otherwise the supervisor kills
-  the process mid-write and the checkpoint is partial.
+  Emitted at the top of `terminate/2`, before owned runtime processes are
+  stopped. Lifecycle observers receive the termination reason through the
+  middleware and action pipeline. DurableServer owns snapshot persistence.
 
   ## Fields
 

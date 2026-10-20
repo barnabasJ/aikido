@@ -7,7 +7,7 @@ teams. Add `Aikido.Ash.AI` for model turns and dynamically supplied tools.
 The default `Aikido` supervision tree uses DurableServer for activation, snapshots,
 and recovery. Configure its backend with `durable: [...]`. Use `Aikido.Durable`
 for a separately configured keyed pool; it delegates process ownership and storage
-to DurableServer. InstanceManager and the pod API have been removed.
+to DurableServer.
 
 For a named runtime, declare `use Aikido, otp_app: :my_app` on a module and put
 that module in your supervision tree. It supplies only `child_spec/1` and
@@ -23,8 +23,7 @@ Aikido.Dsl.Instance.Info.instance_options(MyApp.Runtime)
 Spark validates and stores the instance configuration. The Info module reads
 those options; `Aikido.config/2` combines application configuration and runtime
 overrides. Instance modules do not generate lifecycle, persistence, debug or
-configuration accessor wrappers. Use `Aikido.hibernate/3`, `Aikido.thaw/4` and
-`Aikido.Debug` directly when needed.
+configuration accessor wrappers. Use `Aikido.Debug` for runtime diagnostics.
 
 `Aikido.Agent` remains the pure action/signal engine. `Aikido.AgentServer` is the
 runtime callback implementation hosted by DurableServer. Configure
@@ -183,6 +182,13 @@ Set external caller timeouts long enough for the interaction. Pending requests
 and Lua continuations are ephemeral and do not survive process restarts.
 
 ### Snapshot and command scope boundaries
+
+DurableServer is the persistence path for agent snapshots, including complete
+thread history and runtime cron definitions. Configure its backend with the
+runtime's `durable` options. Per-path serialization can implement
+`Aikido.Durable.Codec`; it changes the stored representation without introducing
+a separate store. A codec must retain enough data for `reinstate/1` to rebuild
+the value.
 
 Both first activation and later durable snapshots apply slice `externalize/1`
 and agent `checkpoint/2`; loading applies `restore/2` and `reinstate/1`. Startup

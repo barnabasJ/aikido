@@ -35,7 +35,7 @@ defmodule AikidoTest.Thread.SliceTest do
              )
     end
 
-    test "schema is bound to Aikido.Slices.Thread.schema/0" do
+    test "schema is bound to the thread resource" do
       assert Ash.Resource.Info.attribute_names(Aikido.Dsl.Slice.Info.schema(Aikido.Slices.Thread)) ==
                Ash.Resource.Info.attribute_names(Aikido.Slices.Thread)
     end
@@ -52,35 +52,6 @@ defmodule AikidoTest.Thread.SliceTest do
       assert "aikido.thread.ensure" in route_types
       assert "aikido.thread.append" in route_types
       assert "aikido.thread.clear" in route_types
-    end
-  end
-
-  describe("Persist.Transform implementation") do
-    test "externalize/1 strips a Thread struct to a {id, rev} pointer" do
-      thread =
-        Aikido.Slices.Thread.new(id: "t-1")
-        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{text: "hello"}})
-
-      assert %{id: "t-1", rev: 1} = Aikido.Slices.Thread.externalize(thread)
-    end
-
-    test "externalize/1 returns nil for nil input" do
-      assert nil == Aikido.Slices.Thread.externalize(nil)
-    end
-
-    test "externalize/1 reflects rev count for multi-entry threads" do
-      thread =
-        Aikido.Slices.Thread.new(id: "t-2")
-        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{text: "one"}})
-        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{text: "two"}})
-        |> Aikido.Slices.Thread.append(%{kind: :message, payload: %{text: "three"}})
-
-      assert %{id: "t-2", rev: 3} = Aikido.Slices.Thread.externalize(thread)
-    end
-
-    test "reinstate/1 passes through (rehydration is the Persister's job)" do
-      pointer = %{id: "t-1", rev: 5}
-      assert Aikido.Slices.Thread.reinstate(pointer) == pointer
     end
   end
 

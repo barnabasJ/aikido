@@ -155,6 +155,61 @@ defmodule AikidoTest.DurableTest do
     assert {:error, :not_found} = Aikido.Durable.stop(pool, "missing")
   end
 
+  test "thread history survives durable stop and activation", %{pool: pool} do
+    {:ok, first} = Aikido.Durable.ensure_started(pool, "thread-history")
+
+    {:ok, thread} =
+      Aikido.AgentServer.call(
+        first,
+        Jido.Signal.new!("aikido.thread.append", %{
+          entry: %{kind: :message, payload: %{text: "Keep this conversation"}}
+        }),
+        &{:ok, &1.agent.state.thread}
+      )
+
+    assert length(thread.entries) == 1
+    assert :ok = Aikido.Durable.stop(pool, "thread-history")
+    {:ok, second} = Aikido.Durable.ensure_started(pool, "thread-history")
+    assert {:ok, ^thread} = Aikido.AgentServer.state(second, &{:ok, &1.agent.state.thread})
+
+    assert {:ok, %{entries: entries, rev: 2}} =
+             Aikido.AgentServer.call(
+               second,
+               Jido.Signal.new!("aikido.thread.append", %{
+                 entry: %{kind: :message, payload: %{text: "Continue after restoration"}}
+               }),
+               &{:ok, &1.agent.state.thread}
+             )
+
+    assert length(entries) == 2
+  end
+
+  test "dynamic cron definitions restore and cancellation persists", %{pool: pool} do
+    alias AikidoTest.Support.SchedulerIntegrationHarness
+
+    opts = [agent: AikidoTest.Support.SchedulerIntegrationHarness.CronAgent]
+    {:ok, first} = Aikido.Durable.ensure_started(pool, "scheduled", opts)
+    :ok = SchedulerIntegrationHarness.register_cron(first, "0 0 0 1 1 *", job_id: :annual)
+    old_job = SchedulerIntegrationHarness.wait_for_job(first, :annual)
+
+    :ok = Aikido.Durable.stop(pool, "scheduled")
+    {:ok, second} = Aikido.Durable.ensure_started(pool, "scheduled", opts)
+    new_job = SchedulerIntegrationHarness.wait_for_job(second, :annual)
+    refute old_job == new_job
+    refute Process.alive?(old_job)
+
+    :ok = SchedulerIntegrationHarness.cancel_cron(second, :annual)
+    AikidoTest.AgentWait.await_state_value(second, fn state ->
+      !Map.has_key?(state.cron_specs, :annual)
+    end)
+
+    :ok = Aikido.Durable.stop(pool, "scheduled")
+    {:ok, third} = Aikido.Durable.ensure_started(pool, "scheduled", opts)
+    assert :ok = Aikido.AgentServer.await_ready(third)
+    assert {:ok, {%{}, %{}}} =
+             Aikido.AgentServer.state(third, &{:ok, {&1.cron_jobs, &1.cron_specs}})
+  end
+
   test("agent and slice codecs compose with custom checkpoint/restore", %{pool: pool}) do
     {:ok, first} =
       Aikido.Durable.ensure_started(pool, "codec", agent: AikidoTest.DurableTest.CodecAgent)

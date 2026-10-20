@@ -6,10 +6,7 @@ defmodule Aikido.Application do
   def start(_type, _args) do
     Aikido.Telemetry.setup()
 
-    children = [
-      {Task.Supervisor, name: Aikido.Action.TaskSupervisor},
-      Aikido.Storage.ETS.TableOwner
-    ]
+    children = []
 
     register_signal_extensions()
 

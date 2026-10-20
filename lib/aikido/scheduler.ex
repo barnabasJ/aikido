@@ -8,13 +8,11 @@ defmodule Aikido.Scheduler do
 
   The runtime stores live job processes in `AgentServer.State.cron_jobs` and
   separately stores durable schedule definitions in `AgentServer.State.cron_specs`.
-  The durable specs are persisted through `Aikido.Persist` for Durable-
-  managed agents.
+  DurableServer snapshots these definitions and restores the jobs on activation.
   """
 
   alias Aikido.Scheduler.Job
 
-  @cron_specs_state_key :__cron_specs__
   @default_timezone "Etc/UTC"
 
   @type cron_spec :: %{
@@ -25,13 +23,6 @@ defmodule Aikido.Scheduler do
 
   @type cron_specs :: %{optional(term()) => cron_spec()}
   @type invalid_cron_spec :: {term(), term(), term()}
-
-  @doc """
-  Reserved internal agent-state key used to stage durable cron specs across
-  hibernate/thaw boundaries.
-  """
-  @spec cron_specs_state_key() :: atom()
-  def cron_specs_state_key, do: @cron_specs_state_key
 
   @doc """
   Build a normalized durable cron spec map.
@@ -72,12 +63,6 @@ defmodule Aikido.Scheduler do
     end
   end
 
-  @doc """
-  Normalize a persisted cron-spec map, dropping malformed entries.
-  """
-  @spec normalize_cron_specs(term()) :: %{optional(term()) => cron_spec()}
-  def normalize_cron_specs(specs), do: specs |> classify_cron_specs() |> elem(0)
-
   @doc false
   @spec classify_cron_specs(term()) :: {cron_specs(), [invalid_cron_spec()]}
   def classify_cron_specs(specs) when is_map(specs) do
@@ -95,43 +80,7 @@ defmodule Aikido.Scheduler do
   end
 
   def classify_cron_specs(nil), do: {%{}, []}
-  def classify_cron_specs(specs), do: {%{}, [{:__cron_specs__, specs, :invalid_manifest}]}
-
-  @doc false
-  @spec extract_staged_cron_specs(struct()) :: {struct(), term()}
-  def extract_staged_cron_specs(%{state: state} = agent) when is_map(state) do
-    {clean_state, cron_specs} = split_staged_cron_specs(state)
-    {%{agent | state: clean_state}, cron_specs}
-  end
-
-  def extract_staged_cron_specs(agent), do: {agent, %{}}
-
-  @doc false
-  @spec attach_staged_cron_specs(struct(), term()) :: struct()
-  def attach_staged_cron_specs(%{state: state} = agent, cron_specs) when is_map(state) do
-    %{agent | state: stage_cron_specs(state, cron_specs)}
-  end
-
-  def attach_staged_cron_specs(agent, _cron_specs), do: agent
-
-  @doc false
-  @spec split_staged_cron_specs(term()) :: {map(), term()}
-  def split_staged_cron_specs(state) when is_map(state) do
-    cron_specs = Map.get(state, @cron_specs_state_key, %{})
-    {Map.delete(state, @cron_specs_state_key), cron_specs}
-  end
-
-  def split_staged_cron_specs(_state), do: {%{}, %{}}
-
-  @doc false
-  @spec stage_cron_specs(map(), term()) :: map()
-  def stage_cron_specs(state, cron_specs) when is_map(state) do
-    if cron_specs in [nil, %{}] do
-      Map.delete(state, @cron_specs_state_key)
-    else
-      Map.put(state, @cron_specs_state_key, cron_specs)
-    end
-  end
+  def classify_cron_specs(specs), do: {%{}, [{:manifest, specs, :invalid_manifest}]}
 
   @doc """
   Starts a recurring cron job.

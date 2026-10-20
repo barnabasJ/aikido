@@ -14,8 +14,8 @@ defmodule Aikido.Middleware do
         | {:error, ctx, reason}
 
   Both `next.(signal, ctx)` and `on_signal/4` return the same shape. The
-  error tuple carries `ctx` so middleware-level state mutations
-  (e.g. `Persister`'s thaw setting `ctx.agent`) commit to `state.agent`
+  error tuple carries `ctx` so middleware-staged `ctx.agent` values
+  reach the runtime
   regardless of whether the action eventually errored. Action-level
   rollback lives inside AgentServer: the input agent flows back into ctx
   unchanged on error, and the framework commits that input agent (with

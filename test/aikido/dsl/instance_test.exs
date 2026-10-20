@@ -13,7 +13,6 @@ defmodule Aikido.Dsl.InstanceTest do
     assert Spark.Dsl.is?(TestInstance, Aikido.Dsl.Instance.Host)
     options = Info.instance_options(TestInstance)
     assert options.otp_app == :aikido
-    assert {Aikido.Storage.ETS, _opts} = options.storage
 
     slices = Aikido.Agent.DefaultSlices.for_instance(TestInstance)
     modules = Enum.map(slices, &Aikido.Agent.DefaultSlices.module_of/1)
@@ -37,7 +36,6 @@ defmodule Aikido.Dsl.InstanceTest do
           config: 0,
           config: 1,
           __otp_app__: 0,
-          __aikido_storage__: 0,
           __default_slices__: 0,
           start_agent: 1,
           start_agent: 2,
@@ -52,10 +50,6 @@ defmodule Aikido.Dsl.InstanceTest do
           registry_name: 0,
           task_supervisor_name: 0,
           durable_supervisor_name: 0,
-          hibernate: 1,
-          hibernate: 2,
-          thaw: 2,
-          thaw: 3,
           debug: 0,
           debug: 1,
           debug: 2,
