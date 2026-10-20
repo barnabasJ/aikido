@@ -21,13 +21,13 @@ defmodule Aikido.Dsl.AgentOptionalPathTest do
   test "an empty agent uses the standard own state path and no implicit slices" do
     agent = Aikido.Dsl.AgentOptionalPathTest.EmptyAgent.initialize!()
     assert agent.state == %{state: %{}}
-    assert Aikido.Dsl.Agent.Info.slices(agent.agent_module) == []
+    assert Aikido.Ash.Agent.Info.slices(agent.agent_module) == []
   end
 
   test "composition requires only an explicit mount, without an own schema" do
     agent = Aikido.Dsl.AgentOptionalPathTest.CompositionAgent.initialize!()
     assert %Aikido.Slices.Memory{} = agent.state.memory
     assert agent.state.state == %{}
-    assert Aikido.Dsl.Agent.Info.slice_paths(agent.agent_module) == [:memory]
+    assert Aikido.Ash.Agent.Info.slice_paths(agent.agent_module) == [:memory]
   end
 end

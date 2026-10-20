@@ -158,7 +158,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
 
     test "the compiled mount table records explicit ownership" do
       paths =
-        Aikido.Dsl.Agent.Info.slice_paths_for_action(
+        Aikido.Ash.Agent.Info.slice_paths_for_action(
           Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent
         )
 
@@ -197,7 +197,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
   describe("compile-time lookup table shape") do
     test "slice_paths_for_action maps resource/action pairs to mount paths" do
       table =
-        Aikido.Dsl.Agent.Info.slice_paths_for_action(
+        Aikido.Ash.Agent.Info.slice_paths_for_action(
           Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent
         )
 

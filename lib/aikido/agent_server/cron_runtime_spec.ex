@@ -1,7 +1,7 @@
 defmodule Aikido.AgentServer.CronRuntimeSpec do
   @moduledoc false
 
-  alias Aikido.AgentServer.Signal.CronTick
+  alias Aikido.AgentServer.Signals.CronTick
   alias Aikido.Signal
 
   @default_timezone "Etc/UTC"

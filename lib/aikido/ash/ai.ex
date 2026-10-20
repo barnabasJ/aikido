@@ -12,7 +12,7 @@ defmodule Aikido.Ash.AI do
 
   Supply `hooks` at start or set defaults in `ai`. Lua sync hooks gate lifecycle
   steps; async observers can inject context through signals. See
-  `Aikido.Hooks.Hook` and the runtime-patterns guide.
+  `Aikido.Slices.AiReact.Hooks.Hook` and the runtime-patterns guide.
 
       ai do
         model "zai:glm-4.7"
@@ -37,6 +37,6 @@ defmodule Aikido.Ash.AI do
   }
   use Spark.Dsl.Extension,
     sections: [@ai],
-    transformers: [Aikido.Ash.Transformers.AI],
-    verifiers: [Aikido.Ash.Verifiers.AI]
+    transformers: [Aikido.Ash.AI.Transformers.Build],
+    verifiers: [Aikido.Ash.AI.Verifiers.Validate]
 end

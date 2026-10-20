@@ -17,9 +17,9 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   require Ash.Tracer
 
   typed_struct do
-    field :options, Aikido.AI.Options do
+    field :options, Aikido.Slices.AiReact.Options do
       description "Execution policy controlling the supervised tool attempt and its deadline."
-      default %Aikido.AI.Options{}
+      default %Aikido.Slices.AiReact.Options{}
       allow_nil? false
     end
 
@@ -104,7 +104,7 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
     options = d.options
 
     result =
-      Aikido.AI.Execution.run(
+      Aikido.Slices.AiReact.Execution.run(
         agent_pid,
         d.request_id,
         supervisor,

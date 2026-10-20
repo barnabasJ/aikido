@@ -99,7 +99,7 @@ defmodule Aikido.Directives.Cron do
     }
   end
 
-  alias Aikido.AgentServer.Signal.CronRegistered
+  alias Aikido.AgentServer.Signals.CronRegistered
 
   @impl true
   def exec(

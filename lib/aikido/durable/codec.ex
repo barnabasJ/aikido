@@ -19,7 +19,7 @@ defmodule Aikido.Durable.Codec do
       when callback in [:externalize, :reinstate] do
     mounts =
       agent_module
-      |> Aikido.Dsl.Agent.Info.slice_instances()
+      |> Aikido.Ash.Agent.Info.slice_instances()
       |> Enum.map(&{&1.module, &1.path})
 
     own =

@@ -25,7 +25,7 @@ defmodule Aikido.Dsl.SliceMountPathTest do
   describe("agent-declared mount path") do
     test "uses an agent-declared path independently of the slice name" do
       instances =
-        Aikido.Dsl.Agent.Info.slice_instances(Aikido.Dsl.SliceMountPathTest.RenamedMemoryHost)
+        Aikido.Ash.Agent.Info.slice_instances(Aikido.Dsl.SliceMountPathTest.RenamedMemoryHost)
 
       memory = Enum.find(instances, &(&1.module == Aikido.Slices.Memory))
       assert memory
@@ -34,7 +34,7 @@ defmodule Aikido.Dsl.SliceMountPathTest do
 
     test "uses the explicit agent slice mount path" do
       instances =
-        Aikido.Dsl.Agent.Info.slice_instances(Aikido.Dsl.SliceMountPathTest.MemoryHost)
+        Aikido.Ash.Agent.Info.slice_instances(Aikido.Dsl.SliceMountPathTest.MemoryHost)
 
       memory = Enum.find(instances, &(&1.module == Aikido.Slices.Memory))
       assert memory
@@ -44,7 +44,7 @@ defmodule Aikido.Dsl.SliceMountPathTest do
 
   describe("Slice.Instance.new/2 path arg") do
     test "uses the supplied path" do
-      instance = Aikido.Slice.Instance.new(Aikido.Slices.Memory, :short_term)
+      instance = Aikido.Ash.Slice.Instance.new(Aikido.Slices.Memory, :short_term)
       assert instance.path == :short_term
       assert instance.module == Aikido.Slices.Memory
     end

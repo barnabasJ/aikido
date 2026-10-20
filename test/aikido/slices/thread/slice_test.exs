@@ -20,11 +20,11 @@ defmodule AikidoTest.Thread.SliceTest do
 
   describe("slice metadata") do
     test "name is thread" do
-      assert Map.get(Aikido.Dsl.Slice.Info.slice_options(Aikido.Slices.Thread), :name) == "thread"
+      assert Map.get(Aikido.Ash.Slice.Info.slice_options(Aikido.Slices.Thread), :name) == "thread"
     end
 
     test "exposes native thread action references via actions/1" do
-      action_set = MapSet.new(Aikido.Dsl.Slice.Info.actions(Aikido.Slices.Thread))
+      action_set = MapSet.new(Aikido.Ash.Slice.Info.actions(Aikido.Slices.Thread))
 
       assert MapSet.equal?(
                action_set,
@@ -39,7 +39,7 @@ defmodule AikidoTest.Thread.SliceTest do
     test "exposes one signal route per action" do
       route_types =
         Aikido.Slices.Thread
-        |> Aikido.Dsl.Slice.Info.signal_routes()
+        |> Aikido.Ash.Slice.Info.signal_routes()
         |> Enum.map(fn
           {type, _action} -> type
           {type, _action, _opts} -> type
@@ -72,7 +72,7 @@ defmodule AikidoTest.Thread.SliceTest do
 
   describe("agent integration") do
     test "agent includes its explicitly mounted thread slice" do
-      assert Aikido.Slices.Thread in Aikido.Dsl.Agent.Info.slices(
+      assert Aikido.Slices.Thread in Aikido.Ash.Agent.Info.slices(
                AikidoTest.Thread.SliceTest.AgentWithThread
              )
     end
@@ -83,7 +83,7 @@ defmodule AikidoTest.Thread.SliceTest do
     end
 
     test "agent has no thread slice unless mounted" do
-      refute Aikido.Slices.Thread in Aikido.Dsl.Agent.Info.slices(
+      refute Aikido.Slices.Thread in Aikido.Ash.Agent.Info.slices(
                AikidoTest.Thread.SliceTest.AgentWithoutThread
              )
     end

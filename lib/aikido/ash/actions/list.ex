@@ -12,7 +12,7 @@ defmodule Aikido.Ash.Actions.List do
     Runtime.safe(fn ->
       Enum.reduce_while(
         Aikido.Durable.members(
-          Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource))
+          Aikido.durable_supervisor_name(Aikido.Ash.Agent.Info.agent_instance!(resource))
         ),
         {:ok, []},
         fn

@@ -158,7 +158,7 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
 
     test "slice_paths_for_action contains both mount paths for the shared action" do
       table =
-        Aikido.Dsl.Agent.Info.slice_paths_for_action(
+        Aikido.Ash.Agent.Info.slice_paths_for_action(
           Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent
         )
 
@@ -170,7 +170,7 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
 
     test "mount_config_map exposes per-mount config" do
       configs =
-        Aikido.Dsl.Agent.Info.mount_config_map(
+        Aikido.Ash.Agent.Info.mount_config_map(
           Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent
         )
 

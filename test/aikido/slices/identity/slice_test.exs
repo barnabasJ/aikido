@@ -20,12 +20,12 @@ defmodule AikidoTest.Identity.SliceTest do
 
   describe("slice metadata") do
     test "name is identity" do
-      assert Map.get(Aikido.Dsl.Slice.Info.slice_options(Aikido.Slices.Identity), :name) ==
+      assert Map.get(Aikido.Ash.Slice.Info.slice_options(Aikido.Slices.Identity), :name) ==
                "identity"
     end
 
     test "exposes native identity action references via actions/1" do
-      action_set = MapSet.new(Aikido.Dsl.Slice.Info.actions(Aikido.Slices.Identity))
+      action_set = MapSet.new(Aikido.Ash.Slice.Info.actions(Aikido.Slices.Identity))
 
       assert MapSet.equal?(
                action_set,
@@ -40,7 +40,7 @@ defmodule AikidoTest.Identity.SliceTest do
     test "exposes one signal route per action" do
       route_types =
         Aikido.Slices.Identity
-        |> Aikido.Dsl.Slice.Info.signal_routes()
+        |> Aikido.Ash.Slice.Info.signal_routes()
         |> Enum.map(fn
           {type, _action} -> type
           {type, _action, _opts} -> type
@@ -54,7 +54,7 @@ defmodule AikidoTest.Identity.SliceTest do
 
   describe("agent integration") do
     test "agent includes its explicitly mounted identity slice" do
-      assert Aikido.Slices.Identity in Aikido.Dsl.Agent.Info.slices(
+      assert Aikido.Slices.Identity in Aikido.Ash.Agent.Info.slices(
                AikidoTest.Identity.SliceTest.AgentWithIdentity
              )
     end
@@ -65,7 +65,7 @@ defmodule AikidoTest.Identity.SliceTest do
     end
 
     test "agent has no identity slice unless mounted" do
-      refute Aikido.Slices.Identity in Aikido.Dsl.Agent.Info.slices(
+      refute Aikido.Slices.Identity in Aikido.Ash.Agent.Info.slices(
                AikidoTest.Identity.SliceTest.AgentWithoutIdentity
              )
     end

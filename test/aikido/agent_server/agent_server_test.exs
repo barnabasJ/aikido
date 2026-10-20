@@ -1137,7 +1137,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, cron_jobs} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs} end)
       assert map_size(cron_jobs) == 1
 
-      [spec] = Aikido.Dsl.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+      [spec] = Aikido.Ash.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
       job_id = spec.job_id
 
       assert Map.has_key?(cron_jobs, job_id)
@@ -1169,7 +1169,7 @@ defmodule AikidoTest.AgentServerTest do
 
       {:ok, cron_jobs} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs} end)
 
-      [spec] = Aikido.Dsl.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+      [spec] = Aikido.Ash.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
       job_id = spec.job_id
 
       cron_pid = Map.get(cron_jobs, job_id)
@@ -1182,7 +1182,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test "Info.schedules/1 exposes mounted slice schedules" do
       schedules =
-        Aikido.Dsl.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+        Aikido.Ash.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
 
       assert length(schedules) == 1
       [spec] = schedules
@@ -1198,7 +1198,7 @@ defmodule AikidoTest.AgentServerTest do
     end
 
     test "schedule routes are included in Info.routes/1" do
-      routes = Aikido.Dsl.Agent.Info.routes(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+      routes = Aikido.Ash.Agent.Info.routes(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
 
       schedule_route =
         Enum.find(routes, fn {signal_type, _, _} ->

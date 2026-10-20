@@ -77,7 +77,7 @@ defmodule Aikido.Slices.AiReact do
         default %{}
       end
 
-      attribute :options, Aikido.AI.Options do
+      attribute :options, Aikido.Slices.AiReact.Options do
         description "Execution limits, delivery controls and completion policy for this ReAct run."
         public? true
         default %{}
@@ -237,7 +237,7 @@ defmodule Aikido.Slices.AiReact do
         constraints @keyword_constraints
       end
 
-      attribute :hooks, {:array, Aikido.Hooks.Hook} do
+      attribute :hooks, {:array, Aikido.Slices.AiReact.Hooks.Hook} do
         description "Ordered hook definitions participating in the run lifecycle."
         public? true
         allow_nil? false
@@ -279,14 +279,14 @@ defmodule Aikido.Slices.AiReact do
     end
 
     config_schema do
-      attribute :options, Aikido.AI.Options do
+      attribute :options, Aikido.Slices.AiReact.Options do
         description "Default execution limits, delivery controls and completion policy for mounted agents."
         public? true
         default %{}
         allow_nil? false
       end
 
-      attribute :hooks, {:array, Aikido.Hooks.Hook} do
+      attribute :hooks, {:array, Aikido.Slices.AiReact.Hooks.Hook} do
         description "Default lifecycle hooks inherited by agents mounting this slice."
         public? true
         allow_nil? false
@@ -350,28 +350,42 @@ defmodule Aikido.Slices.AiReact do
       end
     end
 
-    route Aikido.Signals.AiReact.HandoffCompleted, Aikido.Slices.AiReact.Implementation,
+    route Aikido.Slices.AiReact.Signals.HandoffCompleted, Aikido.Slices.AiReact.Implementation,
       public?: false
 
-    route Aikido.Signals.AiReact.HandoffFailed, Aikido.Slices.AiReact.Implementation,
+    route Aikido.Slices.AiReact.Signals.HandoffFailed, Aikido.Slices.AiReact.Implementation,
       public?: false
 
-    route Aikido.Signals.AiReact.ToolsReady, Aikido.Slices.AiReact.Implementation, public?: false
-    route Aikido.Signals.AiReact.Ask, Aikido.Slices.AiReact.Implementation
-    route Aikido.Signals.AiReact.Message, Aikido.Slices.AiReact.Implementation
-    route Aikido.Signals.AiReact.Deliver, Aikido.Slices.AiReact.Implementation
-    route Aikido.Signals.AiReact.Handoff, Aikido.Slices.AiReact.Implementation
-    route Aikido.Signals.AiReact.TodoChanged, Aikido.Slices.AiReact.Implementation, public?: false
-    route Aikido.Signals.AiReact.Stream, Aikido.Slices.AiReact.Implementation, public?: false
-    route Aikido.Signals.AiReact.LlmTurn, Aikido.Slices.AiReact.Implementation, public?: false
-    route Aikido.Signals.AiReact.ToolResult, Aikido.Slices.AiReact.Implementation, public?: false
-    route Aikido.Signals.AiReact.Failed, Aikido.Slices.AiReact.Implementation, public?: false
-    route Aikido.Signals.AiReact.Cancel, Aikido.Slices.AiReact.Implementation
-
-    route Aikido.Signals.AiReact.HookCompleted, Aikido.Slices.AiReact.Implementation,
+    route Aikido.Slices.AiReact.Signals.ToolsReady, Aikido.Slices.AiReact.Implementation,
       public?: false
 
-    route Aikido.Signals.AiReact.HookContext, Aikido.Slices.AiReact.Implementation, public?: false
+    route Aikido.Slices.AiReact.Signals.Ask, Aikido.Slices.AiReact.Implementation
+    route Aikido.Slices.AiReact.Signals.Message, Aikido.Slices.AiReact.Implementation
+    route Aikido.Slices.AiReact.Signals.Deliver, Aikido.Slices.AiReact.Implementation
+    route Aikido.Slices.AiReact.Signals.Handoff, Aikido.Slices.AiReact.Implementation
+
+    route Aikido.Slices.Todo.Signals.TodoChanged, Aikido.Slices.AiReact.Implementation,
+      public?: false
+
+    route Aikido.Slices.AiReact.Signals.Stream, Aikido.Slices.AiReact.Implementation,
+      public?: false
+
+    route Aikido.Slices.AiReact.Signals.LlmTurn, Aikido.Slices.AiReact.Implementation,
+      public?: false
+
+    route Aikido.Slices.AiReact.Signals.ToolResult, Aikido.Slices.AiReact.Implementation,
+      public?: false
+
+    route Aikido.Slices.AiReact.Signals.Failed, Aikido.Slices.AiReact.Implementation,
+      public?: false
+
+    route Aikido.Slices.AiReact.Signals.Cancel, Aikido.Slices.AiReact.Implementation
+
+    route Aikido.Slices.AiReact.Signals.HookCompleted, Aikido.Slices.AiReact.Implementation,
+      public?: false
+
+    route Aikido.Slices.AiReact.Signals.HookContext, Aikido.Slices.AiReact.Implementation,
+      public?: false
   end
 
   @doc """
@@ -426,8 +440,8 @@ defmodule Aikido.Slices.AiReact do
         do: Map.merge(state, %{status: :failed, error: :interrupted}),
         else: state
 
-    context = if(state.context, do: Aikido.AI.Context.close_tool_calls(state.context))
-    state = Aikido.AI.Context.replace_context(state, context)
+    context = if(state.context, do: Aikido.Slices.AiReact.Context.close_tool_calls(state.context))
+    state = Aikido.Slices.AiReact.Context.replace_context(state, context)
 
     Map.merge(state, %{
       handoff_pending: nil,

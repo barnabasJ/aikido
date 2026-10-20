@@ -5,7 +5,7 @@ defmodule AgentExamples.HandoffTest do
     messages = [
       ReqLLM.Context.system("Keep the procedure."),
       ReqLLM.Context.user("Continue the work."),
-      ReqLLM.Context.user(Aikido.AI.Handoff.instructions())
+      ReqLLM.Context.user(Aikido.Slices.AiReact.Handoff.instructions())
     ]
 
     assert {:ok, response} =

@@ -42,7 +42,7 @@ defmodule Aikido.Ash.Actions.Signal do
   end
 
   defp dispatch(resource, pid, signal) do
-    if !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)) &&
+    if !is_nil(Aikido.Ash.Agent.Info.team_config(resource)) &&
          signal.type in ~w(aikido.ash.team.start aikido.ash.team.reconcile aikido.ash.team.add_member aikido.ash.team.remove_member aikido.ash.team.ensure_member aikido.ash.team.stop_member) do
       Aikido.Ash.Team.call(resource, pid, signal)
     else

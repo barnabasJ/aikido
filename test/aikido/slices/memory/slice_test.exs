@@ -20,11 +20,11 @@ defmodule AikidoTest.Memory.SliceTest do
 
   describe("slice metadata") do
     test "name is memory" do
-      assert Map.get(Aikido.Dsl.Slice.Info.slice_options(Aikido.Slices.Memory), :name) == "memory"
+      assert Map.get(Aikido.Ash.Slice.Info.slice_options(Aikido.Slices.Memory), :name) == "memory"
     end
 
     test "exposes the eight Aikido.Slices.Memory.* modules via actions/1" do
-      action_set = MapSet.new(Aikido.Dsl.Slice.Info.actions(Aikido.Slices.Memory))
+      action_set = MapSet.new(Aikido.Ash.Slice.Info.actions(Aikido.Slices.Memory))
 
       assert MapSet.equal?(
                action_set,
@@ -44,7 +44,7 @@ defmodule AikidoTest.Memory.SliceTest do
     test "exposes one signal route per action" do
       route_types =
         Aikido.Slices.Memory
-        |> Aikido.Dsl.Slice.Info.signal_routes()
+        |> Aikido.Ash.Slice.Info.signal_routes()
         |> Enum.map(fn
           {type, _action} -> type
           {type, _action, _opts} -> type
@@ -152,13 +152,13 @@ defmodule AikidoTest.Memory.SliceTest do
 
   describe("agent integration") do
     test "agent includes its explicitly mounted memory slice" do
-      assert Aikido.Slices.Memory in Aikido.Dsl.Agent.Info.slices(
+      assert Aikido.Slices.Memory in Aikido.Ash.Agent.Info.slices(
                AikidoTest.Memory.SliceTest.AgentWithMemory
              )
     end
 
     test "agent has no memory slice unless mounted" do
-      refute Aikido.Slices.Memory in Aikido.Dsl.Agent.Info.slices(
+      refute Aikido.Slices.Memory in Aikido.Ash.Agent.Info.slices(
                AikidoTest.Memory.SliceTest.AgentWithoutMemory
              )
     end

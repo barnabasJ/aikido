@@ -4,7 +4,7 @@ defmodule AgentExamples.AITest do
   alias AgentExamples.{Agents, AI}
 
   defmodule RuntimeClient do
-    @behaviour Aikido.AI.Client
+    @behaviour Aikido.Slices.AiReact.Client
     def generate_text(%{probe: probe} = model, messages, options) do
       send(probe, {:runtime_model_call, model, messages, options})
 

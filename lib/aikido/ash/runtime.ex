@@ -16,7 +16,7 @@ defmodule Aikido.Ash.Runtime do
 
   def resolve(resource, id) when is_binary(id) do
     case Aikido.Durable.lookup(
-           Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource)),
+           Aikido.durable_supervisor_name(Aikido.Ash.Agent.Info.agent_instance!(resource)),
            id
          ) do
       :error -> {:error, "Agent #{id} is not running"}
@@ -52,9 +52,9 @@ defmodule Aikido.Ash.Runtime do
             attr.name == :id ->
               agent.id
 
-            attr.name in Aikido.Dsl.Agent.Info.state_fields(resource) ->
+            attr.name in Aikido.Ash.Agent.Info.state_fields(resource) ->
               agent.state
-              |> Map.get(Aikido.Dsl.Agent.Info.agent_path!(resource), %{})
+              |> Map.get(Aikido.Ash.Agent.Info.agent_path!(resource), %{})
               |> Map.get(attr.name)
 
             true ->

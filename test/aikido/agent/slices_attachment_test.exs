@@ -83,7 +83,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
       agent = AikidoTest.Agent.SlicesAttachmentTest.AgentBareSlice.initialize!()
       assert %{counter: 0, label: "default"} = agent.state.simple
 
-      assert AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice in Aikido.Dsl.Agent.Info.slices(
+      assert AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice in Aikido.Ash.Agent.Info.slices(
                AikidoTest.Agent.SlicesAttachmentTest.AgentBareSlice
              )
     end
@@ -116,7 +116,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
 
       route_paths =
         AikidoTest.Agent.SlicesAttachmentTest.AgentRoutedSlice
-        |> Aikido.Dsl.Agent.Info.routes()
+        |> Aikido.Ash.Agent.Info.routes()
         |> Enum.map(fn {path, _action, _priority} -> path end)
 
       assert "absolute.path.one" in route_paths
@@ -135,7 +135,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
       end
 
       modules =
-        Aikido.Dsl.Agent.Info.slices(AikidoTest.Agent.SlicesAttachmentTest.AgentMultipleSlices)
+        Aikido.Ash.Agent.Info.slices(AikidoTest.Agent.SlicesAttachmentTest.AgentMultipleSlices)
 
       assert AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice in modules
       assert AikidoTest.Agent.SlicesAttachmentTest.OtherSlice in modules
@@ -195,7 +195,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
           end
         end)
 
-      assert stderr =~ "Got duplicate Aikido.Dsl.Agent.SliceMount: simple"
+      assert stderr =~ "Got duplicate Aikido.Ash.Agent.SliceMount: simple"
     end
   end
 

@@ -69,6 +69,22 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert directive.code =~ "typed_struct do"
     assert directive.code =~ "def exec("
     refute directive.open?
+
+    research = Catalog.find("research-team") |> AgentExamples.Source.for_example()
+
+    for {module, category} <- [
+          {Aikido.AI, :support},
+          {Aikido.Slices.AiReact.Options, :support},
+          {Aikido.Slices.AiReact.Hooks, :support},
+          {Aikido.Slices.AiReact.Hooks.Hook, :support},
+          {Aikido.Slices.AiReact.Directives.ExecuteHook, :directive},
+          {Aikido.Slices.AiWorker.Signals.Accept, :signal},
+          {Aikido.Slices.AiWorker.Accept, :action}
+        ] do
+      definition = Enum.find(research, &(&1.module == module))
+      assert definition.category == category
+      refute definition.open?
+    end
   end
 
   test "counter commands update its visual and stop releases its process", %{conn: conn} do

@@ -12,7 +12,7 @@ defmodule Aikido.Ash.Team.Action do
   def run(input, _opts, _context) do
     runtime = input.context.aikido
     resource = runtime.agent_module
-    config = Aikido.Dsl.Agent.Info.team_config(resource)
+    config = Aikido.Ash.Agent.Info.team_config(resource)
 
     data = Map.get(input.arguments, :data, Map.delete(input.arguments, :state))
     signal = %{runtime.signal | data: Map.merge(runtime.signal.data || %{}, data)}

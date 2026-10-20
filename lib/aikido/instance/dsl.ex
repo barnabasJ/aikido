@@ -1,0 +1,24 @@
+defmodule Aikido.Instance.Dsl do
+  @moduledoc """
+  Spark DSL extension for `use Aikido` (the application instance
+  supervisor).
+
+  Defines a single host-owned section:
+
+    * `instance do … end` — `otp_app`.
+
+  Spark validates and stores the configuration. Read it through
+  `Aikido.Instance.Info`. Supervision entry points come from the instance
+  host. Agent lifecycle and persistence are exposed through domain actions.
+  """
+
+  @instance_section %Spark.Dsl.Section{
+    name: :instance,
+    describe: "Application instance configuration.",
+    schema: [
+      otp_app: [type: :atom, required: true, doc: "The otp_app for this Aikido instance."]
+    ]
+  }
+
+  use Spark.Dsl.Extension, sections: [@instance_section]
+end

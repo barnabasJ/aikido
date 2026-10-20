@@ -3,8 +3,8 @@ defmodule Aikido.DocsExamplesTest do
 
   @invalid_doctest_placeholder ~r/iex>.*\n\s*(?:\[.*\.\.\.|%[A-Za-z0-9_.]+\{.*\.\.\.\}|\{:error,\s*\.\.\.\}|\*\* \([^)]+\).*\.\.\.)/m
 
-  test "Aikido.Dsl.Agent.Info accessor docs do not emit doctest prompts" do
-    docs = function_docs(Aikido.Dsl.Agent.Info)
+  test "Aikido.Ash.Agent.Info accessor docs do not emit doctest prompts" do
+    docs = function_docs(Aikido.Ash.Agent.Info)
 
     for function_name <- [:slices, :signal_routes] do
       doc = Map.fetch!(docs, {function_name, 1})

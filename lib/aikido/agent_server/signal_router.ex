@@ -37,7 +37,7 @@ defmodule Aikido.AgentServer.SignalRouter do
   Builds a unified router from all route sources in the agent state.
 
   Collects routes from:
-  - Agent routes (priority 0) via `Aikido.Dsl.Agent.Info.signal_routes/1`
+  - Agent routes (priority 0) via `Aikido.Ash.Agent.Info.signal_routes/1`
   - Slice routes (priority -10) via the compiled slice route table
 
   Native router validation rejects invalid routes instead of silently dropping them.
@@ -64,7 +64,7 @@ defmodule Aikido.AgentServer.SignalRouter do
   end
 
   defp add_agent_routes(routes, %State{agent_module: agent_module}) do
-    agent_routes = Aikido.Dsl.Agent.Info.signal_routes(agent_module)
+    agent_routes = Aikido.Ash.Agent.Info.signal_routes(agent_module)
     routes ++ normalize_routes(agent_routes, @agent_default_priority)
   end
 
@@ -73,7 +73,7 @@ defmodule Aikido.AgentServer.SignalRouter do
   # single source of truth for slice routes. Already normalized with
   # priority by the agent transformer pipeline.
   defp add_slice_routes(routes, %State{agent_module: agent_module}) do
-    routes ++ Aikido.Dsl.Agent.Info.routes(agent_module)
+    routes ++ Aikido.Ash.Agent.Info.routes(agent_module)
   end
 
   defp normalize_routes(routes, default_priority) do

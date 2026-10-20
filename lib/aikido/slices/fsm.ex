@@ -122,6 +122,6 @@ defmodule Aikido.Slices.FSM do
       end
     end
 
-    route Aikido.Signals.FSM.Transition, Aikido.Slices.FSM.Transition
+    route Aikido.Slices.FSM.Signals.Transition, Aikido.Slices.FSM.Transition
   end
 end

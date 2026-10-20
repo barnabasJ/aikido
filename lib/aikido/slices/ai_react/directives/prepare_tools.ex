@@ -3,9 +3,9 @@ defmodule Aikido.Slices.AiReact.Directives.PrepareTools do
   use Aikido.Directive
 
   typed_struct do
-    field :options, Aikido.AI.Options do
+    field :options, Aikido.Slices.AiReact.Options do
       description "Execution policy used to supervise preparation of the run's native Ash AI tools."
-      default %Aikido.AI.Options{}
+      default %Aikido.Slices.AiReact.Options{}
       allow_nil? false
     end
 
@@ -39,7 +39,7 @@ defmodule Aikido.Slices.AiReact.Directives.PrepareTools do
         options = directive.options
 
         result =
-          Aikido.AI.Execution.run(
+          Aikido.Slices.AiReact.Execution.run(
             owner,
             directive.request_id,
             supervisor,

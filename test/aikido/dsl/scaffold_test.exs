@@ -5,7 +5,7 @@ defmodule Aikido.Dsl.ScaffoldTest do
 
   @migrated_modules [
     Aikido.Ash.Agent,
-    Aikido.Dsl.Instance,
+    Aikido.Instance.Dsl,
     Aikido.Ash.Slice,
     Ash.Resource.Dsl
   ]
@@ -22,8 +22,8 @@ defmodule Aikido.Dsl.ScaffoldTest do
     assert :schedules in section_names
   end
 
-  test "Aikido.Dsl.Instance contributes the `instance` section" do
-    section_names = Enum.map(Aikido.Dsl.Instance.sections(), & &1.name)
+  test "Aikido.Instance.Dsl contributes the `instance` section" do
+    section_names = Enum.map(Aikido.Instance.Dsl.sections(), & &1.name)
     assert :instance in section_names
   end
 

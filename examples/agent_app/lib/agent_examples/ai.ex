@@ -21,7 +21,7 @@ defmodule AgentExamples.AI do
 
     pid =
       case Aikido.Durable.lookup(
-             Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource)),
+             Aikido.durable_supervisor_name(Aikido.Ash.Agent.Info.agent_instance!(resource)),
              record.id
            ) do
         {:ok, pid} -> pid
@@ -70,7 +70,7 @@ defmodule AgentExamples.AI do
 
     pid =
       case Aikido.Durable.lookup(
-             Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource)),
+             Aikido.durable_supervisor_name(Aikido.Ash.Agent.Info.agent_instance!(resource)),
              team.id
            ) do
         {:ok, pid} -> pid

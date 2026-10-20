@@ -92,8 +92,8 @@ defmodule Aikido.Ash.Team do
   }
   use Spark.Dsl.Extension,
     sections: [@team],
-    transformers: [Aikido.Ash.Transformers.Team],
-    verifiers: [Aikido.Ash.Verifiers.Team]
+    transformers: [Aikido.Ash.Team.Transformers.Build],
+    verifiers: [Aikido.Ash.Team.Verifiers.Validate]
 
   @doc false
   def start(resource, pid, topology, context \\ %{}) do
@@ -118,7 +118,7 @@ defmodule Aikido.Ash.Team do
     end
 
     Aikido.AgentServer.call_until(pid, signal, "aikido.ash.team.**", selector,
-      timeout: Aikido.Dsl.Agent.Info.team_config(resource).timeout + 1_000
+      timeout: Aikido.Ash.Agent.Info.team_config(resource).timeout + 1_000
     )
   end
 end

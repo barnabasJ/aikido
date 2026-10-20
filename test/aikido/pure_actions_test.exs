@@ -120,7 +120,11 @@ defmodule Aikido.PureActionsTest do
       Path.wildcard("lib/aikido/actions/**/*.ex") ++
         Path.wildcard("lib/aikido/slices/**/*.ex") ++
         Path.wildcard("examples/agent_app/lib/agent_examples/**/implementation.ex") ++
-        ["lib/aikido/ash/team/engine.ex", "lib/aikido/ai/handoff.ex", "lib/aikido/hooks.ex"]
+        [
+          "lib/aikido/ash/team/engine.ex",
+          "lib/aikido/slices/ai_react/handoff.ex",
+          "lib/aikido/slices/ai_react/hooks.ex"
+        ]
 
     violations =
       for path <- paths,
@@ -128,8 +132,8 @@ defmodule Aikido.PureActionsTest do
           reducer?(ast) ||
             path in [
               "lib/aikido/ash/team/engine.ex",
-              "lib/aikido/ai/handoff.ex",
-              "lib/aikido/hooks.ex"
+              "lib/aikido/slices/ai_react/handoff.ex",
+              "lib/aikido/slices/ai_react/hooks.ex"
             ],
           violation <- effect_calls(ast),
           do: {path, violation}

@@ -49,8 +49,8 @@ defmodule Aikido.MixProject do
             # These finite names come from compiled Spark declarations, not runtime input.
             # Exact generated anchors fail closed if compiler output changes.
             {:unsafe_input,
-             {Aikido.Ash.Transformers.Agent, :"-resolve_local_actions/3-fun-1-", 3}},
-            {:unsafe_input, {Aikido.Ash.Transformers.Domain, :"-register/2-fun-1-", 2}},
+             {Aikido.Ash.Agent.Transformers.Build, :"-resolve_local_actions/3-fun-1-", 3}},
+            {:unsafe_input, {Aikido.Ash.Domain.Transformers.Build, :"-register/2-fun-1-", 2}},
             # Reads our trusted, compressed backend snapshots, including native callbacks.
             {:unsafe_input, {Aikido.Durable.AgentServer, :load_state, 2}},
             # Task-capacity fallback kills only the already retired scheduler PID.
@@ -194,7 +194,7 @@ defmodule Aikido.MixProject do
   defp aliases do
     dsl_extensions =
       Enum.join(
-        ~w(Aikido.Dsl.Instance Aikido.Ash.Agent Aikido.Ash.Slice
+        ~w(Aikido.Instance.Dsl Aikido.Ash.Agent Aikido.Ash.Slice
            Aikido.Ash.Team Aikido.Ash.AI Aikido.Ash.Domain
            Ash.TypedStruct.Dsl Aikido.Signal.Dsl),
         ","

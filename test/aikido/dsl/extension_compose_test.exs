@@ -29,7 +29,7 @@ defmodule Aikido.Dsl.ExtensionComposeTest do
 
   describe("multiple mounts compose") do
     test "all three slices mount at the agent-declared paths" do
-      instances = Aikido.Dsl.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.MultiHost)
+      instances = Aikido.Ash.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.MultiHost)
       memory = Enum.find(instances, &(&1.module == Aikido.Slices.Memory))
       identity = Enum.find(instances, &(&1.module == Aikido.Slices.Identity))
       thread = Enum.find(instances, &(&1.module == Aikido.Slices.Thread))
@@ -42,7 +42,7 @@ defmodule Aikido.Dsl.ExtensionComposeTest do
   describe("explicit mounts") do
     test "still produce slice instances at the slice's declared path" do
       instances =
-        Aikido.Dsl.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.HostNoBlocks)
+        Aikido.Ash.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.HostNoBlocks)
 
       memory = Enum.find(instances, &(&1.module == Aikido.Slices.Memory))
       identity = Enum.find(instances, &(&1.module == Aikido.Slices.Identity))

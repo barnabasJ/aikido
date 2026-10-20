@@ -34,13 +34,13 @@ defmodule AikidoTest.Slices.FSMTest do
 
   describe("Slice.Info surface") do
     test "FSM signal_routes routes aikido.fsm.transition" do
-      assert {"aikido.fsm.transition", {Aikido.Slices.FSM, :transition}} in Aikido.Dsl.Slice.Info.signal_routes(
+      assert {"aikido.fsm.transition", {Aikido.Slices.FSM, :transition}} in Aikido.Ash.Slice.Info.signal_routes(
                Aikido.Slices.FSM
              )
     end
 
     test "FSM owns the native transition action" do
-      assert {Aikido.Slices.FSM, :transition} in Aikido.Dsl.Slice.Info.actions(Aikido.Slices.FSM)
+      assert {Aikido.Slices.FSM, :transition} in Aikido.Ash.Slice.Info.actions(Aikido.Slices.FSM)
     end
 
     test "the slice action runs directly through Ash with its declared arguments" do

@@ -3,32 +3,21 @@ defmodule AgentExamples.Source do
   @root Path.expand("../../../..", __DIR__)
   @files Enum.flat_map(
            [
-             "examples/agent_app/lib/agent_examples/agents/*.ex",
-             "examples/agent_app/lib/agent_examples/slices/*.ex",
-             "examples/agent_app/lib/agent_examples/signals/*.ex",
-             "examples/agent_app/lib/agent_examples/ai/*.ex",
-             "examples/agent_app/lib/agent_examples/**/implementation.ex",
-             "examples/agent_app/lib/agent_examples/agents.ex",
-             "examples/agent_app/lib/agent_examples/ai.ex",
-             "examples/agent_app/lib/agent_examples/playground.ex",
+             "examples/agent_app/lib/agent_examples/**/*.ex",
+             "lib/aikido/ai.ex",
              "lib/aikido/slices/ai_react.ex",
+             "lib/aikido/slices/ai_react/**/*.ex",
              "lib/aikido/slices/ai_worker.ex",
              "lib/aikido/slices/ai_worker/**/*.ex",
-             "lib/aikido/slices/ai_react/**/*.ex",
-             "lib/aikido/hooks.ex",
-             "lib/aikido/ai/*.ex",
              "lib/aikido/slices/todo.ex",
-             "lib/aikido/slices/todo/*.ex",
-             "lib/aikido/signals/ai_react/*.ex",
-             "lib/aikido/signals/ai_worker/*.ex",
-             "lib/aikido/signals/todo/*.ex",
-             "lib/aikido/hooks/*.ex",
+             "lib/aikido/slices/todo/**/*.ex",
              "lib/aikido/ash/ai.ex",
              "lib/aikido/ash/team/engine.ex"
            ],
            &Path.wildcard(Path.join(@root, &1))
          )
          |> Enum.uniq()
+         |> Enum.reject(&(&1 == __ENV__.file))
 
   for file <- @files, do: @external_resource(file)
 
@@ -44,44 +33,41 @@ defmodule AgentExamples.Source do
                    end
 
                  Enum.flat_map(nodes, fn
-                   {:defmodule, metadata, [{:__aliases__, _, parts}, _]} ->
+                   {:defmodule, metadata, [{:__aliases__, _, parts}, [do: body]]} ->
                      module = Module.concat(parts)
                      name = Enum.join(parts, ".")
 
+                     {_body, contracts} =
+                       Macro.prewalk(body, [], fn
+                         {:use, _, [{:__aliases__, _, used} | options]} = node, contracts ->
+                           extensions =
+                             case options do
+                               [options] when is_list(options) ->
+                                 Keyword.get(options, :extensions, [])
+
+                               _ ->
+                                 []
+                             end
+
+                           extensions =
+                             for {:__aliases__, _, extension} <- extensions,
+                                 do: Module.concat(extension)
+
+                           {node, [Module.concat(used) | extensions ++ contracts]}
+
+                         node, contracts ->
+                           {node, contracts}
+                       end)
+
                      category =
                        cond do
-                         String.ends_with?(name, ".Implementation") ||
-                             String.ends_with?(file, "/implementation.ex") ->
-                           :action
-
-                         String.contains?(file, "agent_examples/signals/") ||
-                             String.contains?(file, "lib/aikido/signals/") ->
-                           :signal
-
-                         String.contains?(file, "/agents/") ->
-                           :agent
-
-                         String.contains?(file, "agent_examples/slices/") ->
-                           :slice
-
-                         module in [
-                           Aikido.Slices.AiReact,
-                           Aikido.Slices.AiWorker,
-                           Aikido.Slices.Todo
-                         ] ->
-                           :slice
-
-                         String.starts_with?(name, "Aikido.Slices.AiWorker.") ->
-                           :action
-
-                         String.contains?(file, "/directives/") || module == Aikido.Hooks.Execute ->
-                           :directive
-
-                         module == AgentExamples.Agents ->
-                           :domain
-
-                         true ->
-                           :support
+                         Aikido.Signal in contracts -> :signal
+                         Aikido.Ash.Agent in contracts || Aikido.Agent in contracts -> :agent
+                         Aikido.Ash.Slice in contracts || Aikido.Slice in contracts -> :slice
+                         Aikido.Directive in contracts -> :directive
+                         Ash.Resource.Actions.Implementation in contracts -> :action
+                         Ash.Domain in contracts -> :domain
+                         true -> :support
                        end
 
                      [
@@ -102,15 +88,9 @@ defmodule AgentExamples.Source do
                  end)
                end)
 
-  @ai_names [
+  @ai_owners [
     AgentExamples.AI,
-    AgentExamples.AI.Tools,
-    AgentExamples.AI.Tools.Implementation,
-    AgentExamples.AI.LuaSurface,
-    AgentExamples.AI.ScriptedClient,
-    AgentExamples.AI.StreamingClient,
-    Aikido.AI.Options,
-    Aikido.AI.Handoff,
+    Aikido.AI,
     Aikido.Ash.AI,
     Aikido.Slices.AiReact,
     Aikido.Slices.AiWorker
@@ -130,13 +110,9 @@ defmodule AgentExamples.Source do
       entry.module in modules ||
         Enum.any?(modules, &String.starts_with?(entry.name, inspect(&1) <> ".")) ||
         (AgentExamples.Catalog.ai?(example) &&
-           (entry.module in @ai_names || String.starts_with?(entry.name, "Aikido.Slices.AiReact.") ||
-              String.starts_with?(entry.name, "Aikido.Hooks") ||
-              String.starts_with?(entry.name, "Aikido.Slices.AiWorker.") ||
-              String.starts_with?(entry.name, "Aikido.Signals.AiReact.") ||
-              String.starts_with?(entry.name, "Aikido.Signals.AiWorker.") ||
-              (example.slug == "conversation" &&
-                 String.starts_with?(entry.name, "Aikido.Signals.Todo."))))
+           Enum.any?(@ai_owners, fn owner ->
+             entry.module == owner || String.starts_with?(entry.name, inspect(owner) <> ".")
+           end))
     end)
     |> Enum.sort_by(fn entry ->
       {if(entry.module == example.resource, do: 0, else: rank(entry.category)), entry.name}

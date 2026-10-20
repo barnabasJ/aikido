@@ -80,7 +80,7 @@ defmodule Aikido.Ash.SignalRoutes do
   end
 
   defp expand_entity(dsl, section, %{type: type} = entity)
-       when is_struct(entity, Aikido.Dsl.Agent.Route) or
+       when is_struct(entity, Aikido.Ash.Agent.Route) or
               is_struct(entity, Aikido.Ash.Slice.Route) or
               is_struct(entity, Aikido.Ash.Agent.Signal) do
     target = if is_struct(entity, Aikido.Ash.Agent.Signal), do: entity.target, else: entity.action

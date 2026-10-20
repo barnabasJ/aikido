@@ -162,10 +162,12 @@ Agents.team_stop!(team.id)
 ## Read the code
 
 Start with [the domain](lib/agent_examples/agents.ex), then
-[Counter](lib/agent_examples/agents/counter.ex) and its
-[pure action](lib/agent_examples/counter/implementation.ex). Compare
-[Notebook](lib/agent_examples/agents/notebook.ex) with its
-[embedded Journal](lib/agent_examples/slices/journal.ex).
+[Counter](lib/agent_examples/counter.ex) and its
+[signals](lib/agent_examples/counter/signals.ex) and
+[pure action](lib/agent_examples/counter/implementation.ex). Resource files sit
+beside their own signal and implementation folders. Compare
+[Notebook](lib/agent_examples/notebook.ex) with its
+[embedded Journal](lib/agent_examples/journal.ex).
 [Work](lib/agent_examples/worker/implementation.ex) shows the complete asynchronous
 signal chain; its uppercase task is a local stand-in for one blocking tool call.
 [Demo](lib/agent_examples/demo.ex) subscribes before sending work so it can

@@ -25,7 +25,7 @@ defmodule Aikido.Directives.Schedule do
     end
   end
 
-  alias Aikido.AgentServer.Signal.Scheduled
+  alias Aikido.AgentServer.Signals.Scheduled
 
   @impl true
   def exec(%{delay_ms: delay, message: message}, input_signal, state) do

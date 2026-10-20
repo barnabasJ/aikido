@@ -6,6 +6,12 @@
 
 ### Changed
 
+- Group concrete signals and feature helpers with their owning agent runtime,
+  slice or Ash extension. Keep shared signal infrastructure under `Aikido.Signal`.
+  Update examples, source panels and tests to the same ownership layout. Renamed
+  modules stored in older snapshots require application-managed migration before
+  restoration; no compatibility modules are provided.
+
 - Attach dedicated native implementations to public lifecycle, inspection, list
   and signal actions. Remove the action-name dispatcher and retain only shared
   reference, snapshot, scope and error helpers in `Aikido.Ash.Runtime`.

@@ -27,6 +27,6 @@ defmodule Aikido.Ash.Domain do
   @agents %Spark.Dsl.Section{name: :agents, entities: [@entry]}
   use Spark.Dsl.Extension,
     sections: [@agents],
-    transformers: [Aikido.Ash.Transformers.Domain],
-    verifiers: [Aikido.Ash.Verifiers.Domain]
+    transformers: [Aikido.Ash.Domain.Transformers.Build],
+    verifiers: [Aikido.Ash.Domain.Verifiers.Validate]
 end

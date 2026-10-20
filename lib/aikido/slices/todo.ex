@@ -34,12 +34,12 @@ defmodule Aikido.Slices.Todo do
       end
     end
 
-    route Aikido.Signals.Todo.TodoAdd, Aikido.Slices.Todo.Implementation
-    route Aikido.Signals.Todo.TodoRemove, Aikido.Slices.Todo.Implementation
-    route Aikido.Signals.Todo.TodoActivate, Aikido.Slices.Todo.Implementation
-    route Aikido.Signals.Todo.TodoComplete, Aikido.Slices.Todo.Implementation
-    route Aikido.Signals.Todo.TodoBlock, Aikido.Slices.Todo.Implementation
-    route Aikido.Signals.Todo.Expire, Aikido.Slices.Todo.Implementation, public?: false
+    route Aikido.Slices.Todo.Signals.TodoAdd, Aikido.Slices.Todo.Implementation
+    route Aikido.Slices.Todo.Signals.TodoRemove, Aikido.Slices.Todo.Implementation
+    route Aikido.Slices.Todo.Signals.TodoActivate, Aikido.Slices.Todo.Implementation
+    route Aikido.Slices.Todo.Signals.TodoComplete, Aikido.Slices.Todo.Implementation
+    route Aikido.Slices.Todo.Signals.TodoBlock, Aikido.Slices.Todo.Implementation
+    route Aikido.Slices.Todo.Signals.Expire, Aikido.Slices.Todo.Implementation, public?: false
   end
 
   @doc false

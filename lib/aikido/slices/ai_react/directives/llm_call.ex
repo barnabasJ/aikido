@@ -34,9 +34,9 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
       description "Identifier correlating a summary response with the pending context handoff."
     end
 
-    field :options, Aikido.AI.Options do
+    field :options, Aikido.Slices.AiReact.Options do
       description "Execution policy controlling model-call attempts, deadlines and streaming."
-      default %Aikido.AI.Options{}
+      default %Aikido.Slices.AiReact.Options{}
       allow_nil? false
     end
 
@@ -124,13 +124,13 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
     messages = Context.to_list(d.context)
 
     result =
-      Aikido.AI.Execution.run(
+      Aikido.Slices.AiReact.Execution.run(
         agent_pid,
         d.request_id,
         supervisor,
         fn notify, attempt ->
           if options.streaming && d.mode != :handoff do
-            Aikido.AI.Streaming.call(
+            Aikido.Slices.AiReact.Streaming.call(
               d.client,
               d.model,
               messages,

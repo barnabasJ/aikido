@@ -27,7 +27,7 @@ for runtime configuration:
 agent = MyApp.Agents.worker_start!(%{id: "worker"})
 MyApp.Agents.worker_inspect!(agent)
 Aikido.config(MyApp.Runtime, max_tasks: 2_000)
-Aikido.Dsl.Instance.Info.instance_options(MyApp.Runtime)
+Aikido.Instance.Info.instance_options(MyApp.Runtime)
 ```
 
 `use Aikido` forwards native Spark options, including custom extensions and
@@ -290,8 +290,8 @@ options %{
 }
 ```
 
-Options use the `Aikido.AI.Options` typed struct. Hook decisions likewise use
-`Aikido.Hooks.Decision`; neither requires a resource or create action. Hook
+Options use the `Aikido.Slices.AiReact.Options` typed struct. Hook decisions likewise use
+`Aikido.Slices.AiReact.Hooks.Decision`; neither requires a resource or create action. Hook
 configuration retains its embedded resource so native casting handles an
 omitted or nil `:function` request callback correctly.
 A per-request options value

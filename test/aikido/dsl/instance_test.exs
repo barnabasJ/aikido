@@ -6,11 +6,11 @@ end
 defmodule Aikido.Dsl.InstanceTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Dsl.Instance.Info
+  alias Aikido.Instance.Info
   alias Aikido.Dsl.InstanceTest.TestInstance
 
   test "Spark Info exposes instance configuration and defaults" do
-    assert Spark.Dsl.is?(TestInstance, Aikido.Dsl.Instance.Host)
+    assert Spark.Dsl.is?(TestInstance, Aikido.Instance.Host)
     options = Info.instance_options(TestInstance)
     assert options.otp_app == :aikido
   end

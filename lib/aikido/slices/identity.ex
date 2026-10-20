@@ -11,9 +11,9 @@ defmodule Aikido.Slices.Identity do
 
   ## Routes
 
-      route Aikido.Signals.Identity.Ensure, Aikido.Slices.Identity.Implementation
-      route Aikido.Signals.Identity.Evolve, Aikido.Slices.Identity.Implementation
-      route Aikido.Signals.Identity.UpdateProfile, Aikido.Slices.Identity.Implementation
+      route Aikido.Slices.Identity.Signals.Ensure, Aikido.Slices.Identity.Implementation
+      route Aikido.Slices.Identity.Signals.Evolve, Aikido.Slices.Identity.Implementation
+      route Aikido.Slices.Identity.Signals.UpdateProfile, Aikido.Slices.Identity.Implementation
 
   Mount with `slice :identity, Aikido.Slices.Identity` inside an agent resource.
 
@@ -57,9 +57,9 @@ defmodule Aikido.Slices.Identity do
       end
     end
 
-    route Aikido.Signals.Identity.Ensure, Aikido.Slices.Identity.Implementation
-    route Aikido.Signals.Identity.Evolve, Aikido.Slices.Identity.Implementation
-    route Aikido.Signals.Identity.UpdateProfile, Aikido.Slices.Identity.Implementation
+    route Aikido.Slices.Identity.Signals.Ensure, Aikido.Slices.Identity.Implementation
+    route Aikido.Slices.Identity.Signals.Evolve, Aikido.Slices.Identity.Implementation
+    route Aikido.Slices.Identity.Signals.UpdateProfile, Aikido.Slices.Identity.Implementation
   end
 
   @type t :: map()

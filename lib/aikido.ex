@@ -81,7 +81,7 @@ defmodule Aikido do
     {otp_app, host_opts} = Keyword.pop!(opts, :otp_app)
 
     quote location: :keep do
-      use Aikido.Dsl.Instance.Host, unquote(host_opts)
+      use Aikido.Instance.Host, unquote(host_opts)
 
       instance do
         otp_app unquote(otp_app)
@@ -98,7 +98,7 @@ defmodule Aikido do
   """
   @spec config(module(), keyword()) :: keyword()
   def config(instance, overrides \\ []) do
-    otp_app = Aikido.Dsl.Instance.Info.instance_options(instance) |> Map.fetch!(:otp_app)
+    otp_app = Aikido.Instance.Info.instance_options(instance) |> Map.fetch!(:otp_app)
 
     otp_app
     |> Application.get_env(instance, [])

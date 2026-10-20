@@ -68,7 +68,9 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
                end)
 
       assert List.last(state.context.messages) == message
-      assert state.estimated_tokens == Aikido.AI.Context.estimate_tokens(state.context)
+
+      assert state.estimated_tokens ==
+               Aikido.Slices.AiReact.Context.estimate_tokens(state.context)
     end
   end
 
@@ -240,7 +242,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
         }
 
       {:ok, hook} =
-        Ash.Type.cast_input(Aikido.Hooks.Hook, %{
+        Ash.Type.cast_input(Aikido.Slices.AiReact.Hooks.Hook, %{
           name: "terminal",
           event: :run_completed,
           mode: :async,
@@ -264,14 +266,16 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
         assert Enum.count(result.state.context.messages, &(&1 == message)) == 1
 
         assert result.state.estimated_tokens ==
-                 Aikido.AI.Context.estimate_tokens(result.state.context)
+                 Aikido.Slices.AiReact.Context.estimate_tokens(result.state.context)
 
         refute Enum.any?(result.directives, &match?(%ToolExec{}, &1))
 
         if queued == [] do
           assert result.state.status == :completed
           assert result.state.result == "provider answer"
-          assert [%Aikido.Hooks.Execute{event: %{type: :run_completed}}] = result.directives
+
+          assert [%Aikido.Slices.AiReact.Directives.ExecuteHook{event: %{type: :run_completed}}] =
+                   result.directives
         else
           assert result.state.status == :running
           assert result.state.queued_messages == []

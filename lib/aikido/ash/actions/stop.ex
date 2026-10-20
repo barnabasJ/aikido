@@ -12,7 +12,7 @@ defmodule Aikido.Ash.Actions.Stop do
       with {:ok, {id, pid}} <- Runtime.resolve(resource, agent),
            :ok <-
              Aikido.Durable.stop(
-               Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource)),
+               Aikido.durable_supervisor_name(Aikido.Ash.Agent.Info.agent_instance!(resource)),
                pid
              ) do
         {:ok, %{id: id, resource: resource, status: :stopped}}

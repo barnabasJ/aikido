@@ -102,7 +102,7 @@ defmodule AikidoTest.NativeOptionsTest do
 
   test "instance and directive hosts preserve custom Spark extensions and their own DSL" do
     instance = AikidoTest.NativeOptions.Instance
-    assert Aikido.Dsl.Instance.Info.instance_options(instance).otp_app == :aikido
+    assert Aikido.Instance.Info.instance_options(instance).otp_app == :aikido
     assert Spark.Dsl.Extension.get_opt(instance, [:custom_options], :label) == "instance"
 
     directive = AikidoTest.NativeOptions.Directive

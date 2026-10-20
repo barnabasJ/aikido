@@ -91,7 +91,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
 
   defp slice_job_id do
     [spec] =
-      Aikido.Dsl.Agent.Info.schedules(
+      Aikido.Ash.Agent.Info.schedules(
         AikidoTest.Integration.SchedulerIntegrationTest.SliceScheduledAgent
       )
 

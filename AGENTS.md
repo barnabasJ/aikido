@@ -60,6 +60,11 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Local EKV requires its disk to survive; it does not by itself provide machine-loss protection. Recovery does not replay external effects or resume in-flight Lua VMs.
 - Subscribe before triggering asynchronous work. Use one-shot subscriptions or `Aikido.AgentServer.call_until/5` from external callers. Never poll for completion, and never wait for completion inside directive execution.
 
+## Source organization
+- Keep feature-specific signal definitions, types, helpers and directives beneath their owning resource or feature. Use `Signals` for concrete definitions; keep the reusable envelope and definition/routing infrastructure under `Aikido.Signal`.
+- Keep each Ash extension's metadata, transformers and verifiers beneath that extension. Retain genuinely reusable actions, directives and runtime contracts in their shared subsystems.
+- Place example resources beside their own implementation and signal files. Keep source-viewer paths and categories aligned with the declared native contracts when files move.
+
 ## Standards
 - Keep Ash reducer actions pure: the same input returns the same state and directives
 - Directives mutate **no** state — neither `agent.state` (domain) nor `%AgentServer.State{}` (runtime). State changes flow through the action's return value; runtime bookkeeping flows through GenServer callbacks and `process_signal/2` cascade callbacks

@@ -61,7 +61,7 @@ defmodule Aikido.Dsl.ExtensionOrderTest do
 
   describe("middleware-chain order preservation") do
     test "middleware list mirrors declaration order" do
-      middleware = Aikido.Dsl.Agent.Info.middleware(Aikido.Dsl.ExtensionOrderTest.HostOrderTest)
+      middleware = Aikido.Ash.Agent.Info.middleware(Aikido.Dsl.ExtensionOrderTest.HostOrderTest)
       mods = Enum.map(middleware, fn {mod, _opts} -> mod end)
 
       assert mods == [
@@ -73,7 +73,7 @@ defmodule Aikido.Dsl.ExtensionOrderTest do
 
     test "reversing the declaration order reverses the middleware list" do
       middleware =
-        Aikido.Dsl.Agent.Info.middleware(Aikido.Dsl.ExtensionOrderTest.HostReverseOrder)
+        Aikido.Ash.Agent.Info.middleware(Aikido.Dsl.ExtensionOrderTest.HostReverseOrder)
 
       mods = Enum.map(middleware, fn {mod, _opts} -> mod end)
 

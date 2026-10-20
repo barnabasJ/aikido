@@ -278,7 +278,7 @@ defmodule Aikido.Durable.AgentServer do
   defp maybe_reconcile(runtime) do
     resource = runtime.agent_module
 
-    if Aikido.Dsl.Agent.Info.team_config(resource) do
+    if Aikido.Ash.Agent.Info.team_config(resource) do
       send(self(), {:signal, Aikido.Signal.new!("aikido.ash.team.reconcile", %{})})
     end
   end

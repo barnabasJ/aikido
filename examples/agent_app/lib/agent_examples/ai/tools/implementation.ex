@@ -18,7 +18,7 @@ defmodule AgentExamples.AI.Tools.Implementation do
       members = team.team.members |> Map.keys() |> Enum.map(&to_string/1) |> Enum.sort()
 
       templates =
-        Aikido.Dsl.Agent.Info.team_config(team.__struct__).workers
+        Aikido.Ash.Agent.Info.team_config(team.__struct__).workers
         |> Map.keys()
         |> Enum.map(&to_string/1)
         |> Enum.sort()
@@ -90,7 +90,7 @@ defmodule AgentExamples.AI.Tools.Implementation do
   end
 
   defp resolve_template(team, name) do
-    case Enum.find(Aikido.Dsl.Agent.Info.team_config(team.__struct__).workers, fn {key, _} ->
+    case Enum.find(Aikido.Ash.Agent.Info.team_config(team.__struct__).workers, fn {key, _} ->
            to_string(key) == name
          end) do
       {key, %{resource: resource}} -> {:ok, key, resource}
@@ -166,7 +166,7 @@ defmodule AgentExamples.AI.Tools.Implementation do
            |> Ash.ActionInput.for_action(:inspect, %{agent: caller.agent_id}, opts)
            |> Ash.run_action(opts) do
       cond do
-        !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)) ->
+        !is_nil(Aikido.Ash.Agent.Info.team_config(resource)) ->
           {:ok, record, nil, record}
 
         caller.parent && caller.parent.meta[:team_resource] ->

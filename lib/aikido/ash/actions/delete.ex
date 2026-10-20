@@ -37,7 +37,7 @@ defmodule Aikido.Ash.Actions.Delete do
   end
 
   defp delete_process(resource, id) do
-    instance = Aikido.Dsl.Agent.Info.agent_instance!(resource)
+    instance = Aikido.Ash.Agent.Info.agent_instance!(resource)
     pool = Aikido.durable_supervisor_name(instance)
 
     Aikido.Durable.delete(pool, id, agent: resource)

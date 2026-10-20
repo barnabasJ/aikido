@@ -9,7 +9,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
   """
   use Ash.Resource.Actions.Implementation
 
-  alias Aikido.AI.Context, as: Conversation
+  alias Aikido.Slices.AiReact.Context, as: Conversation
   alias Aikido.Slices.AiReact.Directives.{LLMCall, PrepareTools, ToolExec}
 
   @impl true
@@ -20,7 +20,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
       result ->
         result = prepare_tools(result)
-        Aikido.AI.Handoff.plan(result)
+        Aikido.Slices.AiReact.Handoff.plan(result)
     end
   end
 
@@ -84,10 +84,18 @@ defmodule Aikido.Slices.AiReact.Implementation do
   defp prepare_tools(error), do: error
 
   defp handle(input, :handoff_completed, _context),
-    do: Aikido.AI.Handoff.complete(input.arguments.state, Map.delete(input.arguments, :state))
+    do:
+      Aikido.Slices.AiReact.Handoff.complete(
+        input.arguments.state,
+        Map.delete(input.arguments, :state)
+      )
 
   defp handle(input, :handoff_failed, _context),
-    do: Aikido.AI.Handoff.fail(input.arguments.state, Map.delete(input.arguments, :state))
+    do:
+      Aikido.Slices.AiReact.Handoff.fail(
+        input.arguments.state,
+        Map.delete(input.arguments, :state)
+      )
 
   defp handle(input, :tools_ready, _context) do
     state = input.arguments.state
@@ -105,7 +113,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       {directives, state} =
         Enum.map_reduce(state.tool_preparation, state, fn
           %LLMCall{} = effect, state ->
-            {state, effect} = Aikido.Hooks.prepare_model(state, effect)
+            {state, effect} = Aikido.Slices.AiReact.Hooks.prepare_model(state, effect)
             {effect, state}
 
           effect, state ->
@@ -125,10 +133,18 @@ defmodule Aikido.Slices.AiReact.Implementation do
   end
 
   defp handle(input, :hook_completed, _context),
-    do: Aikido.Hooks.completed(input.arguments.state, Map.delete(input.arguments, :state))
+    do:
+      Aikido.Slices.AiReact.Hooks.completed(
+        input.arguments.state,
+        Map.delete(input.arguments, :state)
+      )
 
   defp handle(input, :hook_context, _context),
-    do: Aikido.Hooks.context(input.arguments.state, Map.delete(input.arguments, :state))
+    do:
+      Aikido.Slices.AiReact.Hooks.context(
+        input.arguments.state,
+        Map.delete(input.arguments, :state)
+      )
 
   defp handle(input, action, context) when action in [:message, :deliver] do
     state = input.arguments.state
@@ -160,9 +176,13 @@ defmodule Aikido.Slices.AiReact.Implementation do
     if state.status == :waiting do
       state = apply_todo_gate(state, input.context.aikido.agent.state)
 
-      Aikido.Hooks.transition(Aikido.Types.ActionResult.new(state: state), :after_model, %{
-        todo_completion: true
-      })
+      Aikido.Slices.AiReact.Hooks.transition(
+        Aikido.Types.ActionResult.new(state: state),
+        :after_model,
+        %{
+          todo_completion: true
+        }
+      )
     else
       Aikido.Types.ActionResult.new(state: state)
     end
@@ -242,7 +262,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
             do: Map.put(payload, :turn, Map.from_struct(input.arguments.turn)),
             else: payload
 
-        Aikido.Hooks.transition(result, event, payload)
+        Aikido.Slices.AiReact.Hooks.transition(result, event, payload)
 
       _ ->
         result
@@ -262,9 +282,13 @@ defmodule Aikido.Slices.AiReact.Implementation do
              state
            ) do
         {:ok, result} ->
-          Aikido.Hooks.transition(bind_scope({:ok, result}, input), :run_started, %{
-            query: input.arguments.text
-          })
+          Aikido.Slices.AiReact.Hooks.transition(
+            bind_scope({:ok, result}, input),
+            :run_started,
+            %{
+              query: input.arguments.text
+            }
+          )
 
         error ->
           error
@@ -303,9 +327,13 @@ defmodule Aikido.Slices.AiReact.Implementation do
              input.arguments.state
            ) do
         {:ok, result} ->
-          Aikido.Hooks.transition(bind_scope({:ok, result}, input), :run_started, %{
-            query: input.arguments.text
-          })
+          Aikido.Slices.AiReact.Hooks.transition(
+            bind_scope({:ok, result}, input),
+            :run_started,
+            %{
+              query: input.arguments.text
+            }
+          )
 
         error ->
           error
@@ -403,7 +431,8 @@ defmodule Aikido.Slices.AiReact.Implementation do
           turn,
           Map.merge(slice, %{
             usage: usage,
-            last_input_tokens: Aikido.AI.Handoff.input_tokens(ReqLLM.Response.usage(response)),
+            last_input_tokens:
+              Aikido.Slices.AiReact.Handoff.input_tokens(ReqLLM.Response.usage(response)),
             streaming_text: turn.text,
             streaming_thinking: turn.thinking,
             stream_attempt: 0
@@ -500,7 +529,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
     context = base.context
 
-    options = data[:options] || Map.get(slice, :options) || %Aikido.AI.Options{}
+    options = data[:options] || Map.get(slice, :options) || %Aikido.Slices.AiReact.Options{}
 
     new_slice = %{
       status: :setup,
@@ -741,7 +770,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
   end
 
   defp apply_todo_gate(state, agent_state) do
-    options = Map.get(state, :options) || %Aikido.AI.Options{}
+    options = Map.get(state, :options) || %Aikido.Slices.AiReact.Options{}
 
     if options.completion == :todos do
       case Map.get(agent_state, options.todo_path) do

@@ -155,18 +155,18 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
       assert_counts(reference, expected)
     end
 
-    assert Aikido.Dsl.Agent.Info.slice_paths_for_action(resource)[{Remote, :remote}] ==
+    assert Aikido.Ash.Agent.Info.slice_paths_for_action(resource)[{Remote, :remote}] ==
              [:counter, :other]
   end
 
   test "matched public commands preserve predicates, priority and mount ownership", context do
     %{resource: resource, domain: domain, reference: reference} = context
-    assert Aikido.Dsl.Agent.Info.signal_routes(resource) == []
+    assert Aikido.Ash.Agent.Info.signal_routes(resource) == []
 
-    assert Aikido.Dsl.Agent.Info.slice_paths_for_action(resource)[{Counter, :matched}] ==
+    assert Aikido.Ash.Agent.Info.slice_paths_for_action(resource)[{Counter, :matched}] ==
              [:counter, :other]
 
-    assert Enum.any?(Aikido.Dsl.Agent.Info.routes(resource), fn
+    assert Enum.any?(Aikido.Ash.Agent.Info.routes(resource), fn
              {"mounted.matched", predicate, {Counter, :matched}, -15} ->
                is_function(predicate, 1)
 
@@ -214,7 +214,7 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
 
   test "normalization removes repeated mount routes and retains every routing distinction",
        context do
-    routes = Aikido.Dsl.Agent.Info.routes(context.resource)
+    routes = Aikido.Ash.Agent.Info.routes(context.resource)
     assert Enum.count(routes, &match?({"mounted.local", {Counter, :local}, -10}, &1)) == 1
     assert Enum.count(routes, &match?({"mounted.remote", {Remote, :remote}, -10}, &1)) == 1
     assert Enum.count(routes, &match?({"mounted.matched", _, {Counter, :matched}, -15}, &1)) == 1

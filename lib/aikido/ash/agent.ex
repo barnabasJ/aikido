@@ -30,7 +30,7 @@ defmodule Aikido.Ash.Agent do
 
   @slice %Spark.Dsl.Entity{
     name: :slice,
-    target: Aikido.Dsl.Agent.SliceMount,
+    target: Aikido.Ash.Agent.SliceMount,
     args: [:path, :module],
     identifier: :path,
     schema: [
@@ -59,7 +59,7 @@ defmodule Aikido.Ash.Agent do
   @schema %{Enum.find(Ash.Resource.Dsl.sections(), &(&1.name == :attributes)) | name: :schema}
   @route %Spark.Dsl.Entity{
     name: :route,
-    target: Aikido.Dsl.Agent.Route,
+    target: Aikido.Ash.Agent.Route,
     args: [:type, :action],
     schema: [
       type: [type: :any, required: true],
@@ -71,7 +71,7 @@ defmodule Aikido.Ash.Agent do
   }
   @schedule %Spark.Dsl.Entity{
     name: :schedule,
-    target: Aikido.Dsl.Agent.Schedule,
+    target: Aikido.Ash.Agent.Schedule,
     args: [:cron, :signal_type],
     schema: [
       cron: [type: :string, required: true],
@@ -107,14 +107,14 @@ defmodule Aikido.Ash.Agent do
   use Spark.Dsl.Extension,
     sections: [@agent, @schedules],
     transformers: [
-      Aikido.Ash.Transformers.Agent,
-      Aikido.Dsl.Agent.Transformers.WalkExtensions,
-      Aikido.Dsl.Agent.Transformers.ExpandRoutes,
-      Aikido.Dsl.Agent.Transformers.AddInitialization
+      Aikido.Ash.Agent.Transformers.Build,
+      Aikido.Ash.Agent.Transformers.WalkExtensions,
+      Aikido.Ash.Agent.Transformers.ExpandRoutes,
+      Aikido.Ash.Agent.Transformers.AddInitialization
     ],
     verifiers: [
-      Aikido.Ash.Verifiers.Agent,
-      Aikido.Dsl.Agent.Verifiers.UniquePaths,
-      Aikido.Dsl.Agent.Verifiers.Composition
+      Aikido.Ash.Agent.Verifiers.Validate,
+      Aikido.Ash.Agent.Verifiers.UniquePaths,
+      Aikido.Ash.Agent.Verifiers.Composition
     ]
 end

@@ -13,7 +13,7 @@ defmodule Aikido.Ash.Actions.Start do
   end
 
   defp startup_topology(resource, definition) do
-    if config = Aikido.Dsl.Agent.Info.team_config(resource) do
+    if config = Aikido.Ash.Agent.Info.team_config(resource) do
       Aikido.Ash.Team.Topology.build(
         definition || config.topology.nodes,
         config.instance,
@@ -32,7 +32,7 @@ defmodule Aikido.Ash.Actions.Start do
       |> Map.get(:aikido_runtime_options, [])
       |> Keyword.take([:parent, :partition, :on_parent_death, :restart?])
 
-    pool = Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource))
+    pool = Aikido.durable_supervisor_name(Aikido.Ash.Agent.Info.agent_instance!(resource))
 
     Runtime.safe(fn ->
       with {:ok, pid} <-
@@ -52,7 +52,7 @@ defmodule Aikido.Ash.Actions.Start do
           Process.whereis(pool) && Aikido.Durable.restored?(pool, id, runtime_options)
 
         result =
-          if !is_nil(Aikido.Dsl.Agent.Info.team_config(resource)) && !restored?,
+          if !is_nil(Aikido.Ash.Agent.Info.team_config(resource)) && !restored?,
             do:
               Aikido.Ash.Team.start(
                 resource,
@@ -68,7 +68,7 @@ defmodule Aikido.Ash.Actions.Start do
 
           error ->
             Aikido.Durable.stop(
-              Aikido.durable_supervisor_name(Aikido.Dsl.Agent.Info.agent_instance!(resource)),
+              Aikido.durable_supervisor_name(Aikido.Ash.Agent.Info.agent_instance!(resource)),
               pid
             )
 
@@ -82,10 +82,10 @@ defmodule Aikido.Ash.Actions.Start do
     attributes
     |> Map.delete(:id)
     |> then(fn attributes ->
-      {own_state, slices} = Map.split(attributes, Aikido.Dsl.Agent.Info.state_fields(resource))
+      {own_state, slices} = Map.split(attributes, Aikido.Ash.Agent.Info.state_fields(resource))
 
       slices =
-        if Aikido.Dsl.Agent.Info.ai?(resource) do
+        if Aikido.Ash.Agent.Info.ai?(resource) do
           configuration =
             Map.take(own_state, [
               :options,
@@ -112,7 +112,7 @@ defmodule Aikido.Ash.Actions.Start do
           slices
         end
 
-      Map.put(slices, Aikido.Dsl.Agent.Info.agent_path!(resource), own_state)
+      Map.put(slices, Aikido.Ash.Agent.Info.agent_path!(resource), own_state)
     end)
   end
 end

@@ -42,6 +42,18 @@ only when no domain is specified. Domain inclusion uses Ash's normal validation;
 register application agents in their domain. `use Aikido.Slice` likewise forwards
 native resource options and defaults to the embedded data layer.
 
+## Source organization
+
+Place each resource beside its owned implementations and signal definitions.
+For example, `counter.ex`, `counter/implementation.ex` and `counter/signals.ex`
+keep the example counter's state, reducers and payload contracts together.
+
+Library features follow the same rule: ReAct signals, hooks, execution helpers
+and directives live under `Aikido.Slices.AiReact`; runtime protocol signals live
+under `Aikido.AgentServer.Signals`. Each Ash extension owns its `Info`,
+`Transformers` and `Verifiers` modules. Shared envelopes, routing infrastructure
+and reusable directives remain in their shared subsystems.
+
 ## An agent resource
 
 Start an Aikido instance in your application supervision tree:
@@ -116,7 +128,7 @@ groups the agent's own fields under `:state`; `path :other_name` changes that pa
 
 Each public command uses its own native implementation under `Aikido.Ash.Actions`.
 The transformer attaches that implementation directly. Shared reference resolution,
-snapshot projection and caller-scope helpers live in `Aikido.Ash.Runtime`.
+snapshot projection and caller-scope helpers live in `lib/aikido/ash/runtime.ex`.
 
 The generated public actions are all generic Ash actions: `start`, `stop`,
 `delete`, `inspect`, `list`, and the declared signals. These public commands do

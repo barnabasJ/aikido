@@ -150,7 +150,7 @@ defmodule Aikido.Telemetry.Config do
   defp instance_observability(instance, key), do: instance_option(instance, :observability, key)
 
   defp instance_option(instance, section, key) do
-    if Spark.Dsl.is?(instance, Aikido.Dsl.Instance.Host) do
+    if Spark.Dsl.is?(instance, Aikido.Instance.Host) do
       instance
       |> Aikido.config()
       |> Keyword.get(section, [])

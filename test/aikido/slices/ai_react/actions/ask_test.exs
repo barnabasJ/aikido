@@ -42,7 +42,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
   test "initialization and mount configuration enforce positive iteration budgets" do
     for invalid <- [0, -1] do
       assert {:error, _} =
-               Aikido.Slice.Config.resolve_config(Aikido.Slices.AiReact, %{
+               Aikido.Ash.Slice.Config.resolve_config(Aikido.Slices.AiReact, %{
                  max_iterations: invalid
                })
 
@@ -53,10 +53,10 @@ defmodule Aikido.Slices.AiReact.AskTest do
     end
 
     assert {:ok, %{max_iterations: 1}} =
-             Aikido.Slice.Config.resolve_config(Aikido.Slices.AiReact, %{max_iterations: 1})
+             Aikido.Ash.Slice.Config.resolve_config(Aikido.Slices.AiReact, %{max_iterations: 1})
 
     assert {:ok, %{max_iterations: 10}} =
-             Aikido.Slice.Config.resolve_config(Aikido.Slices.AiReact)
+             Aikido.Ash.Slice.Config.resolve_config(Aikido.Slices.AiReact)
   end
 
   test "transitions an idle slice to :setup and prepares tools before the model call" do
@@ -186,7 +186,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
       assert input.arguments.client == client
 
       assert %{client: ^client} =
-               Aikido.Slice.Config.resolve_config!(Aikido.Slices.AiReact, %{client: client})
+               Aikido.Ash.Slice.Config.resolve_config!(Aikido.Slices.AiReact, %{client: client})
     end
 
     invalid =
@@ -199,7 +199,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
     refute invalid.valid?
 
     assert_raise ArgumentError, fn ->
-      Aikido.Slice.Config.resolve_config!(Aikido.Slices.AiReact, %{
+      Aikido.Ash.Slice.Config.resolve_config!(Aikido.Slices.AiReact, %{
         client: AikidoTest.NonexistentClient
       })
     end

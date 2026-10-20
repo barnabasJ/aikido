@@ -79,7 +79,7 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCallTest do
   end
 
   test "casts execution options before starting model work" do
-    assert %Aikido.AI.Options{streaming: true, model_timeout_ms: 5_000} =
+    assert %Aikido.Slices.AiReact.Options{streaming: true, model_timeout_ms: 5_000} =
              directive(options: %{streaming: "true", model_timeout_ms: "5000"}).options
 
     assert {:error, _} =
