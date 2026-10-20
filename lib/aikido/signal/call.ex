@@ -20,7 +20,7 @@ defmodule Aikido.Signal.Call do
     target is copied from the query. The runtime delivers it as
     `{:signal, reply_signal}` to the caller's mailbox.
   * `call/3` blocks in a receive that matches on the correlation id and
-    returns the reply's data.
+    returns the reply signal.
 
   ## Example
 
