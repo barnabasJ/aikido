@@ -132,14 +132,14 @@ defmodule Aikido.AI.Handoff do
             }
 
             Aikido.Hooks.transition(
-              Aikido.ActionResult.new(state: state, directives: [effect]),
+              Aikido.Types.ActionResult.new(state: state, directives: [effect]),
               :after_model,
               %{handoff: true}
             )
           end
       end
     else
-      Aikido.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(state: state)
     end
   end
 
@@ -154,11 +154,11 @@ defmodule Aikido.AI.Handoff do
           hooks_pending: %{}
         })
 
-      Aikido.Hooks.transition(Aikido.ActionResult.new(state: state), :run_failed, %{
+      Aikido.Hooks.transition(Aikido.Types.ActionResult.new(state: state), :run_failed, %{
         reason: state.error
       })
     else
-      Aikido.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(state: state)
     end
   end
 

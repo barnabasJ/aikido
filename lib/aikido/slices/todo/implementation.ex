@@ -7,7 +7,7 @@ defmodule Aikido.Slices.Todo.Implementation do
     id = input.arguments.id
 
     if Enum.any?(state.items, &(&1.id == id)) do
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state: %{
           state
           | items: Enum.reject(state.items, &(&1.id == id)),
@@ -43,10 +43,10 @@ defmodule Aikido.Slices.Todo.Implementation do
 
       action == :expire &&
           (item.revision != data.revision || item.status not in [:pending, :active]) ->
-        Aikido.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(state: state)
 
       action != :add && item.status == :completed ->
-        Aikido.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(state: state)
 
       true ->
         revision = state.revision + 1
@@ -121,7 +121,7 @@ defmodule Aikido.Slices.Todo.Implementation do
             effects
           end
 
-        Aikido.ActionResult.new(state: state, directives: effects)
+        Aikido.Types.ActionResult.new(state: state, directives: effects)
     end
   end
 end

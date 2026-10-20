@@ -370,7 +370,7 @@ defmodule AikidoTest.AshTest do
     signal = Jido.Signal.new!("slice.increment", %{amount: 3}, source: "/test")
     state = %{count: 2}
 
-    assert {:ok, %Aikido.ActionResult{state: %{count: 5}, directives: []}} =
+    assert {:ok, %Aikido.Types.ActionResult{state: %{count: 5}, directives: []}} =
              then(signal, fn signal ->
                AikidoTest.AshFixtures.CounterSlice
                |> Ash.ActionInput.for_action(

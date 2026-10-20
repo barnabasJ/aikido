@@ -8,7 +8,7 @@ defmodule Aikido.Slices.Memory.Implementation do
     slice = input.arguments.state
     memory = ensure_memory(slice, input)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.append_to_space(memory, name, item, options(input)),
       directives: []
     )
@@ -21,7 +21,7 @@ defmodule Aikido.Slices.Memory.Implementation do
     slice = input.arguments.state
     memory = ensure_memory(slice, input)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.delete_from_space(memory, name, key, options(input)),
       directives: []
     )
@@ -33,7 +33,7 @@ defmodule Aikido.Slices.Memory.Implementation do
     slice = input.arguments.state
     memory = ensure_memory(slice, input)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.delete_space(memory, name, options(input)),
       directives: []
     )
@@ -46,10 +46,10 @@ defmodule Aikido.Slices.Memory.Implementation do
 
     case slice do
       %Aikido.Slices.Memory{} = memory ->
-        Aikido.ActionResult.new(state: memory, directives: [])
+        Aikido.Types.ActionResult.new(state: memory, directives: [])
 
       _ ->
-        Aikido.ActionResult.new(
+        Aikido.Types.ActionResult.new(
           state:
             Aikido.Slices.Memory.new(
               Keyword.merge(
@@ -75,7 +75,7 @@ defmodule Aikido.Slices.Memory.Implementation do
     slice = input.arguments.state
     memory = ensure_memory(slice, input)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.ensure_space(memory, name, default, options(input)),
       directives: []
     )
@@ -89,7 +89,7 @@ defmodule Aikido.Slices.Memory.Implementation do
     slice = input.arguments.state
     memory = ensure_memory(slice, input)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.put_in_space(memory, name, key, value, options(input)),
       directives: []
     )
@@ -102,7 +102,7 @@ defmodule Aikido.Slices.Memory.Implementation do
     slice = input.arguments.state
     memory = ensure_memory(slice, input)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Memory.put_space(memory, name, space, options(input)),
       directives: []
     )
@@ -115,7 +115,7 @@ defmodule Aikido.Slices.Memory.Implementation do
     slice = input.arguments.state
     memory = ensure_memory(slice, input)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state:
         Aikido.Slices.Memory.update_space(
           memory,

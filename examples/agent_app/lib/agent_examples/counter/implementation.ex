@@ -4,6 +4,6 @@ defmodule AgentExamples.Counter.Implementation do
   @impl true
   def run(input, _opts, _context) do
     state = input.arguments.state
-    Aikido.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
+    Aikido.Types.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
   end
 end

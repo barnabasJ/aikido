@@ -22,7 +22,7 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest.SendAction do
     if get_in(ctx, [:slice_config, :fail?]) do
       {:error, {:planned_failure, ctx[:slice_path]}}
     else
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state: %{messages: messages ++ ["#{token}: #{msg}"]},
         directives: directives
       )
@@ -52,7 +52,7 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest.SlackSlice do
   end
 
   actions do
-    action :send, Aikido.ActionResult do
+    action :send, Aikido.Types.ActionResult do
       argument :state, :term
 
       argument :message, :string,

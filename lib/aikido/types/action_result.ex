@@ -1,4 +1,4 @@
-defmodule Aikido.ActionResult do
+defmodule Aikido.Types.ActionResult do
   @moduledoc """
   The result of a native Ash agent action: its next state and validated I/O directives.
 

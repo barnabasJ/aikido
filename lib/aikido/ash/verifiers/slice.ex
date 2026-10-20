@@ -19,7 +19,7 @@ defmodule Aikido.Ash.Verifiers.Slice do
 
       Enum.any?(routes ++ schedules, &invalid_action?(dsl, &1.action)) ->
         error(
-          "Slice routes require generic Ash actions with a :state argument and Aikido.ActionResult return type"
+          "Slice routes require generic Ash actions with a :state argument and Aikido.Types.ActionResult return type"
         )
 
       true ->
@@ -39,7 +39,7 @@ defmodule Aikido.Ash.Verifiers.Slice do
       end
 
     case definition do
-      %{type: :action, returns: Aikido.ActionResult, arguments: arguments} ->
+      %{type: :action, returns: Aikido.Types.ActionResult, arguments: arguments} ->
         !Enum.any?(arguments, &(&1.name == :state))
 
       _ ->

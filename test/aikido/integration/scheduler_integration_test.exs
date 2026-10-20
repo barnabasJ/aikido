@@ -7,7 +7,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implem
     count = Map.get(slice, :tick_count, 0)
     ticks = Map.get(slice, :ticks, [])
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{tick_count: count + 1, ticks: ticks ++ [%{source: :slice_schedule}]},
       directives: []
     )
@@ -33,7 +33,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest.ScheduledSlice do
   end
 
   actions do
-    action :slice_tick, Aikido.ActionResult do
+    action :slice_tick, Aikido.Types.ActionResult do
       argument :state, :term
 
       run AikidoTest.Integration.SchedulerIntegrationTest.SliceTickAction.Implementation

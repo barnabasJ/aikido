@@ -1,7 +1,7 @@
 defmodule Aikido.PureActionsTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.{ActionResult, Directive, SignalCtx}
+  alias Aikido.{Directive, SignalCtx}
   alias Aikido.Directives.{Emit, Schedule}
   alias Aikido.Slices.{Identity, Memory, Thread, Todo}
 
@@ -130,7 +130,7 @@ defmodule Aikido.PureActionsTest do
   defp reducer?(ast) do
     {_ast, found?} =
       Macro.prewalk(ast, false, fn
-        {{:., _, [{:__aliases__, _, [:Aikido, :ActionResult]}, fun]}, _, _} = node, _
+        {{:., _, [{:__aliases__, _, [:Aikido, :Types, :ActionResult]}, fun]}, _, _} = node, _
         when fun in [:new, :new!] ->
           {node, true}
 
@@ -192,7 +192,7 @@ defmodule Aikido.PureActionsTest do
         context: %{aikido: %{signal: signal, slice_path: :test}}
       )
 
-    assert {:ok, %ActionResult{} = first} = Ash.run_action(input)
+    assert {:ok, %Aikido.Types.ActionResult{} = first} = Ash.run_action(input)
     assert {:ok, second} = Ash.run_action(input)
     assert first == second
     first

@@ -6,7 +6,7 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysActi
     slice = input.arguments.state
     slice = slice || %{}
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Map.merge(slice, %{action_ran: true, key_a: true, key_b: true, key_c: true}),
       directives: []
     )
@@ -28,7 +28,7 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Imple
       saw_c: Map.get(slice, :key_c, false)
     }
 
-    Aikido.ActionResult.new(state: Map.merge(slice, observation), directives: [])
+    Aikido.Types.ActionResult.new(state: Map.merge(slice, observation), directives: [])
   end
 end
 
@@ -58,13 +58,13 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent do
   end
 
   actions do
-    action :set_multiple, Aikido.ActionResult do
+    action :set_multiple, Aikido.Types.ActionResult do
       argument :state, :term
 
       run AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysAction.Implementation
     end
 
-    action :observe, Aikido.ActionResult do
+    action :observe, Aikido.Types.ActionResult do
       argument :state, :term
 
       run AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Implementation

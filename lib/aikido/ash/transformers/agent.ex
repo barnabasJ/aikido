@@ -101,7 +101,8 @@ defmodule Aikido.Ash.Transformers.Agent do
 
           {dsl, name, aliases} =
             case Ash.Resource.Info.action(dsl, name) do
-              %{type: :action, returns: Aikido.ActionResult} = action when name == signal.name ->
+              %{type: :action, returns: Aikido.Types.ActionResult} = action
+              when name == signal.name ->
                 internal = String.to_atom("__aikido_reduce_#{name}")
                 reducer = %{action | name: internal, public?: false}
 
@@ -194,42 +195,17 @@ defmodule Aikido.Ash.Transformers.Agent do
   defp add_signal(dsl, signal, _mounts) do
     case Enum.find(Transformer.get_entities(dsl, [:actions]), &(&1.name == signal.name)) do
       nil ->
-        fields = signal_fields(dsl, signal)
+        arguments = signal_arguments(dsl, signal)
 
-        arguments =
-          if fields == [] do
-            [
-              %Ash.Resource.Actions.Argument{
-                name: :data,
-                type: Ash.Type.Map,
-                default: %{},
-                allow_nil?: false,
-                public?: true
-              }
-            ]
+        {arguments, dsl} =
+          if arguments == [] do
+            {[build_argument!(:data, :map, default: %{}, allow_nil?: false)], dsl}
           else
-            Enum.map(fields, fn {name, options} ->
-              build_argument!(
-                name,
-                options[:type],
-                Keyword.take(options, [
-                  :constraints,
-                  :allow_nil?,
-                  :default,
-                  :description,
-                  :sensitive?
-                ])
-              )
-            end)
+            {arguments,
+             Transformer.persist(dsl, :aikido_flat_signal_inputs, [
+               signal.name | Transformer.get_persisted(dsl, :aikido_flat_signal_inputs, [])
+             ])}
           end
-
-        dsl =
-          if fields != [],
-            do:
-              Transformer.persist(dsl, :aikido_flat_signal_inputs, [
-                signal.name | Transformer.get_persisted(dsl, :aikido_flat_signal_inputs, [])
-              ]),
-            else: dsl
 
         Builder.add_new_action(dsl, :action, signal.name,
           returns: :map,
@@ -326,14 +302,27 @@ defmodule Aikido.Ash.Transformers.Agent do
     )
   end
 
-  defp signal_fields(dsl, %{target: target}) do
-    {resource, name} = target
+  defp signal_arguments(dsl, %{target: {resource, name}}) do
+    action =
+      if resource == Transformer.get_persisted(dsl, :module) do
+        Ash.Resource.Info.action(dsl, name)
+      else
+        Code.ensure_compiled!(resource)
+        Ash.Resource.Info.action(resource, name)
+      end
 
-    if resource == Transformer.get_persisted(dsl, :module) do
-      dsl |> Ash.Resource.Info.action(name) |> Aikido.ActionRef.schema()
-    else
-      Code.ensure_compiled!(resource)
-      Aikido.ActionRef.schema(target)
+    case Enum.find(action.arguments, &(&1.name == :data)) do
+      nil ->
+        action.arguments
+        |> Enum.reject(&(&1.name == :state))
+        |> Enum.map(&%{&1 | public?: true})
+
+      data ->
+        for {name, options} <- Keyword.get(data.constraints, :fields, []) do
+          {type, options} = Keyword.pop!(options, :type)
+          options = Keyword.take(options, Keyword.keys(Ash.Resource.Actions.Argument.schema()))
+          build_argument!(name, type, options)
+        end
     end
   end
 

@@ -31,7 +31,7 @@ defmodule Aikido.Signal.Call do
       # Action handling "my.agent.ping"
       def run(input, _opts, _context) do
         emit = Aikido.Signal.Call.reply(input.context.aikido.signal, "my.agent.ping.reply", %{ok: true})
-        Aikido.ActionResult.new(state: input.arguments.state, directives: List.wrap(emit))
+        Aikido.Types.ActionResult.new(state: input.arguments.state, directives: List.wrap(emit))
       end
 
   ## Why not `Aikido.AgentServer.call/4`?
@@ -169,7 +169,7 @@ defmodule Aikido.Signal.Call do
             {Aikido.AgentServer.Queries, :build_children_reply, []}
           )
 
-        Aikido.ActionResult.new(state: input.arguments.state, directives: List.wrap(directive))
+        Aikido.Types.ActionResult.new(state: input.arguments.state, directives: List.wrap(directive))
       end
 
       # Builder — sees the full %State{}

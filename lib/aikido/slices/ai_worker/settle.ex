@@ -39,7 +39,7 @@ defmodule Aikido.Slices.AiWorker.Settle do
     else
       if is_nil(pending) && ai.status in [:completed, :failed, :idle],
         do: next(state, context, []),
-        else: Aikido.ActionResult.new(state: state)
+        else: Aikido.Types.ActionResult.new(state: state)
     end
   end
 
@@ -49,10 +49,13 @@ defmodule Aikido.Slices.AiWorker.Settle do
         {:ok, result} =
           Aikido.Slices.AiWorker.Accept.start_task(%{state | queue: rest}, data, context)
 
-        Aikido.ActionResult.new(state: result.state, directives: effects ++ result.directives)
+        Aikido.Types.ActionResult.new(
+          state: result.state,
+          directives: effects ++ result.directives
+        )
 
       [] ->
-        Aikido.ActionResult.new(state: state, directives: effects)
+        Aikido.Types.ActionResult.new(state: state, directives: effects)
     end
   end
 end

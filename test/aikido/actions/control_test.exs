@@ -9,7 +9,7 @@ defmodule AikidoTest.Actions.ControlTest do
 
   describe("Cancel") do
     test "sets status to failed with cancelled error" do
-      {:ok, %Aikido.ActionResult{state: result, directives: []}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: []}} =
         then(sig("cancel", %{reason: :cancelled}), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:cancel, Map.put(signal.data || %{}, :state, %{}),
@@ -23,7 +23,7 @@ defmodule AikidoTest.Actions.ControlTest do
     end
 
     test "includes custom cancellation reason" do
-      {:ok, %Aikido.ActionResult{state: result, directives: []}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: []}} =
         then(sig("cancel", %{reason: :user_requested}), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:cancel, Map.put(signal.data || %{}, :state, %{}),
@@ -39,7 +39,7 @@ defmodule AikidoTest.Actions.ControlTest do
 
   describe("Noop") do
     test "returns empty state change" do
-      {:ok, %Aikido.ActionResult{state: result, directives: []}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: []}} =
         then(sig("noop"), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:noop, Map.put(signal.data || %{}, :state, %{}),
@@ -58,7 +58,7 @@ defmodule AikidoTest.Actions.ControlTest do
       target = self()
       data = %{target_pid: target, signal_type: nil, payload: nil, source: nil}
 
-      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(sig("forward", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:forward, Map.put(signal.data || %{}, :state, %{}),
@@ -78,7 +78,7 @@ defmodule AikidoTest.Actions.ControlTest do
       target = self()
       data = %{target_pid: target, signal_type: "custom.signal", payload: nil, source: nil}
 
-      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: _result, directives: [directive]}} =
         then(sig("forward", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:forward, Map.put(signal.data || %{}, :state, %{}),
@@ -95,7 +95,7 @@ defmodule AikidoTest.Actions.ControlTest do
       target = self()
       data = %{target_pid: target, signal_type: "test", payload: %{key: "value"}, source: nil}
 
-      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: _result, directives: [directive]}} =
         then(sig("forward", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:forward, Map.put(signal.data || %{}, :state, %{}),
@@ -118,7 +118,7 @@ defmodule AikidoTest.Actions.ControlTest do
         source: "/broadcast"
       }
 
-      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(sig("broadcast", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:broadcast, Map.put(signal.data || %{}, :state, %{}),
@@ -146,7 +146,7 @@ defmodule AikidoTest.Actions.ControlTest do
           data: %{signal_type: "response", payload: %{answer: 42}, reply_to: reply_pid}
         })
 
-      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(input, fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:reply, Map.put(signal.data || %{}, :state, %{}),
@@ -170,7 +170,7 @@ defmodule AikidoTest.Actions.ControlTest do
           data: %{signal_type: "response", payload: %{}}
         })
 
-      {:ok, %Aikido.ActionResult{state: result, directives: []}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: []}} =
         then(input, fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:reply, Map.put(signal.data || %{}, :state, %{}),
@@ -191,7 +191,7 @@ defmodule AikidoTest.Actions.ControlTest do
           data: %{signal_type: "response", payload: %{}}
         })
 
-      {:ok, %Aikido.ActionResult{state: result, directives: []}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: []}} =
         then(input, fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:reply, Map.put(signal.data || %{}, :state, %{}),

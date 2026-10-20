@@ -9,6 +9,6 @@ defmodule Aikido.Actions.Control.Broadcast do
     source = input.arguments[:source]
     signal = struct!(Jido.Signal, id: nil, type: type, data: payload, source: source)
     directive = Aikido.Directives.emit(signal, {:pubsub, topic: topic})
-    Aikido.ActionResult.new(state: %{broadcast_to: topic}, directives: [directive])
+    Aikido.Types.ActionResult.new(state: %{broadcast_to: topic}, directives: [directive])
   end
 end

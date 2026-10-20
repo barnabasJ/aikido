@@ -7,7 +7,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.EmitDirectiveAction.Implement
       input.arguments.directive
 
     slice = input.arguments.state
-    Aikido.ActionResult.new(state: slice || %{}, directives: [directive])
+    Aikido.Types.ActionResult.new(state: slice || %{}, directives: [directive])
   end
 end
 
@@ -27,7 +27,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.TestAgent do
   end
 
   actions do
-    action :emit_directive, Aikido.ActionResult do
+    action :emit_directive, Aikido.Types.ActionResult do
       argument :state, :term
       argument :directive, :term, allow_nil?: false
 
@@ -57,7 +57,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.StopOnSignalAction.Implementa
         directives
       end
 
-    Aikido.ActionResult.new(state: %{stop_reason: reason}, directives: directives)
+    Aikido.Types.ActionResult.new(state: %{stop_reason: reason}, directives: directives)
   end
 end
 
@@ -81,7 +81,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent do
   end
 
   actions do
-    action :stop_on_signal, Aikido.ActionResult do
+    action :stop_on_signal, Aikido.Types.ActionResult do
       argument :state, :term
       argument :reason, :term, default: :normal
 
@@ -394,7 +394,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       directive = %AikidoTest.AgentServer.DirectiveExecTest.CustomDirective{value: 42}
       assert {:error, errors} = Aikido.Types.Directive.cast_input(directive, [])
       assert inspect(errors) =~ "does not implement"
-      assert {:error, _} = Aikido.ActionResult.new(state: %{}, directives: [directive])
+      assert {:error, _} = Aikido.Types.ActionResult.new(state: %{}, directives: [directive])
 
       assert_raise UndefinedFunctionError, fn ->
         Aikido.Directive.exec(directive, input_signal, state)

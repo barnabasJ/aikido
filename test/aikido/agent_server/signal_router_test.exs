@@ -12,7 +12,7 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes do
   end
 
   actions do
-    action :test_action, Aikido.ActionResult do
+    action :test_action, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.TestActions.Noop.Implementation
     end

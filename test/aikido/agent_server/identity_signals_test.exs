@@ -8,7 +8,7 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementatio
     slice = input.arguments.state
     events = Map.get(slice, :identity_events, [])
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{slice | identity_events: events ++ [%{type: type, data: data}]},
       directives: []
     )
@@ -32,7 +32,7 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAgent do
   end
 
   actions do
-    action :identity_watcher, Aikido.ActionResult do
+    action :identity_watcher, Aikido.Types.ActionResult do
       argument :state, :term
       argument :data, :map, allow_nil?: false, default: %{}
       run AikidoTest.AgentServer.IdentitySignalsTest.WatcherAction.Implementation

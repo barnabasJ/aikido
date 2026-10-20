@@ -12,7 +12,7 @@ defmodule AikidoTest.TracePropagation.Reducer do
   use Ash.Resource.Actions.Implementation
 
   def run(%{action: %{name: :begin_work}} = input, _, _) do
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{input.arguments.state | status: :working},
       directives: [
         %Aikido.Directives.AsyncTask{
@@ -26,7 +26,7 @@ defmodule AikidoTest.TracePropagation.Reducer do
   def run(%{action: %{name: :accept_result}} = input, _, _) do
     value = input.arguments.result.value
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{input.arguments.state | status: :finishing},
       directives: [
         %Aikido.Directives.Schedule{
@@ -44,7 +44,7 @@ defmodule AikidoTest.TracePropagation.Reducer do
   end
 
   def run(%{action: %{name: :finish}} = input, _, _) do
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{input.arguments.state | status: :completed, value: input.arguments.value}
     )
   end
@@ -75,25 +75,25 @@ defmodule AikidoTest.TracePropagation.Pipeline do
   end
 
   actions do
-    action :begin_work, Aikido.ActionResult do
+    action :begin_work, Aikido.Types.ActionResult do
       argument :state, :term
       argument :amount, :integer, allow_nil?: false
       run AikidoTest.TracePropagation.Reducer
     end
 
-    action :accept_result, Aikido.ActionResult do
+    action :accept_result, Aikido.Types.ActionResult do
       argument :state, :term
       argument :result, :map, allow_nil?: false
       run AikidoTest.TracePropagation.Reducer
     end
 
-    action :finish, Aikido.ActionResult do
+    action :finish, Aikido.Types.ActionResult do
       argument :state, :term
       argument :value, :integer, allow_nil?: false
       run AikidoTest.TracePropagation.Reducer
     end
 
-    action :fail, Aikido.ActionResult do
+    action :fail, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.TracePropagation.Reducer
     end

@@ -111,9 +111,9 @@ defmodule Aikido.Slices.AiReact.Implementation do
         |> Map.put(:prepared_tools, input.arguments.prepared_tools)
         |> Map.put(:tool_preparation, [])
 
-      Aikido.ActionResult.new(state: state, directives: directives)
+      Aikido.Types.ActionResult.new(state: state, directives: directives)
     else
-      Aikido.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(state: state)
     end
   end
 
@@ -142,7 +142,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       {:error, :busy}
     else
       with {:ok, context} <- ReqLLM.Context.normalize(input.arguments.messages) do
-        Aikido.ActionResult.new(state: Conversation.replace_context(state, context))
+        Aikido.Types.ActionResult.new(state: Conversation.replace_context(state, context))
       end
     end
   end
@@ -153,11 +153,11 @@ defmodule Aikido.Slices.AiReact.Implementation do
     if state.status == :waiting do
       state = apply_todo_gate(state, input.context.aikido.agent.state)
 
-      Aikido.Hooks.transition(Aikido.ActionResult.new(state: state), :after_model, %{
+      Aikido.Hooks.transition(Aikido.Types.ActionResult.new(state: state), :after_model, %{
         todo_completion: true
       })
     else
-      Aikido.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(state: state)
     end
   end
 
@@ -180,9 +180,9 @@ defmodule Aikido.Slices.AiReact.Implementation do
             if(reset?, do: "", else: Map.get(state, :streaming_thinking, "")) <> data.thinking
         })
 
-      Aikido.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(state: state)
     else
-      Aikido.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(state: state)
     end
   end
 
@@ -192,7 +192,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
          _context
        )
        when not is_nil(terminal) and action in [:llm_turn, :tool_result, :failed] do
-    Aikido.ActionResult.new(state: input.arguments.state)
+    Aikido.Types.ActionResult.new(state: input.arguments.state)
   end
 
   defp handle(input, [action: action] = opts, context) do
@@ -271,7 +271,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
           &(&1 ++ [input.arguments.text])
         )
 
-      Aikido.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(state: state)
     end
   end
 
@@ -285,7 +285,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
           Map.update(metadata, :deliveries, [delivery], &(&1 ++ [delivery]))
         end)
 
-      Aikido.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(state: state)
     else
       case ask_open_run(
              %{
@@ -332,7 +332,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
     if slice.status in [:setup, :running, :waiting] &&
          (is_nil(requested) || requested == slice.request_id) do
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state:
           slice
           |> Map.put(:status, :failed)
@@ -341,7 +341,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
         directives: []
       )
     else
-      Aikido.ActionResult.new(state: slice, directives: [])
+      Aikido.Types.ActionResult.new(state: slice, directives: [])
     end
   end
 
@@ -352,13 +352,13 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
     cond do
       failed_stale?(slice, id) ->
-        Aikido.ActionResult.new(state: slice, directives: [])
+        Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       slice.status not in [:setup, :running] || not is_nil(Map.get(slice, :handoff_pending)) ->
-        Aikido.ActionResult.new(state: slice, directives: [])
+        Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       true ->
-        Aikido.ActionResult.new(
+        Aikido.Types.ActionResult.new(
           state:
             slice
             |> Map.put(:status, :failed)
@@ -378,10 +378,10 @@ defmodule Aikido.Slices.AiReact.Implementation do
     cond do
       not is_nil(Map.get(slice, :handoff_pending)) || llm_turn_stale?(slice, request_id) ||
           (input.arguments[:iteration] && input.arguments.iteration != slice.iteration + 1) ->
-        Aikido.ActionResult.new(state: slice, directives: [])
+        Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       slice.status != :running ->
-        Aikido.ActionResult.new(state: slice, directives: [])
+        Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       true ->
         usage =
@@ -411,14 +411,14 @@ defmodule Aikido.Slices.AiReact.Implementation do
 
     cond do
       tool_result_stale?(slice, data.request_id) ->
-        Aikido.ActionResult.new(state: slice, directives: [])
+        Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       slice.status != :running || not is_nil(Map.get(slice, :handoff_pending)) ->
-        Aikido.ActionResult.new(state: slice, directives: [])
+        Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       not Enum.any?(slice.pending_tool_calls, &(&1.id == data.tool_call_id)) ||
           Enum.any?(slice.tool_results_received, &(&1.tool_call_id == data.tool_call_id)) ->
-        Aikido.ActionResult.new(state: slice, directives: [])
+        Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       true ->
         tool_result_append_and_maybe_dispatch(data, slice)
@@ -550,7 +550,10 @@ defmodule Aikido.Slices.AiReact.Implementation do
       llm_opts: llm_opts
     }
 
-    Aikido.ActionResult.new(state: Map.merge(slice || %{}, new_slice), directives: [directive])
+    Aikido.Types.ActionResult.new(
+      state: Map.merge(slice || %{}, new_slice),
+      directives: [directive]
+    )
   end
 
   defp ask_running?(%{status: status}) when status in [:setup, :running] do
@@ -617,9 +620,9 @@ defmodule Aikido.Slices.AiReact.Implementation do
         iteration: new_slice.iteration + 1
       }
 
-      Aikido.ActionResult.new(state: new_slice, directives: [effect])
+      Aikido.Types.ActionResult.new(state: new_slice, directives: [effect])
     else
-      Aikido.ActionResult.new(state: new_slice, directives: [])
+      Aikido.Types.ActionResult.new(state: new_slice, directives: [])
     end
   end
 
@@ -651,7 +654,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
         result: nil
     }
 
-    Aikido.ActionResult.new(state: new_slice, directives: [])
+    Aikido.Types.ActionResult.new(state: new_slice, directives: [])
   end
 
   defp llm_turn_dispatch_tools(slice, new_context, iteration, msg_calls) do
@@ -673,7 +676,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
         }
       end)
 
-    Aikido.ActionResult.new(state: new_slice, directives: directives)
+    Aikido.Types.ActionResult.new(state: new_slice, directives: directives)
   end
 
   defp tool_result_stale?(%{request_id: current}, request_id) do
@@ -692,7 +695,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
     if length(received) == length(slice.pending_tool_calls) do
       tool_result_finalize_batch(slice)
     else
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state: %{slice | context: new_context, tool_results_received: received},
         directives: []
       )
@@ -736,7 +739,7 @@ defmodule Aikido.Slices.AiReact.Implementation do
       llm_opts: slice.llm_opts
     }
 
-    Aikido.ActionResult.new(state: new_slice, directives: [directive])
+    Aikido.Types.ActionResult.new(state: new_slice, directives: [directive])
   end
 
   defp tool_result_maybe_append_cycle_warning(state, previous_signature, current_signature)

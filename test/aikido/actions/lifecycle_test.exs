@@ -14,7 +14,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
       parent = %ParentRef{pid: parent_pid, id: "parent-1", tag: :child, meta: %{}}
       data = %{signal_type: "child.done", payload: %{result: 42}, source: "/child"}
 
-      {:ok, %Aikido.ActionResult{state: result, directives: directives}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: directives}} =
         then(sig("notify_parent", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:notify_parent, Map.put(signal.data || %{}, :state, %{}),
@@ -34,7 +34,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
     test "returns notified: false when ctx.parent is nil (orphaned)" do
       data = %{signal_type: "child.done", payload: %{}, source: "/child"}
 
-      {:ok, %Aikido.ActionResult{state: result, directives: directives}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: directives}} =
         then(sig("notify_parent", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:notify_parent, Map.put(signal.data || %{}, :state, %{}),
@@ -61,7 +61,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
         delivery_mode: :async
       }
 
-      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(sig("notify_pid", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:notify_pid, Map.put(signal.data || %{}, :state, %{}),
@@ -91,7 +91,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
         delivery_mode: :sync
       }
 
-      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: _result, directives: [directive]}} =
         then(sig("notify_pid", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:notify_pid, Map.put(signal.data || %{}, :state, %{}),
@@ -117,7 +117,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
         restart?: true
       }
 
-      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(sig("spawn_child", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:spawn_child, Map.put(signal.data || %{}, :state, %{}),
@@ -145,7 +145,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
         restart?: false
       }
 
-      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: _result, directives: [directive]}} =
         then(sig("spawn_child", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:spawn_child, Map.put(signal.data || %{}, :state, %{}),
@@ -162,7 +162,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
 
   describe("StopSelf") do
     test "creates stop directive with normal reason" do
-      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(sig("stop_self", %{reason: :normal}), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:stop_self, Map.put(signal.data || %{}, :state, %{}),
@@ -178,7 +178,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
     end
 
     test "supports custom stop reasons" do
-      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(sig("stop_self", %{reason: :work_complete}), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:stop_self, Map.put(signal.data || %{}, :state, %{}),
@@ -197,7 +197,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
     test "creates stop_child directive" do
       data = %{tag: :worker_1, reason: :normal}
 
-      {:ok, %Aikido.ActionResult{state: result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: result, directives: [directive]}} =
         then(sig("stop_child", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:stop_child, Map.put(signal.data || %{}, :state, %{}),
@@ -216,7 +216,7 @@ defmodule AikidoTest.Actions.LifecycleTest do
     test "supports custom stop reasons" do
       data = %{tag: :processor, reason: :shutdown}
 
-      {:ok, %Aikido.ActionResult{state: _result, directives: [directive]}} =
+      {:ok, %Aikido.Types.ActionResult{state: _result, directives: [directive]}} =
         then(sig("stop_child", data), fn signal ->
           Aikido.AgentServer.RuntimeActions
           |> Ash.ActionInput.for_action(:stop_child, Map.put(signal.data || %{}, :state, %{}),

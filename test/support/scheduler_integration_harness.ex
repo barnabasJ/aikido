@@ -9,7 +9,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementati
     count = Map.get(slice, :tick_count, 0)
     ticks = Map.get(slice, :ticks, [])
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{tick_count: count + 1, ticks: ticks ++ [params]},
       directives: []
     )
@@ -33,7 +33,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Impl
         struct!(Jido.Signal, id: nil, type: "cron.tick", data: %{}, source: "/test")
 
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
-    Aikido.ActionResult.new(state: slice, directives: [directive])
+    Aikido.Types.ActionResult.new(state: slice, directives: [directive])
   end
 end
 
@@ -45,7 +45,11 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CancelCronAction.Implem
     job_id = input.arguments.job_id
 
     slice = input.arguments.state
-    Aikido.ActionResult.new(state: slice, directives: [Aikido.Directives.cron_cancel(job_id)])
+
+    Aikido.Types.ActionResult.new(
+      state: slice,
+      directives: [Aikido.Directives.cron_cancel(job_id)]
+    )
   end
 end
 
@@ -70,14 +74,14 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CronAgent do
   end
 
   actions do
-    action :cron_count, Aikido.ActionResult do
+    action :cron_count, Aikido.Types.ActionResult do
       argument :state, :term
       argument :data, :map, default: %{}
 
       run AikidoTest.Support.SchedulerIntegrationHarness.TickAction.Implementation
     end
 
-    action :register_cron, Aikido.ActionResult do
+    action :register_cron, Aikido.Types.ActionResult do
       argument :state, :term
       argument :cron, :string, allow_nil?: false
       argument :job_id, :term
@@ -87,7 +91,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CronAgent do
       run AikidoTest.Support.SchedulerIntegrationHarness.RegisterCronAction.Implementation
     end
 
-    action :cancel_cron, Aikido.ActionResult do
+    action :cancel_cron, Aikido.Types.ActionResult do
       argument :state, :term
       argument :job_id, :term, allow_nil?: false
 

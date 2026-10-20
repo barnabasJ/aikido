@@ -7,7 +7,7 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Impleme
     slice = slice || %{}
     followup = struct!(Jido.Signal, id: nil, type: "step1.followup", source: "/test", data: %{})
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Map.put(slice, :step1_action_ran, true),
       directives: [Aikido.Directives.emit(followup)]
     )
@@ -21,7 +21,11 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyActio
   def run(input, _opts, _context) do
     slice = input.arguments.state
     slice = slice || %{}
-    Aikido.ActionResult.new(state: Map.put(slice, :step1_followup_ran, true), directives: [])
+
+    Aikido.Types.ActionResult.new(
+      state: Map.put(slice, :step1_followup_ran, true),
+      directives: []
+    )
   end
 end
 
@@ -34,7 +38,7 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Impleme
     slice = slice || %{}
     saw_action = Map.get(slice, :step1_action_ran, false)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Map.put(slice, :step2_saw_action_ran, saw_action),
       directives: []
     )
@@ -64,19 +68,19 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent do
   end
 
   actions do
-    action :step1, Aikido.ActionResult do
+    action :step1, Aikido.Types.ActionResult do
       argument :state, :term
 
       run AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step1Action.Implementation
     end
 
-    action :set_followup_key, Aikido.ActionResult do
+    action :set_followup_key, Aikido.Types.ActionResult do
       argument :state, :term
 
       run AikidoTest.AgentServer.SignalDirectiveOrderingTest.SetFollowupKeyAction.Implementation
     end
 
-    action :step2, Aikido.ActionResult do
+    action :step2, Aikido.Types.ActionResult do
       argument :state, :term
 
       run AikidoTest.AgentServer.SignalDirectiveOrderingTest.Step2Action.Implementation

@@ -4,7 +4,7 @@ defmodule Aikido.Agent do
 
   Declare agents as Ash resources with `Aikido.Ash.Agent`. The convenience
   `use Aikido.Agent` installs that same extension and uses the shared runtime
-  domain. Reducers are native generic actions returning `Aikido.ActionResult`;
+  domain. Reducers are native generic actions returning `Aikido.Types.ActionResult`;
   they are pure and return directives for all I/O.
   """
 

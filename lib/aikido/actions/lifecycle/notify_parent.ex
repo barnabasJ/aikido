@@ -18,7 +18,7 @@ defmodule Aikido.Actions.Lifecycle.NotifyParent do
           nil
       end
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{notified: directive != nil},
       directives: List.wrap(directive)
     )

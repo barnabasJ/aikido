@@ -24,7 +24,7 @@ defmodule Aikido.Slices.AiReact.FailedTest do
   end
 
   test "settles a matching :running slice to :failed and stores the reason" do
-    {:ok, %Aikido.ActionResult{state: new_slice, directives: []}} =
+    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: []}} =
       then(signal("req_match", :rate_limited), fn signal ->
         Aikido.Slices.AiReact
         |> Ash.ActionInput.for_action(
@@ -43,7 +43,7 @@ defmodule Aikido.Slices.AiReact.FailedTest do
   test "drops stale signals — request_id mismatch leaves the slice untouched" do
     slice = running_slice("req_active")
 
-    {:ok, %Aikido.ActionResult{state: returned_slice, directives: []}} =
+    {:ok, %Aikido.Types.ActionResult{state: returned_slice, directives: []}} =
       then(signal("req_old", :anything), fn signal ->
         Aikido.Slices.AiReact
         |> Ash.ActionInput.for_action(:failed, Map.put(signal.data || %{}, :state, slice),
@@ -59,7 +59,7 @@ defmodule Aikido.Slices.AiReact.FailedTest do
   test "drops the signal when the slice has already terminated" do
     slice = %{running_slice("req_done") | status: :completed, result: "earlier answer"}
 
-    {:ok, %Aikido.ActionResult{state: returned_slice, directives: []}} =
+    {:ok, %Aikido.Types.ActionResult{state: returned_slice, directives: []}} =
       then(signal("req_done", :late), fn signal ->
         Aikido.Slices.AiReact
         |> Ash.ActionInput.for_action(:failed, Map.put(signal.data || %{}, :state, slice),

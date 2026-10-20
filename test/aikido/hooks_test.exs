@@ -125,7 +125,7 @@ defmodule Aikido.HooksTest do
 
     state = state(hooks)
     model = %LLMCall{model: "offline", request_id: "run", context: state.context}
-    {:ok, result} = Aikido.ActionResult.new(state: state, directives: [model])
+    {:ok, result} = Aikido.Types.ActionResult.new(state: state, directives: [model])
 
     {:ok, %{state: waiting, directives: [gate]}} =
       Aikido.Hooks.transition({:ok, result}, :run_started, %{})
@@ -164,7 +164,7 @@ defmodule Aikido.HooksTest do
       state = state([hook("return nil")])
 
       {:ok, result} =
-        Aikido.ActionResult.new(
+        Aikido.Types.ActionResult.new(
           state: state,
           directives: [%LLMCall{model: "offline", request_id: "run", context: state.context}]
         )
@@ -244,7 +244,7 @@ defmodule Aikido.HooksTest do
     state = state([hook("return nil")])
 
     {:ok, result} =
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state: state,
         directives: [%LLMCall{model: "offline", request_id: "run", context: state.context}]
       )
@@ -254,7 +254,7 @@ defmodule Aikido.HooksTest do
 
     signal = Jido.Signal.new!("ai.react.cancel", %{request_id: "run"})
 
-    {:ok, %Aikido.ActionResult{state: cancelled, directives: []}} =
+    {:ok, %Aikido.Types.ActionResult{state: cancelled, directives: []}} =
       then(signal, fn signal ->
         Aikido.Slices.AiReact
         |> Ash.ActionInput.for_action(:cancel, Map.put(signal.data || %{}, :state, waiting),
@@ -276,7 +276,7 @@ defmodule Aikido.HooksTest do
     state = state([hook("error('observer failed')", mode: :async)])
 
     {:ok, result} =
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state: state,
         directives: [%LLMCall{model: "offline", request_id: "run", context: state.context}]
       )
@@ -314,7 +314,7 @@ defmodule Aikido.HooksTest do
 
   test "terminal hooks finish before completion is published and ignore late model results" do
     state = state([hook("return nil", event: :run_completed)]) |> Map.put(:status, :completed)
-    {:ok, result} = Aikido.ActionResult.new(state: state)
+    {:ok, result} = Aikido.Types.ActionResult.new(state: state)
 
     {:ok, %{state: waiting, directives: [gate]}} =
       Aikido.Hooks.transition({:ok, result}, :after_model, %{})
@@ -333,7 +333,7 @@ defmodule Aikido.HooksTest do
 
     signal = Jido.Signal.new!("ai.react.llm.completed", %{request_id: "run", turn: turn})
 
-    {:ok, %Aikido.ActionResult{state: unchanged, directives: []}} =
+    {:ok, %Aikido.Types.ActionResult{state: unchanged, directives: []}} =
       then(signal, fn signal ->
         Aikido.Slices.AiReact
         |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, waiting),
@@ -362,7 +362,7 @@ defmodule Aikido.HooksTest do
     assert [%{text: "later evidence"}] = queued.hook_context
 
     {:ok, result} =
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state: queued,
         directives: [%LLMCall{model: "offline", request_id: "run", context: state.context}]
       )

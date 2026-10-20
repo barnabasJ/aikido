@@ -42,9 +42,9 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
     worker = Catalog.find("worker") |> AgentExamples.Source.for_example()
     definition = Enum.find(worker, &(&1.module == AgentExamples.Worker))
-    assert definition.code =~ "action :work, Aikido.ActionResult"
-    assert definition.code =~ "action :completed, Aikido.ActionResult"
-    assert definition.code =~ "action :failed, Aikido.ActionResult"
+    assert definition.code =~ "action :work, Aikido.Types.ActionResult"
+    assert definition.code =~ "action :completed, Aikido.Types.ActionResult"
+    assert definition.code =~ "action :failed, Aikido.Types.ActionResult"
     assert definition.open?
 
     implementation = Enum.find(worker, &(&1.module == AgentExamples.Worker.Implementation))

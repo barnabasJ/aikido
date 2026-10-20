@@ -61,7 +61,7 @@ defmodule MyApp.Counter do
   end
 
   actions do
-    action :increment, Aikido.ActionResult do
+    action :increment, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :amount, :integer, allow_nil?: false
 
@@ -75,7 +75,7 @@ defmodule MyApp.Increment do
 
   @impl true
   def run(input, _opts, _context) do
-    Aikido.ActionResult.new(state: %{count: input.arguments.state.count + input.arguments.amount})
+    Aikido.Types.ActionResult.new(state: %{count: input.arguments.state.count + input.arguments.amount})
   end
 end
 ```
@@ -158,13 +158,13 @@ as demonstrated by `AgentExamples.AI.ask/3`.
 
 Use IDs for durable identity: recovery may replace a PID. Neither a receipt nor
 a snapshot establishes exactly-once external effects or a durable input inbox.
-Native state transitions return `Aikido.ActionResult`, an `Ash.TypedStruct` with
+Native state transitions return `Aikido.Types.ActionResult`, an `Ash.TypedStruct` with
 `state` and `directives`. Define directives with `use Aikido.Directive`,
 Ash's `typed_struct` fields, and an `exec/3` behaviour callback in the same module.
 Directive modules are checked with Ash's native `:module` behaviour constraint,
 which delegates to Spark. The runtime validates every returned result before applying state
 or executing effects, including raw maps returned by native actions. Use
-`Aikido.ActionResult.new/1` for validation when calling an action directly with Ash.
+`Aikido.Types.ActionResult.new/1` for validation when calling an action directly with Ash.
 Ash owns arguments, defaults, constraints, preparations, authorization, and errors.
 
 Agents can declare the same native reducer actions directly, without slices.
@@ -223,7 +223,7 @@ defmodule MyApp.CounterSlice do
   end
 
   actions do
-    action :increment, Aikido.ActionResult do
+    action :increment, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :amount, :integer, allow_nil?: false
 
@@ -360,7 +360,7 @@ agent API. AgentServer invokes the original resource's native Ash actions direct
 ## Native contracts and tools
 
 Actions declare native Ash `argument`s and a return type. Reducers return
-`Aikido.ActionResult`; ordinary tools return their declared Ash type. Implement
+`Aikido.Types.ActionResult`; ordinary tools return their declared Ash type. Implement
 callbacks with `Ash.Resource.Actions.Implementation` modules and reference them
 with `run MyApp.Implementation` on the owning resource.
 

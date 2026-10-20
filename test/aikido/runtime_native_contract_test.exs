@@ -3,7 +3,7 @@ defmodule Aikido.RuntimeNativeContractTest.RawResult do
 
   def run(_input, _opts, _context) do
     {:ok,
-     %Aikido.ActionResult{
+     %Aikido.Types.ActionResult{
        state: %{count: 99},
        directives: [%Aikido.Directives.Schedule{delay_ms: -1, message: :tick}]
      }}
@@ -24,7 +24,7 @@ defmodule Aikido.RuntimeNativeContractTest.InvalidDirectiveAgent do
   end
 
   actions do
-    action :invalid, Aikido.ActionResult do
+    action :invalid, Aikido.Types.ActionResult do
       argument :state, :term
       run Aikido.RuntimeNativeContractTest.RawResult
     end

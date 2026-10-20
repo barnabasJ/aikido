@@ -58,140 +58,140 @@ defmodule Aikido.Ash.Team.State do
   end
 
   actions do
-    action :start, Aikido.ActionResult do
+    action :start, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :reconcile, Aikido.ActionResult do
+    action :reconcile, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :add_member, Aikido.ActionResult do
+    action :add_member, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :remove_member, Aikido.ActionResult do
+    action :remove_member, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :ensure_member, Aikido.ActionResult do
+    action :ensure_member, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :stop_member, Aikido.ActionResult do
+    action :stop_member, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :send, Aikido.ActionResult do
+    action :send, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :broadcast, Aikido.ActionResult do
+    action :broadcast, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :assign_task, Aikido.ActionResult do
+    action :assign_task, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :cleanup, Aikido.ActionResult do
+    action :cleanup, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :started, Aikido.ActionResult do
+    action :started, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :stopped, Aikido.ActionResult do
+    action :stopped, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :failed, Aikido.ActionResult do
+    action :failed, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :timeout, Aikido.ActionResult do
+    action :timeout, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :operation_completed, Aikido.ActionResult do
+    action :operation_completed, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :task_completed, Aikido.ActionResult do
+    action :task_completed, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :task_failed, Aikido.ActionResult do
+    action :task_failed, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :task_timeout, Aikido.ActionResult do
+    action :task_timeout, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :child_started, Aikido.ActionResult do
+    action :child_started, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Ash.Team.Action
     end
 
-    action :child_exit, Aikido.ActionResult do
+    action :child_exit, Aikido.Types.ActionResult do
       public? false
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}

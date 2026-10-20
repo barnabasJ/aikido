@@ -7,7 +7,7 @@ defmodule Aikido.Slices.Thread.Implementation do
     slice = input.arguments.state
     thread = append_ensure_thread(slice, input)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Thread.append(thread, entry, entry_options(input, thread)),
       directives: []
     )
@@ -19,13 +19,16 @@ defmodule Aikido.Slices.Thread.Implementation do
 
     case slice do
       %Aikido.Slices.Thread{} = thread ->
-        Aikido.ActionResult.new(
+        Aikido.Types.ActionResult.new(
           state: Aikido.Slices.Thread.clear(thread, options(input)),
           directives: []
         )
 
       _ ->
-        Aikido.ActionResult.new(state: Aikido.Slices.Thread.new(options(input)), directives: [])
+        Aikido.Types.ActionResult.new(
+          state: Aikido.Slices.Thread.new(options(input)),
+          directives: []
+        )
     end
   end
 
@@ -36,10 +39,10 @@ defmodule Aikido.Slices.Thread.Implementation do
 
     case slice do
       %Aikido.Slices.Thread{} = thread ->
-        Aikido.ActionResult.new(state: thread, directives: [])
+        Aikido.Types.ActionResult.new(state: thread, directives: [])
 
       _ ->
-        Aikido.ActionResult.new(
+        Aikido.Types.ActionResult.new(
           state:
             Aikido.Slices.Thread.new(
               Keyword.merge(

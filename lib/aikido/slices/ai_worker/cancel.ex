@@ -16,12 +16,12 @@ defmodule Aikido.Slices.AiWorker.Cancel do
           source: "/aikido"
         )
 
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state: %{state | pending: nil},
         directives: [Aikido.Directives.emit(signal)]
       )
     else
-      Aikido.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(state: state)
     end
   end
 end

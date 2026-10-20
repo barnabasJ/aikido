@@ -12,7 +12,7 @@ Build reliable multi-agent systems by keeping decision logic pure and runtime ef
 Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/effect separation rules in this file are canonical.
 
 ## Core Contracts
-- Define reducers as native Ash actions returning `Aikido.ActionResult`.
+- Define reducers as native Ash actions returning `Aikido.Types.ActionResult`.
 - Keep agent logic pure. Actions must not send messages, perform network or database I/O, spawn processes, or schedule timers. Return directives for all side effects; directives never mutate state of any kind.
 - Use **Ash types** for data contracts and **Spark.Options** for DSL/configuration validation.
 - Preserve tagged tuple and structured error contracts at public boundaries.

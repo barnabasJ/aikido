@@ -5,7 +5,7 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.TickAction.Implementation do
   def run(input, _opts, _context) do
     slice = input.arguments.state
     count = Map.get(slice, :tick_count, 0)
-    Aikido.ActionResult.new(state: %{tick_count: count + 1}, directives: [])
+    Aikido.Types.ActionResult.new(state: %{tick_count: count + 1}, directives: [])
   end
 end
 
@@ -28,7 +28,7 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent do
   end
 
   actions do
-    action :tick, Aikido.ActionResult do
+    action :tick, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.Agent.SchedulesIntegrationTest.TickAction.Implementation
     end

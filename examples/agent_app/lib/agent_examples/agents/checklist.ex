@@ -20,13 +20,13 @@ defmodule AgentExamples.Checklist do
   end
 
   actions do
-    action :add, Aikido.ActionResult do
+    action :add, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :item, :string, allow_nil?: false
       run {AgentExamples.Checklist.Implementation, action: :add}
     end
 
-    action :complete, Aikido.ActionResult do
+    action :complete, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :item, :string, allow_nil?: false
       run {AgentExamples.Checklist.Implementation, action: :complete}

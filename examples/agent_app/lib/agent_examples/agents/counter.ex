@@ -13,7 +13,7 @@ defmodule AgentExamples.Counter do
   end
 
   actions do
-    action :add, Aikido.ActionResult do
+    action :add, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :amount, :integer, allow_nil?: false
       run AgentExamples.Counter.Implementation

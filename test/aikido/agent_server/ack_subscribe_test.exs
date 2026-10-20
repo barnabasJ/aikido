@@ -7,7 +7,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation do
       input.arguments.value
 
     slice = input.arguments.state
-    Aikido.ActionResult.new(state: %{slice | value: v, status: :written}, directives: [])
+    Aikido.Types.ActionResult.new(state: %{slice | value: v, status: :written}, directives: [])
   end
 end
 
@@ -38,13 +38,13 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.TestAgent do
   end
 
   actions do
-    action :write, Aikido.ActionResult do
+    action :write, Aikido.Types.ActionResult do
       argument :state, :term
       argument :value, :integer, allow_nil?: false
       run AikidoTest.AgentServer.AckSubscribeTest.WriteAction.Implementation
     end
 
-    action :fail, Aikido.ActionResult do
+    action :fail, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.AgentServer.AckSubscribeTest.FailingAction.Implementation
     end

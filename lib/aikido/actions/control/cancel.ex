@@ -5,7 +5,7 @@ defmodule Aikido.Actions.Control.Cancel do
   def run(input, _opts, _context) do
     reason = input.arguments[:reason]
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{status: :failed, error: {:cancelled, reason}},
       directives: []
     )

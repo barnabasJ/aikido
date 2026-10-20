@@ -80,7 +80,7 @@ defmodule Aikido.AgentServer do
 
       # In an action, return the terminal status as part of slice state:
       slice = %{slice | status: :completed, last_answer: answer}
-      Aikido.ActionResult.new(state: slice, directives: [])
+      Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       # Subscribe before sending the command, then await its terminal state:
       selector = fn runtime ->
@@ -1897,9 +1897,14 @@ defmodule Aikido.AgentServer do
     )
     |> Ash.run_action(options)
     |> case do
-      {:ok, %Aikido.ActionResult{} = result} -> Aikido.ActionResult.new(Map.from_struct(result))
-      {:ok, result} -> Aikido.ActionResult.new(result)
-      error -> error
+      {:ok, %Aikido.Types.ActionResult{} = result} ->
+        Aikido.Types.ActionResult.new(Map.from_struct(result))
+
+      {:ok, result} ->
+        Aikido.Types.ActionResult.new(result)
+
+      error ->
+        error
     end
   end
 

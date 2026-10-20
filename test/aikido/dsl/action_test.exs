@@ -18,7 +18,9 @@ defmodule Aikido.NativeActionTest.Actions.Implementation do
         _opts,
         _context
       ) do
-    Aikido.ActionResult.new(state: %{count: input.arguments.state.count + input.arguments.amount})
+    Aikido.Types.ActionResult.new(
+      state: %{count: input.arguments.state.count + input.arguments.amount}
+    )
   end
 
   @impl true
@@ -27,7 +29,7 @@ defmodule Aikido.NativeActionTest.Actions.Implementation do
         _opts,
         _context
       ) do
-    Aikido.ActionResult.new(state: %{count: 100}, directives: [input.arguments.directive])
+    Aikido.Types.ActionResult.new(state: %{count: 100}, directives: [input.arguments.directive])
   end
 
   @impl true
@@ -36,7 +38,7 @@ defmodule Aikido.NativeActionTest.Actions.Implementation do
         _opts,
         _context
       ) do
-    Aikido.ActionResult.new(state: input.arguments.state)
+    Aikido.Types.ActionResult.new(state: input.arguments.state)
   end
 
   @impl true
@@ -47,7 +49,7 @@ defmodule Aikido.NativeActionTest.Actions.Implementation do
       ) do
     runtime = input.context.aikido
 
-    Aikido.ActionResult.new(state: Map.take(runtime, [:agent_id, :signal, :slice_config]))
+    Aikido.Types.ActionResult.new(state: Map.take(runtime, [:agent_id, :signal, :slice_config]))
   end
 
   @impl true
@@ -56,7 +58,7 @@ defmodule Aikido.NativeActionTest.Actions.Implementation do
         _opts,
         _context
       ) do
-    Aikido.ActionResult.new(state: %{}, directives: :invalid)
+    Aikido.Types.ActionResult.new(state: %{}, directives: :invalid)
   end
 end
 
@@ -64,20 +66,20 @@ defmodule Aikido.NativeActionTest.Actions do
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
   actions do
-    action :increment, Aikido.ActionResult do
+    action :increment, Aikido.Types.ActionResult do
       description "Increment typed state."
       argument :state, :map, allow_nil?: false
       argument :amount, :integer, allow_nil?: false, default: 1, constraints: [min: 1]
       run Aikido.NativeActionTest.Actions.Implementation
     end
 
-    action :emit, Aikido.ActionResult do
+    action :emit, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :directive, :term, allow_nil?: false
       run Aikido.NativeActionTest.Actions.Implementation
     end
 
-    action :prepared, Aikido.ActionResult do
+    action :prepared, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
 
       prepare fn input, _context ->
@@ -89,12 +91,12 @@ defmodule Aikido.NativeActionTest.Actions do
       run Aikido.NativeActionTest.Actions.Implementation
     end
 
-    action :runtime, Aikido.ActionResult do
+    action :runtime, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       run Aikido.NativeActionTest.Actions.Implementation
     end
 
-    action :invalid_result, Aikido.ActionResult do
+    action :invalid_result, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       run Aikido.NativeActionTest.Actions.Implementation
     end
@@ -141,12 +143,7 @@ defmodule Aikido.NativeActionTest do
 
   test "actions declare the shared result type" do
     assert Ash.Resource.Info.action(Aikido.NativeActionTest.Actions, :increment).returns ==
-             Aikido.ActionResult
-  end
-
-  test "payload introspection excludes runtime state" do
-    assert Keyword.keys(Aikido.ActionRef.schema({Aikido.NativeActionTest.Actions, :increment})) ==
-             [:amount]
+             Aikido.Types.ActionResult
   end
 
   test "arguments retain native defaults" do
@@ -156,12 +153,12 @@ defmodule Aikido.NativeActionTest do
   end
 
   test "native input casting coerces strings" do
-    assert {:ok, %Aikido.ActionResult{state: %{count: 5}, directives: []}} =
+    assert {:ok, %Aikido.Types.ActionResult{state: %{count: 5}, directives: []}} =
              run(:increment, %{amount: "3"})
   end
 
   test "native defaults apply when arguments are omitted" do
-    assert {:ok, %Aikido.ActionResult{state: %{count: 3}, directives: []}} = run(:increment)
+    assert {:ok, %Aikido.Types.ActionResult{state: %{count: 3}, directives: []}} = run(:increment)
   end
 
   test "native constraints reject invalid values" do
@@ -177,27 +174,28 @@ defmodule Aikido.NativeActionTest do
   end
 
   test "preparations and native before-action hooks execute" do
-    assert {:ok, %Aikido.ActionResult{state: %{prepared: true}, directives: []}} = run(:prepared)
+    assert {:ok, %Aikido.Types.ActionResult{state: %{prepared: true}, directives: []}} =
+             run(:prepared)
   end
 
   test "results are a reusable Ash type" do
-    assert Ash.Type.NewType.new_type?(Aikido.ActionResult)
+    assert Ash.Type.NewType.new_type?(Aikido.Types.ActionResult)
 
-    assert {:ok, %Aikido.ActionResult{state: %{count: 1}, directives: []}} =
-             Aikido.ActionResult.new(state: %{count: 1})
+    assert {:ok, %Aikido.Types.ActionResult{state: %{count: 1}, directives: []}} =
+             Aikido.Types.ActionResult.new(state: %{count: 1})
   end
 
   test "known directives validate" do
     directive = Aikido.Directives.stop(:normal)
 
-    assert {:ok, %Aikido.ActionResult{directives: [^directive]}} =
-             Aikido.ActionResult.new(state: %{}, directives: [directive])
+    assert {:ok, %Aikido.Types.ActionResult{directives: [^directive]}} =
+             Aikido.Types.ActionResult.new(state: %{}, directives: [directive])
   end
 
   test "custom directive behaviours validate" do
     directive = %Aikido.NativeActionTest.CustomDirective{value: 1}
 
-    assert {:ok, %Aikido.ActionResult{state: %{count: 100}, directives: [^directive]}} =
+    assert {:ok, %Aikido.Types.ActionResult{state: %{count: 100}, directives: [^directive]}} =
              run(:emit, %{directive: directive})
   end
 
@@ -224,7 +222,7 @@ defmodule Aikido.NativeActionTest do
         amount: 4
       })
 
-    assert {:ok, %Aikido.ActionResult{state: %{count: 6}}} = Ash.run_action(input)
+    assert {:ok, %Aikido.Types.ActionResult{state: %{count: 6}}} = Ash.run_action(input)
   end
 
   test "runtime context preserves signal and mount configuration" do
@@ -237,7 +235,7 @@ defmodule Aikido.NativeActionTest do
     }
 
     assert {:ok,
-            %Aikido.ActionResult{
+            %Aikido.Types.ActionResult{
               state: %{
                 agent_id: "agent",
                 signal: ^signal,

@@ -5,6 +5,10 @@ defmodule Aikido.Actions.Lifecycle.StopSelf do
   def run(input, _opts, _context) do
     reason = input.arguments[:reason]
     directive = Aikido.Directives.stop(reason)
-    Aikido.ActionResult.new(state: %{stopping: true, reason: reason}, directives: [directive])
+
+    Aikido.Types.ActionResult.new(
+      state: %{stopping: true, reason: reason},
+      directives: [directive]
+    )
   end
 end

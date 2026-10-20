@@ -16,7 +16,7 @@ defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction.Implementa
   def run(input, _opts, _context) do
     slice = input.arguments.state
     ctx = input.context.aikido
-    Aikido.ActionResult.new(state: %{slice | last_tags: ctx[:tags] || []}, directives: [])
+    Aikido.Types.ActionResult.new(state: %{slice | last_tags: ctx[:tags] || []}, directives: [])
   end
 end
 
@@ -42,7 +42,7 @@ defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.MiddlewareAgent do
   end
 
   actions do
-    action :reduce_inspect, Aikido.ActionResult do
+    action :reduce_inspect, Aikido.Types.ActionResult do
       argument :state, :term
 
       run AikidoTest.AgentServer.MiddlewarePipelineTest.InspectAction.Implementation

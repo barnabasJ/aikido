@@ -7,7 +7,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.EmitDirectiveActi
       input.arguments.directive
 
     slice = input.arguments.state
-    Aikido.ActionResult.new(state: slice || %{}, directives: [directive])
+    Aikido.Types.ActionResult.new(state: slice || %{}, directives: [directive])
   end
 end
 
@@ -28,7 +28,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.HarnessAgent do
   end
 
   actions do
-    action :emit_directive, Aikido.ActionResult do
+    action :emit_directive, Aikido.Types.ActionResult do
       argument :state, :term
       argument :directive, :term, allow_nil?: false
 

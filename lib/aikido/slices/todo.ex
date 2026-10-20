@@ -34,7 +34,7 @@ defmodule Aikido.Slices.Todo do
   end
 
   actions do
-    action :todo_add, Aikido.ActionResult do
+    action :todo_add, Aikido.Types.ActionResult do
       argument :state, :term
       argument :id, :string, allow_nil?: false
       argument :text, :string, allow_nil?: false
@@ -44,33 +44,33 @@ defmodule Aikido.Slices.Todo do
       run {Aikido.Slices.Todo.Implementation, action: :add}
     end
 
-    action :todo_remove, Aikido.ActionResult do
+    action :todo_remove, Aikido.Types.ActionResult do
       argument :state, :term
       argument :id, :string, allow_nil?: false
       run {Aikido.Slices.Todo.Implementation, action: :remove}
     end
 
-    action :todo_activate, Aikido.ActionResult do
+    action :todo_activate, Aikido.Types.ActionResult do
       argument :state, :term
       argument :id, :string, allow_nil?: false
       run {Aikido.Slices.Todo.Implementation, action: :activate}
     end
 
-    action :todo_complete, Aikido.ActionResult do
+    action :todo_complete, Aikido.Types.ActionResult do
       argument :state, :term
       argument :id, :string, allow_nil?: false
       argument :result, :term
       run {Aikido.Slices.Todo.Implementation, action: :complete}
     end
 
-    action :todo_block, Aikido.ActionResult do
+    action :todo_block, Aikido.Types.ActionResult do
       argument :state, :term
       argument :id, :string, allow_nil?: false
       argument :reason, :term, allow_nil?: false
       run {Aikido.Slices.Todo.Implementation, action: :block}
     end
 
-    action :expire, Aikido.ActionResult do
+    action :expire, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :id, :string, allow_nil?: false

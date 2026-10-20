@@ -110,7 +110,7 @@ defmodule Aikido.PreparedToolsTest do
       signal =
         Jido.Signal.new!("ai.react.tools.ready", %{request_id: "old", prepared_tools: {[], %{}}})
 
-      assert {:ok, %Aikido.ActionResult{state: ^current, directives: []}} =
+      assert {:ok, %Aikido.Types.ActionResult{state: ^current, directives: []}} =
                then(signal, fn signal ->
                  Aikido.Slices.AiReact
                  |> Ash.ActionInput.for_action(

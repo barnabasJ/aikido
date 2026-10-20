@@ -14,17 +14,17 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.CounterSlice do
   end
 
   actions do
-    action :bump, Aikido.ActionResult do
+    action :bump, Aikido.Types.ActionResult do
       argument :state, :term
       run Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation
     end
 
-    action :escape, Aikido.ActionResult do
+    action :escape, Aikido.Types.ActionResult do
       argument :state, :term
       run Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation
     end
 
-    action :unbound, Aikido.ActionResult do
+    action :unbound, Aikido.Types.ActionResult do
       argument :state, :term
       run Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation
     end
@@ -38,7 +38,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.BumpAction.Implementation do
   def run(input, _opts, _context) do
     slice = input.arguments.state
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{slice | count: (Map.get(slice, :count) || 0) + 1},
       directives: []
     )
@@ -51,7 +51,11 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.EscapeAction.Implementation do
   @impl true
   def run(input, _opts, _context) do
     slice = input.arguments.state
-    Aikido.ActionResult.new(state: Map.put(slice || %{count: 0}, :tagged, true), directives: [])
+
+    Aikido.Types.ActionResult.new(
+      state: Map.put(slice || %{count: 0}, :tagged, true),
+      directives: []
+    )
   end
 end
 
@@ -61,7 +65,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.UnboundAction.Implementation do
   @impl true
   def run(input, _opts, _context) do
     slice = input.arguments.state
-    Aikido.ActionResult.new(state: Map.put(slice || %{}, :stamped, true), directives: [])
+    Aikido.Types.ActionResult.new(state: Map.put(slice || %{}, :stamped, true), directives: [])
   end
 end
 

@@ -3,25 +3,25 @@ defmodule Aikido.AgentServer.RuntimeActions do
   use Ash.Resource, domain: Aikido.RuntimeDomain, data_layer: Ash.DataLayer.Simple
 
   actions do
-    action :query_children, Aikido.ActionResult do
+    action :query_children, Aikido.Types.ActionResult do
       description "Reply with the agent's child process identifiers."
       run Aikido.AgentServer.Actions.QueryChildren
     end
 
-    action :cancel, Aikido.ActionResult do
+    action :cancel, Aikido.Types.ActionResult do
       argument :state, :term
       argument :reason, :term, description: "Cancellation reason", default: :cancelled
       description "Handle cancellation requests"
       run Aikido.Actions.Control.Cancel
     end
 
-    action :noop, Aikido.ActionResult do
+    action :noop, Aikido.Types.ActionResult do
       argument :state, :term
       description "No-operation, acknowledges signal without changes"
       run Aikido.Actions.Control.Noop
     end
 
-    action :forward, Aikido.ActionResult do
+    action :forward, Aikido.Types.ActionResult do
       argument :state, :term
       argument :target_pid, :term, description: "Target process PID", allow_nil?: false
       argument :signal_type, :string, description: "New signal type (optional)", default: nil
@@ -31,7 +31,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       run Aikido.Actions.Control.Forward
     end
 
-    action :broadcast, Aikido.ActionResult do
+    action :broadcast, Aikido.Types.ActionResult do
       argument :state, :term
       argument :topic, :string, description: "PubSub topic", allow_nil?: false
       argument :signal_type, :string, description: "Signal type to broadcast", allow_nil?: false
@@ -41,7 +41,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       run Aikido.Actions.Control.Broadcast
     end
 
-    action :reply, Aikido.ActionResult do
+    action :reply, Aikido.Types.ActionResult do
       argument :state, :term
       argument :signal_type, :string, description: "Reply signal type", allow_nil?: false
       argument :payload, :map, description: "Reply payload", default: %{}
@@ -49,7 +49,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       run Aikido.Actions.Control.Reply
     end
 
-    action :notify_parent, Aikido.ActionResult do
+    action :notify_parent, Aikido.Types.ActionResult do
       argument :state, :term
 
       argument :signal_type, :string,
@@ -62,7 +62,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       run Aikido.Actions.Lifecycle.NotifyParent
     end
 
-    action :notify_pid, Aikido.ActionResult do
+    action :notify_pid, Aikido.Types.ActionResult do
       argument :state, :term
       argument :target_pid, :term, description: "Target process PID", allow_nil?: false
       argument :signal_type, :string, description: "Signal type to emit", allow_nil?: false
@@ -78,7 +78,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       run Aikido.Actions.Lifecycle.NotifyPid
     end
 
-    action :spawn_child, Aikido.ActionResult do
+    action :spawn_child, Aikido.Types.ActionResult do
       argument :state, :term
       argument :agent_module, :atom, description: "Agent module to spawn", allow_nil?: false
       argument :tag, :atom, description: "Tag for tracking this child", allow_nil?: false
@@ -93,14 +93,14 @@ defmodule Aikido.AgentServer.RuntimeActions do
       run Aikido.Actions.Lifecycle.SpawnChild
     end
 
-    action :stop_self, Aikido.ActionResult do
+    action :stop_self, Aikido.Types.ActionResult do
       argument :state, :term
       argument :reason, :term, description: "Reason for stopping", default: :normal
       description "Request graceful termination of this agent"
       run Aikido.Actions.Lifecycle.StopSelf
     end
 
-    action :stop_child, Aikido.ActionResult do
+    action :stop_child, Aikido.Types.ActionResult do
       argument :state, :term
       argument :tag, :atom, description: "Tag of child to stop", allow_nil?: false
       argument :reason, :term, description: "Reason for stopping", default: :normal
@@ -108,7 +108,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       run Aikido.Actions.Lifecycle.StopChild
     end
 
-    action :schedule_signal, Aikido.ActionResult do
+    action :schedule_signal, Aikido.Types.ActionResult do
       argument :state, :term
 
       argument :delay_ms, :integer,
@@ -123,7 +123,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       run Aikido.Actions.Scheduling.ScheduleSignal
     end
 
-    action :schedule_timeout, Aikido.ActionResult do
+    action :schedule_timeout, Aikido.Types.ActionResult do
       argument :state, :term
 
       argument :timeout_ms, :integer,
@@ -141,7 +141,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       run Aikido.Actions.Scheduling.ScheduleTimeout
     end
 
-    action :schedule_cron, Aikido.ActionResult do
+    action :schedule_cron, Aikido.Types.ActionResult do
       argument :state, :term
       argument :cron, :string, description: "Cron expression", allow_nil?: false
       argument :job_id, :term, description: "Job identifier for cancellation", default: nil
@@ -152,7 +152,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       run Aikido.Actions.Scheduling.ScheduleCron
     end
 
-    action :cancel_cron, Aikido.ActionResult do
+    action :cancel_cron, Aikido.Types.ActionResult do
       argument :state, :term
       argument :job_id, :term, description: "Job identifier to cancel", allow_nil?: false
       description "Cancel a scheduled cron job"

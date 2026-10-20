@@ -19,7 +19,7 @@ defmodule Aikido.AgentServer.Actions.QueryChildren do
         {Aikido.AgentServer.Queries, :build_children_reply, []}
       )
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %Aikido.Agent.SliceUpdate{slices: %{}},
       directives: List.wrap(directive)
     )

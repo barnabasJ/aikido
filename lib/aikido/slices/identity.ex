@@ -60,7 +60,7 @@ defmodule Aikido.Slices.Identity do
   end
 
   actions do
-    action :ensure, Aikido.ActionResult do
+    action :ensure, Aikido.Types.ActionResult do
       argument :state, :term
 
       argument :profile, :map,
@@ -71,7 +71,7 @@ defmodule Aikido.Slices.Identity do
       run {Aikido.Slices.Identity.Implementation, action: :ensure}
     end
 
-    action :evolve, Aikido.ActionResult do
+    action :evolve, Aikido.Types.ActionResult do
       argument :state, :term
       argument :days, :integer, description: "Days of simulated time to add", default: 0
       argument :years, :integer, description: "Years of simulated time to add", default: 0
@@ -79,7 +79,7 @@ defmodule Aikido.Slices.Identity do
       run {Aikido.Slices.Identity.Implementation, action: :evolve}
     end
 
-    action :update_profile, Aikido.ActionResult do
+    action :update_profile, Aikido.Types.ActionResult do
       argument :state, :term
 
       argument :profile, :map,

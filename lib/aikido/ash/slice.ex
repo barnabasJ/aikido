@@ -3,7 +3,7 @@ defmodule Aikido.Ash.Slice do
   Embedded Ash resource extension for agent slices.
 
   Use with `data_layer: :embedded`. Declare native generic actions on the slice
-  resource, returning `Aikido.ActionResult`. Routed actions receive `state`
+  resource, returning `Aikido.Types.ActionResult`. Routed actions receive `state`
   (the current slice value) and typed payload arguments. The agent pipeline
   applies that returned state and executes the directives after the action.
   Slice actions are pure and must never perform side effects; return directives

@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Move the shared action return contract to `Aikido.Types.ActionResult`. Generate
+  public signal arguments directly from native Ash argument metadata and remove
+  the redundant `Aikido.ActionRef` schema conversion helper.
+
 - Use native Ash tracer contexts across signal, directive and asynchronous task
   boundaries. Remove Aikido's separate trace IDs and process-dictionary tracing;
   preserve span ancestry through AI work and result signals, and restore context
@@ -197,7 +201,7 @@
 - Declare the built-in children query on a shared runtime resource and implement
   it with `Ash.Resource.Actions.Implementation`, preserving domain state.
 - Replace the custom action DSL with native Ash generic actions and a shared
-  `Aikido.ActionResult` contract that validates returned directives. Agents may
+  `Aikido.Types.ActionResult` contract that validates returned directives. Agents may
   declare reducers directly; built-in slices and the example app use native
   resource/action targets.
 - Initialize and validate agent state through native Ash resource attributes

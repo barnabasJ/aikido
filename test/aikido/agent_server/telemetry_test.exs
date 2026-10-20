@@ -4,7 +4,11 @@ defmodule AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementatio
   @impl true
   def run(_input, _opts, _context) do
     signal = struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{}, source: "/test")
-    Aikido.ActionResult.new(state: %{}, directives: [%Aikido.Directives.Emit{signal: signal}])
+
+    Aikido.Types.ActionResult.new(
+      state: %{},
+      directives: [%Aikido.Directives.Emit{signal: signal}]
+    )
   end
 end
 
@@ -13,7 +17,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implement
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{},
       directives: [%Aikido.Directives.Schedule{delay_ms: 100, message: :tick}]
     )
@@ -40,12 +44,12 @@ defmodule AikidoTest.AgentServer.TelemetryTest.TelemetryAgent do
   end
 
   actions do
-    action :emit_directive, Aikido.ActionResult do
+    action :emit_directive, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.AgentServer.TelemetryTest.EmitDirectiveAction.Implementation
     end
 
-    action :schedule_directive, Aikido.ActionResult do
+    action :schedule_directive, Aikido.Types.ActionResult do
       argument :state, :term
 
       run AikidoTest.AgentServer.TelemetryTest.ScheduleDirectiveAction.Implementation

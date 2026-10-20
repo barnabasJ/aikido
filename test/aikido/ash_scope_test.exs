@@ -2,7 +2,7 @@ defmodule AikidoTest.ScopeReducer do
   use Ash.Resource.Actions.Implementation
 
   def run(input, _, context) do
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{
         observed: %{
           actor: context.actor,
@@ -28,7 +28,7 @@ defmodule AikidoTest.ScopedAgent do
   end
 
   actions do
-    action :reduce, Aikido.ActionResult do
+    action :reduce, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       run AikidoTest.ScopeReducer

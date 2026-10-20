@@ -40,7 +40,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
   end
 
   test "transitions an idle slice to :setup and prepares tools before the model call" do
-    {:ok, %Aikido.ActionResult{state: new_slice, directives: [directive]}} =
+    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [directive]}} =
       then(ask_signal(), fn signal ->
         Aikido.Slices.AiReact
         |> Ash.ActionInput.for_action(:ask, Map.put(signal.data || %{}, :state, idle_slice()),
@@ -81,7 +81,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
   end
 
   test "omits the system message when no system_prompt is given" do
-    {:ok, %Aikido.ActionResult{state: new_slice, directives: [_]}} =
+    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [_]}} =
       then(ask_signal(%{system_prompt: nil}), fn signal ->
         Aikido.Slices.AiReact
         |> Ash.ActionInput.for_action(:ask, Map.put(signal.data || %{}, :state, idle_slice()),
@@ -109,7 +109,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
         tool_results_received: [%{id: "stale"}]
       })
 
-    {:ok, %Aikido.ActionResult{state: new_slice, directives: [_]}} =
+    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [_]}} =
       then(ask_signal(), fn signal ->
         Aikido.Slices.AiReact
         |> Ash.ActionInput.for_action(:ask, Map.put(signal.data || %{}, :state, slice),
@@ -142,7 +142,7 @@ defmodule Aikido.Slices.AiReact.AskTest do
   end
 
   test "accepts the ask when the slice is nil (uninitialized)" do
-    {:ok, %Aikido.ActionResult{state: %{status: :setup}, directives: [%PrepareTools{}]}} =
+    {:ok, %Aikido.Types.ActionResult{state: %{status: :setup}, directives: [%PrepareTools{}]}} =
       then(ask_signal(), fn signal ->
         Aikido.Slices.AiReact
         |> Ash.ActionInput.for_action(:ask, Map.put(signal.data || %{}, :state, nil),

@@ -6,7 +6,10 @@ defmodule AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation do
     signal =
       struct!(Jido.Signal, id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test")
 
-    Aikido.ActionResult.new(state: %{}, directives: [%Aikido.Directives.Emit{signal: signal}])
+    Aikido.Types.ActionResult.new(
+      state: %{},
+      directives: [%Aikido.Directives.Emit{signal: signal}]
+    )
   end
 end
 
@@ -30,7 +33,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent do
   end
 
   actions do
-    action :emit_test, Aikido.ActionResult do
+    action :emit_test, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.Agent.SignalHandlingTest.EmitTestAction.Implementation
     end

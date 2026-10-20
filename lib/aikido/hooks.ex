@@ -49,7 +49,7 @@ defmodule Aikido.Hooks do
 
     cond do
       state.request_id != data.request_id ->
-        Aikido.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(state: state)
 
       data.mode == :async ->
         state =
@@ -58,10 +58,10 @@ defmodule Aikido.Hooks do
             _ -> state
           end
 
-        Aikido.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(state: state)
 
       state.status not in [:setup, :running] || not Map.has_key?(pending, data.token) ->
-        Aikido.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(state: state)
 
       true ->
         {continuation, pending} = Map.pop!(pending, data.token)
@@ -88,7 +88,7 @@ defmodule Aikido.Hooks do
         do: enqueue_context(state, data[:name] || "async", data.text),
         else: state
 
-    Aikido.ActionResult.new(state: state)
+    Aikido.Types.ActionResult.new(state: state)
   end
 
   defp steps(%LLMCall{} = effect),
@@ -101,7 +101,7 @@ defmodule Aikido.Hooks do
 
   defp advance(state, [], status, directives) do
     state = state |> Map.put(:status, status) |> Map.put(:hook_terminal, nil)
-    Aikido.ActionResult.new(state: state, directives: directives)
+    Aikido.Types.ActionResult.new(state: state, directives: directives)
   end
 
   defp advance(state, [{:event, event, payload} | rest], status, directives) do
@@ -134,7 +134,7 @@ defmodule Aikido.Hooks do
         |> Map.put(:hooks_pending, Map.put(pending, token, %{queue: rest, status: status}))
         |> Map.put(:status, if(status == :setup, do: :setup, else: :running))
 
-      Aikido.ActionResult.new(state: state, directives: directives ++ [effect])
+      Aikido.Types.ActionResult.new(state: state, directives: directives ++ [effect])
     end
   end
 
@@ -184,6 +184,6 @@ defmodule Aikido.Hooks do
       |> Map.put(:hooks_pending, %{})
       |> Map.put(:hook_terminal, nil)
 
-    Aikido.ActionResult.new(state: state)
+    Aikido.Types.ActionResult.new(state: state)
   end
 end

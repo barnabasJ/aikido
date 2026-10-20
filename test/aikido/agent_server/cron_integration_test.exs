@@ -9,7 +9,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementat
     count = Map.get(slice, :tick_count, 0)
     ticks = Map.get(slice, :ticks, [])
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{tick_count: count + 1, ticks: ticks ++ [params]},
       directives: []
     )
@@ -32,7 +32,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implemen
 
     timezone = Map.get(params, :timezone)
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
-    Aikido.ActionResult.new(state: %{}, directives: [directive])
+    Aikido.Types.ActionResult.new(state: %{}, directives: [directive])
   end
 end
 
@@ -44,7 +44,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CancelCronAction.Implementa
     job_id =
       input.arguments.job_id
 
-    Aikido.ActionResult.new(state: %{}, directives: [Aikido.Directives.cron_cancel(job_id)])
+    Aikido.Types.ActionResult.new(state: %{}, directives: [Aikido.Directives.cron_cancel(job_id)])
   end
 end
 
@@ -69,14 +69,14 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent do
   end
 
   actions do
-    action :cron_count, Aikido.ActionResult do
+    action :cron_count, Aikido.Types.ActionResult do
       argument :state, :term
       argument :data, :map, allow_nil?: false, default: %{}
 
       run AikidoTest.AgentServer.CronIntegrationTest.CronCountAction.Implementation
     end
 
-    action :register_cron, Aikido.ActionResult do
+    action :register_cron, Aikido.Types.ActionResult do
       argument :state, :term
       argument :cron, :string, allow_nil?: false
       argument :job_id, :term
@@ -86,7 +86,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent do
       run AikidoTest.AgentServer.CronIntegrationTest.RegisterCronAction.Implementation
     end
 
-    action :cancel_cron, Aikido.ActionResult do
+    action :cancel_cron, Aikido.Types.ActionResult do
       argument :state, :term
       argument :job_id, :term, allow_nil?: false
 

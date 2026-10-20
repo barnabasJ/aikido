@@ -74,7 +74,7 @@ defmodule Aikido.Slices.FSM do
       change Aikido.Slices.FSM.Initialize
     end
 
-    action :transition, Aikido.ActionResult do
+    action :transition, Aikido.Types.ActionResult do
       argument :state, :term, allow_nil?: false
       argument :to, :string, allow_nil?: false, constraints: [trim?: false, allow_empty?: true]
       run Aikido.Slices.FSM.Transition

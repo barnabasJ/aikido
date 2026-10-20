@@ -23,19 +23,19 @@ defmodule AgentExamples.Worker do
   end
 
   actions do
-    action :work, Aikido.ActionResult do
+    action :work, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :text, :string, allow_nil?: false
       run {AgentExamples.Worker.Implementation, action: :work}
     end
 
-    action :completed, Aikido.ActionResult do
+    action :completed, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :result, :string, allow_nil?: false
       run {AgentExamples.Worker.Implementation, action: :completed}
     end
 
-    action :failed, Aikido.ActionResult do
+    action :failed, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :reason, :term, allow_nil?: false
       run {AgentExamples.Worker.Implementation, action: :failed}

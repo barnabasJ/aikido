@@ -14,7 +14,7 @@ defmodule AgentExamples.Worker.Implementation do
           error_type: "worker.failed"
         )
 
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state: %{state | status: :working, result: nil, error: nil},
         directives: [directive]
       )
@@ -23,14 +23,14 @@ defmodule AgentExamples.Worker.Implementation do
 
   @impl true
   def run(input, [action: :completed], _context) do
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{input.arguments.state | status: :completed, result: input.arguments.result}
     )
   end
 
   @impl true
   def run(input, [action: :failed], _context) do
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{input.arguments.state | status: :failed, error: input.arguments.reason}
     )
   end

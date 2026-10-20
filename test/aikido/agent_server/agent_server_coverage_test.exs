@@ -35,7 +35,7 @@ defmodule AikidoTest.AgentServerCoverageTest.ManyDirectivesAction.Implementation
         %Aikido.Directives.Emit{signal: signal}
       end
 
-    Aikido.ActionResult.new(state: %{directive_count: count}, directives: directives)
+    Aikido.Types.ActionResult.new(state: %{directive_count: count}, directives: directives)
   end
 end
 
@@ -57,7 +57,7 @@ defmodule AikidoTest.AgentServerCoverageTest.ManyDirectivesAgent do
   end
 
   actions do
-    action :many_directives, Aikido.ActionResult do
+    action :many_directives, Aikido.Types.ActionResult do
       argument :state, :term
       argument :count, :integer, default: 10
       run AikidoTest.AgentServerCoverageTest.ManyDirectivesAction.Implementation
@@ -70,7 +70,10 @@ defmodule AikidoTest.AgentServerCoverageTest.CompleteAction.Implementation do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
-    Aikido.ActionResult.new(state: %{status: :completed, last_answer: "done!"}, directives: [])
+    Aikido.Types.ActionResult.new(
+      state: %{status: :completed, last_answer: "done!"},
+      directives: []
+    )
   end
 end
 
@@ -79,7 +82,7 @@ defmodule AikidoTest.AgentServerCoverageTest.FailAction.Implementation do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{status: :failed, error: "something went wrong"},
       directives: []
     )
@@ -96,7 +99,7 @@ defmodule AikidoTest.AgentServerCoverageTest.DelayCompleteAction.Implementation 
 
     AikidoTest.TestActions.SlowAction.Implementation.work(delay)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{status: :completed, last_answer: "delayed done!"},
       directives: []
     )
@@ -123,17 +126,17 @@ defmodule AikidoTest.AgentServerCoverageTest.CompletionAgent do
   end
 
   actions do
-    action :complete, Aikido.ActionResult do
+    action :complete, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.AgentServerCoverageTest.CompleteAction.Implementation
     end
 
-    action :fail, Aikido.ActionResult do
+    action :fail, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.AgentServerCoverageTest.FailAction.Implementation
     end
 
-    action :delay_complete, Aikido.ActionResult do
+    action :delay_complete, Aikido.Types.ActionResult do
       argument :state, :term
       argument :delay_ms, :integer, default: 50
       run AikidoTest.AgentServerCoverageTest.DelayCompleteAction.Implementation

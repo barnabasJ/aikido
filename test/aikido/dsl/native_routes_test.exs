@@ -2,7 +2,7 @@ defmodule Aikido.Dsl.NativeRoutesTest.Reducer do
   use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(input, _opts, _context), do: Aikido.ActionResult.new(state: input.arguments.state)
+  def run(input, _opts, _context), do: Aikido.Types.ActionResult.new(state: input.arguments.state)
 end
 
 defmodule Aikido.Dsl.NativeRoutesTest.Slice do
@@ -14,7 +14,7 @@ defmodule Aikido.Dsl.NativeRoutesTest.Slice do
   end
 
   actions do
-    action :reduce, Aikido.ActionResult do
+    action :reduce, Aikido.Types.ActionResult do
       public? false
       argument :state, :map
       run Aikido.Dsl.NativeRoutesTest.Reducer

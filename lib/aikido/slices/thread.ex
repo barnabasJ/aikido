@@ -84,7 +84,7 @@ defmodule Aikido.Slices.Thread do
   end
 
   actions do
-    action :append, Aikido.ActionResult do
+    action :append, Aikido.Types.ActionResult do
       argument :state, :term
 
       argument :entry, :union,
@@ -98,13 +98,13 @@ defmodule Aikido.Slices.Thread do
       run {Aikido.Slices.Thread.Implementation, action: :append}
     end
 
-    action :clear, Aikido.ActionResult do
+    action :clear, Aikido.Types.ActionResult do
       argument :state, :term
       description "Reset the thread to an empty state."
       run {Aikido.Slices.Thread.Implementation, action: :clear}
     end
 
-    action :ensure, Aikido.ActionResult do
+    action :ensure, Aikido.Types.ActionResult do
       argument :state, :term
 
       argument :metadata, :map,

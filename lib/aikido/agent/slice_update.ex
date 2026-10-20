@@ -10,7 +10,7 @@ defmodule Aikido.Agent.SliceUpdate do
   ## Usage
 
       def run(input, _opts, _context) do
-        Aikido.ActionResult.new(
+        Aikido.Types.ActionResult.new(
           state: %Aikido.Agent.SliceUpdate{
             slices: %{
               team: input.arguments.team,

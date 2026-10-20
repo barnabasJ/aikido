@@ -16,7 +16,7 @@ defmodule Aikido.Actions.Control.Forward do
       struct!(Jido.Signal, id: nil, type: final_type, data: final_payload, source: final_source)
 
     directive = Aikido.Directives.emit_to_pid(out_signal, pid)
-    Aikido.ActionResult.new(state: %{forwarded_to: pid}, directives: [directive])
+    Aikido.Types.ActionResult.new(state: %{forwarded_to: pid}, directives: [directive])
   end
 
   defp resolve_type(type, _original) when is_binary(type) do

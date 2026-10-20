@@ -4,7 +4,7 @@ defmodule AgentExamples.Checklist.Implementation do
   @impl true
   def run(input, [action: :add], _context) do
     state = input.arguments.state
-    Aikido.ActionResult.new(state: %{state | items: state.items ++ [input.arguments.item]})
+    Aikido.Types.ActionResult.new(state: %{state | items: state.items ++ [input.arguments.item]})
   end
 
   @impl true
@@ -12,7 +12,7 @@ defmodule AgentExamples.Checklist.Implementation do
     %{state: state, item: item} = input.arguments
 
     if item in state.items do
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state: %{state | items: List.delete(state.items, item), completed: state.completed + 1}
       )
     else

@@ -10,6 +10,6 @@ defmodule Aikido.Actions.Lifecycle.NotifyPid do
     mode = input.arguments[:delivery_mode]
     signal = struct!(Jido.Signal, id: nil, type: type, data: payload, source: source)
     directive = Aikido.Directives.emit_to_pid(signal, pid, delivery_mode: mode)
-    Aikido.ActionResult.new(state: %{sent_to: pid}, directives: [directive])
+    Aikido.Types.ActionResult.new(state: %{sent_to: pid}, directives: [directive])
   end
 end

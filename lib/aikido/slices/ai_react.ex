@@ -174,7 +174,7 @@ defmodule Aikido.Slices.AiReact do
   @behaviour Aikido.Durable.Codec
 
   actions do
-    action :handoff_completed, Aikido.ActionResult do
+    action :handoff_completed, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :request_id, :string, allow_nil?: false
@@ -184,7 +184,7 @@ defmodule Aikido.Slices.AiReact do
       run {Aikido.Slices.AiReact.Implementation, action: :handoff_completed}
     end
 
-    action :handoff_failed, Aikido.ActionResult do
+    action :handoff_failed, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :request_id, :string, allow_nil?: false
@@ -193,7 +193,7 @@ defmodule Aikido.Slices.AiReact do
       run {Aikido.Slices.AiReact.Implementation, action: :handoff_failed}
     end
 
-    action :tools_ready, Aikido.ActionResult do
+    action :tools_ready, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :request_id, :string, allow_nil?: false
@@ -201,7 +201,7 @@ defmodule Aikido.Slices.AiReact do
       run {Aikido.Slices.AiReact.Implementation, action: :tools_ready}
     end
 
-    action :ask, Aikido.ActionResult do
+    action :ask, Aikido.Types.ActionResult do
       argument :state, :term
       argument :options, Aikido.AI.Options
       argument :tool_options, {:array, :tuple}, constraints: @keyword_constraints
@@ -220,19 +220,19 @@ defmodule Aikido.Slices.AiReact do
       run {Aikido.Slices.AiReact.Implementation, action: :ask}
     end
 
-    action :message, Aikido.ActionResult do
+    action :message, Aikido.Types.ActionResult do
       argument :state, :term
       argument :text, :string, allow_nil?: false
       run {Aikido.Slices.AiReact.Implementation, action: :message}
     end
 
-    action :handoff, Aikido.ActionResult do
+    action :handoff, Aikido.Types.ActionResult do
       argument :state, :term
       argument :messages, {:array, :term}, allow_nil?: false
       run {Aikido.Slices.AiReact.Implementation, action: :handoff}
     end
 
-    action :deliver, Aikido.ActionResult do
+    action :deliver, Aikido.Types.ActionResult do
       argument :state, :term
       argument :metadata, :map, default: %{}
       argument :text, :string, allow_nil?: false
@@ -240,13 +240,13 @@ defmodule Aikido.Slices.AiReact do
       run {Aikido.Slices.AiReact.Implementation, action: :deliver}
     end
 
-    action :todo_changed, Aikido.ActionResult do
+    action :todo_changed, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       run {Aikido.Slices.AiReact.Implementation, action: :todo_changed}
     end
 
-    action :stream, Aikido.ActionResult do
+    action :stream, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :request_id, :string, allow_nil?: false
@@ -257,13 +257,13 @@ defmodule Aikido.Slices.AiReact do
       run {Aikido.Slices.AiReact.Implementation, action: :stream}
     end
 
-    action :cancel, Aikido.ActionResult do
+    action :cancel, Aikido.Types.ActionResult do
       argument :state, :term
       argument :request_id, :string, default: nil
       run {Aikido.Slices.AiReact.Implementation, action: :cancel}
     end
 
-    action :failed, Aikido.ActionResult do
+    action :failed, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :reason, :term, allow_nil?: false
@@ -272,7 +272,7 @@ defmodule Aikido.Slices.AiReact do
       run {Aikido.Slices.AiReact.Implementation, action: :failed}
     end
 
-    action :llm_turn, Aikido.ActionResult do
+    action :llm_turn, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :iteration, :integer
@@ -282,7 +282,7 @@ defmodule Aikido.Slices.AiReact do
       run {Aikido.Slices.AiReact.Implementation, action: :llm_turn}
     end
 
-    action :tool_result, Aikido.ActionResult do
+    action :tool_result, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :tool_call_id, :string, allow_nil?: false
@@ -293,7 +293,7 @@ defmodule Aikido.Slices.AiReact do
       run {Aikido.Slices.AiReact.Implementation, action: :tool_result}
     end
 
-    action :hook_completed, Aikido.ActionResult do
+    action :hook_completed, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :request_id, :string, allow_nil?: false
@@ -305,7 +305,7 @@ defmodule Aikido.Slices.AiReact do
       run {Aikido.Slices.AiReact.Implementation, action: :hook_completed}
     end
 
-    action :hook_context, Aikido.ActionResult do
+    action :hook_context, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :request_id, :string, allow_nil?: false

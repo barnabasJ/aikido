@@ -12,7 +12,7 @@ defmodule Aikido.Actions.Scheduling.ScheduleTimeout do
 
     directive = Aikido.Directives.schedule(timeout, signal)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{timeout_set: id, expires_in_ms: timeout},
       directives: [directive]
     )

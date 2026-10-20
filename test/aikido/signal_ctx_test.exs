@@ -5,7 +5,7 @@ defmodule AikidoTest.SignalCtxTest.ContextProbe.Implementation do
   def run(input, _opts, _context) do
     ctx = input.context.aikido
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{workflow_id: Map.get(ctx, :workflow_id), user: Map.get(ctx, :user)},
       directives: []
     )
@@ -17,7 +17,7 @@ defmodule AikidoTest.SignalCtxTest.ContextProbe do
   use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
 
   actions do
-    action :context_probe, Aikido.ActionResult do
+    action :context_probe, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.SignalCtxTest.ContextProbe.Implementation
     end
@@ -90,7 +90,7 @@ defmodule AikidoTest.SignalCtxTest do
         |> Aikido.SignalCtx.put(:user, "alice")
 
       assert {:ok,
-              %Aikido.ActionResult{
+              %Aikido.Types.ActionResult{
                 state: %{workflow_id: "abc-123", user: "alice"},
                 directives: []
               }} =
@@ -107,7 +107,8 @@ defmodule AikidoTest.SignalCtxTest do
     end
 
     test "without an explicit signal, ctx defaults to %{}" do
-      assert {:ok, %Aikido.ActionResult{state: %{workflow_id: nil, user: nil}, directives: []}} =
+      assert {:ok,
+              %Aikido.Types.ActionResult{state: %{workflow_id: nil, user: nil}, directives: []}} =
                then(struct!(Jido.Signal, id: nil, type: "test", source: "/test"), fn signal ->
                  AikidoTest.SignalCtxTest.ContextProbe
                  |> Ash.ActionInput.for_action(

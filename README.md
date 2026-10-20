@@ -38,7 +38,7 @@ Set `instance MyApp.Aikido` in the agent block for agents using that runtime.
 ## An agent and its public interface
 
 Define native Ash actions directly on an agent or on a mounted slice. Runtime
-state is supplied internally; each action returns `Aikido.ActionResult`:
+state is supplied internally; each action returns `Aikido.Types.ActionResult`:
 
 ```elixir
 defmodule MyApp.Counter do
@@ -57,7 +57,7 @@ defmodule MyApp.Counter do
   end
 
   actions do
-    action :add, Aikido.ActionResult do
+    action :add, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :amount, :integer, allow_nil?: false
 
@@ -72,7 +72,7 @@ defmodule MyApp.Increment do
   @impl true
   def run(input, _opts, _context) do
     state = input.arguments.state
-    Aikido.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
+    Aikido.Types.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
   end
 end
 

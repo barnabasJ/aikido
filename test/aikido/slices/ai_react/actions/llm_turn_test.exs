@@ -55,7 +55,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
           finish_reason: if(tool_calls == [], do: :stop, else: :tool_calls)
         )
 
-      assert {:ok, %Aikido.ActionResult{state: state, directives: _directives}} =
+      assert {:ok, %Aikido.Types.ActionResult{state: state, directives: _directives}} =
                then(signal("req_1", response), fn signal ->
                  Aikido.Slices.AiReact
                  |> Ash.ActionInput.for_action(
@@ -94,7 +94,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
 
   describe("final answer turn") do
     test "appends the assistant message and settles :completed with the text" do
-      {:ok, %Aikido.ActionResult{state: new_slice, directives: directives}} =
+      {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: directives}} =
         then(signal("req_1", final_turn("42")), fn signal ->
           Aikido.Slices.AiReact
           |> Ash.ActionInput.for_action(
@@ -119,7 +119,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
     test "stores pending calls, emits one ToolExec per call, increments iteration" do
       calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
 
-      {:ok, %Aikido.ActionResult{state: new_slice, directives: directives}} =
+      {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: directives}} =
         then(signal("req_1", tool_turn(calls)), fn signal ->
           Aikido.Slices.AiReact
           |> Ash.ActionInput.for_action(
@@ -150,7 +150,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
         %{id: "call_2", name: "test_add", arguments: %{"a" => 3, "b" => 4}}
       ]
 
-      {:ok, %Aikido.ActionResult{state: new_slice, directives: directives}} =
+      {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: directives}} =
         then(signal("req_1", tool_turn(calls)), fn signal ->
           Aikido.Slices.AiReact
           |> Ash.ActionInput.for_action(
@@ -171,7 +171,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
       slice = running_slice(iteration: 3, max_iterations: 4)
       calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
 
-      {:ok, %Aikido.ActionResult{state: new_slice, directives: directives}} =
+      {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: directives}} =
         then(signal("req_1", tool_turn(calls)), fn signal ->
           Aikido.Slices.AiReact
           |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, slice),
@@ -192,7 +192,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
     test "drops a signal whose request_id doesn't match the slice" do
       slice = running_slice(request_id: "req_active")
 
-      {:ok, %Aikido.ActionResult{state: returned, directives: []}} =
+      {:ok, %Aikido.Types.ActionResult{state: returned, directives: []}} =
         then(signal("req_old", final_turn("ignored")), fn signal ->
           Aikido.Slices.AiReact
           |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, slice),
@@ -208,7 +208,7 @@ defmodule Aikido.Slices.AiReact.LLMTurnTest do
     test "drops a signal that arrives after the slice has already terminated" do
       slice = %{running_slice() | status: :completed, result: "earlier"}
 
-      {:ok, %Aikido.ActionResult{state: returned, directives: []}} =
+      {:ok, %Aikido.Types.ActionResult{state: returned, directives: []}} =
         then(signal("req_1", final_turn("ignored")), fn signal ->
           Aikido.Slices.AiReact
           |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, slice),

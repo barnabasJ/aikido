@@ -32,7 +32,7 @@ defmodule Aikido.Slices.AiWorker do
   end
 
   actions do
-    action :accept, Aikido.ActionResult do
+    action :accept, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :task_id, :string, allow_nil?: false
@@ -52,20 +52,20 @@ defmodule Aikido.Slices.AiWorker do
       run Aikido.Slices.AiWorker.Accept
     end
 
-    action :cancel_task, Aikido.ActionResult do
+    action :cancel_task, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       argument :task_id, :string, allow_nil?: false
       run Aikido.Slices.AiWorker.Cancel
     end
 
-    action :observe, Aikido.ActionResult do
+    action :observe, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       run Aikido.Slices.AiWorker.Observe
     end
 
-    action :settle, Aikido.ActionResult do
+    action :settle, Aikido.Types.ActionResult do
       public? false
       argument :state, :term
       run Aikido.Slices.AiWorker.Settle

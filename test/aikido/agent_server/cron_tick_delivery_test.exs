@@ -13,7 +13,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction.Implementa
       end
 
     count = Map.get(slice, :tick_count, 0)
-    Aikido.ActionResult.new(state: Map.put(slice, :tick_count, count + 1), directives: [])
+    Aikido.Types.ActionResult.new(state: Map.put(slice, :tick_count, count + 1), directives: [])
   end
 end
 
@@ -32,7 +32,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.RegisterCronAction.Impleme
       struct!(Jido.Signal, id: nil, type: "cron.tick", data: %{}, source: "/test/cron")
 
     directive = Aikido.Directives.cron(cron_expr, tick_signal, job_id: job_id)
-    Aikido.ActionResult.new(state: slice, directives: [directive])
+    Aikido.Types.ActionResult.new(state: slice, directives: [directive])
   end
 end
 
@@ -55,13 +55,13 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent do
   end
 
   actions do
-    action :tick_count, Aikido.ActionResult do
+    action :tick_count, Aikido.Types.ActionResult do
       argument :state, :term
 
       run AikidoTest.AgentServer.CronTickDeliveryTest.TickCountAction.Implementation
     end
 
-    action :register_cron, Aikido.ActionResult do
+    action :register_cron, Aikido.Types.ActionResult do
       argument :state, :term
       argument :cron, :string, allow_nil?: false
       argument :job_id, :term

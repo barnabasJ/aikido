@@ -5,7 +5,7 @@ defmodule AikidoTest.AshFixtures.Increment.Implementation do
   def run(input, _opts, _context) do
     state = input.arguments.state
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{count: state.count + input.arguments.amount},
       directives: []
     )
@@ -19,7 +19,7 @@ defmodule AikidoTest.AshFixtures.GeneratedIncrement.Implementation do
   def run(input, _opts, _context) do
     state = input.arguments.state
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{state | count: state.count + input.arguments.amount},
       directives: []
     )
@@ -33,7 +33,7 @@ defmodule AikidoTest.AshFixtures.DataIncrement.Implementation do
   def run(input, _opts, _context) do
     state = input.arguments.state
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{state | count: state.count + input.arguments.data.amount},
       directives: []
     )
@@ -59,7 +59,7 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter do
   end
 
   actions do
-    action :reduce_increment, Aikido.ActionResult do
+    action :reduce_increment, Aikido.Types.ActionResult do
       argument :state, :term
 
       argument :amount, :integer,
@@ -73,7 +73,7 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter do
   end
 
   actions do
-    action :reduce_data, Aikido.ActionResult do
+    action :reduce_data, Aikido.Types.ActionResult do
       argument :state, :term
 
       argument :data, :map,
@@ -101,7 +101,7 @@ defmodule AikidoTest.AshFixtures.Counter do
   end
 
   actions do
-    action :reduce_increment, Aikido.ActionResult do
+    action :reduce_increment, Aikido.Types.ActionResult do
       argument :state, :term
       argument :amount, :integer, default: 1
       run AikidoTest.AshFixtures.Increment.Implementation
@@ -118,7 +118,7 @@ defmodule AikidoTest.AshFixtures.CounterSlice.Implementation do
         _opts,
         _context
       ) do
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{count: input.arguments.state.count + Map.get(input.arguments.data, :amount, 1)}
     )
   end
@@ -129,7 +129,7 @@ defmodule AikidoTest.AshFixtures.CounterSlice.Implementation do
         _opts,
         _context
       ) do
-    Aikido.ActionResult.new(state: input.arguments.state)
+    Aikido.Types.ActionResult.new(state: input.arguments.state)
   end
 
   @impl true
@@ -138,7 +138,7 @@ defmodule AikidoTest.AshFixtures.CounterSlice.Implementation do
         _opts,
         _context
       ) do
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{count: input.arguments.state.count + Map.get(input.arguments.data, :amount, 1)}
     )
   end
@@ -152,20 +152,20 @@ defmodule AikidoTest.AshFixtures.CounterSlice do
   end
 
   actions do
-    action :increment, Aikido.ActionResult do
+    action :increment, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :data, :map, allow_nil?: false
       run AikidoTest.AshFixtures.CounterSlice.Implementation
     end
 
-    action :internal, Aikido.ActionResult do
+    action :internal, Aikido.Types.ActionResult do
       public? false
       argument :state, :map, allow_nil?: false
       argument :data, :map, allow_nil?: false
       run AikidoTest.AshFixtures.CounterSlice.Implementation
     end
 
-    action :tick, Aikido.ActionResult do
+    action :tick, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :data, :map, allow_nil?: false
       run AikidoTest.AshFixtures.CounterSlice.Implementation
@@ -231,7 +231,7 @@ defmodule AikidoTest.AshFixtures.TaskAction.Implementation do
         }
       )
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{state | result: result},
       directives: [Aikido.Directives.emit_to_pid(reply, data.reply_to)]
     )
@@ -253,7 +253,7 @@ defmodule AikidoTest.AshFixtures.TaskWorker do
   end
 
   actions do
-    action :task_echo, Aikido.ActionResult do
+    action :task_echo, Aikido.Types.ActionResult do
       argument :state, :term
       argument :text, :string, allow_nil?: false
       argument :task_id, :string, allow_nil?: false

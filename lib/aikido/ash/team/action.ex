@@ -9,8 +9,11 @@ defmodule Aikido.Ash.Team.Action do
     config = Aikido.Dsl.Agent.Info.team_config(resource)
 
     case Aikido.Ash.Team.Engine.handle(runtime.signal, input.arguments.state, runtime, config) do
-      {:ok, state, directives} -> Aikido.ActionResult.new(state: state, directives: directives)
-      {:error, _} = error -> error
+      {:ok, state, directives} ->
+        Aikido.Types.ActionResult.new(state: state, directives: directives)
+
+      {:error, _} = error ->
+        error
     end
   end
 end

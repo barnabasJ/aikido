@@ -10,7 +10,7 @@ defmodule Aikido.Actions.Scheduling.ScheduleSignal do
     signal = struct!(Jido.Signal, id: nil, type: type, data: payload, source: source)
     directive = Aikido.Directives.schedule(delay, signal)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{scheduled_for_ms: delay, signal_type: type},
       directives: [directive]
     )

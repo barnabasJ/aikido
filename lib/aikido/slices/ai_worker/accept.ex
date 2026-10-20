@@ -15,10 +15,10 @@ defmodule Aikido.Slices.AiWorker.Accept do
 
     cond do
       duplicate? ->
-        Aikido.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(state: state)
 
       state.pending || context.agent.state.ai.status in [:setup, :running, :waiting] ->
-        Aikido.ActionResult.new(state: Map.update(state, :queue, [data], &(&1 ++ [data])))
+        Aikido.Types.ActionResult.new(state: Map.update(state, :queue, [data], &(&1 ++ [data])))
 
       true ->
         start_task(state, data, context)
@@ -48,7 +48,7 @@ defmodule Aikido.Slices.AiWorker.Accept do
       struct!(Jido.Signal, id: nil, type: "ai.react.ask", data: payload, source: "/aikido")
       |> Aikido.SignalCtx.put_ctx(Map.get(data, :signal_context, %{}))
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: %{state | pending: pending},
       directives: [Aikido.Directives.emit_to_pid(ask, context.agent_pid)]
     )

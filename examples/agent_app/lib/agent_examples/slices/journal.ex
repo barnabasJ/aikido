@@ -7,7 +7,7 @@ defmodule AgentExamples.Journal do
   end
 
   actions do
-    action :append, Aikido.ActionResult do
+    action :append, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :text, :string, allow_nil?: false
       run AgentExamples.Journal.Implementation

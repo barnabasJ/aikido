@@ -5,7 +5,7 @@ defmodule AikidoTest.Signal.CallTest.EchoAction.Implementation do
   def run(input, _opts, _context) do
     signal = input.context.aikido.signal
     directive = Aikido.Signal.Call.reply(signal, "aikido.test.echo.reply", %{ok: true})
-    Aikido.ActionResult.new(state: %{}, directives: List.wrap(directive))
+    Aikido.Types.ActionResult.new(state: %{}, directives: List.wrap(directive))
   end
 end
 
@@ -14,7 +14,7 @@ defmodule AikidoTest.Signal.CallTest.SilentAction.Implementation do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
-    Aikido.ActionResult.new(state: %{}, directives: [])
+    Aikido.Types.ActionResult.new(state: %{}, directives: [])
   end
 end
 
@@ -29,12 +29,12 @@ defmodule AikidoTest.Signal.CallTest.CallTestAgent do
   end
 
   actions do
-    action :echo_action, Aikido.ActionResult do
+    action :echo_action, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.Signal.CallTest.EchoAction.Implementation
     end
 
-    action :silent_action, Aikido.ActionResult do
+    action :silent_action, Aikido.Types.ActionResult do
       argument :state, :term
       run AikidoTest.Signal.CallTest.SilentAction.Implementation
     end

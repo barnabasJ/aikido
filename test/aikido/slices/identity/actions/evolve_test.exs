@@ -9,7 +9,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
 
   describe("native evolve action") do
     test "initializes identity when slice is nil" do
-      assert {:ok, %Aikido.ActionResult{state: %State{} = evolved, directives: []}} =
+      assert {:ok, %Aikido.Types.ActionResult{state: %State{} = evolved, directives: []}} =
                then(sig(%{days: 0, years: 0}), fn signal ->
                  Aikido.Slices.Identity
                  |> Ash.ActionInput.for_action(:evolve, Map.put(signal.data || %{}, :state, nil),
@@ -25,7 +25,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
     test "evolves identity by years" do
       identity = State.new()
 
-      assert {:ok, %Aikido.ActionResult{state: %State{} = evolved, directives: []}} =
+      assert {:ok, %Aikido.Types.ActionResult{state: %State{} = evolved, directives: []}} =
                then(sig(%{days: 0, years: 5}), fn signal ->
                  Aikido.Slices.Identity
                  |> Ash.ActionInput.for_action(
@@ -43,7 +43,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
     test "evolves identity by days" do
       identity = State.new()
 
-      assert {:ok, %Aikido.ActionResult{state: %State{} = evolved, directives: []}} =
+      assert {:ok, %Aikido.Types.ActionResult{state: %State{} = evolved, directives: []}} =
                then(sig(%{days: 730, years: 0}), fn signal ->
                  Aikido.Slices.Identity
                  |> Ash.ActionInput.for_action(
@@ -61,7 +61,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
     test "evolves identity by combined years and days" do
       identity = State.new()
 
-      assert {:ok, %Aikido.ActionResult{state: %State{} = evolved, directives: []}} =
+      assert {:ok, %Aikido.Types.ActionResult{state: %State{} = evolved, directives: []}} =
                then(sig(%{days: 365, years: 3}), fn signal ->
                  Aikido.Slices.Identity
                  |> Ash.ActionInput.for_action(
@@ -80,7 +80,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
       identity = State.new()
       assert identity.rev == 0
 
-      assert {:ok, %Aikido.ActionResult{state: %State{} = evolved, directives: []}} =
+      assert {:ok, %Aikido.Types.ActionResult{state: %State{} = evolved, directives: []}} =
                then(sig(%{days: 0, years: 1}), fn signal ->
                  Aikido.Slices.Identity
                  |> Ash.ActionInput.for_action(

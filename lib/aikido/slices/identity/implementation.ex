@@ -8,10 +8,10 @@ defmodule Aikido.Slices.Identity.Implementation do
 
     case slice do
       %Aikido.Slices.Identity{} = identity ->
-        Aikido.ActionResult.new(state: identity, directives: [])
+        Aikido.Types.ActionResult.new(state: identity, directives: [])
 
       _ ->
-        Aikido.ActionResult.new(
+        Aikido.Types.ActionResult.new(
           state:
             Aikido.Slices.Identity.new(Keyword.merge(Map.to_list(data), now: timestamp(input))),
           directives: []
@@ -31,7 +31,7 @@ defmodule Aikido.Slices.Identity.Implementation do
         Keyword.merge(Map.to_list(params), now: timestamp(input))
       )
 
-    Aikido.ActionResult.new(state: evolved, directives: [])
+    Aikido.Types.ActionResult.new(state: evolved, directives: [])
   end
 
   @impl true
@@ -40,7 +40,7 @@ defmodule Aikido.Slices.Identity.Implementation do
     slice = input.arguments.state
     identity = update_profile_ensure_identity(slice, input)
 
-    Aikido.ActionResult.new(
+    Aikido.Types.ActionResult.new(
       state: Aikido.Slices.Identity.update_profile(identity, profile, now: timestamp(input)),
       directives: []
     )

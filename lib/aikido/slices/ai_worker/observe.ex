@@ -16,12 +16,12 @@ defmodule Aikido.Slices.AiWorker.Observe do
           source: "/aikido"
         )
 
-      Aikido.ActionResult.new(
+      Aikido.Types.ActionResult.new(
         state: state,
         directives: [Aikido.Directives.emit_to_pid(observe, context.agent_pid)]
       )
     else
-      Aikido.ActionResult.new(state: state, directives: [])
+      Aikido.Types.ActionResult.new(state: state, directives: [])
     end
   end
 end

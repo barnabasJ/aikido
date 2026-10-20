@@ -24,7 +24,7 @@ defmodule Aikido.Ash.Verifiers.Agent do
 
       Enum.any?(routes, &invalid_action?(dsl, &1.action)) ->
         error(
-          "Agent routes require generic Ash actions with a :state argument and Aikido.ActionResult return type",
+          "Agent routes require generic Ash actions with a :state argument and Aikido.Types.ActionResult return type",
           resource
         )
 
@@ -54,7 +54,7 @@ defmodule Aikido.Ash.Verifiers.Agent do
         else: Ash.Resource.Info.action(resource, name)
 
     case definition do
-      %{type: :action, returns: Aikido.ActionResult, arguments: arguments} ->
+      %{type: :action, returns: Aikido.Types.ActionResult, arguments: arguments} ->
         !Enum.any?(arguments, &(&1.name == :state))
 
       _ ->

@@ -11,10 +11,10 @@ defmodule Aikido.Actions.Control.Reply do
       {:ok, pid} ->
         out = struct!(Jido.Signal, id: nil, type: type, data: payload, source: "/reply")
         directive = Aikido.Directives.emit_to_pid(out, pid)
-        Aikido.ActionResult.new(state: %{replied_to: pid}, directives: [directive])
+        Aikido.Types.ActionResult.new(state: %{replied_to: pid}, directives: [directive])
 
       :error ->
-        Aikido.ActionResult.new(
+        Aikido.Types.ActionResult.new(
           state: %{replied_to: nil, warning: "No reply_to found in signal"},
           directives: []
         )

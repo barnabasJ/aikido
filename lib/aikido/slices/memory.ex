@@ -100,7 +100,7 @@ defmodule Aikido.Slices.Memory do
   end
 
   actions do
-    action :append_to_space, Aikido.ActionResult do
+    action :append_to_space, Aikido.Types.ActionResult do
       argument :state, :term
       argument :space, :atom, description: "List space name.", allow_nil?: false
       argument :item, :term, description: "Item to append.", allow_nil?: false
@@ -108,7 +108,7 @@ defmodule Aikido.Slices.Memory do
       run {Aikido.Slices.Memory.Implementation, action: :append_to_space}
     end
 
-    action :delete_from_space, Aikido.ActionResult do
+    action :delete_from_space, Aikido.Types.ActionResult do
       argument :state, :term
       argument :space, :atom, description: "Map space name.", allow_nil?: false
       argument :key, :term, description: "Key to remove.", allow_nil?: false
@@ -116,14 +116,14 @@ defmodule Aikido.Slices.Memory do
       run {Aikido.Slices.Memory.Implementation, action: :delete_from_space}
     end
 
-    action :delete_space, Aikido.ActionResult do
+    action :delete_space, Aikido.Types.ActionResult do
       argument :state, :term
       argument :space, :atom, description: "Space name to delete.", allow_nil?: false
       description "Delete a non-reserved space."
       run {Aikido.Slices.Memory.Implementation, action: :delete_space}
     end
 
-    action :ensure, Aikido.ActionResult do
+    action :ensure, Aikido.Types.ActionResult do
       argument :state, :term
       argument :metadata, :map, description: "Optional metadata for new memory.", default: %{}
       argument :id, :string, description: "Optional explicit memory id."
@@ -131,7 +131,7 @@ defmodule Aikido.Slices.Memory do
       run {Aikido.Slices.Memory.Implementation, action: :ensure}
     end
 
-    action :ensure_space, Aikido.ActionResult do
+    action :ensure_space, Aikido.Types.ActionResult do
       argument :state, :term
       argument :space, :atom, description: "Space name to ensure.", allow_nil?: false
 
@@ -146,7 +146,7 @@ defmodule Aikido.Slices.Memory do
       run {Aikido.Slices.Memory.Implementation, action: :ensure_space}
     end
 
-    action :put_in_space, Aikido.ActionResult do
+    action :put_in_space, Aikido.Types.ActionResult do
       argument :state, :term
       argument :space, :atom, description: "Map space name.", allow_nil?: false
       argument :key, :term, description: "Key to set.", allow_nil?: false
@@ -155,7 +155,7 @@ defmodule Aikido.Slices.Memory do
       run {Aikido.Slices.Memory.Implementation, action: :put_in_space}
     end
 
-    action :put_space, Aikido.ActionResult do
+    action :put_space, Aikido.Types.ActionResult do
       argument :state, :term
       argument :space, :atom, description: "Space name to set.", allow_nil?: false
 
@@ -167,7 +167,7 @@ defmodule Aikido.Slices.Memory do
       run {Aikido.Slices.Memory.Implementation, action: :put_space}
     end
 
-    action :update_space, Aikido.ActionResult do
+    action :update_space, Aikido.Types.ActionResult do
       argument :state, :term
       argument :space, :atom, description: "Space name to update.", allow_nil?: false
 
