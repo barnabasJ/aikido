@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Use Ash typed structs for AI execution options and Lua hook decisions instead
+  of data-only embedded resources. Cast parent references and validate
+  parent-death policies through native startup option field types.
+
 - Cast slice configuration directly with Ash's constrained map type after
   resolving defaults and overrides. Read config declarations from Spark entities;
   remove the generated config action and its passthrough implementation.

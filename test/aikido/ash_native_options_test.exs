@@ -1,6 +1,28 @@
 defmodule AikidoTest.AshNativeOptionsTest do
   use ExUnit.Case, async: true
 
+  test "AI options retain defaults, casting and constraints as an Ash type" do
+    input =
+      Ash.ActionInput.for_action(Aikido.Slices.AiReact, :ask, %{
+        query: "Hello",
+        request_id: "typed-options",
+        options: %{model_timeout_ms: "5000"}
+      })
+
+    assert input.valid?, inspect(input.errors)
+    assert input.arguments.options.model_timeout_ms == 5_000
+    assert input.arguments.options.streaming == false
+
+    invalid =
+      Ash.ActionInput.for_action(Aikido.Slices.AiReact, :ask, %{
+        query: "Hello",
+        request_id: "invalid-typed-options",
+        options: %{model_timeout_ms: 0}
+      })
+
+    refute invalid.valid?
+  end
+
   test "native option fields preserve unknown keys, ordering, duplicates and nested values" do
     options = [provider_specific: [nested: true], observer: self(), repeat: 1, repeat: nil]
 

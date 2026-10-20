@@ -272,7 +272,11 @@ options %{
 }
 ```
 
-Options are a native `Aikido.AI.Options` contract. A per-request options value
+Options use the `Aikido.AI.Options` typed struct. Hook decisions likewise use
+`Aikido.Hooks.Decision`; neither requires a resource or create action. Hook
+configuration retains its embedded resource so native casting handles an
+omitted or nil `:function` request callback correctly.
+A per-request options value
 replaces the configured options. Retry defaults are zero. Tool retries must be
 explicitly enabled and are appropriate only when repeating the tool is safe.
 All attempts and backoff share one overall deadline. Cancellation and owner

@@ -177,6 +177,17 @@ defmodule AikidoTest.AgentServer.OptionsTest do
   end
 
   describe("parent validation") do
+    test "rejects unknown parent-death policies through the typed field" do
+      assert {:error, %Ash.Error.Changes.InvalidAttribute{field: :on_parent_death}} =
+               Aikido.AgentServer.Options.new(
+                 @base_opts ++
+                   [
+                     agent_module: AikidoTest.AgentServer.OptionsTest.ValidAgent,
+                     on_parent_death: :unknown
+                   ]
+               )
+    end
+
     test "accepts nil parent" do
       {:ok, opts} =
         Aikido.AgentServer.Options.new(
@@ -220,7 +231,7 @@ defmodule AikidoTest.AgentServer.OptionsTest do
             [agent_module: AikidoTest.AgentServer.OptionsTest.ValidAgent, parent: "invalid"]
         )
 
-      assert error.message =~ "parent"
+      assert error.field == :parent
     end
   end
 end

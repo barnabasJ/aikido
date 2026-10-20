@@ -49,12 +49,13 @@ defmodule Aikido.AgentServer.Options do
       description:
         "Runtime-appended middleware modules. Each entry is a bare module or {Mod, opts_map}."
 
-    field :parent, :term, allow_nil?: true, description: "Parent reference for hierarchy"
+    field :parent, ParentRef, allow_nil?: true, description: "Parent reference for hierarchy"
 
     field :on_parent_death, :atom,
       allow_nil?: false,
       default: :stop,
-      description: "Behavior when parent dies"
+      description: "Behavior when parent dies",
+      constraints: [one_of: [:stop, :continue, :emit_orphan]]
 
     field :skip_schedules, :boolean,
       allow_nil?: false,
@@ -97,14 +98,8 @@ defmodule Aikido.AgentServer.Options do
   def new(attrs) when is_map(attrs) do
     attrs = normalize_attrs(attrs)
 
-    with {:ok, agent_module} <- validate_agent_module(attrs[:agent_module]),
-         {:ok, parent} <- validate_parent(attrs[:parent]) do
-      attrs =
-        attrs
-        |> Map.put(:agent_module, agent_module)
-        |> Map.put(:parent, parent)
-
-      super(attrs)
+    with {:ok, agent_module} <- validate_agent_module(attrs[:agent_module]) do
+      super(Map.put(attrs, :agent_module, agent_module))
     end
   end
 
@@ -162,16 +157,4 @@ defmodule Aikido.AgentServer.Options do
 
   defp validate_agent_module(_),
     do: {:error, Aikido.Error.validation_error("agent_module must be a module atom")}
-
-  defp validate_parent(nil), do: {:ok, nil}
-
-  defp validate_parent(%ParentRef{} = parent), do: {:ok, parent}
-
-  defp validate_parent(attrs) when is_map(attrs) do
-    ParentRef.new(attrs)
-  end
-
-  defp validate_parent(_) do
-    {:error, Aikido.Error.validation_error("parent must be nil or a ParentRef")}
-  end
 end

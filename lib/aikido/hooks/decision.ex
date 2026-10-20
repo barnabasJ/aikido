@@ -1,15 +1,14 @@
 defmodule Aikido.Hooks.Decision do
   @moduledoc "The validated result of a synchronous Lua hook."
-  use Ash.Resource, data_layer: :embedded
+  use Ash.TypedStruct
 
-  attributes do
-    attribute :decision, :atom,
+  typed_struct do
+    field :decision, :atom,
       constraints: [one_of: [:continue, :deny]],
       allow_nil?: false,
-      default: :continue,
-      public?: true
+      default: :continue
 
-    attribute :context, :string, public?: true
-    attribute :message, :string, public?: true
+    field :context, :string
+    field :message, :string
   end
 end
