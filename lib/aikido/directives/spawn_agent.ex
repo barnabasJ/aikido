@@ -122,10 +122,14 @@ defmodule Aikido.Directives.SpawnAgent do
       |> maybe_put_aikido(state.aikido)
       |> Map.to_list()
 
-    case Aikido.start_agent(
-           state.aikido || Aikido.Default,
-           agent_module,
-           Keyword.put(child_opts, :restart?, restart?)
+    case Aikido.Durable.start(
+           Aikido.durable_supervisor_name(state.aikido || Aikido.Default),
+           child_id,
+           agent: agent_module,
+           initial_state: Keyword.get(child_opts, :initial_state, %{}),
+           partition: child_partition,
+           agent_opts: child_opts,
+           permanent: restart?
          ) do
       {:ok, _pid} ->
         :ok

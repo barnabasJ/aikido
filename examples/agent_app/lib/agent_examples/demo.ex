@@ -21,7 +21,8 @@ defmodule AgentExamples.Demo do
       IO.inspect(notebook.journal.entries, label: "Notebook journal")
 
       worker = Agents.worker_start!(%{id: "demo-worker"})
-      worker_pid = Aikido.whereis(Aikido.Default, worker.id)
+
+      worker_pid = worker.pid
 
       result =
         after_signal(worker_pid, "worker.completed", fn ->

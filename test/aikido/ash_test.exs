@@ -200,7 +200,7 @@ defmodule AikidoTest.AshTest do
                Aikido.Ash.start(AikidoTest.AshFixtures.DefaultCounter, %{origin: "override"})
              )
 
-    assert is_pid(Aikido.whereis(Aikido.Default, record.id))
+    assert is_pid(AikidoTest.Case.agent_pid(Aikido.Default, record.id))
 
     assert {:error, _} =
              snapshot_result(
@@ -226,7 +226,7 @@ defmodule AikidoTest.AshTest do
     assert updated.count == 7
     assert {:ok, [read]} = AikidoTest.AshFixtures.Domain.counter_list()
     assert read.count == 7
-    pid = Aikido.whereis(AikidoTest.AshFixtures.Instance, "counter")
+    pid = AikidoTest.Case.agent_pid(AikidoTest.AshFixtures.Instance, "counter")
     ref = Process.monitor(pid)
     assert {:ok, %{status: :stopped}} = AikidoTest.AshFixtures.Domain.counter_stop(updated)
     assert_receive {:DOWN, ^ref, :process, ^pid, _}
@@ -348,14 +348,14 @@ defmodule AikidoTest.AshTest do
     assert {:error, %Ash.Error.Forbidden{}} =
              AikidoTest.AshFixtures.Domain.protected_start(%{id: "protected"})
 
-    assert Aikido.whereis(AikidoTest.AshFixtures.Instance, "protected") == nil
+    assert AikidoTest.Case.agent_pid(AikidoTest.AshFixtures.Instance, "protected") == nil
 
     assert {:ok, _} =
              AikidoTest.AshFixtures.Domain.protected_start(%{id: "protected"},
                actor: %{id: "user"}
              )
 
-    assert is_pid(Aikido.whereis(AikidoTest.AshFixtures.Instance, "protected"))
+    assert is_pid(AikidoTest.Case.agent_pid(AikidoTest.AshFixtures.Instance, "protected"))
   end
 
   test "slice schedules retain their runtime declarations" do

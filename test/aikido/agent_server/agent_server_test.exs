@@ -146,7 +146,7 @@ defmodule AikidoTest.AgentServerTest do
   describe("durable agent activation") do
     test("starts with agent module", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       assert Process.alive?(pid)
       GenServer.stop(pid)
@@ -154,7 +154,9 @@ defmodule AikidoTest.AgentServerTest do
 
     test("starts with custom id", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "custom-123")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "custom-123"
+        )
 
       {:ok, id} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.id} end)
       assert id == "custom-123"
@@ -163,15 +165,17 @@ defmodule AikidoTest.AgentServerTest do
 
     test("registers with DurableServer", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "registry-test")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "registry-test"
+        )
 
-      assert Aikido.whereis(aikido, "registry-test") == pid
+      assert AikidoTest.Case.agent_pid(aikido, "registry-test") == pid
       GenServer.stop(pid)
     end
 
     test("starts with initial_state seeded into slice path", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
           id: "prebuilt-456",
           initial_state: %{domain: %{counter: 99}}
         )
@@ -188,7 +192,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("starts with initial_state", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
           initial_state: %{domain: %{counter: 42}}
         )
 
@@ -203,30 +207,32 @@ defmodule AikidoTest.AgentServerTest do
   describe("durable supervision") do
     test("starts under DurableServer", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "dynamic-test")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "dynamic-test"
+        )
 
       assert Process.alive?(pid)
-      assert Aikido.whereis(aikido, "dynamic-test") == pid
-      Aikido.stop_agent(aikido, pid)
+      assert AikidoTest.Case.agent_pid(aikido, "dynamic-test") == pid
+      Aikido.Durable.stop(Aikido.durable_supervisor_name(aikido), pid)
     end
 
     test("recovers directly started durable agents after a crash", %{aikido: aikido}) do
       id = "dynamic-restart-test"
 
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: id)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: id)
 
       restarted_pid = AikidoTest.LifecycleWait.restart(pid)
       assert is_pid(restarted_pid)
       refute restarted_pid == pid
-      Aikido.stop_agent(aikido, restarted_pid)
+      Aikido.Durable.stop(Aikido.durable_supervisor_name(aikido), restarted_pid)
     end
   end
 
   describe("call/3 (sync)") do
     test("processes signal and returns agent", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -236,7 +242,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("processes multiple signals in sequence", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       for _ <- 1..5 do
         signal = Jido.Signal.new!("increment", %{}, source: "/test")
@@ -252,7 +258,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("records data from signal", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       signal = Jido.Signal.new!("record", %{message: "hello"}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -262,7 +268,9 @@ defmodule AikidoTest.AgentServerTest do
 
     test("works with agent ID string", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "call-id-test")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "call-id-test"
+        )
 
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -307,7 +315,7 @@ defmodule AikidoTest.AgentServerTest do
       end
 
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.InlineAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.InlineAgent)
 
       slow_signal = Jido.Signal.new!("slow", %{}, source: "/test")
       :erlang.trace(pid, true, [:receive])
@@ -394,7 +402,7 @@ defmodule AikidoTest.AgentServerTest do
       end
 
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.BufferedSignalAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.BufferedSignalAgent)
 
       slow_signal = Jido.Signal.new!("slow", %{}, source: "/test")
       :erlang.trace(pid, true, [:receive])
@@ -429,7 +437,7 @@ defmodule AikidoTest.AgentServerTest do
   describe("cast/2 (async)") do
     test("processes signal asynchronously", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
       assert :ok = Aikido.AgentServer.cast(pid, signal)
@@ -445,7 +453,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("processes multiple signals", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       for _ <- 1..5 do
         signal = Jido.Signal.new!("increment", %{}, source: "/test")
@@ -465,7 +473,9 @@ defmodule AikidoTest.AgentServerTest do
   describe("state/3") do
     test("returns projected fields from state via selector", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "state-test")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "state-test"
+        )
 
       {:ok, %{id: id, counter: counter, status: status}} =
         Aikido.AgentServer.state(pid, fn s ->
@@ -480,7 +490,9 @@ defmodule AikidoTest.AgentServerTest do
 
     test("works with agent ID string", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "state-id-test")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "state-id-test"
+        )
 
       {:ok, id} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.id} end)
       assert id == "state-id-test"
@@ -488,49 +500,53 @@ defmodule AikidoTest.AgentServerTest do
     end
   end
 
-  describe("whereis/1 and whereis/2") do
+  describe("whereis/1 and lookup") do
     test("whereis/1 returns pid for registered agent using default registry", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "whereis-test-1")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "whereis-test-1"
+        )
 
-      assert Aikido.whereis(aikido, "whereis-test-1") == pid
+      assert AikidoTest.Case.agent_pid(aikido, "whereis-test-1") == pid
       GenServer.stop(pid)
     end
 
     test("whereis/1 returns nil for unknown agent", %{aikido: aikido}) do
-      assert Aikido.whereis(aikido, "nonexistent") == nil
+      assert AikidoTest.Case.agent_pid(aikido, "nonexistent") == nil
     end
 
-    test("whereis/2 returns pid for registered agent in specific registry", %{aikido: aikido}) do
+    test("lookup returns pid for registered agent in specific registry", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "whereis-test-2")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "whereis-test-2"
+        )
 
-      assert Aikido.whereis(aikido, "whereis-test-2") == pid
+      assert AikidoTest.Case.agent_pid(aikido, "whereis-test-2") == pid
       GenServer.stop(pid)
     end
 
-    test("whereis/2 returns nil for unknown agent in specific registry", %{aikido: aikido}) do
-      assert Aikido.whereis(aikido, "nonexistent-2") == nil
+    test("lookup returns nil for unknown agent in specific registry", %{aikido: aikido}) do
+      assert AikidoTest.Case.agent_pid(aikido, "nonexistent-2") == nil
     end
 
-    test("whereis/3 resolves only within the requested partition", %{aikido: aikido}) do
+    test("partitioned lookup resolves only within the requested partition", %{aikido: aikido}) do
       {:ok, alpha_pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
           id: "whereis-shared",
           partition: :alpha
         )
 
       {:ok, beta_pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
           id: "whereis-shared",
           partition: :beta
         )
 
-      assert Aikido.whereis(aikido, "whereis-shared", partition: :alpha) == alpha_pid
+      assert AikidoTest.Case.agent_pid(aikido, "whereis-shared", partition: :alpha) == alpha_pid
 
-      assert Aikido.whereis(aikido, "whereis-shared", partition: :beta) == beta_pid
+      assert AikidoTest.Case.agent_pid(aikido, "whereis-shared", partition: :beta) == beta_pid
 
-      assert Aikido.whereis(aikido, "whereis-shared") == nil
+      assert AikidoTest.Case.agent_pid(aikido, "whereis-shared") == nil
       GenServer.stop(alpha_pid)
       GenServer.stop(beta_pid)
     end
@@ -539,7 +555,7 @@ defmodule AikidoTest.AgentServerTest do
   describe("alive?/1") do
     test("returns true for alive process", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       assert Aikido.AgentServer.alive?(pid)
       GenServer.stop(pid)
@@ -547,7 +563,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("returns false for dead process", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       GenServer.stop(pid)
       refute Aikido.AgentServer.alive?(pid)
@@ -555,7 +571,9 @@ defmodule AikidoTest.AgentServerTest do
 
     test("works with agent ID string", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "alive-test")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "alive-test"
+        )
 
       assert Aikido.AgentServer.alive?(pid)
       GenServer.stop(pid)
@@ -566,7 +584,7 @@ defmodule AikidoTest.AgentServerTest do
     @tag :capture_log
     test("Emit directive is processed", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       signal = Jido.Signal.new!("emit_test", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -582,7 +600,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("Error directive is processed", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       signal = Jido.Signal.new!("error_test", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -598,7 +616,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("Schedule directive schedules a delayed signal", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       signal = Jido.Signal.new!("schedule_test", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -619,7 +637,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("Stop directive stops the server", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       ref = Process.monitor(pid)
       signal = Jido.Signal.new!("stop_test", %{}, source: "/test")
@@ -634,7 +652,7 @@ defmodule AikidoTest.AgentServerTest do
       %{aikido: aikido}
     ) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       signal = Jido.Signal.new!("unknown.signal.type", %{}, source: "/test")
 
@@ -647,7 +665,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("aikido.agent.stop gracefully stops even without explicit routes", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       ref = Process.monitor(pid)
       signal = Jido.Signal.new!("aikido.agent.stop", %{reason: :shutdown}, source: "/test")
@@ -659,7 +677,7 @@ defmodule AikidoTest.AgentServerTest do
   describe("drain loop") do
     test("processes directives in order", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       for i <- 1..10 do
         signal = Jido.Signal.new!("record", %{index: i}, source: "/test")
@@ -682,7 +700,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("status transitions correctly", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       {:ok, status} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.status} end)
       assert status == :idle
@@ -693,7 +711,7 @@ defmodule AikidoTest.AgentServerTest do
   describe("status transitions") do
     test("starts as initializing then transitions to idle", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       {:ok, status} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.status} end)
       assert status == :idle
@@ -705,7 +723,7 @@ defmodule AikidoTest.AgentServerTest do
       %{aikido: aikido}
     ) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -778,7 +796,7 @@ defmodule AikidoTest.AgentServerTest do
       end
 
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.ScheduleTrackingAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.ScheduleTrackingAgent)
 
       signal = Jido.Signal.new!("start_schedule", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -863,7 +881,7 @@ defmodule AikidoTest.AgentServerTest do
       end
 
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.MultiScheduleAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.MultiScheduleAgent)
 
       signal = Jido.Signal.new!("schedule_many", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -944,7 +962,7 @@ defmodule AikidoTest.AgentServerTest do
       end
 
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.WrapScheduleAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.WrapScheduleAgent)
 
       signal = Jido.Signal.new!("schedule_atom", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -970,7 +988,7 @@ defmodule AikidoTest.AgentServerTest do
   describe("server resolution") do
     test("resolves pid directly", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
@@ -980,11 +998,13 @@ defmodule AikidoTest.AgentServerTest do
 
     test("resolves via tuple", %{aikido: aikido}) do
       {:ok, _pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "via-resolve-test")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "via-resolve-test"
+        )
 
       registry = Module.concat(aikido, ExternalRegistry)
       start_supervised!({Registry, keys: :unique, name: registry})
-      pid = Aikido.whereis(aikido, "via-resolve-test")
+      pid = AikidoTest.Case.agent_pid(aikido, "via-resolve-test")
 
       {:ok, :registered} =
         Aikido.AgentServer.state(pid, fn _ ->
@@ -996,12 +1016,12 @@ defmodule AikidoTest.AgentServerTest do
       signal = Jido.Signal.new!("increment", %{}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(via, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.counter == 1
-      GenServer.stop(Aikido.whereis(aikido, "via-resolve-test"))
+      GenServer.stop(AikidoTest.Case.agent_pid(aikido, "via-resolve-test"))
     end
 
     test("resolves string id", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
           id: "string-resolve-test"
         )
 
@@ -1012,10 +1032,10 @@ defmodule AikidoTest.AgentServerTest do
     end
 
     test("returns error for non-existent server", %{aikido: aikido}) do
-      assert Aikido.whereis(aikido, "nonexistent-server") == nil
+      assert AikidoTest.Case.agent_pid(aikido, "nonexistent-server") == nil
 
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       GenServer.stop(pid)
       refute Aikido.AgentServer.alive?(pid)
@@ -1033,7 +1053,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("alive? returns false for non-existent server", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       GenServer.stop(pid)
       refute Aikido.AgentServer.alive?(pid)
@@ -1043,7 +1063,7 @@ defmodule AikidoTest.AgentServerTest do
   describe("error handling") do
     test("unknown call returns error", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       result = GenServer.call(pid, :unknown_message)
       assert result == {:error, :unknown_call}
@@ -1052,7 +1072,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("unknown cast is ignored", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       GenServer.cast(pid, :unknown_message)
       assert {:ok, :responsive} = Aikido.AgentServer.state(pid, fn _ -> {:ok, :responsive} end)
@@ -1061,7 +1081,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("unknown info message is ignored", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       send(pid, :random_message)
       assert {:ok, :responsive} = Aikido.AgentServer.state(pid, fn _ -> {:ok, :responsive} end)
@@ -1072,7 +1092,9 @@ defmodule AikidoTest.AgentServerTest do
   describe("agent ID handling") do
     test("uses provided ID for the agent", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "struct-id-123")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "struct-id-123"
+        )
 
       {:ok, id} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.id} end)
       assert id == "struct-id-123"
@@ -1081,7 +1103,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test("generates ID when not provided", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       {:ok, id} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.id} end)
       assert is_binary(id)
@@ -1091,13 +1113,17 @@ defmodule AikidoTest.AgentServerTest do
 
     test("accepts opaque durable keys with stable runtime identifiers", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: :atom_id)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: :atom_id
+        )
 
       {:ok, id} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.id} end)
       assert is_binary(id)
 
       assert {:error, {:already_started, ^pid}} =
-               Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: :atom_id)
+               AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+                 id: :atom_id
+               )
 
       assert {:ok, ^id} = Aikido.AgentServer.state(pid, &{:ok, &1.id})
       GenServer.stop(pid)
@@ -1107,7 +1133,9 @@ defmodule AikidoTest.AgentServerTest do
   describe("termination") do
     test("terminates cleanly with :normal reason", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: "terminate-test")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent,
+          id: "terminate-test"
+        )
 
       monitor = Process.monitor(pid)
       GenServer.stop(pid, :normal)
@@ -1152,7 +1180,7 @@ defmodule AikidoTest.AgentServerTest do
       end
 
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.CounterAgent)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.CounterAgent)
 
       signals =
         for _ <- 1..10 do
@@ -1184,7 +1212,10 @@ defmodule AikidoTest.AgentServerTest do
 
     test("registers slice schedules on startup", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServerTest.AgentWithScheduledSlice
+        )
 
       {:ok, cron_jobs} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs} end)
       assert map_size(cron_jobs) == 1
@@ -1202,7 +1233,9 @@ defmodule AikidoTest.AgentServerTest do
 
     test("skips schedules when skip_schedules option is true", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.AgentWithScheduledSlice,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServerTest.AgentWithScheduledSlice,
           skip_schedules: true
         )
 
@@ -1213,7 +1246,10 @@ defmodule AikidoTest.AgentServerTest do
 
     test("cleans up cron jobs on termination", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServerTest.AgentWithScheduledSlice
+        )
 
       {:ok, cron_jobs} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs} end)
 

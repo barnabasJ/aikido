@@ -76,7 +76,7 @@ defmodule Aikido.PreparedToolsTest do
     assert {:ok, "done"} = Task.await(task)
 
     assert {:ok, nil} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.prepared_tools})
-    assert :ok = Aikido.stop_agent(ctx.aikido, pid)
+    assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(ctx.aikido), pid)
     assert {:ok, restored} = start_test_agent(ctx, Agent, id: id)
 
     expect(AshAi, :build_tools_and_registry, fn opts ->

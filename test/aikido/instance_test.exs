@@ -102,7 +102,9 @@ defmodule AikidoTest.InstanceTest do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
 
       {:ok, agent_pid} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "test-1"
         )
 
@@ -110,87 +112,130 @@ defmodule AikidoTest.InstanceTest do
       assert Process.alive?(agent_pid)
     end
 
-    test "shared whereis/2 looks up an agent by ID" do
+    test "shared lookup looks up an agent by ID" do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
 
       {:ok, agent_pid} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "lookup-test"
         )
 
-      found_pid = Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "lookup-test")
+      found_pid = AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "lookup-test")
       assert found_pid == agent_pid
     end
 
-    test "shared whereis/2 returns nil for unknown ID" do
+    test "shared lookup returns nil for unknown ID" do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
-      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "nonexistent") == nil
+      assert AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "nonexistent") == nil
     end
 
-    test "shared list_agents/1 lists all agents" do
+    test "shared members lists all agents" do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
 
       {:ok, _} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "list-1"
         )
 
       {:ok, _} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "list-2"
         )
 
-      agents = Aikido.list_agents(AikidoTest.InstanceTest.TestInstance)
+      agents =
+        Aikido.Durable.members(
+          Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance)
+        )
+
       ids = Enum.map(agents, fn {id, _pid} -> id end)
       assert "list-1" in ids
       assert "list-2" in ids
     end
 
-    test "shared agent_count/1 returns count of running agents" do
+    test "shared active membership count returns count of running agents" do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
-      assert Aikido.agent_count(AikidoTest.InstanceTest.TestInstance) == 0
+
+      assert Enum.count(
+               Aikido.Durable.members(
+                 Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance)
+               )
+             ) == 0
 
       {:ok, _} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "count-1"
         )
 
-      assert Aikido.agent_count(AikidoTest.InstanceTest.TestInstance) == 1
+      assert Enum.count(
+               Aikido.Durable.members(
+                 Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance)
+               )
+             ) == 1
 
       {:ok, _} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "count-2"
         )
 
-      assert Aikido.agent_count(AikidoTest.InstanceTest.TestInstance) == 2
+      assert Enum.count(
+               Aikido.Durable.members(
+                 Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance)
+               )
+             ) == 2
     end
 
     test "shared stop_agent/2 stops an agent by ID" do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
 
       {:ok, pid} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "stop-test"
         )
 
-      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "stop-test") != nil
+      assert AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "stop-test") != nil
       ref = Process.monitor(pid)
-      assert :ok = Aikido.stop_agent(AikidoTest.InstanceTest.TestInstance, "stop-test")
+
+      assert :ok =
+               Aikido.Durable.stop(
+                 Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance),
+                 "stop-test"
+               )
+
       assert_receive {:DOWN, ^ref, :process, ^pid, _}, 1000
 
-      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "stop-test") == nil
+      assert AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "stop-test") == nil
     end
 
     test "shared stop_agent/2 stops an agent by pid" do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
 
       {:ok, pid} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "stop-pid-test"
         )
 
       assert Process.alive?(pid)
-      assert :ok = Aikido.stop_agent(AikidoTest.InstanceTest.TestInstance, pid)
+
+      assert :ok =
+               Aikido.Durable.stop(
+                 Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance),
+                 pid
+               )
+
       refute Process.alive?(pid)
     end
 
@@ -198,18 +243,24 @@ defmodule AikidoTest.InstanceTest do
       {:ok, _sup_pid} = AikidoTest.InstanceTest.TestInstance.start_link()
 
       {:ok, unpartitioned_pid} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "shared-id"
         )
 
       {:ok, alpha_pid} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "shared-id",
           partition: :alpha
         )
 
       {:ok, beta_pid} =
-        Aikido.start_agent(AikidoTest.InstanceTest.TestInstance, AikidoTest.TestAgents.Minimal,
+        AikidoTest.Case.start_test_agent(
+          AikidoTest.InstanceTest.TestInstance,
+          AikidoTest.TestAgents.Minimal,
           id: "shared-id",
           partition: :beta
         )
@@ -217,43 +268,77 @@ defmodule AikidoTest.InstanceTest do
       assert unpartitioned_pid != alpha_pid
       assert alpha_pid != beta_pid
 
-      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "shared-id") ==
+      assert AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "shared-id") ==
                unpartitioned_pid
 
-      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "shared-id", partition: :alpha) ==
+      assert AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "shared-id",
+               partition: :alpha
+             ) ==
                alpha_pid
 
-      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "shared-id", partition: :beta) ==
+      assert AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "shared-id",
+               partition: :beta
+             ) ==
                beta_pid
 
-      assert Aikido.list_agents(AikidoTest.InstanceTest.TestInstance) == [
+      assert Aikido.Durable.members(
+               Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance)
+             ) == [
                {"shared-id", unpartitioned_pid}
              ]
 
-      assert Aikido.list_agents(AikidoTest.InstanceTest.TestInstance, partition: :alpha) == [
+      assert Aikido.Durable.members(
+               Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance),
+               partition: :alpha
+             ) == [
                {"shared-id", alpha_pid}
              ]
 
-      assert Aikido.list_agents(AikidoTest.InstanceTest.TestInstance, partition: :beta) == [
+      assert Aikido.Durable.members(
+               Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance),
+               partition: :beta
+             ) == [
                {"shared-id", beta_pid}
              ]
 
-      assert Aikido.agent_count(AikidoTest.InstanceTest.TestInstance) == 1
-      assert Aikido.agent_count(AikidoTest.InstanceTest.TestInstance, partition: :alpha) == 1
-      assert Aikido.agent_count(AikidoTest.InstanceTest.TestInstance, partition: :beta) == 1
+      assert Enum.count(
+               Aikido.Durable.members(
+                 Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance)
+               )
+             ) == 1
+
+      assert Enum.count(
+               Aikido.Durable.members(
+                 Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance),
+                 partition: :alpha
+               )
+             ) == 1
+
+      assert Enum.count(
+               Aikido.Durable.members(
+                 Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance),
+                 partition: :beta
+               )
+             ) == 1
 
       assert :ok =
-               Aikido.stop_agent(AikidoTest.InstanceTest.TestInstance, "shared-id",
+               Aikido.Durable.stop(
+                 Aikido.durable_supervisor_name(AikidoTest.InstanceTest.TestInstance),
+                 "shared-id",
                  partition: :alpha
                )
 
-      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "shared-id", partition: :alpha) ==
+      assert AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "shared-id",
+               partition: :alpha
+             ) ==
                nil
 
-      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "shared-id") ==
+      assert AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "shared-id") ==
                unpartitioned_pid
 
-      assert Aikido.whereis(AikidoTest.InstanceTest.TestInstance, "shared-id", partition: :beta) ==
+      assert AikidoTest.Case.agent_pid(AikidoTest.InstanceTest.TestInstance, "shared-id",
+               partition: :beta
+             ) ==
                beta_pid
     end
   end

@@ -114,7 +114,7 @@ defmodule AikidoTest.AshPersistenceTest do
     durable: durable
   } do
     ref = Domain.temporary_start!(%{id: "low-level", value: 7})
-    assert :ok = Aikido.stop_agent(instance, ref.pid)
+    assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), ref.pid)
     restarted = Domain.temporary_start!(%{id: "low-level", value: 8})
     assert %{value: 8} = Domain.temporary_inspect!(restarted)
 
@@ -166,11 +166,15 @@ defmodule AikidoTest.AshPersistenceTest do
     child = Domain.permanent_start!(%{id: "child"})
     binding = Aikido.AgentServer.ParentRef.new!(%{pid: parent.pid, id: parent.id, tag: :child})
     assert {:ok, _} = Aikido.AgentServer.adopt_parent(child.pid, binding)
-    assert {:ok, _} = Aikido.parent_binding(instance, child.id)
+
+    assert {:ok, _} =
+             Aikido.Durable.parent_binding(Aikido.durable_supervisor_name(instance), child.id)
 
     Domain.permanent_stop!(child)
     Domain.permanent_delete!(child.id)
-    assert :error = Aikido.parent_binding(instance, child.id)
+
+    assert :error =
+             Aikido.Durable.parent_binding(Aikido.durable_supervisor_name(instance), child.id)
   end
 
   test "explicit delete handles reference inputs and malformed identifiers" do

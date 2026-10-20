@@ -35,7 +35,13 @@ defmodule AgentExamples.AITest do
 
       assert {:ok, ReqLLM.Generation} =
                Aikido.AgentServer.state(
-                 Aikido.whereis(Aikido.Default, record.id),
+                 case Aikido.Durable.lookup(
+                        Aikido.durable_supervisor_name(Aikido.Default),
+                        record.id
+                      ) do
+                   {:ok, pid} -> pid
+                   :error -> nil
+                 end,
                  &{:ok, &1.agent.state.ai.client}
                )
     end
@@ -60,7 +66,12 @@ defmodule AgentExamples.AITest do
       assert record.client == RuntimeClient
       assert record.system_prompt == "Configured by the caller"
       assert record.max_iterations == 3
-      pid = Aikido.whereis(Aikido.Default, record.id)
+
+      pid =
+        case Aikido.Durable.lookup(Aikido.durable_supervisor_name(Aikido.Default), record.id) do
+          {:ok, pid} -> pid
+          :error -> nil
+        end
 
       assert {:ok, %{system_prompt: "Configured by the caller", max_iterations: 3}} =
                Aikido.AgentServer.state(
@@ -299,7 +310,11 @@ defmodule AgentExamples.AITest do
   end
 
   defp lua(record, script) do
-    pid = Aikido.whereis(Aikido.Default, record.id)
+    pid =
+      case Aikido.Durable.lookup(Aikido.durable_supervisor_name(Aikido.Default), record.id) do
+        {:ok, pid} -> pid
+        :error -> nil
+      end
 
     {:ok, caller} =
       Aikido.AgentServer.state(

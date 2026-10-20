@@ -2197,11 +2197,8 @@ defmodule Aikido.AgentServer do
 
   defp resolve_server(id) when is_binary(id) do
     {:error,
-     {
-       :invalid_server,
-       # String IDs require an explicit Aikido instance lookup via Aikido.whereis/2
-       "String IDs require an explicit Aikido instance lookup. Use Aikido.whereis(MyApp.Aikido, \"#{id}\", partition: ...) first or pass the pid directly."
-     }}
+     {:invalid_server,
+      "String IDs require an explicit Aikido instance lookup for #{inspect(id)}. Use the PID from the domain start action's reference, or pass an instance-scoped PID obtained from DurableServer lookup."}}
   end
 
   defp resolve_server(_) do
@@ -2228,9 +2225,11 @@ defmodule Aikido.AgentServer do
   end
 
   defp resolve_adopt_child(id, state) when is_binary(id) do
-    case Aikido.whereis(state.aikido, id, partition: state.partition) do
-      pid when is_pid(pid) -> {:ok, pid}
-      nil -> {:error, :child_not_found}
+    case Aikido.Durable.lookup(Aikido.durable_supervisor_name(state.aikido), id,
+           partition: state.partition
+         ) do
+      {:ok, pid} -> {:ok, pid}
+      :error -> {:error, :child_not_found}
     end
   end
 

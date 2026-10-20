@@ -300,11 +300,13 @@ defmodule AikidoTest.DurableTest do
     )
 
     assert {:ok, pid} =
-             Aikido.start_agent(instance, AikidoTest.TestAgents.Counter, id: "default-counter")
+             AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Counter,
+               id: "default-counter"
+             )
 
     assert %DurableServer{} = :sys.get_state(pid)
-    assert Aikido.whereis(instance, "default-counter") == pid
-    assert :ok = Aikido.stop_agent(instance, pid)
+    assert AikidoTest.Case.agent_pid(instance, "default-counter") == pid
+    assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), pid)
   end
 
   test("Ash teams recover their desired members and saved worker state", %{directory: directory}) do
@@ -330,7 +332,7 @@ defmodule AikidoTest.DurableTest do
         })
       )
 
-    first = Aikido.whereis(instance, team.id)
+    first = AikidoTest.Case.agent_pid(instance, team.id)
     second = AikidoTest.LifecycleWait.restart(first)
 
     member =
@@ -346,13 +348,13 @@ defmodule AikidoTest.DurableTest do
 
     assert Process.alive?(member)
     assert {:ok, 8} = Aikido.AgentServer.state(member, &{:ok, &1.agent.state.state.count})
-    assert :ok = Aikido.stop_agent(instance, second)
+    assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), second)
 
     resumed =
       snapshot_result(AikidoTest.AshFixtures.Domain.dynamic_start!(%{id: team.id, topology: %{}}))
 
     assert Map.has_key?(resumed.team.topology.nodes, "counter")
-    resumed_pid = Aikido.whereis(instance, team.id)
+    resumed_pid = AikidoTest.Case.agent_pid(instance, team.id)
 
     worker =
       AikidoTest.AgentWait.await_state_value(

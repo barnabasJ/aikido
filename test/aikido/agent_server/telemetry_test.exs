@@ -91,7 +91,9 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
   describe("signal telemetry") do
     test("emits start and stop events for signal processing", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
           id: "telemetry-signal-test"
         )
 
@@ -116,7 +118,9 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
     test("includes directive count in stop event", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
           id: "telemetry-directive-count"
         )
 
@@ -133,7 +137,9 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
   describe("directive telemetry") do
     test("emits start and stop events for directive execution", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
           id: "telemetry-directive-test"
         )
 
@@ -173,7 +179,9 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
     test("reports correct directive type", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
           id: "telemetry-type-test"
         )
 
@@ -200,7 +208,9 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
   describe("metadata correctness") do
     test("includes agent_id and agent_module in signal events", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
           id: "telemetry-metadata-test"
         )
 
@@ -215,7 +225,9 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
     test("includes signal_type in directive events", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
           id: "telemetry-signal-type-test"
         )
 
@@ -235,7 +247,9 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
   describe("timing measurements") do
     test("duration is positive for signal processing", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
           id: "telemetry-timing-test"
         )
 
@@ -248,7 +262,9 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
     test("duration is positive for directive execution", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.TelemetryTest.TelemetryAgent,
           id: "telemetry-directive-timing"
         )
 

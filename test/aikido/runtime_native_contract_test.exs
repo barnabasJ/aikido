@@ -71,7 +71,10 @@ defmodule Aikido.RuntimeNativeContractTest do
     aikido: instance
   } do
     {:ok, pid} =
-      Aikido.start_agent(instance, Aikido.RuntimeNativeContractTest.InvalidDirectiveAgent)
+      AikidoTest.Case.start_test_agent(
+        instance,
+        Aikido.RuntimeNativeContractTest.InvalidDirectiveAgent
+      )
 
     assert {:error, _} =
              Aikido.AgentServer.call(pid, Jido.Signal.new!("invalid.directive", %{}), fn _ ->
@@ -84,7 +87,7 @@ defmodule Aikido.RuntimeNativeContractTest do
   test "runtime reads and subscriptions do not dump snapshots, while state changes sync", %{
     aikido: instance
   } do
-    {:ok, pid} = Aikido.start_agent(instance, AikidoTest.TestAgents.Counter)
+    {:ok, pid} = AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Counter)
     :ok = Aikido.AgentServer.await_ready(pid)
 
     function = {Aikido.Durable.AgentServer, :dump_state, 1}
@@ -111,7 +114,7 @@ defmodule Aikido.RuntimeNativeContractTest do
   end
 
   test "callback dispatch subscribes before an immediately completed command", %{aikido: instance} do
-    {:ok, pid} = Aikido.start_agent(instance, AikidoTest.TestAgents.Counter)
+    {:ok, pid} = AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Counter)
 
     dispatch = fn ->
       Aikido.AgentServer.call(pid, Jido.Signal.new!("increment", %{amount: 3}), fn _ ->
@@ -128,8 +131,8 @@ defmodule Aikido.RuntimeNativeContractTest do
   end
 
   test "adopting a suspended child does not block the parent's mailbox", %{aikido: instance} do
-    {:ok, parent} = Aikido.start_agent(instance, AikidoTest.TestAgents.Minimal)
-    {:ok, child} = Aikido.start_agent(instance, AikidoTest.TestAgents.Minimal)
+    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Minimal)
+    {:ok, child} = AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Minimal)
     :ok = :sys.suspend(child)
 
     try do

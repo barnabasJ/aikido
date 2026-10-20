@@ -17,7 +17,15 @@ defmodule AgentExamples.AI do
     request_id = Ash.UUIDv7.generate()
     timeout = Keyword.get(opts, :timeout, 30_000)
     resource = Map.get(record, :resource) || record.__struct__
-    pid = Aikido.whereis(Aikido.Ash.Runtime.option(resource, :instance), record.id)
+
+    pid =
+      case Aikido.Durable.lookup(
+             Aikido.durable_supervisor_name(Aikido.Ash.Runtime.option(resource, :instance)),
+             record.id
+           ) do
+        {:ok, pid} -> pid
+        :error -> nil
+      end
 
     observe = fn state ->
       ai = state.agent.state.ai
@@ -49,7 +57,12 @@ defmodule AgentExamples.AI do
   def delegate(team, member, text, opts \\ []) do
     task_id = Ash.UUIDv7.generate()
     timeout = Keyword.get(opts, :timeout, 20_000)
-    pid = Aikido.whereis(Aikido.Default, team.id)
+
+    pid =
+      case Aikido.Durable.lookup(Aikido.durable_supervisor_name(Aikido.Default), team.id) do
+        {:ok, pid} -> pid
+        :error -> nil
+      end
 
     observe = fn state ->
       case state.agent.state.team.tasks[task_id] do

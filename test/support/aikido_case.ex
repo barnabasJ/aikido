@@ -8,7 +8,7 @@ defmodule AikidoTest.Case do
         use AikidoTest.Case, async: true
         
         test "my test", %{aikido: aikido} do
-          {:ok, pid} = Aikido.start_agent(aikido, MyAgent)
+          {:ok, pid} = AikidoTest.Case.start_test_agent(aikido, MyAgent)
           # ...
         end
       end
@@ -39,13 +39,32 @@ defmodule AikidoTest.Case do
     quote do
       import AikidoTest.Case
       import AikidoTest.AgentWait
+    end
+  end
 
-      @doc """
-      Starts an agent under this test's Aikido instance.
-      """
-      def start_test_agent(context, agent, opts \\ []) do
-        Aikido.start_agent(context.aikido, agent, opts)
-      end
+  @doc "Activate a runtime fixture directly through DurableServer."
+  def start_test_agent(context_or_instance, resource, opts \\ [])
+
+  def start_test_agent(%{aikido: instance}, resource, opts),
+    do: start_test_agent(instance, resource, opts)
+
+  def start_test_agent(instance, resource, opts) do
+    id = if opts[:id] in [nil, ""], do: Ash.UUIDv7.generate(), else: opts[:id]
+
+    Aikido.Durable.start(Aikido.durable_supervisor_name(instance), id,
+      agent: resource,
+      initial_state: Keyword.get(opts, :initial_state, %{}),
+      partition: opts[:partition],
+      agent_opts: opts,
+      permanent: Keyword.get(opts, :restart?, true)
+    )
+  end
+
+  @doc "Resolve a runtime fixture PID for subscription and lifecycle assertions."
+  def agent_pid(instance, id, opts \\ []) do
+    case Aikido.Durable.lookup(Aikido.durable_supervisor_name(instance), id, opts) do
+      {:ok, pid} -> pid
+      :error -> nil
     end
   end
 
@@ -80,7 +99,7 @@ defmodule AikidoTest.Case do
 
   ## Options
 
-  Runtime integration tests use the internal `Aikido.start_agent/3` path, with defaults:
+  Runtime integration tests use the internal `AikidoTest.Case.start_test_agent/3` path, with defaults:
 
     * `:aikido` - Uses the test context's aikido instance
     * `:id` - Generates a unique ID if not provided
@@ -93,12 +112,12 @@ defmodule AikidoTest.Case do
   def start_server(context, agent, opts \\ []) do
     {instance, opts} = Keyword.pop(opts, :aikido, context.aikido)
     opts = Keyword.put_new(opts, :id, unique_id())
-    {:ok, pid} = Aikido.start_agent(instance, agent, opts)
+    {:ok, pid} = AikidoTest.Case.start_test_agent(instance, agent, opts)
 
     ExUnit.Callbacks.on_exit(fn ->
       if Process.alive?(pid) do
         try do
-          Aikido.stop_agent(instance, pid)
+          Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), pid)
         catch
           :exit, _ -> :ok
         end

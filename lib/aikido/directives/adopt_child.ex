@@ -37,7 +37,13 @@ defmodule Aikido.Directives.AdoptChild do
     pid =
       if is_pid(child),
         do: child,
-        else: Aikido.whereis(state.aikido, child, partition: state.partition)
+        else:
+          (case Aikido.Durable.lookup(Aikido.durable_supervisor_name(state.aikido), child,
+                  partition: state.partition
+                ) do
+             {:ok, pid} -> pid
+             :error -> nil
+           end)
 
     if is_pid(pid) and pid != self() and not Map.has_key?(state.children, tag) do
       parent =

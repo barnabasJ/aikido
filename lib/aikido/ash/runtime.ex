@@ -34,17 +34,18 @@ defmodule Aikido.Ash.Runtime do
       input.context
       |> Map.get(:aikido_runtime_options, [])
       |> Keyword.take([:parent, :partition, :on_parent_death, :restart?])
-      |> Keyword.merge(id: record.id, initial_state: initial_state(resource, record))
+
+    pool = Aikido.durable_supervisor_name(option(resource, :instance))
 
     safe(fn ->
       with {:ok, pid} <-
-             Aikido.start_agent(
-               option(resource, :instance),
-               resource,
-               runtime_options
+             Aikido.Durable.start(pool, record.id,
+               agent: resource,
+               initial_state: initial_state(resource, record),
+               partition: runtime_options[:partition],
+               agent_opts: runtime_options,
+               permanent: Keyword.get(runtime_options, :restart?, true)
              ) do
-        pool = Aikido.durable_supervisor_name(option(resource, :instance))
-
         restored? =
           Process.whereis(pool) && Aikido.Durable.restored?(pool, record.id, runtime_options)
 
@@ -64,7 +65,7 @@ defmodule Aikido.Ash.Runtime do
             {:ok, reference(resource, record.id, pid)}
 
           error ->
-            Aikido.stop_agent(option(resource, :instance), pid)
+            Aikido.Durable.stop(Aikido.durable_supervisor_name(option(resource, :instance)), pid)
             error
         end
       end
@@ -119,7 +120,8 @@ defmodule Aikido.Ash.Runtime do
   def stop(resource, agent) do
     safe(fn ->
       with {:ok, {id, pid}} <- resolve(resource, agent),
-           :ok <- Aikido.stop_agent(option(resource, :instance), pid) do
+           :ok <-
+             Aikido.Durable.stop(Aikido.durable_supervisor_name(option(resource, :instance)), pid) do
         {:ok, %{id: id, resource: resource, status: :stopped}}
       end
     end)
@@ -147,14 +149,10 @@ defmodule Aikido.Ash.Runtime do
            AgentServer.state(pid, fn runtime ->
              {:ok, {runtime.durable_server, runtime.durable_key, runtime.partition}}
            end) do
-      if pool do
-        Aikido.Durable.delete(pool, key,
-          agent: resource,
-          partition: partition
-        )
-      else
-        Aikido.stop_agent(option(resource, :instance), pid)
-      end
+      Aikido.Durable.delete(pool, key,
+        agent: resource,
+        partition: partition
+      )
     end
   end
 
@@ -162,11 +160,7 @@ defmodule Aikido.Ash.Runtime do
     instance = option(resource, :instance)
     pool = Aikido.durable_supervisor_name(instance)
 
-    if Process.whereis(pool) do
-      Aikido.Durable.delete(pool, id, agent: resource)
-    else
-      with {:ok, {_id, pid}} <- resolve(resource, id), do: Aikido.stop_agent(instance, pid)
-    end
+    Aikido.Durable.delete(pool, id, agent: resource)
   end
 
   def inspect_agent(resource, agent) do
@@ -179,15 +173,19 @@ defmodule Aikido.Ash.Runtime do
 
   def list(resource, arguments \\ %{}) do
     safe(fn ->
-      Enum.reduce_while(Aikido.list_agents(option(resource, :instance)), {:ok, []}, fn
-        {_id, pid}, {:ok, records} ->
-          case live_snapshot(resource, pid) do
-            {:ok, record} -> {:cont, {:ok, [record | records]}}
-            {:error, :different_resource} -> {:cont, {:ok, records}}
-            {:error, :not_running} -> {:cont, {:ok, records}}
-            {:error, reason} -> {:halt, {:error, reason}}
-          end
-      end)
+      Enum.reduce_while(
+        Aikido.Durable.members(Aikido.durable_supervisor_name(option(resource, :instance))),
+        {:ok, []},
+        fn
+          {_id, pid}, {:ok, records} ->
+            case live_snapshot(resource, pid) do
+              {:ok, record} -> {:cont, {:ok, [record | records]}}
+              {:error, :different_resource} -> {:cont, {:ok, records}}
+              {:error, :not_running} -> {:cont, {:ok, records}}
+              {:error, reason} -> {:halt, {:error, reason}}
+            end
+        end
+      )
       |> case do
         {:ok, records} ->
           with {:ok, filter} <-
@@ -215,9 +213,9 @@ defmodule Aikido.Ash.Runtime do
   defp resolve(resource, %{id: id}), do: resolve(resource, id)
 
   defp resolve(resource, id) when is_binary(id) do
-    case Aikido.whereis(option(resource, :instance), id) do
-      nil -> {:error, "Agent #{id} is not running"}
-      pid -> resolve(resource, pid)
+    case Aikido.Durable.lookup(Aikido.durable_supervisor_name(option(resource, :instance)), id) do
+      :error -> {:error, "Agent #{id} is not running"}
+      {:ok, pid} -> resolve(resource, pid)
     end
   end
 

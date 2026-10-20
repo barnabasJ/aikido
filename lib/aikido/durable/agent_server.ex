@@ -187,14 +187,31 @@ defmodule Aikido.Durable.AgentServer do
   defp restore_parent(options) do
     case options[:parent] do
       %{id: id} = parent ->
-        pid = Aikido.whereis(options[:aikido], id, partition: Map.get(parent, :partition))
+        pid =
+          case Aikido.Durable.lookup(Aikido.durable_supervisor_name(options[:aikido]), id,
+                 partition: Map.get(parent, :partition)
+               ) do
+            {:ok, pid} -> pid
+            :error -> nil
+          end
 
         if pid do
           meta = Map.get(parent, :meta, %{})
 
           meta =
             if meta[:team_id],
-              do: Map.put(meta, :team_pid, Aikido.whereis(options[:aikido], meta.team_id)),
+              do:
+                Map.put(
+                  meta,
+                  :team_pid,
+                  case Aikido.Durable.lookup(
+                         Aikido.durable_supervisor_name(options[:aikido]),
+                         meta.team_id
+                       ) do
+                    {:ok, pid} -> pid
+                    :error -> nil
+                  end
+                ),
               else: meta
 
           Keyword.put(options, :parent, parent |> Map.put(:pid, pid) |> Map.put(:meta, meta))

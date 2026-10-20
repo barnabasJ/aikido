@@ -54,7 +54,12 @@ defmodule AgentExamples.AgentsTest do
 
   test "an async result enters the receiving action through a signal", %{prefix: prefix} do
     worker = snapshot_result(Agents.worker_start!(%{id: prefix <> "-worker"}))
-    pid = Aikido.whereis(Aikido.Default, worker.id)
+
+    pid =
+      case Aikido.Durable.lookup(Aikido.durable_supervisor_name(Aikido.Default), worker.id) do
+        {:ok, pid} -> pid
+        :error -> nil
+      end
 
     {:ok, reference} =
       Aikido.AgentServer.subscribe(pid, "worker.completed", &{:ok, &1.agent.state.state},

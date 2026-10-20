@@ -104,7 +104,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
   describe("cron job registration") do
     test("agent can register a cron job", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-1"
         )
 
@@ -124,7 +126,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("agent can register multiple cron jobs", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-2"
         )
 
@@ -160,7 +164,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("registering same job_id updates existing job (upsert)", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-3"
         )
 
@@ -200,7 +206,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("failed upsert preserves the existing runtime job and durable spec", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-upsert-invalid"
         )
 
@@ -243,7 +251,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("invalid dynamic cron input is rejected and preserves the agent", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-invalid-type"
         )
 
@@ -270,7 +280,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("rejects non-durable cron messages during registration", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-invalid-message"
         )
 
@@ -301,7 +313,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("cron job with timezone", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-4"
         )
 
@@ -320,7 +334,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("invalid cron directive is isolated and agent survives", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-4b"
         )
 
@@ -349,7 +365,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("invalid timezone directive is isolated and agent survives", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-4c"
         )
 
@@ -378,7 +396,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("auto-generates job_id if not provided", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-5"
         )
 
@@ -403,7 +423,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
   describe("runtime failure isolation and recovery") do
     test("abnormal cron job death does not kill agent and job restarts", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-9a"
         )
 
@@ -443,7 +465,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("cancel removes durable spec even when runtime pid is already gone", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-9b"
         )
 
@@ -493,7 +517,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
   describe("cron job cancellation") do
     test("agent can cancel a cron job", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-6"
         )
 
@@ -526,7 +552,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("cancelling non-existent job is safe", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-7"
         )
 
@@ -546,7 +574,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("can cancel and re-register same job_id", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-8"
         )
 
@@ -593,7 +623,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
   describe("cleanup on agent termination") do
     test("cron jobs are cleaned up when agent stops normally", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-10"
         )
 
@@ -614,7 +646,9 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
 
     test("multiple cron jobs are all cleaned up on termination", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-11"
         )
 
@@ -656,12 +690,16 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest do
   describe("job scoping") do
     test("different agents can use same job_id without collision", %{aikido: aikido}) do
       {:ok, pid1} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-12a"
         )
 
       {:ok, pid2} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronIntegrationTest.CronTestAgent,
           id: "cron-test-12b"
         )
 

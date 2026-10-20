@@ -19,7 +19,7 @@ defmodule AikidoTest.AshTeamTest do
       assert completed.team.operation.status == :completed
     end
 
-    pid = Aikido.whereis(AikidoTest.AshFixtures.Instance, team.id)
+    pid = AikidoTest.Case.agent_pid(AikidoTest.AshFixtures.Instance, team.id)
     assert {:ok, 0} = Aikido.AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)})
   end
 
@@ -77,7 +77,10 @@ defmodule AikidoTest.AshTeamTest do
     assert parent.pid == state.members["lead"]
     assert parent.meta.team_id == "graph"
     assert parent.meta.team_resource == DynamicTeam
-    assert parent.meta.team_pid == Aikido.whereis(AikidoTest.AshFixtures.Instance, "graph")
+
+    assert parent.meta.team_pid ==
+             AikidoTest.Case.agent_pid(AikidoTest.AshFixtures.Instance, "graph")
+
     removed = snapshot_result(Domain.dynamic_remove_member!(team, %{member: "lead"}))
     state = removed.team
     assert state.operation.status == :completed
@@ -102,7 +105,7 @@ defmodule AikidoTest.AshTeamTest do
                &{:ok, &1.agent.state.state.count}
              )
 
-    assert Aikido.whereis(AikidoTest.AshFixtures.Instance, "override/worker") == nil
+    assert AikidoTest.Case.agent_pid(AikidoTest.AshFixtures.Instance, "override/worker") == nil
 
     empty = snapshot_result(Domain.team_start!(%{id: "empty", topology: %{}}))
     assert empty.team.members == %{}
@@ -143,7 +146,7 @@ defmodule AikidoTest.AshTeamTest do
           {"limit", Map.new(1..6, &{to_string(&1), %{resource: Counter}})}
         ] do
       assert {:error, _} = Domain.dynamic_start(%{id: id, topology: topology})
-      assert Aikido.whereis(AikidoTest.AshFixtures.Instance, id) == nil
+      assert AikidoTest.Case.agent_pid(AikidoTest.AshFixtures.Instance, id) == nil
     end
   end
 
@@ -228,7 +231,7 @@ defmodule AikidoTest.AshTeamTest do
     team = snapshot_result(Domain.dynamic_start!(%{id: "tasks"}))
     added = snapshot_result(Domain.dynamic_add_member!(team, %{member: "echo", template: :echo}))
     assert added.team.operation.status == :completed
-    pid = Aikido.whereis(AikidoTest.AshFixtures.Instance, team.id)
+    pid = AikidoTest.Case.agent_pid(AikidoTest.AshFixtures.Instance, team.id)
 
     {:ok, ref} =
       Aikido.AgentServer.subscribe(

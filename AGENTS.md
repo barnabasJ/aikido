@@ -52,7 +52,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 
 ## Persistence and Completion
 - DurableServer is the sole persistence/activation path. Do not introduce parallel storage adapters or an instance manager.
-- Start application agents through domain actions. `Aikido.start_agent/3` is the internal activation path for lifecycle adapters, spawning directives and runtime tests. Add the Aikido runtime to the application supervision tree once; agents share its DurableServer supervisor and are not linked to command callers.
+- Start application agents through domain actions. Lifecycle action implementations and spawning directives call `Aikido.Durable` directly; do not add a parallel lifecycle facade. Add the Aikido runtime to the application supervision tree once; agents share its DurableServer supervisor and are not linked to command callers.
 - `persistence :permanent` retains snapshots on stop; `:temporary` deletes them on stop. Both checkpoint while running. The separate `delete` action removes the saved identity regardless of retention. `restart?` controls automatic crash recovery independently of retention.
 - Use paired `externalize/1` and `reinstate/1` callbacks for path state, or paired agent-wide `checkpoint/2` and `restore/2`, to control snapshot content. Keep credentials and runtime-only closures out of persisted configuration. A separate Ash data layer does not persist the live agent automatically.
 - Local EKV requires its disk to survive; it does not by itself provide machine-loss protection. Recovery does not replay external effects or resume in-flight Lua VMs.

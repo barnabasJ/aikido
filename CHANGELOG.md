@@ -6,6 +6,12 @@
 
 ### Changed
 
+- Keep `Aikido` focused on runtime supervision and configuration. Remove its
+  agent lifecycle, lookup and enumeration entry points; domain action
+  implementations and spawning directives call `Aikido.Durable` directly.
+  Remove the redundant debug and UUID shortcuts in favor of `Aikido.Debug`
+  and `Ash.UUIDv7`.
+
 - Remove AgentServer startup wrappers. Start application agents through their
   Ash domain actions, with one internal activation path through DurableServer.
   Runtime tests use that internal path without linking agents to the caller.

@@ -74,7 +74,12 @@ defmodule AgentExamplesWeb.LiveViewTest do
     record = Playground.get(owner, "counter").record
     view |> element("#stop-example") |> render_click()
     assert Playground.get(owner, "counter").status == :stopped
-    assert Aikido.whereis(Aikido.Default, record.id) == nil
+
+    assert (case Aikido.Durable.lookup(Aikido.durable_supervisor_name(Aikido.Default), record.id) do
+              {:ok, pid} -> pid
+              :error -> nil
+            end) == nil
+
     assert has_element?(view, "#start-form")
   end
 
@@ -432,7 +437,13 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
     assert {:ok, %{system_prompt: "User-provided orchestration", max_iterations: 4}} =
              Aikido.AgentServer.state(
-               Aikido.whereis(Aikido.Default, record.id),
+               case Aikido.Durable.lookup(
+                      Aikido.durable_supervisor_name(Aikido.Default),
+                      record.id
+                    ) do
+                 {:ok, pid} -> pid
+                 :error -> nil
+               end,
                &{:ok, Map.take(&1.agent.state.ai, [:system_prompt, :max_iterations])}
              )
   end

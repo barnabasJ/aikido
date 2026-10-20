@@ -172,11 +172,13 @@ defmodule AikidoTest.AgentServerCoverageTest do
 
     test("via tuple that exists works", %{aikido: aikido}) do
       {:ok, _pid} =
-        Aikido.start_agent(aikido, AikidoTest.TestAgents.Counter, id: "via-test-exists")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.TestAgents.Counter,
+          id: "via-test-exists"
+        )
 
       registry = Module.concat(aikido, ExternalRegistry)
       start_supervised!({Registry, keys: :unique, name: registry})
-      pid = Aikido.whereis(aikido, "via-test-exists")
+      pid = AikidoTest.Case.agent_pid(aikido, "via-test-exists")
 
       {:ok, :registered} =
         Aikido.AgentServer.state(pid, fn _ ->
@@ -227,7 +229,10 @@ defmodule AikidoTest.AgentServerCoverageTest do
   describe("agent resolution with defaults") do
     test("agent uses default values from schema", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerCoverageTest.SimpleTestAgent)
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServerCoverageTest.SimpleTestAgent
+        )
 
       {:ok, counter} =
         Aikido.AgentServer.state(pid, fn s -> {:ok, s.agent.state.domain.counter} end)
@@ -238,7 +243,9 @@ defmodule AikidoTest.AgentServerCoverageTest do
 
     test("id and initial_state options are respected", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServerCoverageTest.SimpleTestAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServerCoverageTest.SimpleTestAgent,
           id: "custom-id-123",
           initial_state: %{counter: 999}
         )
@@ -260,7 +267,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
       agent = %{agent | state: put_in(agent.state, [:domain, :counter], 50)}
 
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.TestAgents.Counter,
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.TestAgents.Counter,
           id: agent.id,
           initial_state: agent.state
         )
@@ -283,7 +290,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
   describe("invalid signal handling") do
     test("signal with no matching route does not crash the agent", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.TestAgents.Minimal)
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.TestAgents.Minimal)
 
       signal = Jido.Signal.new!("nonexistent_action", %{}, source: "/test")
 
@@ -308,11 +315,13 @@ defmodule AikidoTest.AgentServerCoverageTest do
 
     test("alive? returns true for existing via tuple", %{aikido: aikido}) do
       {:ok, _pid} =
-        Aikido.start_agent(aikido, AikidoTest.TestAgents.Counter, id: "alive-via-test")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.TestAgents.Counter,
+          id: "alive-via-test"
+        )
 
       registry = Module.concat(aikido, ExternalRegistry)
       start_supervised!({Registry, keys: :unique, name: registry})
-      pid = Aikido.whereis(aikido, "alive-via-test")
+      pid = AikidoTest.Case.agent_pid(aikido, "alive-via-test")
 
       {:ok, :registered} =
         Aikido.AgentServer.state(pid, fn _ ->

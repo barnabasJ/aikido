@@ -55,7 +55,9 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
   describe("signal routing via AgentServer") do
     test("signals are routed to actions by type", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
           id: "signal-route-test"
         )
 
@@ -67,7 +69,9 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
 
     test("multiple signals processed in sequence", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
           id: "multi-signal-test"
         )
 
@@ -89,7 +93,9 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
 
     test("signal data is passed to action", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
           id: "signal-data-test"
         )
 
@@ -101,7 +107,9 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
 
     test("action can return directives", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
           id: "directive-test"
         )
 
@@ -114,7 +122,9 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
       aikido: aikido
     }) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
           id: "unknown-signal-test"
         )
 

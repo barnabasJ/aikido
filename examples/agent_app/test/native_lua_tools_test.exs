@@ -183,7 +183,7 @@ defmodule AgentExamples.NativeLuaToolsTest do
     dumped = Aikido.Durable.AgentServer.dump_state(:sys.get_state(ref.pid).user_state)
     snapshot = Aikido.Durable.AgentServer.load_state(1, dumped)
     refute functions?(snapshot)
-    assert :ok = Aikido.stop_agent(Aikido.Default, ref.pid)
+    assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(Aikido.Default), ref.pid)
     assert {:ok, restored} = Aikido.Ash.start(Assistant, %{id: ref.id})
 
     assert {:ok, answer} =

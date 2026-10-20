@@ -138,9 +138,25 @@ defmodule Aikido.Durable do
     end
   end
 
-  def stop(name, key, opts \\ []) do
+  @doc "Stop by logical key or PID, retaining or deleting the snapshot according to the agent's persistence setting."
+  def stop(name, key_or_pid, opts \\ [])
+
+  def stop(_name, pid, _opts) when is_pid(pid) do
+    with {:ok, {pool, key, partition, keep_snapshot?}} <-
+           Aikido.AgentServer.state(pid, fn runtime ->
+             {:ok,
+              {runtime.durable_server, runtime.durable_key, runtime.partition,
+               keep_snapshot?(runtime.agent_module)}}
+           end) do
+      if keep_snapshot?,
+        do: DurableServer.Supervisor.terminate_child_permanent(pool, pid),
+        else: delete(pool, key, partition: partition)
+    end
+  end
+
+  def stop(name, key, opts) do
     case lookup(name, key, opts) do
-      {:ok, pid} -> Aikido.stop_agent(config(name).aikido, pid)
+      {:ok, pid} -> stop(name, pid, opts)
       :error -> {:error, :not_found}
     end
   end

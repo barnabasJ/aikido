@@ -24,7 +24,7 @@ Provide stable, reusable testing patterns for pure agents, AgentServer runtime b
 - Prefer behavior assertions over implementation/log assertions
 - Avoid `Process.sleep/1`; use subscriptions and monitored process lifecycle checks
 - Keep tests focused and deterministic (single behavior per test where practical)
-- Test application-facing lifecycle through domain actions. Runtime-specific tests use the internal `Aikido.start_agent/3` path; agents stay owned by the shared DurableServer supervisor. Observe termination with monitors rather than caller links.
+- Test application-facing lifecycle through domain actions. Runtime-specific tests activate fixtures directly through `Aikido.Durable`; agents stay owned by the shared DurableServer supervisor. Observe termination with monitors rather than caller links.
 - Use unique IDs/helpers to avoid test cross-talk
 
 ## High-Value Coverage

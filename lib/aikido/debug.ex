@@ -19,8 +19,8 @@ defmodule Aikido.Debug do
       Aikido.Debug.disable(MyApp.Aikido)
       Aikido.Debug.level(MyApp.Aikido)          # => :off
 
-      # Via top-level Aikido module (applies to Aikido.Default)
-      Aikido.debug(:on)
+      # Default runtime
+      Aikido.Debug.enable(Aikido.Default, :on)
   """
 
   @type level :: :off | :on | :verbose

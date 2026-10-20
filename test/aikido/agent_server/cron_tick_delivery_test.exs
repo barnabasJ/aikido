@@ -86,7 +86,9 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest do
   describe("cron tick delivery (issue #136 regression)") do
     test("cron tick actually delivers signal and updates agent state", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent,
           id: unique_id("cron-tick")
         )
 
@@ -122,7 +124,9 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest do
       id = unique_id("cron-cast")
 
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent,
           id: id
         )
 
@@ -143,7 +147,9 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest do
 
     test("multiple cron ticks accumulate state changes", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent,
+        AikidoTest.Case.start_test_agent(
+          aikido,
+          AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent,
           id: unique_id("cron-multi")
         )
 

@@ -20,11 +20,12 @@ setting controls whether stopping retains its snapshot.
 
 For a named runtime, declare `use Aikido, otp_app: :my_app` on a module and put
 that module in your supervision tree. It supplies only `child_spec/1` and
-`start_link/1` (with optional arguments). Call shared APIs explicitly:
+`start_link/1` (with optional arguments). Use the domain for agents and `Aikido`
+for runtime configuration:
 
 ```elixir
-MyApp.Agents.worker_start!(%{id: "worker"})
-Aikido.whereis(MyApp.Runtime, "worker")
+agent = MyApp.Agents.worker_start!(%{id: "worker"})
+MyApp.Agents.worker_inspect!(agent)
 Aikido.config(MyApp.Runtime, max_tasks: 2_000)
 Aikido.Dsl.Instance.Info.instance_options(MyApp.Runtime)
 ```
@@ -36,7 +37,9 @@ options while retaining Ash's typed-struct DSL and the directive behaviour.
 Spark validates and stores the instance configuration. The Info module reads
 those options; `Aikido.config/2` combines application configuration and runtime
 overrides. Instance modules do not generate lifecycle, persistence, debug or
-configuration accessor wrappers. Use `Aikido.Debug` for runtime diagnostics.
+configuration accessor wrappers. Agent lifecycle implementations call
+`Aikido.Durable` directly; there is no separate lifecycle facade on `Aikido`.
+Use `Aikido.Debug` for runtime diagnostics.
 
 `Aikido.Agent` holds immutable identity and state and offers a convenience macro
 for the Ash resource host. AgentServer routes signals to native Ash reducers and

@@ -24,7 +24,9 @@ children = [Aikido]
 
 This starts shared task, non-agent process, and DurableServer supervision once.
 All agents in the runtime use DurableServer's shared dynamic supervisor;
-starting an agent does not create another runtime supervision tree.
+starting an agent does not create another runtime supervision tree. `Aikido`
+sets up that runtime; domain actions are the public API for agent lifecycle
+and state access.
 
 If you need a separate named runtime, define its module yourself:
 

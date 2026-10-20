@@ -61,7 +61,9 @@ defmodule AikidoTest.Signal.CallTest do
   describe("call/3") do
     test("the built-in children action replies without changing domain state", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent, id: "children-query")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent,
+          id: "children-query"
+        )
 
       :ok = Aikido.AgentServer.await_ready(pid)
       assert {:ok, before_state} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state})
@@ -76,7 +78,9 @@ defmodule AikidoTest.Signal.CallTest do
 
     test("returns the reply signal on the happy path", %{aikido: aikido}) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent, id: "echo")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent,
+          id: "echo"
+        )
 
       query = Jido.Signal.new!("aikido.test.echo", %{}, source: "/test")
       assert {:ok, reply} = Aikido.Signal.Call.call(pid, query)
@@ -91,7 +95,9 @@ defmodule AikidoTest.Signal.CallTest do
       %{aikido: aikido}
     ) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent, id: "silent")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent,
+          id: "silent"
+        )
 
       query = Jido.Signal.new!("aikido.test.silent", %{}, source: "/test")
       assert {:error, :timeout} = Aikido.Signal.Call.call(pid, query, timeout: 50)
@@ -122,7 +128,9 @@ defmodule AikidoTest.Signal.CallTest do
       %{aikido: aikido}
     ) do
       {:ok, pid} =
-        Aikido.start_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent, id: "dying")
+        AikidoTest.Case.start_test_agent(aikido, AikidoTest.Signal.CallTest.CallTestAgent,
+          id: "dying"
+        )
 
       Process.unlink(pid)
 

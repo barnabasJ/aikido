@@ -30,7 +30,7 @@ defmodule Aikido.Ash.Team.Runtime do
   end
 
   def stop_member(instance, pid) do
-    case Aikido.stop_agent(instance, pid) do
+    case Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), pid) do
       :ok -> {:ok, :stopped}
       {:error, :not_found} -> {:ok, :stopped}
     end

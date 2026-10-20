@@ -42,7 +42,7 @@ defmodule AikidoTest.AgentServerStopLogTest do
     log =
       capture_log(fn ->
         {:ok, pid} =
-          Aikido.start_agent(aikido, AikidoTest.AgentServerStopLogTest.TestAgent)
+          AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerStopLogTest.TestAgent)
 
         ref = Process.monitor(pid)
         signal = Jido.Signal.new!("stop_test", %{}, source: "/test")

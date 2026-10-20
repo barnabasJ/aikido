@@ -280,7 +280,8 @@ defmodule AgentExamples.Playground do
     with {:ok, attributes} <- attributes(example, options),
          attributes = with_request_callback(example, attributes, key),
          {:ok, record} <- Aikido.Ash.start(example.resource, attributes) do
-      pid = Aikido.whereis(Aikido.Default, record.id)
+      pid = record.pid
+
       {:ok, ref} = Aikido.AgentServer.subscribe(pid, "**", &snapshot/1)
       {:ok, snapshot} = Aikido.AgentServer.state(pid, &{:ok, elem(snapshot(&1), 1)})
 

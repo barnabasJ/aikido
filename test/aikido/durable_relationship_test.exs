@@ -28,8 +28,8 @@ defmodule AikidoTest.DurableRelationshipTest do
     instance: instance,
     durable: durable
   } do
-    {:ok, parent} = Aikido.start_agent(instance, Minimal, id: "parent")
-    {:ok, child} = Aikido.start_agent(instance, Minimal, id: "child")
+    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "parent")
+    {:ok, child} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "child")
     assert {:ok, ^child} = AgentServer.adopt_child(parent, child, :worker, %{role: "analysis"})
 
     {key, _entry} =
@@ -37,15 +37,17 @@ defmodule AikidoTest.DurableRelationshipTest do
         pid == child
       end)
 
-    assert :ok = Aikido.stop_agent(instance, child)
-    assert {:ok, %{parent_id: "parent", tag: :worker}} = Aikido.parent_binding(instance, "child")
+    assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), child)
+
+    assert {:ok, %{parent_id: "parent", tag: :worker}} =
+             Aikido.Durable.parent_binding(Aikido.durable_supervisor_name(instance), "child")
 
     {:ok, info} = DurableServer.Supervisor.get_server_info(durable, key)
     saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
     refute Map.has_key?(saved.parent, :pid)
     assert saved.parent.meta == %{role: "analysis"}
 
-    {:ok, restored} = Aikido.start_agent(instance, Minimal, id: "child")
+    {:ok, restored} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "child")
 
     assert {:ok, %{id: "parent", pid: ^parent, tag: :worker}} =
              AgentServer.state(restored, &{:ok, &1.parent})
@@ -54,24 +56,26 @@ defmodule AikidoTest.DurableRelationshipTest do
   test "detachment is authoritative after recovery and cannot resurrect the startup parent", %{
     instance: instance
   } do
-    {:ok, parent} = Aikido.start_agent(instance, Minimal, id: "parent")
+    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "parent")
 
     {:ok, child} =
-      Aikido.start_agent(instance, Minimal,
+      AikidoTest.Case.start_test_agent(instance, Minimal,
         id: "child",
         on_parent_death: :continue,
         parent: %{pid: parent, id: "parent", tag: :worker}
       )
 
-    assert :ok = Aikido.stop_agent(instance, parent)
+    assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), parent)
 
     assert :orphan =
              await_state_value(child, fn runtime -> if is_nil(runtime.parent), do: :orphan end)
 
-    assert :error = Aikido.parent_binding(instance, "child")
-    assert :ok = Aikido.stop_agent(instance, child)
-    {:ok, _parent} = Aikido.start_agent(instance, Minimal, id: "parent")
-    {:ok, restored} = Aikido.start_agent(instance, Minimal, id: "child")
+    assert :error =
+             Aikido.Durable.parent_binding(Aikido.durable_supervisor_name(instance), "child")
+
+    assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), child)
+    {:ok, _parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "parent")
+    {:ok, restored} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "child")
     assert {:ok, nil} = AgentServer.state(restored, &{:ok, &1.parent})
   end
 
@@ -79,18 +83,21 @@ defmodule AikidoTest.DurableRelationshipTest do
     instance: instance,
     directory: directory
   } do
-    {:ok, parent} = Aikido.start_agent(instance, Minimal, id: "parent")
-    {:ok, child} = Aikido.start_agent(instance, Minimal, id: "child")
+    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "parent")
+    {:ok, child} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "child")
     assert {:ok, ^child} = AgentServer.adopt_child(parent, child, :worker)
-    assert :ok = Aikido.stop_agent(instance, child)
-    assert :ok = Aikido.stop_agent(instance, parent)
+    assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), child)
+    assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), parent)
     stop_supervised!(instance)
 
     start_supervised!({Aikido, name: instance, durable: [data_dir: directory]})
-    assert {:ok, %{parent_id: "parent", tag: :worker}} = Aikido.parent_binding(instance, "child")
-    assert nil == Aikido.whereis(instance, "child")
-    {:ok, restored_parent} = Aikido.start_agent(instance, Minimal, id: "parent")
-    {:ok, restored_child} = Aikido.start_agent(instance, Minimal, id: "child")
+
+    assert {:ok, %{parent_id: "parent", tag: :worker}} =
+             Aikido.Durable.parent_binding(Aikido.durable_supervisor_name(instance), "child")
+
+    assert nil == AikidoTest.Case.agent_pid(instance, "child")
+    {:ok, restored_parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "parent")
+    {:ok, restored_child} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "child")
     refute restored_parent == parent
     refute restored_child == child
 
@@ -102,7 +109,7 @@ defmodule AikidoTest.DurableRelationshipTest do
     instance: instance,
     durable: durable
   } do
-    {:ok, parent} = Aikido.start_agent(instance, Minimal, id: "parent")
+    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "parent")
     {:ok, runtime} = AgentServer.state(parent, &{:ok, &1})
     signal = Jido.Signal.new!("spawn.test", %{})
     directive = Aikido.Directives.spawn_agent(Minimal, :worker, opts: %{id: "child"})
@@ -112,6 +119,8 @@ defmodule AikidoTest.DurableRelationshipTest do
     restored = AikidoTest.LifecycleWait.restart(child)
 
     assert {:ok, %{id: "parent", pid: ^parent}} = AgentServer.state(restored, &{:ok, &1.parent})
-    assert {:ok, %{parent_id: "parent"}} = Aikido.parent_binding(instance, "child")
+
+    assert {:ok, %{parent_id: "parent"}} =
+             Aikido.Durable.parent_binding(Aikido.durable_supervisor_name(instance), "child")
   end
 end
