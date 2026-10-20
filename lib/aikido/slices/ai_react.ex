@@ -28,113 +28,326 @@ defmodule Aikido.Slices.AiReact do
     description "ReAct reasoning slice attached via `slices:` on a Aikido.Agent."
 
     schema do
-      attribute :handoff_pending, :integer
-      attribute :handoff_count, :integer, public?: true, default: 0, allow_nil?: false
-      attribute :last_handoff, :map, public?: true
+      attribute :handoff_pending, :integer do
+        description "Identifier of the context handoff awaiting a summary result."
+      end
 
-      attribute :estimated_tokens, :integer,
-        public?: true,
-        default: 0,
-        allow_nil?: false,
-        constraints: [min: 0]
+      attribute :handoff_count, :integer do
+        description "Number of context handoffs adopted during this run."
+        public? true
+        default 0
+        allow_nil? false
+      end
 
-      attribute :last_input_tokens, :integer
-      attribute :prepared_tools, :term
-      attribute :tool_preparation, {:array, :term}, default: [], allow_nil?: false
-      attribute :run_scope, :map, default: %{}
-      attribute :run_metadata, :map, public?: true, default: %{}
-      attribute :options, Aikido.AI.Options, public?: true, default: %{}, allow_nil?: false
-      attribute :queued_messages, {:array, :string}, public?: true, default: [], allow_nil?: false
+      attribute :last_handoff, :map do
+        description "Details of the most recently adopted context handoff."
+        public? true
+      end
 
-      attribute :streaming_text, :string,
-        public?: true,
-        default: "",
-        constraints: [allow_empty?: true, trim?: false]
+      attribute :estimated_tokens, :integer do
+        description "Estimated token count used to decide when context needs a handoff."
+        public? true
+        default 0
+        allow_nil? false
+        constraints min: 0
+      end
 
-      attribute :streaming_thinking, :string,
-        public?: true,
-        default: "",
-        constraints: [allow_empty?: true, trim?: false]
+      attribute :last_input_tokens, :integer do
+        description "Provider-reported input token count from the latest model response."
+      end
 
-      attribute :stream_attempt, :integer, default: 0
-      attribute :usage, :map, public?: true, default: %{}
-      attribute :status, :atom, public?: true, allow_nil?: false, default: :idle
-      attribute :request_id, :term, public?: true, allow_nil?: true, default: nil
-      attribute :context, :term, public?: true, allow_nil?: true, default: nil
-      attribute :iteration, :integer, public?: true, allow_nil?: false, default: 0
+      attribute :prepared_tools, :term do
+        description "Transient tool descriptions and callback registry prepared for the current run."
+      end
 
-      attribute :max_iterations, :integer,
-        public?: true,
-        allow_nil?: false,
-        default: 10,
-        constraints: [min: 1]
+      attribute :tool_preparation, {:array, :term} do
+        description "Model or tool directives waiting for tool preparation to complete."
+        default []
+        allow_nil? false
+      end
 
-      attribute :result, :term, public?: true, allow_nil?: true, default: nil
-      attribute :error, :term, public?: true, allow_nil?: true, default: nil
+      attribute :run_scope, :map do
+        description "Caller actor and tenant bound to the current run for delivery and tool scope checks."
+        default %{}
+      end
 
-      attribute :pending_tool_calls, {:array, :term},
-        public?: true,
-        allow_nil?: false,
-        default: []
+      attribute :run_metadata, :map do
+        description "Application metadata attached to the request and its completion."
+        public? true
+        default %{}
+      end
 
-      attribute :tool_results_received, {:array, :term},
-        public?: true,
-        allow_nil?: false,
-        default: []
+      attribute :options, Aikido.AI.Options do
+        description "Execution limits, delivery controls and completion policy for this ReAct run."
+        public? true
+        default %{}
+        allow_nil? false
+      end
 
-      attribute :previous_tool_signature, :term, public?: true, allow_nil?: true, default: nil
-      attribute :model, :term, public?: true, allow_nil?: true, default: nil
-      attribute :client, :module, public?: true, allow_nil?: false, default: ReqLLM.Generation
-      attribute :tools, {:array, :atom}, public?: true, allow_nil?: false, default: []
+      attribute :queued_messages, {:array, :string} do
+        description "User messages waiting to be appended at the next safe model boundary."
+        public? true
+        default []
+        allow_nil? false
+      end
 
-      attribute :tool_options, {:array, :tuple},
-        public?: true,
-        default: [otp_app: :aikido],
-        constraints: @keyword_constraints
+      attribute :streaming_text, :string do
+        description "Assistant text accumulated from the current streaming model attempt."
+        public? true
+        default ""
+        constraints allow_empty?: true, trim?: false
+      end
 
-      attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
-      attribute :system_prompt, :term, public?: true, allow_nil?: true, default: nil
+      attribute :streaming_thinking, :string do
+        description "Thinking text accumulated from the current streaming model attempt."
+        public? true
+        default ""
+        constraints allow_empty?: true, trim?: false
+      end
 
-      attribute :llm_opts, {:array, :tuple},
-        public?: true,
-        allow_nil?: false,
-        default: [max_tokens: 4096, temperature: 0.2],
-        constraints: @keyword_constraints
+      attribute :stream_attempt, :integer do
+        description "Latest accepted streaming attempt, used to discard stale retry deltas."
+        default 0
+      end
 
-      attribute :hooks, {:array, Aikido.Hooks.Hook}, public?: true, allow_nil?: false, default: []
-      attribute :hooks_pending, :map, public?: true, allow_nil?: false, default: %{}
-      attribute :hook_sequence, :integer, public?: true, allow_nil?: false, default: 0
-      attribute :hook_context, {:array, :map}, public?: true, allow_nil?: false, default: []
-      attribute :hook_errors, {:array, :map}, public?: true, allow_nil?: false, default: []
-      attribute :hook_terminal, :atom, public?: true
+      attribute :usage, :map do
+        description "Token usage and provider accounting retained from model responses."
+        public? true
+        default %{}
+      end
+
+      attribute :status, :atom do
+        description "Current ReAct lifecycle stage from idle through setup, execution and completion."
+        public? true
+        allow_nil? false
+        default :idle
+      end
+
+      attribute :request_id, :term do
+        description "Identifier correlating the current run with model, tool and hook results."
+        public? true
+        allow_nil? true
+        default nil
+      end
+
+      attribute :context, :term do
+        description "Native ReqLLM conversation retained across model and tool turns."
+        public? true
+        allow_nil? true
+        default nil
+      end
+
+      attribute :iteration, :integer do
+        description "Number of model turns already processed in the current run."
+        public? true
+        allow_nil? false
+        default 0
+      end
+
+      attribute :max_iterations, :integer do
+        description "Maximum model turns allowed before the run fails its iteration limit."
+        public? true
+        allow_nil? false
+        default 10
+        constraints min: 1
+      end
+
+      attribute :result, :term do
+        description "Final assistant response retained when the run completes."
+        public? true
+        allow_nil? true
+        default nil
+      end
+
+      attribute :error, :term do
+        description "Failure reason retained when the run cannot complete."
+        public? true
+        allow_nil? true
+        default nil
+      end
+
+      attribute :pending_tool_calls, {:array, :term} do
+        description "Tool calls from the current model turn awaiting their results."
+        public? true
+        allow_nil? false
+        default []
+      end
+
+      attribute :tool_results_received, {:array, :term} do
+        description "Tool results already received for the current batch, including their call identifiers."
+        public? true
+        allow_nil? false
+        default []
+      end
+
+      attribute :previous_tool_signature, :term do
+        description "Signature of the previous tool batch used to detect repeated calls."
+        public? true
+        allow_nil? true
+        default nil
+      end
+
+      attribute :model, :term do
+        description "Model used by the current run or as the default for the next request."
+        public? true
+        allow_nil? true
+        default nil
+      end
+
+      attribute :client, :module do
+        description "Module implementing the model generation callback used by this slice."
+        public? true
+        allow_nil? false
+        default ReqLLM.Generation
+      end
+
+      attribute :tools, {:array, :atom} do
+        description "Native Ash AI tool names available to the model during this run."
+        public? true
+        allow_nil? false
+        default []
+      end
+
+      attribute :tool_options, {:array, :tuple} do
+        description "Native Ash AI options used to build tool descriptions and callbacks."
+        public? true
+        default otp_app: :aikido
+        constraints @keyword_constraints
+      end
+
+      attribute :tool_context, :map do
+        description "Native Ash scope and application context supplied to tool execution."
+        public? true
+        allow_nil? false
+        default %{}
+      end
+
+      attribute :system_prompt, :term do
+        description "System instructions supplied when opening a model conversation."
+        public? true
+        allow_nil? true
+        default nil
+      end
+
+      attribute :llm_opts, {:array, :tuple} do
+        description "Provider generation options merged into each model request."
+        public? true
+        allow_nil? false
+        default max_tokens: 4096, temperature: 0.2
+        constraints @keyword_constraints
+      end
+
+      attribute :hooks, {:array, Aikido.Hooks.Hook} do
+        description "Ordered hook definitions participating in the run lifecycle."
+        public? true
+        allow_nil? false
+        default []
+      end
+
+      attribute :hooks_pending, :map do
+        description "Hook continuations awaiting their correlated completion signals."
+        public? true
+        allow_nil? false
+        default %{}
+      end
+
+      attribute :hook_sequence, :integer do
+        description "Monotonic sequence used to identify pending hook continuations."
+        public? true
+        allow_nil? false
+        default 0
+      end
+
+      attribute :hook_context, {:array, :map} do
+        description "Context entries contributed by hooks for subsequent model turns."
+        public? true
+        allow_nil? false
+        default []
+      end
+
+      attribute :hook_errors, {:array, :map} do
+        description "Hook failures retained without replacing the primary run result."
+        public? true
+        allow_nil? false
+        default []
+      end
+
+      attribute :hook_terminal, :atom do
+        description "Terminal status awaiting completion of synchronous lifecycle hooks."
+        public? true
+      end
     end
 
     config_schema do
-      attribute :options, Aikido.AI.Options, public?: true, default: %{}, allow_nil?: false
-      attribute :hooks, {:array, Aikido.Hooks.Hook}, public?: true, allow_nil?: false, default: []
-      attribute :model, :term, public?: true, allow_nil?: true
-      attribute :client, :module, public?: true, allow_nil?: false, default: ReqLLM.Generation
-      attribute :tools, {:array, :atom}, public?: true, allow_nil?: false, default: []
+      attribute :options, Aikido.AI.Options do
+        description "Default execution limits, delivery controls and completion policy for mounted agents."
+        public? true
+        default %{}
+        allow_nil? false
+      end
 
-      attribute :tool_options, {:array, :tuple},
-        public?: true,
-        default: [otp_app: :aikido],
-        constraints: @keyword_constraints
+      attribute :hooks, {:array, Aikido.Hooks.Hook} do
+        description "Default lifecycle hooks inherited by agents mounting this slice."
+        public? true
+        allow_nil? false
+        default []
+      end
 
-      attribute :tool_context, :map, public?: true, allow_nil?: false, default: %{}
-      attribute :system_prompt, :term, public?: true, allow_nil?: true
+      attribute :model, :term do
+        description "Default model inherited by agents mounting this slice."
+        public? true
+        allow_nil? true
+      end
 
-      attribute :max_iterations, :integer,
-        public?: true,
-        allow_nil?: false,
-        default: 10,
-        constraints: [min: 1]
+      attribute :client, :module do
+        description "Default generation callback module inherited by mounted agents."
+        public? true
+        allow_nil? false
+        default ReqLLM.Generation
+      end
 
-      attribute :llm_opts, {:array, :tuple},
-        public?: true,
-        allow_nil?: false,
-        default: [max_tokens: 4096, temperature: 0.2],
-        constraints: @keyword_constraints
+      attribute :tools, {:array, :atom} do
+        description "Default native Ash AI tool names inherited by mounted agents."
+        public? true
+        allow_nil? false
+        default []
+      end
+
+      attribute :tool_options, {:array, :tuple} do
+        description "Default native Ash AI options used to prepare tools for mounted agents."
+        public? true
+        default otp_app: :aikido
+        constraints @keyword_constraints
+      end
+
+      attribute :tool_context, :map do
+        description "Default native Ash scope and application context for tool execution."
+        public? true
+        allow_nil? false
+        default %{}
+      end
+
+      attribute :system_prompt, :term do
+        description "Default system instructions for conversations opened by mounted agents."
+        public? true
+        allow_nil? true
+      end
+
+      attribute :max_iterations, :integer do
+        description "Default maximum number of model turns permitted in a run."
+        public? true
+        allow_nil? false
+        default 10
+        constraints min: 1
+      end
+
+      attribute :llm_opts, {:array, :tuple} do
+        description "Default provider generation options inherited by mounted agents."
+        public? true
+        allow_nil? false
+        default max_tokens: 4096, temperature: 0.2
+        constraints @keyword_constraints
+      end
     end
 
     route Aikido.Signals.AiReact.HandoffCompleted, Aikido.Slices.AiReact.Implementation,

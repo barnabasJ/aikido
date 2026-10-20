@@ -6,11 +6,15 @@ defmodule Aikido.Signals.Memory.UpdateSpace do
     type "aikido.memory.update_space"
 
     schema do
-      attribute :space, :atom, description: "Space name to update.", allow_nil?: false
+      attribute :space, :atom do
+        description "Space name to update."
+        allow_nil? false
+      end
 
-      attribute :value, Aikido.Slices.Memory.Space,
-        description: "Replacement %Aikido.Slices.Memory.Space{} value.",
-        allow_nil?: false
+      attribute :value, Aikido.Slices.Memory.Space do
+        description "Replacement %Aikido.Slices.Memory.Space{} value."
+        allow_nil? false
+      end
     end
   end
 end

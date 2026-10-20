@@ -63,8 +63,15 @@ defmodule AikidoTest.TracePropagation.Pipeline do
     instance AikidoTest.TracePropagation.Instance
 
     schema do
-      attribute :status, :atom, default: :idle
-      attribute :value, :integer, default: 0
+      attribute :status, :atom do
+        description "Current lifecycle or processing status of the fixture."
+        default :idle
+      end
+
+      attribute :value, :integer do
+        description "Domain value used to verify state transitions and native contracts."
+        default 0
+      end
     end
 
     signal :work, "trace.start", :begin_work

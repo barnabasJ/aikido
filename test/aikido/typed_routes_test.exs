@@ -5,12 +5,13 @@ defmodule AikidoTest.TypedRoutesTest.Increment do
     type "typed.increment"
 
     schema do
-      attribute :amount, :integer,
-        default: 2,
-        allow_nil?: false,
-        constraints: [min: 1],
-        description: "Amount to add",
-        sensitive?: true
+      attribute :amount, :integer do
+        default 2
+        allow_nil? false
+        constraints min: 1
+        description "Amount to add"
+        sensitive? true
+      end
     end
   end
 end
@@ -22,7 +23,11 @@ defmodule AikidoTest.TypedRoutesTest.Reset do
     type "typed.reset"
 
     schema do
-      attribute :value, :integer, default: 0, allow_nil?: false
+      attribute :value, :integer do
+        description "Counter value to restore when handling the reset signal."
+        default 0
+        allow_nil? false
+      end
     end
   end
 end
@@ -34,7 +39,9 @@ defmodule AikidoTest.TypedRoutesTest.Wrapped do
     type "typed.wrapped"
 
     schema do
-      attribute :data, :term
+      attribute :data, :term do
+        description "Whole signal payload retained for native contract checks."
+      end
     end
   end
 end
@@ -109,7 +116,11 @@ defmodule AikidoTest.TypedRoutesTest.CounterSlice do
     name "typed_counter"
 
     schema do
-      attribute :count, :integer, default: 0, allow_nil?: false
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 0
+        allow_nil? false
+      end
     end
 
     route [AikidoTest.TypedRoutesTest.Increment, AikidoTest.TypedRoutesTest.Reset],
@@ -124,7 +135,11 @@ defmodule AikidoTest.TypedRoutesTest.ObserverSlice do
     name "typed_observer"
 
     schema do
-      attribute :count, :integer, default: 0, allow_nil?: false
+      attribute :count, :integer do
+        description "Number of signals observed by the wildcard route."
+        default 0
+        allow_nil? false
+      end
     end
 
     route "**", AikidoTest.TypedRoutesTest.Count
@@ -138,8 +153,15 @@ defmodule AikidoTest.TypedRoutesTest.First do
     type "typed.first"
 
     schema do
-      attribute :data, :term, default: false
-      attribute :marker, :string, default: "first"
+      attribute :data, :term do
+        description "Whole signal payload retained for native contract checks."
+        default false
+      end
+
+      attribute :marker, :string do
+        description "Marker distinguishing the selected signal contract."
+        default "first"
+      end
     end
   end
 end
@@ -151,8 +173,14 @@ defmodule AikidoTest.TypedRoutesTest.Second do
     type "typed.second"
 
     schema do
-      attribute :data, :term
-      attribute :marker, :string, default: "second"
+      attribute :data, :term do
+        description "Whole signal payload retained for native contract checks."
+      end
+
+      attribute :marker, :string do
+        description "Marker distinguishing the selected signal contract."
+        default "second"
+      end
     end
   end
 end
@@ -164,8 +192,16 @@ defmodule AikidoTest.TypedRoutesTest.Defaulted do
     type "typed.defaulted"
 
     schema do
-      attribute :mfa, :integer, default: {__MODULE__, :mfa, []}, constraints: [min: 1]
-      attribute :function, :term, default: &__MODULE__.function/0
+      attribute :mfa, :integer do
+        description "Value supplied by the module-function-arguments default."
+        default {__MODULE__, :mfa, []}
+        constraints min: 1
+      end
+
+      attribute :function, :term do
+        description "Value supplied by the function default."
+        default &__MODULE__.function/0
+      end
     end
   end
 
@@ -201,8 +237,17 @@ defmodule AikidoTest.TypedRoutesTest.Agent do
     instance AikidoTest.TypedRoutesTest.Instance
 
     schema do
-      attribute :count, :integer, default: 0, allow_nil?: false, public?: true
-      attribute :received, :term, public?: true
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 0
+        allow_nil? false
+        public? true
+      end
+
+      attribute :received, :term do
+        description "Payload received by the selected native reducer."
+        public? true
+      end
     end
 
     signal :increment, AikidoTest.TypedRoutesTest.Increment, AikidoTest.TypedRoutesTest.Add

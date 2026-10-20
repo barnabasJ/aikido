@@ -2,10 +2,28 @@ defmodule AikidoTest.Actions.StatePreservationTest.State do
   use Ash.Resource, data_layer: :embedded
 
   attributes do
-    attribute :count, :integer, public?: true, default: 42
-    attribute :status, :atom, public?: true, constraints: [one_of: [:running, :failed]]
-    attribute :error, :term, public?: true
-    attribute :revision, :integer, public?: true, update_default: &__MODULE__.update_revision/0
+    attribute :count, :integer do
+      description "Current counter value updated by routed signals."
+      public? true
+      default 42
+    end
+
+    attribute :status, :atom do
+      description "State status retained by effect-only reducers."
+      public? true
+      constraints one_of: [:running, :failed]
+    end
+
+    attribute :error, :term do
+      description "Failure detail retained by effect-only reducers."
+      public? true
+    end
+
+    attribute :revision, :integer do
+      description "Revision whose update default must not run inside a reducer."
+      public? true
+      update_default &__MODULE__.update_revision/0
+    end
   end
 
   def update_revision do
@@ -17,8 +35,16 @@ defmodule AikidoTest.Actions.StatePreservationTest.RestrictedState do
   use Ash.Resource, data_layer: :embedded
 
   attributes do
-    attribute :status, :atom, public?: true, constraints: [one_of: [:running]]
-    attribute :error, :term, public?: true
+    attribute :status, :atom do
+      description "State status retained by effect-only reducers."
+      public? true
+      constraints one_of: [:running]
+    end
+
+    attribute :error, :term do
+      description "Failure detail retained by effect-only reducers."
+      public? true
+    end
   end
 end
 
@@ -29,7 +55,10 @@ defmodule AikidoTest.Actions.StatePreservationTest.Agent do
     name "effect_state_preservation"
 
     schema do
-      attribute :count, :integer, default: 42
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 42
+      end
     end
 
     route "test.noop", {Aikido.AgentServer.RuntimeActions, :noop}

@@ -6,13 +6,20 @@ defmodule AgentExamples.Checklist do
     name "example_checklist"
 
     schema do
-      attribute :items, {:array, :string}, allow_nil?: false, default: [], public?: true
+      attribute :items, {:array, :string} do
+        description "Checklist items awaiting completion."
+        allow_nil? false
+        default []
+        public? true
+      end
 
-      attribute :completed, :integer,
-        allow_nil?: false,
-        default: 0,
-        constraints: [min: 0],
-        public?: true
+      attribute :completed, :integer do
+        description "Number of checklist items completed successfully."
+        allow_nil? false
+        default 0
+        constraints min: 0
+        public? true
+      end
     end
 
     signal :add, AgentExamples.Checklist.Signals.Add, AgentExamples.Checklist.Add

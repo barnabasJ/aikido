@@ -14,7 +14,10 @@ defmodule AikidoTest.DurableTest.CodecSlice do
     name "durable_codec"
 
     schema do
-      attribute :value, :integer, default: 3
+      attribute :value, :integer do
+        description "Domain value used to verify state transitions and native contracts."
+        default 3
+      end
     end
   end
 
@@ -35,8 +38,14 @@ defmodule AikidoTest.DurableTest.CodecAgent do
     path :domain
 
     schema do
-      attribute :value, :integer, default: 5
-      attribute :credential, :string
+      attribute :value, :integer do
+        description "Domain value used to verify state transitions and native contracts."
+        default 5
+      end
+
+      attribute :credential, :string do
+        description "Credential used to verify checkpoint redaction."
+      end
     end
 
     slice :codec, AikidoTest.DurableTest.CodecSlice

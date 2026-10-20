@@ -6,11 +6,31 @@ defmodule AikidoTest.SliceConfigTest.ConfiguredSlice do
     name "config_contract"
 
     config_schema do
-      attribute :required, :string, allow_nil?: false, default: "required default"
-      attribute :optional, :string, default: "optional default"
-      attribute :enabled, :boolean, default: true
-      attribute :from_function, :string, default: &AikidoTest.SliceConfigTest.function_default/0
-      attribute :from_mfa, :string, default: {String, :upcase, ["mfa default"]}
+      attribute :required, :string do
+        description "Required payload used to verify native presence validation."
+        allow_nil? false
+        default "required default"
+      end
+
+      attribute :optional, :string do
+        description "Optional value used to verify native default handling."
+        default "optional default"
+      end
+
+      attribute :enabled, :boolean do
+        description "Boolean option used to verify native default application."
+        default true
+      end
+
+      attribute :from_function, :string do
+        description "Value supplied by the function default."
+        default &AikidoTest.SliceConfigTest.function_default/0
+      end
+
+      attribute :from_mfa, :string do
+        description "Value supplied by the module-function-arguments default."
+        default {String, :upcase, ["mfa default"]}
+      end
     end
   end
 end

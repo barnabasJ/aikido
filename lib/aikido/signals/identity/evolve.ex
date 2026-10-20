@@ -6,9 +6,15 @@ defmodule Aikido.Signals.Identity.Evolve do
     type "aikido.identity.evolve"
 
     schema do
-      attribute :days, :integer, description: "Days of simulated time to add", default: 0
+      attribute :days, :integer do
+        description "Days of simulated time to add"
+        default 0
+      end
 
-      attribute :years, :integer, description: "Years of simulated time to add", default: 0
+      attribute :years, :integer do
+        description "Years of simulated time to add"
+        default 0
+      end
     end
   end
 end

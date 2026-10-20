@@ -28,29 +28,33 @@ defmodule Aikido.Slices.Identity do
     description "Identity self-model for agent (lifecycle facts, profile)."
 
     schema do
-      attribute :rev, :integer,
-        public?: true,
-        allow_nil?: false,
-        default: 0,
-        description: "Monotonic revision"
+      attribute :rev, :integer do
+        description "Monotonic revision"
+        public? true
+        allow_nil? false
+        default 0
+      end
 
-      attribute :profile, :map,
-        public?: true,
-        allow_nil?: false,
-        default: %{age: nil},
-        description: "Lifecycle facts"
+      attribute :profile, :map do
+        description "Lifecycle facts"
+        public? true
+        allow_nil? false
+        default %{age: nil}
+      end
 
-      attribute :created_at, :integer,
-        default: 0,
-        public?: true,
-        allow_nil?: false,
-        description: "Creation timestamp (ms)"
+      attribute :created_at, :integer do
+        description "Creation timestamp (ms)"
+        default 0
+        public? true
+        allow_nil? false
+      end
 
-      attribute :updated_at, :integer,
-        default: 0,
-        public?: true,
-        allow_nil?: false,
-        description: "Last update timestamp (ms)"
+      attribute :updated_at, :integer do
+        description "Last update timestamp (ms)"
+        default 0
+        public? true
+        allow_nil? false
+      end
     end
 
     route Aikido.Signals.Identity.Ensure, Aikido.Slices.Identity.Implementation

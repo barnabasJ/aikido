@@ -25,11 +25,28 @@ defmodule Aikido.Agent do
   use Ash.TypedStruct
 
   typed_struct do
-    field :id, :string, allow_nil?: false
-    field :agent_module, :atom
-    field :name, :string
-    field :description, :string
-    field :state, :map, allow_nil?: false, default: %{}
+    field :id, :string do
+      description "Stable identity used to address and persist this agent."
+      allow_nil? false
+    end
+
+    field :agent_module, :atom do
+      description "Ash resource that defines this agent's state schema and routed actions."
+    end
+
+    field :name, :string do
+      description "Human-readable name declared by the owning agent resource."
+    end
+
+    field :description, :string do
+      description "Description of the agent's role from its resource configuration."
+    end
+
+    field :state, :map do
+      description "Domain state keyed by the agent's own path and its mounted slice paths."
+      allow_nil? false
+      default %{}
+    end
   end
 
   @type t :: %__MODULE__{}

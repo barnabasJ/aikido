@@ -15,7 +15,10 @@ defmodule AikidoTest.AshWholeDataTest.Agent do
     instance AikidoTest.AshWholeDataTest.Instance
 
     schema do
-      attribute :received, :term, public?: true
+      attribute :received, :term do
+        description "Payload received by the selected native reducer."
+        public? true
+      end
     end
 
     signal :map_payload, "whole.map", :reduce_map

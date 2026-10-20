@@ -6,7 +6,10 @@ defmodule Aikido.Signals.Todo.TodoRemove do
     type "aikido.todo.remove"
 
     schema do
-      attribute :id, :string, allow_nil?: false
+      attribute :id, :string do
+        description "Stable identifier of the work item targeted by this event."
+        allow_nil? false
+      end
     end
   end
 end

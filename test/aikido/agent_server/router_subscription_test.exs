@@ -16,7 +16,10 @@ defmodule Aikido.RouterSubscriptionTest.Agent do
     name "router_subscription"
 
     schema do
-      attribute :count, :integer, default: 0
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 0
+      end
     end
 
     route "event.**", :increment

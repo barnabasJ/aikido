@@ -27,21 +27,30 @@ defmodule Aikido.AgentServer.Signal.CronRegistered do
     type "aikido.agent.cron.registered"
 
     schema do
-      attribute :job_id, :term,
-        allow_nil?: false,
-        description: "Logical cron job id within the agent"
+      attribute :job_id, :term do
+        allow_nil? false
+        description "Logical cron job id within the agent"
+      end
 
-      attribute :pid, :term, allow_nil?: false, description: "PID of the spawned cron-job process"
+      attribute :pid, :term do
+        allow_nil? false
+        description "PID of the spawned cron-job process"
+      end
 
-      attribute :monitor_ref, :term,
-        allow_nil?: false,
-        description: "Monitor reference for the cron-job process"
+      attribute :monitor_ref, :term do
+        allow_nil? false
+        description "Monitor reference for the cron-job process"
+      end
 
-      attribute :cron_spec, :term, allow_nil?: false, description: "Validated cron spec map"
+      attribute :cron_spec, :term do
+        allow_nil? false
+        description "Validated cron spec map"
+      end
 
-      attribute :runtime_spec, :term,
-        allow_nil?: false,
-        description: "%CronRuntimeSpec{} carrying scheduler details"
+      attribute :runtime_spec, :term do
+        allow_nil? false
+        description "%CronRuntimeSpec{} carrying scheduler details"
+      end
     end
   end
 end

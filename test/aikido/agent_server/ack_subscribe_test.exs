@@ -29,8 +29,15 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.TestAgent do
     path :app
 
     schema do
-      attribute :value, :integer, default: 0
-      attribute :status, :atom, default: :idle
+      attribute :value, :integer do
+        description "Domain value used to verify state transitions and native contracts."
+        default 0
+      end
+
+      attribute :status, :atom do
+        description "Current lifecycle or processing status of the fixture."
+        default :idle
+      end
     end
 
     route "write", {AikidoTest.AgentServer.AckSubscribeTest.TestAgent, :write}

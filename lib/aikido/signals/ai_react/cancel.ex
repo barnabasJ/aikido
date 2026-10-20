@@ -6,7 +6,10 @@ defmodule Aikido.Signals.AiReact.Cancel do
     type "ai.react.cancel"
 
     schema do
-      attribute :request_id, :string, default: nil
+      attribute :request_id, :string do
+        description "Optional run identifier to cancel; nil selects the active run."
+        default nil
+      end
     end
   end
 end

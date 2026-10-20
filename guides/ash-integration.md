@@ -62,7 +62,10 @@ defmodule MyApp.Signals.Add do
     type "counter.add"
 
     schema do
-      attribute :amount, :integer, allow_nil?: false
+      attribute :amount, :integer do
+        description "Amount to add to the counter."
+        allow_nil? false
+      end
     end
   end
 end
@@ -86,7 +89,11 @@ defmodule MyApp.Counter do
     name "counter"
 
     schema do
-      attribute :count, :integer, default: 0, public?: true
+      attribute :count, :integer do
+        description "Current counter value."
+        default 0
+        public? true
+      end
     end
 
     signal :add, MyApp.Signals.Add, MyApp.Increment
@@ -215,7 +222,11 @@ defmodule MyApp.IncrementRequested do
     source "/worker"
 
     schema do
-      attribute :amount, :integer, allow_nil?: false, default: 1
+      attribute :amount, :integer do
+        description "Amount to add when handling this signal."
+        allow_nil? false
+        default 1
+      end
     end
   end
 end
@@ -351,7 +362,11 @@ defmodule MyApp.CounterSlice do
   slice do
     name "counter_slice"
     schema do
-      attribute :count, :integer, default: 0, public?: true
+      attribute :count, :integer do
+        description "Current counter value."
+        default 0
+        public? true
+      end
     end
     route MyApp.Signals.Add, MyApp.Increment
   end

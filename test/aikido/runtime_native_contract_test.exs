@@ -17,7 +17,10 @@ defmodule Aikido.RuntimeNativeContractTest.InvalidDirectiveAgent do
     name "invalid_directive"
 
     schema do
-      attribute :count, :integer, default: 0
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 0
+      end
     end
 
     route "invalid.directive", :invalid

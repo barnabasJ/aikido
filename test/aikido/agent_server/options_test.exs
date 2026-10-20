@@ -7,7 +7,10 @@ defmodule AikidoTest.AgentServer.OptionsTest.ValidAgent do
     path :domain
 
     schema do
-      attribute :value, :integer, default: 0
+      attribute :value, :integer do
+        description "Domain value used to verify state transitions and native contracts."
+        default 0
+      end
     end
   end
 end

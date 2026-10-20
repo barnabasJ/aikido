@@ -7,17 +7,20 @@ defmodule Aikido.AgentServer.Signal.ChildExit do
     type "aikido.agent.child.exit"
 
     schema do
-      attribute :tag, :term,
-        allow_nil?: false,
-        description: "Tag assigned to the child when spawned"
+      attribute :tag, :term do
+        allow_nil? false
+        description "Tag assigned to the child when spawned"
+      end
 
-      attribute :pid, :term,
-        allow_nil?: false,
-        description: "PID of the child process that exited"
+      attribute :pid, :term do
+        allow_nil? false
+        description "PID of the child process that exited"
+      end
 
-      attribute :reason, :term,
-        allow_nil?: false,
-        description: "Exit reason from the child process"
+      attribute :reason, :term do
+        allow_nil? false
+        description "Exit reason from the child process"
+      end
     end
   end
 end

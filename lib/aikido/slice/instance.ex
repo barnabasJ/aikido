@@ -16,10 +16,21 @@ defmodule Aikido.Slice.Instance do
   use Ash.TypedStruct
 
   typed_struct do
-    field :module, :atom, allow_nil?: false, description: "The slice module"
+    field :module, :atom do
+      allow_nil? false
+      description "Embedded resource providing this mount's state schema and routed actions."
+    end
 
-    field :config, :map, allow_nil?: false, default: %{}, description: "Resolved configuration"
-    field :path, :atom, allow_nil?: false, description: "The slice key in agent.state"
+    field :config, :map do
+      allow_nil? false
+      default %{}
+      description "Validated mount configuration supplied to actions through slice_config."
+    end
+
+    field :path, :atom do
+      allow_nil? false
+      description "The slice key in agent.state"
+    end
   end
 
   @type t :: %__MODULE__{}

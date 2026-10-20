@@ -6,9 +6,15 @@ defmodule Aikido.Signals.Todo.Expire do
     type "aikido.todo.expire"
 
     schema do
-      attribute :id, :string, allow_nil?: false
+      attribute :id, :string do
+        description "Stable identifier of the work item targeted by this event."
+        allow_nil? false
+      end
 
-      attribute :revision, :integer, allow_nil?: false
+      attribute :revision, :integer do
+        description "Item generation that must match before a deadline can block the item."
+        allow_nil? false
+      end
     end
   end
 end

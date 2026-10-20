@@ -6,7 +6,11 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.CounterSlice do
     name "resolution_counter_slice"
 
     schema do
-      attribute :count, :integer, allow_nil?: false, default: 0
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        allow_nil? false
+        default 0
+      end
     end
 
     route "counter.bump", {Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :bump}
@@ -78,7 +82,10 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent do
     path :domain
 
     schema do
-      attribute :last_action, :atom, default: nil
+      attribute :last_action, :atom do
+        description "Most recent reducer action selected by routing."
+        default nil
+      end
     end
 
     slice :counter, Aikido.Dsl.SlicePathResolutionTest.CounterSlice

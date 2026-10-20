@@ -6,9 +6,15 @@ defmodule Aikido.Signals.Memory.DeleteFromSpace do
     type "aikido.memory.delete_from_space"
 
     schema do
-      attribute :space, :atom, description: "Map space name.", allow_nil?: false
+      attribute :space, :atom do
+        description "Map space name."
+        allow_nil? false
+      end
 
-      attribute :key, :term, description: "Key to remove.", allow_nil?: false
+      attribute :key, :term do
+        description "Key to remove."
+        allow_nil? false
+      end
     end
   end
 end

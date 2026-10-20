@@ -21,8 +21,15 @@ defmodule Aikido.Directives.Spawn do
   use Aikido.Directive
 
   typed_struct do
-    field :child_spec, :term, allow_nil?: false, description: "Supervisor child_spec"
-    field :tag, :term, allow_nil?: true, description: "Optional correlation tag"
+    field :child_spec, :term do
+      allow_nil? false
+      description "OTP child specification started under the runtime's process supervisor."
+    end
+
+    field :tag, :term do
+      allow_nil? true
+      description "Optional correlation tag included in spawn diagnostics."
+    end
   end
 
   require Logger

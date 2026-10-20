@@ -7,7 +7,10 @@ defmodule Aikido.AgentServer.Signal.Scheduled do
     type "aikido.scheduled"
 
     schema do
-      attribute :message, :term, allow_nil?: false, description: "The scheduled message payload"
+      attribute :message, :term do
+        allow_nil? false
+        description "The scheduled message payload"
+      end
     end
   end
 end

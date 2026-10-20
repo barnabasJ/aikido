@@ -8,7 +8,11 @@ defmodule AgentExamples.Researcher do
     name "example_researcher"
 
     schema do
-      attribute :specialty, :string, default: "text analysis", public?: true
+      attribute :specialty, :string do
+        description "Research specialty supplied to the assistant's role prompt."
+        default "text analysis"
+        public? true
+      end
     end
   end
 

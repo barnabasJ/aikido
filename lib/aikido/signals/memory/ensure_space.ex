@@ -6,14 +6,16 @@ defmodule Aikido.Signals.Memory.EnsureSpace do
     type "aikido.memory.ensure_space"
 
     schema do
-      attribute :space, :atom, description: "Space name to ensure.", allow_nil?: false
+      attribute :space, :atom do
+        description "Space name to ensure."
+        allow_nil? false
+      end
 
-      attribute :default, :union,
-        description: "Default data for the new space (map → kv, list → list).",
-        default: %Ash.Union{type: :kv, value: %{}},
-        constraints: [
-          types: [kv: [type: :map], list: [type: {:array, :term}]]
-        ]
+      attribute :default, :union do
+        description "Default data for the new space (map → kv, list → list)."
+        default %Ash.Union{type: :kv, value: %{}}
+        constraints types: [kv: [type: :map], list: [type: {:array, :term}]]
+      end
     end
   end
 end

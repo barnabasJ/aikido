@@ -2,8 +2,16 @@ defmodule Aikido.DirectiveTest.Notify do
   use Aikido.Directive
 
   typed_struct do
-    field :recipient, :term, allow_nil?: false
-    field :count, :integer, allow_nil?: false, constraints: [min: 1]
+    field :recipient, :term do
+      description "Process receiving the directive's notification."
+      allow_nil? false
+    end
+
+    field :count, :integer do
+      description "Current counter value updated by routed signals."
+      allow_nil? false
+      constraints min: 1
+    end
   end
 
   @impl true
@@ -17,7 +25,9 @@ defmodule Aikido.DirectiveTest.OtherStruct do
   use Ash.TypedStruct
 
   typed_struct do
-    field :count, :integer
+    field :count, :integer do
+      description "Current counter value updated by routed signals."
+    end
   end
 end
 

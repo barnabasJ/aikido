@@ -7,7 +7,10 @@ defmodule AgentExamples.Worker.Signals.Run do
     source "/examples/worker"
 
     schema do
-      attribute :text, :string, allow_nil?: false
+      attribute :text, :string do
+        description "Text to uppercase in the background worker."
+        allow_nil? false
+      end
     end
   end
 end
@@ -21,7 +24,10 @@ defmodule AgentExamples.Worker.Signals.Completed do
     source "/examples/worker"
 
     schema do
-      attribute :result, :string, allow_nil?: false
+      attribute :result, :string do
+        description "Uppercase text returned by the background task."
+        allow_nil? false
+      end
     end
   end
 end
@@ -35,7 +41,10 @@ defmodule AgentExamples.Worker.Signals.Failed do
     source "/examples/worker"
 
     schema do
-      attribute :reason, :term, allow_nil?: false
+      attribute :reason, :term do
+        description "Failure reason returned by the background task."
+        allow_nil? false
+      end
     end
   end
 end

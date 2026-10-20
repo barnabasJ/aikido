@@ -6,7 +6,10 @@ defmodule AikidoTest.SliceTest.MinimalSlice do
     name "minimal"
 
     schema do
-      attribute :value, :term, allow_nil?: true
+      attribute :value, :term do
+        description "Domain value used to verify state transitions and native contracts."
+        allow_nil? true
+      end
     end
 
     route "minimal.noop", {AikidoTest.TestActions, :noop}
@@ -22,11 +25,19 @@ defmodule AikidoTest.SliceTest.FullSlice do
     description "A test slice"
 
     schema do
-      attribute :counter, :integer, allow_nil?: false, default: 0
+      attribute :counter, :integer do
+        description "Counter used to observe routed state transitions."
+        allow_nil? false
+        default 0
+      end
     end
 
     config_schema do
-      attribute :enabled, :boolean, allow_nil?: false, default: true
+      attribute :enabled, :boolean do
+        description "Boolean option used to verify native default application."
+        allow_nil? false
+        default true
+      end
     end
 
     route "send", {AikidoTest.TestActions, :noop}
@@ -41,7 +52,11 @@ defmodule AikidoTest.SliceTest.SchemaSlice do
     name "schema"
 
     schema do
-      attribute :counter, :integer, allow_nil?: false, default: 0
+      attribute :counter, :integer do
+        description "Counter used to observe routed state transitions."
+        allow_nil? false
+        default 0
+      end
     end
 
     route "schema.noop", {AikidoTest.TestActions, :noop}
@@ -67,9 +82,20 @@ defmodule AikidoTest.SliceTest.RequiredConfigSlice do
     otp_app :aikido
 
     config_schema do
-      attribute :attempts, :integer, allow_nil?: false, constraints: [min: 1]
-      attribute :label, :string, default: {__MODULE__, :default_label, []}
-      attribute :optional, :string
+      attribute :attempts, :integer do
+        description "Positive attempt limit required by the slice configuration."
+        allow_nil? false
+        constraints min: 1
+      end
+
+      attribute :label, :string do
+        description "Label identifying the directive or fixture result."
+        default {__MODULE__, :default_label, []}
+      end
+
+      attribute :optional, :string do
+        description "Optional value used to verify native default handling."
+      end
     end
   end
 

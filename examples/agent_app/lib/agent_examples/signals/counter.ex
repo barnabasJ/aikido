@@ -7,7 +7,10 @@ defmodule AgentExamples.Counter.Signals.Add do
     source "/examples/counter"
 
     schema do
-      attribute :amount, :integer, allow_nil?: false
+      attribute :amount, :integer do
+        description "Amount applied by the typed counter signal."
+        allow_nil? false
+      end
     end
   end
 end
@@ -21,7 +24,10 @@ defmodule AgentExamples.Counter.Signals.Increase do
     source "/examples/counter"
 
     schema do
-      attribute :amount, :integer, allow_nil?: false
+      attribute :amount, :integer do
+        description "Amount applied by the typed counter signal."
+        allow_nil? false
+      end
     end
   end
 end
@@ -35,7 +41,10 @@ defmodule AgentExamples.Counter.Signals.Decrease do
     source "/examples/counter"
 
     schema do
-      attribute :amount, :integer, allow_nil?: false
+      attribute :amount, :integer do
+        description "Amount applied by the typed counter signal."
+        allow_nil? false
+      end
     end
   end
 end

@@ -5,23 +5,65 @@ defmodule Aikido.Ash.Team.State do
     extensions: [Aikido.Ash.Slice]
 
   attributes do
-    attribute :topology, Aikido.Ash.Team.Topology,
-      public?: true,
-      allow_nil?: false,
-      default: %Aikido.Ash.Team.Topology{}
+    attribute :topology, Aikido.Ash.Team.Topology do
+      description "Desired member resources, ownership and dependencies for this team."
+      public? true
+      allow_nil? false
+      default %Aikido.Ash.Team.Topology{}
+    end
 
-    attribute :members, :map, public?: true, allow_nil?: false, default: %{}
-    attribute :incarnations, :map, public?: true, allow_nil?: false, default: %{}
-    attribute :paused, :map, public?: true, allow_nil?: false, default: %{}
-    attribute :failures, :map, public?: true, allow_nil?: false, default: %{}
-    attribute :pending_tasks, :map, public?: true, default: %{}
-    attribute :recovered_tasks, {:array, :string}, default: []
-    attribute :tasks, :map, public?: true, allow_nil?: false, default: %{}
+    attribute :members, :map do
+      description "Live member process identifiers indexed by their topology names."
+      public? true
+      allow_nil? false
+      default %{}
+    end
 
-    attribute :operation, :map,
-      public?: true,
-      allow_nil?: false,
-      default: %{
+    attribute :incarnations, :map do
+      description "Activation identities used to reject stale task results from earlier member processes."
+      public? true
+      allow_nil? false
+      default %{}
+    end
+
+    attribute :paused, :map do
+      description "Members intentionally stopped and excluded from automatic reconciliation."
+      public? true
+      allow_nil? false
+      default %{}
+    end
+
+    attribute :failures, :map do
+      description "Most recent member process exits retained for lifecycle reconciliation."
+      public? true
+      allow_nil? false
+      default %{}
+    end
+
+    attribute :pending_tasks, :map do
+      description "Task requests waiting for their target member to finish activation."
+      public? true
+      default %{}
+    end
+
+    attribute :recovered_tasks, {:array, :string} do
+      description "Interrupted task identities awaiting failure notification after restoration."
+      default []
+    end
+
+    attribute :tasks, :map do
+      description "Tracked task status, results, member attempts and notification metadata."
+      public? true
+      allow_nil? false
+      default %{}
+    end
+
+    attribute :operation, :map do
+      description "Current lifecycle plan, awaited member step and completion or failure outcome."
+      public? true
+      allow_nil? false
+
+      default %{
         id: nil,
         status: :idle,
         remaining: [],
@@ -30,6 +72,7 @@ defmodule Aikido.Ash.Team.State do
         stopped: [],
         error: nil
       }
+    end
   end
 
   slice do

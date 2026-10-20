@@ -19,8 +19,15 @@ defmodule AikidoTest.AgentServerTest.TestAgent do
     path :domain
 
     schema do
-      attribute :counter, :integer, default: 0
-      attribute :messages, {:array, :term}, default: []
+      attribute :counter, :integer do
+        description "Counter used to observe routed state transitions."
+        default 0
+      end
+
+      attribute :messages, {:array, :term} do
+        description "Messages retained by the agent in delivery order."
+        default []
+      end
     end
 
     route "increment", {AikidoTest.TestActions, :increment}
@@ -236,8 +243,15 @@ defmodule AikidoTest.AgentServerTest do
           path :domain
 
           schema do
-            attribute :counter, :integer, default: 0
-            attribute :slow_done, :boolean, default: false
+            attribute :counter, :integer do
+              description "Counter used to observe routed state transitions."
+              default 0
+            end
+
+            attribute :slow_done, :boolean do
+              description "Whether the blocked fixture operation has finished."
+              default false
+            end
           end
 
           route "slow", {AikidoTest.AgentServerTest.InlineAgent, :inline_slow}
@@ -317,8 +331,15 @@ defmodule AikidoTest.AgentServerTest do
           path :domain
 
           schema do
-            attribute :counter, :integer, default: 0
-            attribute :slow_done, :boolean, default: false
+            attribute :counter, :integer do
+              description "Counter used to observe routed state transitions."
+              default 0
+            end
+
+            attribute :slow_done, :boolean do
+              description "Whether the blocked fixture operation has finished."
+              default false
+            end
           end
 
           route "slow", {AikidoTest.AgentServerTest.BufferedSignalAgent, :buffered_slow}
@@ -656,7 +677,10 @@ defmodule AikidoTest.AgentServerTest do
           path :domain
 
           schema do
-            attribute :pings, :integer, default: 0
+            attribute :pings, :integer do
+              description "Number of ping signals handled by the reducer."
+              default 0
+            end
           end
 
           route "start_schedule",
@@ -743,7 +767,10 @@ defmodule AikidoTest.AgentServerTest do
           path :domain
 
           schema do
-            attribute :events, {:array, :term}, default: []
+            attribute :events, {:array, :term} do
+              description "Events recorded in processing order."
+              default []
+            end
           end
 
           route "schedule_many", {AikidoTest.AgentServerTest.MultiScheduleAgent, :schedule_many}
@@ -822,7 +849,10 @@ defmodule AikidoTest.AgentServerTest do
           path :domain
 
           schema do
-            attribute :received, :term, default: nil
+            attribute :received, :term do
+              description "Payload received by the selected native reducer."
+              default nil
+            end
           end
 
           route "schedule_atom", {AikidoTest.AgentServerTest.WrapScheduleAgent, :schedule_atom}
@@ -1049,7 +1079,10 @@ defmodule AikidoTest.AgentServerTest do
           path :domain
 
           schema do
-            attribute :drain_count, :integer, default: 0
+            attribute :drain_count, :integer do
+              description "Number of queued messages processed during shutdown."
+              default 0
+            end
           end
 
           route "slow", {AikidoTest.AgentServerTest.CounterAgent, :slow}

@@ -6,9 +6,14 @@ defmodule Aikido.Signals.Todo.TodoComplete do
     type "aikido.todo.complete"
 
     schema do
-      attribute :id, :string, allow_nil?: false
+      attribute :id, :string do
+        description "Stable identifier of the work item targeted by this event."
+        allow_nil? false
+      end
 
-      attribute :result, :term
+      attribute :result, :term do
+        description "Explicit completion evidence to retain on the completed item."
+      end
     end
   end
 end

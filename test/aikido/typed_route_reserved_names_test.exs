@@ -125,7 +125,11 @@ defmodule AikidoTest.TypedRouteReservedNamesTest do
     {resource, errors} =
       resource(:slice, """
       schema do
-        attribute :count, :integer, default: 7, allow_nil?: false
+        attribute :count, :integer do
+          description "Current counter value updated by routed signals."
+          default 7
+          allow_nil? false
+        end
       end
       route #{inspect(definition)}, #{inspect(Noop)}
       """)

@@ -18,7 +18,10 @@ defmodule AikidoTest.AgentServer.StopChildTest.ParentAgent do
     path :domain
 
     schema do
-      attribute :exit_tags, {:array, :term}, default: []
+      attribute :exit_tags, {:array, :term} do
+        description "Child exit tags recorded by the parent reducer."
+        default []
+      end
     end
 
     route "aikido.agent.child.exit", :record_exit

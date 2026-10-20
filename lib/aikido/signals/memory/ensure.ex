@@ -6,9 +6,14 @@ defmodule Aikido.Signals.Memory.Ensure do
     type "aikido.memory.ensure"
 
     schema do
-      attribute :metadata, :map, description: "Optional metadata for new memory.", default: %{}
+      attribute :metadata, :map do
+        description "Optional metadata for new memory."
+        default %{}
+      end
 
-      attribute :id, :string, description: "Optional explicit memory id."
+      attribute :id, :string do
+        description "Optional explicit memory id."
+      end
     end
   end
 end

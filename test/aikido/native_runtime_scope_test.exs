@@ -30,7 +30,10 @@ defmodule Aikido.NativeRuntimeScopeTest.Slice do
     name "runtime_scope_slice"
 
     schema do
-      attribute :created, :map, default: %{}
+      attribute :created, :map do
+        description "Caller scope observed during native embedded creation."
+        default %{}
+      end
     end
   end
 
@@ -111,10 +114,23 @@ defmodule Aikido.NativeRuntimeScopeTest.Resource do
     name "native_runtime_scope"
 
     schema do
-      attribute :created, :map, default: %{}
-      attribute :observed, :map, default: %{}
-      attribute :owner_id, :string
-      attribute :workspace, :string
+      attribute :created, :map do
+        description "Caller scope observed during native embedded creation."
+        default %{}
+      end
+
+      attribute :observed, :map do
+        description "Caller context or runtime value captured by the receiving reducer."
+        default %{}
+      end
+
+      attribute :owner_id, :string do
+        description "Owner identity copied from the startup actor."
+      end
+
+      attribute :workspace, :string do
+        description "Workspace supplied as the startup tenant."
+      end
     end
 
     slice :mounted, Aikido.NativeRuntimeScopeTest.Slice

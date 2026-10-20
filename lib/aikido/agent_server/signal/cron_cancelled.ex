@@ -21,15 +21,18 @@ defmodule Aikido.AgentServer.Signal.CronCancelled do
     type "aikido.agent.cron.cancelled"
 
     schema do
-      attribute :job_id, :term,
-        allow_nil?: false,
-        description: "Logical cron job id within the agent"
+      attribute :job_id, :term do
+        allow_nil? false
+        description "Logical cron job id within the agent"
+      end
 
-      attribute :pid, :term,
-        description: "PID of the cancelled cron-job process (nil if untracked)"
+      attribute :pid, :term do
+        description "PID of the cancelled cron-job process (nil if untracked)"
+      end
 
-      attribute :monitor_ref, :term,
-        description: "Monitor reference that was cleared (nil if untracked)"
+      attribute :monitor_ref, :term do
+        description "Monitor reference that was cleared (nil if untracked)"
+      end
     end
   end
 end

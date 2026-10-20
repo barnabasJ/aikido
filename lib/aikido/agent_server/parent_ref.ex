@@ -17,25 +17,32 @@ defmodule Aikido.AgentServer.ParentRef do
   use Ash.TypedStruct
 
   typed_struct do
-    field :pid, :term, allow_nil?: false, description: "Parent process PID"
+    field :pid, :term do
+      allow_nil? false
+      description "Parent process PID"
+    end
 
-    field :id, :string,
-      allow_nil?: false,
-      description: "Parent instance ID",
-      constraints: [trim?: false, allow_empty?: true]
+    field :id, :string do
+      allow_nil? false
+      description "Parent instance ID"
+      constraints trim?: false, allow_empty?: true
+    end
 
-    field :partition, :term,
-      allow_nil?: true,
-      description: "Logical partition of the parent agent"
+    field :partition, :term do
+      allow_nil? true
+      description "Logical partition of the parent agent"
+    end
 
-    field :tag, :term,
-      allow_nil?: false,
-      description: "Tag assigned by parent when spawning this child"
+    field :tag, :term do
+      allow_nil? false
+      description "Tag assigned by parent when spawning this child"
+    end
 
-    field :meta, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Arbitrary metadata from parent"
+    field :meta, :map do
+      allow_nil? false
+      default %{}
+      description "Arbitrary metadata from parent"
+    end
   end
 
   @type t :: %__MODULE__{}

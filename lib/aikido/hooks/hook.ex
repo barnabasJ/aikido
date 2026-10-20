@@ -21,9 +21,14 @@ defmodule Aikido.Hooks.Hook do
   use Ash.Resource, data_layer: :embedded
 
   attributes do
-    attribute :name, :string, allow_nil?: false, public?: true
+    attribute :name, :string do
+      description "Hook identity included in execution results and lifecycle diagnostics."
+      allow_nil? false
+      public? true
+    end
 
     attribute :event, :atom do
+      description "AI lifecycle event that triggers this hook."
       allow_nil? false
       public? true
 
@@ -39,36 +44,49 @@ defmodule Aikido.Hooks.Hook do
                   ]
     end
 
-    attribute :mode, :atom,
-      constraints: [one_of: [:sync, :async]],
-      allow_nil?: false,
-      default: :sync,
-      public?: true
+    attribute :mode, :atom do
+      description "Whether the hook gates the lifecycle step or observes it asynchronously."
+      constraints one_of: [:sync, :async]
+      allow_nil? false
+      default :sync
+      public? true
+    end
 
-    attribute :script, :string, allow_nil?: false, public?: true
+    attribute :script, :string do
+      description "Lua source evaluated for each matching lifecycle event."
+      allow_nil? false
+      public? true
+    end
 
-    attribute :request, :function,
-      constraints: [arity: 2, mfa: true],
-      public?: true,
-      description:
-        "Portable external callback for Lua requests; returns {:ok, response} or {:error, reason}."
+    attribute :request, :function do
+      constraints arity: 2, mfa: true
+      public? true
 
-    attribute :max_instructions, :integer,
-      constraints: [min: 1],
-      allow_nil?: false,
-      default: 100_000,
-      public?: true
+      description "Portable external callback for Lua requests; returns {:ok, response} or {:error, reason}."
+    end
 
-    attribute :max_call_depth, :integer,
-      constraints: [min: 1],
-      allow_nil?: false,
-      default: 64,
-      public?: true
+    attribute :max_instructions, :integer do
+      description "Maximum Lua instruction count allowed for one hook execution."
+      constraints min: 1
+      allow_nil? false
+      default 100_000
+      public? true
+    end
 
-    attribute :max_string_bytes, :integer,
-      constraints: [min: 1],
-      allow_nil?: false,
-      default: 1_048_576,
-      public?: true
+    attribute :max_call_depth, :integer do
+      description "Maximum Lua call nesting allowed for one hook execution."
+      constraints min: 1
+      allow_nil? false
+      default 64
+      public? true
+    end
+
+    attribute :max_string_bytes, :integer do
+      description "Maximum Lua string size in bytes allowed during hook execution."
+      constraints min: 1
+      allow_nil? false
+      default 1_048_576
+      public? true
+    end
   end
 end

@@ -6,10 +6,25 @@ defmodule Aikido.SignalContractTest.Definition do
     source "/contract"
 
     schema do
-      attribute :required, :term, allow_nil?: false
-      attribute :optional, :term
-      attribute :enabled, :boolean, default: true
-      attribute :count, :integer, default: 2, constraints: [min: 1]
+      attribute :required, :term do
+        description "Required payload used to verify native presence validation."
+        allow_nil? false
+      end
+
+      attribute :optional, :term do
+        description "Optional value used to verify native default handling."
+      end
+
+      attribute :enabled, :boolean do
+        description "Boolean option used to verify native default application."
+        default true
+      end
+
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 2
+        constraints min: 1
+      end
     end
   end
 end
@@ -21,10 +36,26 @@ defmodule Aikido.SignalContractTest.Defaults do
     type "contract.defaults"
 
     schema do
-      attribute :number, :integer, default: {__MODULE__, :number, []}, constraints: [min: 1]
-      attribute :value, :term, default: &__MODULE__.value/0
-      attribute :flag, :boolean, default: {__MODULE__, :flag, []}
-      attribute :literal, :boolean, default: false
+      attribute :number, :integer do
+        description "Numeric payload used to verify native constraints and defaults."
+        default {__MODULE__, :number, []}
+        constraints min: 1
+      end
+
+      attribute :value, :term do
+        description "Domain value used to verify state transitions and native contracts."
+        default &__MODULE__.value/0
+      end
+
+      attribute :flag, :boolean do
+        description "Boolean value produced by the configured native default."
+        default {__MODULE__, :flag, []}
+      end
+
+      attribute :literal, :boolean do
+        description "Literal false default preserved by native casting."
+        default false
+      end
     end
   end
 

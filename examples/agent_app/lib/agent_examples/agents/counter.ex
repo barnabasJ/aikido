@@ -6,8 +6,19 @@ defmodule AgentExamples.Counter do
     name "example_counter"
 
     schema do
-      attribute :count, :integer, allow_nil?: false, default: 0, public?: true
-      attribute :signals_seen, :integer, allow_nil?: false, default: 0, public?: true
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        allow_nil? false
+        default 0
+        public? true
+      end
+
+      attribute :signals_seen, :integer do
+        description "Total signals observed by the wildcard handler."
+        allow_nil? false
+        default 0
+        public? true
+      end
     end
 
     signal :add, AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Implementation

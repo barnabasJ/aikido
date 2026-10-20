@@ -7,8 +7,15 @@ defmodule Aikido.Dsl.AgentTest.SimpleAgent do
     path :domain
 
     schema do
-      attribute :counter, :integer, default: 0
-      attribute :status, :atom, default: :idle
+      attribute :counter, :integer do
+        description "Counter used to observe routed state transitions."
+        default 0
+      end
+
+      attribute :status, :atom do
+        description "Current lifecycle or processing status of the fixture."
+        default :idle
+      end
     end
   end
 end

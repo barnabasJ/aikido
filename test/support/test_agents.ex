@@ -26,8 +26,15 @@ defmodule AikidoTest.TestAgents.Counter do
     path :domain
 
     schema do
-      attribute :counter, :integer, default: 0
-      attribute :messages, {:array, :term}, default: []
+      attribute :counter, :integer do
+        description "Counter used to observe routed state transitions."
+        default 0
+      end
+
+      attribute :messages, {:array, :term} do
+        description "Messages retained by the agent in delivery order."
+        default []
+      end
     end
 
     route "increment", {AikidoTest.TestActions, :increment}
@@ -48,8 +55,15 @@ defmodule AikidoTest.TestAgents.Basic do
     path :domain
 
     schema do
-      attribute :counter, :integer, default: 0
-      attribute :status, :atom, default: :idle
+      attribute :counter, :integer do
+        description "Counter used to observe routed state transitions."
+        default 0
+      end
+
+      attribute :status, :atom do
+        description "Current lifecycle or processing status of the fixture."
+        default :idle
+      end
     end
   end
 end
@@ -63,8 +77,17 @@ defmodule AikidoTest.TestAgents.AshSchema do
     path :domain
 
     schema do
-      attribute :status, :atom, allow_nil?: false, default: :idle
-      attribute :count, :integer, allow_nil?: false, default: 0
+      attribute :status, :atom do
+        description "Current lifecycle or processing status of the fixture."
+        allow_nil? false
+        default :idle
+      end
+
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        allow_nil? false
+        default 0
+      end
     end
   end
 end

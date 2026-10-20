@@ -29,8 +29,16 @@ defmodule Aikido.InitializationCreateTest.Slice do
     name "initialization_create_slice"
 
     schema do
-      attribute :count, :integer, default: 4, allow_nil?: false
-      attribute :observed, :map, default: %{}
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 4
+        allow_nil? false
+      end
+
+      attribute :observed, :map do
+        description "Caller context or runtime value captured by the receiving reducer."
+        default %{}
+      end
     end
   end
 
@@ -54,8 +62,16 @@ defmodule Aikido.InitializationCreateTest.Agent do
     name "initialization_create_agent"
 
     schema do
-      attribute :count, :integer, default: 2, allow_nil?: false
-      attribute :observed, :map, default: %{}
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 2
+        allow_nil? false
+      end
+
+      attribute :observed, :map do
+        description "Caller context or runtime value captured by the receiving reducer."
+        default %{}
+      end
     end
 
     slice :mounted, Aikido.InitializationCreateTest.Slice

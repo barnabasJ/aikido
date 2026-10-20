@@ -14,8 +14,15 @@ defmodule Aikido.Directives.Error do
   use Aikido.Directive
 
   typed_struct do
-    field :error, :term, allow_nil?: false, description: "Ash error"
-    field :context, :atom, allow_nil?: true, description: "Error context"
+    field :error, :term do
+      allow_nil? false
+      description "Failure value formatted in the agent's runtime error log."
+    end
+
+    field :context, :atom do
+      allow_nil? true
+      description "Optional processing phase included in the logged error message."
+    end
   end
 
   # Error directives log and continue. Users who need stop-on-error or

@@ -78,30 +78,48 @@ defmodule Aikido.Slices.FSM do
     name "fsm"
 
     schema do
-      attribute :state, :string,
-        public?: true,
-        allow_nil?: true,
-        constraints: [trim?: false, allow_empty?: true]
+      attribute :state, :string do
+        description "Current state selected from the configured finite-state-machine transitions."
+        public? true
+        allow_nil? true
+        constraints trim?: false, allow_empty?: true
+      end
 
-      attribute :history, {:array, :term}, public?: true, allow_nil?: false, default: []
-      attribute :terminal?, :boolean, public?: true, allow_nil?: true
+      attribute :history, {:array, :term} do
+        description "Successful transitions in chronological order, including their source and destination."
+        public? true
+        allow_nil? false
+        default []
+      end
 
-      attribute :initial_state, :string,
-        public?: true,
-        allow_nil?: false,
-        default: @default_initial_state,
-        constraints: [trim?: false, allow_empty?: true]
+      attribute :terminal?, :boolean do
+        description "Whether the current state belongs to the configured terminal states."
+        public? true
+        allow_nil? true
+      end
 
-      attribute :transitions, :map,
-        public?: true,
-        allow_nil?: false,
-        default: @default_transitions
+      attribute :initial_state, :string do
+        description "State selected when no explicit current state is provided at initialization."
+        public? true
+        allow_nil? false
+        default @default_initial_state
+        constraints trim?: false, allow_empty?: true
+      end
 
-      attribute :terminal_states, {:array, :string},
-        public?: true,
-        allow_nil?: false,
-        default: @default_terminal_states,
-        constraints: [items: [trim?: false, allow_empty?: true]]
+      attribute :transitions, :map do
+        description "Allowed destination states indexed by their source state."
+        public? true
+        allow_nil? false
+        default @default_transitions
+      end
+
+      attribute :terminal_states, {:array, :string} do
+        description "State names that mark the finite-state machine as terminal."
+        public? true
+        allow_nil? false
+        default @default_terminal_states
+        constraints items: [trim?: false, allow_empty?: true]
+      end
     end
 
     route Aikido.Signals.FSM.Transition, Aikido.Slices.FSM.Transition

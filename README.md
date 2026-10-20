@@ -54,7 +54,10 @@ defmodule MyApp.Signals.Add do
     type "counter.add"
 
     schema do
-      attribute :amount, :integer, allow_nil?: false
+      attribute :amount, :integer do
+        description "Amount to add to the counter."
+        allow_nil? false
+      end
     end
   end
 end
@@ -78,7 +81,12 @@ defmodule MyApp.Counter do
     name "counter"
 
     schema do
-      attribute :count, :integer, allow_nil?: false, default: 0, public?: true
+      attribute :count, :integer do
+        description "Current counter value."
+        allow_nil? false
+        default 0
+        public? true
+      end
     end
 
     signal :add, MyApp.Signals.Add, MyApp.Increment

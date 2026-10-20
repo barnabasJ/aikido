@@ -12,7 +12,9 @@ defmodule AikidoTest.AshVerifiersTest do
         [Aikido.Ash.Slice],
         """
         attributes do
-          uuid_primary_key :id
+          uuid_primary_key :id do
+            description "Unique identity for the resource used by the verifier fixture."
+          end
         end
 
         slice do
@@ -82,7 +84,10 @@ defmodule AikidoTest.AshVerifiersTest do
       agent do
         name "shadowed_state"
         schema do
-          attribute :state, :integer, default: 0
+          attribute :state, :integer do
+            description "Reserved state field used to verify schema shadowing is rejected."
+            default 0
+          end
         end
       end
       """)
@@ -109,7 +114,10 @@ defmodule AikidoTest.AshVerifiersTest do
       agent do
         name "reserved_topology"
         schema do
-          attribute :topology, :map, default: %{}
+          attribute :topology, :map do
+            description "Team topology supplied when the fixture starts."
+            default %{}
+          end
         end
       end
 
@@ -139,12 +147,18 @@ defmodule AikidoTest.AshVerifiersTest do
         agent do
           name "duplicate_fields"
           schema do
-            attribute :count, :integer, default: 0
+            attribute :count, :integer do
+              description "Current counter value updated by routed signals."
+              default 0
+            end
           end
         end
 
         attributes do
-          attribute :count, :integer, default: 1
+          attribute :count, :integer do
+            description "Current counter value updated by routed signals."
+            default 1
+          end
         end
         """)
       end

@@ -26,17 +26,20 @@ defmodule Aikido.AgentServer.Signal.CronDied do
     type "aikido.agent.cron.died"
 
     schema do
-      attribute :job_id, :term,
-        allow_nil?: false,
-        description: "Logical cron job id within the agent"
+      attribute :job_id, :term do
+        allow_nil? false
+        description "Logical cron job id within the agent"
+      end
 
-      attribute :pid, :term,
-        allow_nil?: false,
-        description: "PID of the cron-job process that exited"
+      attribute :pid, :term do
+        allow_nil? false
+        description "PID of the cron-job process that exited"
+      end
 
-      attribute :reason, :term,
-        allow_nil?: false,
-        description: "Exit reason from the cron-job process"
+      attribute :reason, :term do
+        allow_nil? false
+        description "Exit reason from the cron-job process"
+      end
     end
   end
 end

@@ -2,7 +2,9 @@ defmodule Aikido.NativeActionTest.CustomDirective do
   use Aikido.Directive
 
   typed_struct do
-    field :value, :term
+    field :value, :term do
+      description "Domain value used to verify state transitions and native contracts."
+    end
   end
 
   @impl true

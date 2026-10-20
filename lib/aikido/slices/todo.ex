@@ -19,12 +19,19 @@ defmodule Aikido.Slices.Todo do
     name "todos"
 
     schema do
-      attribute :items, {:array, Aikido.Slices.Todo.Item},
-        public?: true,
-        default: [],
-        allow_nil?: false
+      attribute :items, {:array, Aikido.Slices.Todo.Item} do
+        description "Durable work items and their explicit completion or blocking evidence."
+        public? true
+        default []
+        allow_nil? false
+      end
 
-      attribute :revision, :integer, public?: true, default: 0, allow_nil?: false
+      attribute :revision, :integer do
+        description "Monotonic work-list revision used to identify new item generations."
+        public? true
+        default 0
+        allow_nil? false
+      end
     end
 
     route Aikido.Signals.Todo.TodoAdd, Aikido.Slices.Todo.Implementation

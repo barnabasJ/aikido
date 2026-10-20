@@ -6,7 +6,12 @@ defmodule AgentExamples.Notebook do
     name "example_notebook"
 
     schema do
-      attribute :title, :string, allow_nil?: false, default: "Notes", public?: true
+      attribute :title, :string do
+        description "Title displayed above the notebook journal."
+        allow_nil? false
+        default "Notes"
+        public? true
+      end
     end
 
     slice :journal, AgentExamples.Journal

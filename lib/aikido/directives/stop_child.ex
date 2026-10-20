@@ -35,8 +35,16 @@ defmodule Aikido.Directives.StopChild do
   use Aikido.Directive
 
   typed_struct do
-    field :tag, :term, allow_nil?: false, description: "Tag of the child to stop"
-    field :reason, :term, allow_nil?: false, default: :normal, description: "Reason for stopping"
+    field :tag, :term do
+      allow_nil? false
+      description "Tag of the child to stop"
+    end
+
+    field :reason, :term do
+      allow_nil? false
+      default :normal
+      description "Reason for stopping"
+    end
   end
 
   require Logger

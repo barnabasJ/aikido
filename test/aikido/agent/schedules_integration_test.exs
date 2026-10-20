@@ -17,7 +17,10 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent do
     path :domain
 
     schema do
-      attribute :tick_count, :integer, default: 0
+      attribute :tick_count, :integer do
+        description "Number of scheduled ticks handled by the agent."
+        default 0
+      end
     end
 
     route "agent.tick", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick}
@@ -43,7 +46,10 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.MultiScheduleAgent do
     path :domain
 
     schema do
-      attribute :tick_count, :integer, default: 0
+      attribute :tick_count, :integer do
+        description "Number of scheduled ticks handled by the agent."
+        default 0
+      end
     end
 
     route "heartbeat.tick", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick}
@@ -64,7 +70,10 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.NoScheduleAgent do
     path :domain
 
     schema do
-      attribute :tick_count, :integer, default: 0
+      attribute :tick_count, :integer do
+        description "Number of scheduled ticks handled by the agent."
+        default 0
+      end
     end
   end
 end

@@ -7,7 +7,10 @@ defmodule Aikido.Directives.AsyncTaskTest.TestAgent do
     path :domain
 
     schema do
-      attribute :value, :term, default: nil
+      attribute :value, :term do
+        description "Domain value used to verify state transitions and native contracts."
+        default nil
+      end
     end
   end
 end

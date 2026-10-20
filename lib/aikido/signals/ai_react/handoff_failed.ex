@@ -6,11 +6,20 @@ defmodule Aikido.Signals.AiReact.HandoffFailed do
     type "ai.react.context_handoff.failed"
 
     schema do
-      attribute :request_id, :string, allow_nil?: false
+      attribute :request_id, :string do
+        description "Run identifier used to correlate this event with the active request."
+        allow_nil? false
+      end
 
-      attribute :handoff_id, :integer, allow_nil?: false
+      attribute :handoff_id, :integer do
+        description "Identifier correlating this result with the pending context handoff."
+        allow_nil? false
+      end
 
-      attribute :reason, :term, allow_nil?: false
+      attribute :reason, :term do
+        description "Failure reason reported by the supervised operation."
+        allow_nil? false
+      end
     end
   end
 end

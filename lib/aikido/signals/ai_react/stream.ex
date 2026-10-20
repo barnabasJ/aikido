@@ -6,15 +6,32 @@ defmodule Aikido.Signals.AiReact.Stream do
     type "ai.react.stream"
 
     schema do
-      attribute :request_id, :string, allow_nil?: false
+      attribute :request_id, :string do
+        description "Run identifier used to correlate this event with the active request."
+        allow_nil? false
+      end
 
-      attribute :iteration, :integer, allow_nil?: false
+      attribute :iteration, :integer do
+        description "Model iteration producing this streaming delta."
+        allow_nil? false
+      end
 
-      attribute :attempt, :integer, default: 0
+      attribute :attempt, :integer do
+        description "Streaming retry attempt used to reject deltas from superseded attempts."
+        default 0
+      end
 
-      attribute :text, :string, default: "", constraints: [allow_empty?: true, trim?: false]
+      attribute :text, :string do
+        description "Incremental assistant text produced by this streaming model response."
+        default ""
+        constraints allow_empty?: true, trim?: false
+      end
 
-      attribute :thinking, :string, default: "", constraints: [allow_empty?: true, trim?: false]
+      attribute :thinking, :string do
+        description "Incremental thinking text produced by this streaming model response."
+        default ""
+        constraints allow_empty?: true, trim?: false
+      end
     end
   end
 end

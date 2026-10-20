@@ -10,7 +10,11 @@ defmodule Aikido.Directives.Stop do
   use Aikido.Directive
 
   typed_struct do
-    field :reason, :term, allow_nil?: false, default: :normal, description: "Reason for stopping"
+    field :reason, :term do
+      allow_nil? false
+      default :normal
+      description "Reason for stopping"
+    end
   end
 
   @impl true

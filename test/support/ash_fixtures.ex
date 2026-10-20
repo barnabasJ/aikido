@@ -51,7 +51,12 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter do
     instance AikidoTest.AshFixtures.Instance
 
     schema do
-      attribute :count, :integer, allow_nil?: false, default: 0, public?: true
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        allow_nil? false
+        default 0
+        public? true
+      end
     end
 
     signal :add, "generated.add", :reduce_increment
@@ -93,7 +98,12 @@ defmodule AikidoTest.AshFixtures.Counter do
     instance AikidoTest.AshFixtures.Instance
 
     schema do
-      attribute :count, :integer, allow_nil?: false, default: 0, public?: true
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        allow_nil? false
+        default 0
+        public? true
+      end
     end
 
     signal :increment, "counter.increment", :reduce_increment
@@ -148,7 +158,11 @@ defmodule AikidoTest.AshFixtures.CounterSlice do
   use Ash.Resource, data_layer: :embedded, extensions: [Aikido.Ash.Slice]
 
   attributes do
-    attribute :count, :integer, public?: true, default: 0
+    attribute :count, :integer do
+      description "Current counter value updated by routed signals."
+      public? true
+      default 0
+    end
   end
 
   actions do
@@ -246,7 +260,10 @@ defmodule AikidoTest.AshFixtures.TaskWorker do
     instance AikidoTest.AshFixtures.Instance
 
     schema do
-      attribute :result, :string, public?: true
+      attribute :result, :string do
+        description "Echoed task result delivered to the assigning team."
+        public? true
+      end
     end
 
     signal :task, "harness.task", :task_echo
@@ -328,13 +345,19 @@ defmodule AikidoTest.AshFixtures.DefaultCounter do
 
     schema do
       attribute :count, :integer do
+        description "Current counter value updated by routed signals."
         default 0
         allow_nil? false
         public? true
         constraints min: 0
       end
 
-      attribute :origin, :string, default: "local", writable?: false, public?: true
+      attribute :origin, :string do
+        description "Read-only origin assigned by native resource defaults."
+        default "local"
+        writable? false
+        public? true
+      end
     end
   end
 end

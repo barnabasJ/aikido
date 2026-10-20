@@ -21,13 +21,15 @@ defmodule Aikido.AgentServer.Signal.CronRestarted do
     type "aikido.agent.cron.restarted"
 
     schema do
-      attribute :job_id, :term,
-        allow_nil?: false,
-        description: "Logical cron job id within the agent"
+      attribute :job_id, :term do
+        allow_nil? false
+        description "Logical cron job id within the agent"
+      end
 
-      attribute :pid, :term,
-        allow_nil?: false,
-        description: "PID of the freshly-spawned cron-job process"
+      attribute :pid, :term do
+        allow_nil? false
+        description "PID of the freshly-spawned cron-job process"
+      end
     end
   end
 end

@@ -11,9 +11,11 @@ defmodule Aikido.Directives.Notify do
   use Aikido.Directive
 
   typed_struct do
-    field :notification, :struct,
-      allow_nil?: false,
-      constraints: [instance_of: Ash.Notifier.Notification]
+    field :notification, :struct do
+      description "Native Ash notification published in supervised work after state adoption."
+      allow_nil? false
+      constraints instance_of: Ash.Notifier.Notification
+    end
   end
 
   require Logger

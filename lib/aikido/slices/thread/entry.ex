@@ -29,29 +29,40 @@ defmodule Aikido.Slices.Thread.Entry do
   use Ash.TypedStruct
 
   typed_struct do
-    field :id, :string,
-      allow_nil?: false,
-      description: "Unique entry identifier",
-      constraints: [trim?: false, allow_empty?: true]
+    field :id, :string do
+      description "Unique entry identifier"
+      allow_nil? false
+      constraints trim?: false, allow_empty?: true
+    end
 
-    field :seq, :integer,
-      default: 0,
-      allow_nil?: false,
-      description: "Monotonic sequence within thread"
+    field :seq, :integer do
+      description "Monotonic sequence within thread"
+      default 0
+      allow_nil? false
+    end
 
-    field :at, :integer, allow_nil?: false, description: "Timestamp (ms)"
+    field :at, :integer do
+      description "Timestamp (ms)"
+      allow_nil? false
+    end
 
-    field :kind, :atom,
-      default: :note,
-      allow_nil?: false,
-      description: "Entry type - open, any atom accepted"
+    field :kind, :atom do
+      description "Entry type - open, any atom accepted"
+      default :note
+      allow_nil? false
+    end
 
-    field :payload, :map, allow_nil?: false, default: %{}, description: "Kind-specific data"
+    field :payload, :map do
+      description "Kind-specific data"
+      allow_nil? false
+      default %{}
+    end
 
-    field :refs, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Cross-references to other primitives"
+    field :refs, :map do
+      description "Cross-references to other primitives"
+      allow_nil? false
+      default %{}
+    end
   end
 
   @type t :: %__MODULE__{}

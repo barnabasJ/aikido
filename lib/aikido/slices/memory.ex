@@ -47,45 +47,52 @@ defmodule Aikido.Slices.Memory do
     description "Memory state for agent cognition — named map / list spaces."
 
     schema do
-      attribute :id, :string,
-        default: "memory",
-        public?: true,
-        allow_nil?: false,
-        description: "Memory identifier within the owning agent",
-        constraints: [trim?: false, allow_empty?: true]
+      attribute :id, :string do
+        description "Memory identifier within the owning agent"
+        default "memory"
+        public? true
+        allow_nil? false
+        constraints trim?: false, allow_empty?: true
+      end
 
-      attribute :rev, :integer,
-        public?: true,
-        allow_nil?: false,
-        default: 0,
-        description: "Container-level monotonic revision"
+      attribute :rev, :integer do
+        description "Container-level monotonic revision"
+        public? true
+        allow_nil? false
+        default 0
+      end
 
-      attribute :spaces, :map,
-        public?: true,
-        allow_nil?: false,
-        default: %{
+      attribute :spaces, :map do
+        description "Open map of named spaces"
+        public? true
+        allow_nil? false
+
+        default %{
           world: %Aikido.Slices.Memory.Space{data: %{}},
           tasks: %Aikido.Slices.Memory.Space{data: []}
-        },
-        description: "Open map of named spaces"
+        }
+      end
 
-      attribute :created_at, :integer,
-        default: 0,
-        public?: true,
-        allow_nil?: false,
-        description: "Creation timestamp (ms)"
+      attribute :created_at, :integer do
+        description "Creation timestamp (ms)"
+        default 0
+        public? true
+        allow_nil? false
+      end
 
-      attribute :updated_at, :integer,
-        default: 0,
-        public?: true,
-        allow_nil?: false,
-        description: "Last update timestamp (ms)"
+      attribute :updated_at, :integer do
+        description "Last update timestamp (ms)"
+        default 0
+        public? true
+        allow_nil? false
+      end
 
-      attribute :metadata, :map,
-        public?: true,
-        allow_nil?: false,
-        default: %{},
-        description: "Arbitrary metadata"
+      attribute :metadata, :map do
+        description "Arbitrary metadata"
+        public? true
+        allow_nil? false
+        default %{}
+      end
     end
 
     route Aikido.Signals.Memory.Ensure, Aikido.Slices.Memory.Implementation

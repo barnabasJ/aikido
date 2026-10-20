@@ -18,9 +18,23 @@ defmodule Aikido.Slices.AiWorker do
     name "ai_worker"
 
     schema do
-      attribute :queue, {:array, :map}, public?: true, default: []
-      attribute :pending, :term, public?: true, default: nil
-      attribute :completed, :integer, public?: true, default: 0
+      attribute :queue, {:array, :map} do
+        description "Accepted team tasks waiting for the current AI request to settle."
+        public? true
+        default []
+      end
+
+      attribute :pending, :term do
+        description "Correlation and reply destination of the task assigned to the active AI run."
+        public? true
+        default nil
+      end
+
+      attribute :completed, :integer do
+        description "Number of team tasks reported as completed or failed by this worker."
+        public? true
+        default 0
+      end
     end
 
     route Aikido.Signals.AiWorker.Accept, Aikido.Slices.AiWorker.Accept, public?: false

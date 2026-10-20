@@ -12,7 +12,14 @@ defmodule Aikido.Types.ActionResult do
   use Ash.TypedStruct
 
   typed_struct do
-    field :state, :term
-    field :directives, {:array, Aikido.Types.Directive}, allow_nil?: false, default: []
+    field :state, :term do
+      description "Next value for the action's state path, or an explicit multi-slice update."
+    end
+
+    field :directives, {:array, Aikido.Types.Directive} do
+      description "Ordered I/O descriptors executed only after the returned state is adopted."
+      allow_nil? false
+      default []
+    end
   end
 end

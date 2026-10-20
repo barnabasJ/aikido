@@ -17,12 +17,33 @@ defmodule Aikido.Slices.AiReact.Directives.ToolExec do
   require Ash.Tracer
 
   typed_struct do
-    field :options, Aikido.AI.Options, default: %Aikido.AI.Options{}, allow_nil?: false
-    field :tool_call, :map, allow_nil?: false
-    field :registry, :map, allow_nil?: false, default: %{}
+    field :options, Aikido.AI.Options do
+      description "Execution policy controlling the supervised tool attempt and its deadline."
+      default %Aikido.AI.Options{}
+      allow_nil? false
+    end
 
-    field :tool_context, :map, allow_nil?: false, default: %{}
-    field :request_id, :string, allow_nil?: false
+    field :tool_call, :map do
+      description "Model-issued tool call containing its identifier, name and arguments."
+      allow_nil? false
+    end
+
+    field :registry, :map do
+      description "Prepared native Ash AI callbacks indexed by the exposed tool names."
+      allow_nil? false
+      default %{}
+    end
+
+    field :tool_context, :map do
+      description "Native Ash scope and application context passed to the tool callback."
+      allow_nil? false
+      default %{}
+    end
+
+    field :request_id, :string do
+      description "Run identifier attached to the tool-result or failure signal."
+      allow_nil? false
+    end
   end
 
   alias Aikido.AgentServer

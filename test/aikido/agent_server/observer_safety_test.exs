@@ -32,7 +32,10 @@ defmodule AikidoTest.ObserverSafety.Agent do
     name "observer_safety"
 
     schema do
-      attribute :count, :integer, default: 0
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 0
+      end
     end
 
     route "observer.increment", :increment

@@ -6,11 +6,20 @@ defmodule Aikido.Signals.Memory.PutInSpace do
     type "aikido.memory.put_in_space"
 
     schema do
-      attribute :space, :atom, description: "Map space name.", allow_nil?: false
+      attribute :space, :atom do
+        description "Map space name."
+        allow_nil? false
+      end
 
-      attribute :key, :term, description: "Key to set.", allow_nil?: false
+      attribute :key, :term do
+        description "Key to set."
+        allow_nil? false
+      end
 
-      attribute :value, :term, description: "Value to associate with `key`.", allow_nil?: false
+      attribute :value, :term do
+        description "Value to associate with `key`."
+        allow_nil? false
+      end
     end
   end
 end

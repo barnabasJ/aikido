@@ -20,7 +20,10 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.HarnessAgent do
     path :domain
 
     schema do
-      attribute :observed, :term, default: nil
+      attribute :observed, :term do
+        description "Caller context or runtime value captured by the receiving reducer."
+        default nil
+      end
     end
 
     route "test.directive",

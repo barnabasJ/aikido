@@ -65,7 +65,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Use **Ash types** for data contracts and **Spark.Options** for DSL/configuration validation
 - Preserve tagged tuple and structured error contracts at public boundaries
 - Keep cross-agent communication on signals/directives, not ad-hoc process messages
-- Use the Spark formatter's DSL rules and omit parentheses on DSL keys. Use multiline heredocs for multiline documentation and scripts.
+- Use the Spark formatter's DSL rules and omit parentheses on DSL keys. Declare every `field` and `attribute` with `do … end`, including a description explaining its purpose. Keep examples and test fixtures consistent. Use multiline heredocs for multiline documentation and scripts.
 - Comments describe current behavior; omit retired task numbers, ADR references and migration history.
 
 ## Testing and QA

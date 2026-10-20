@@ -39,7 +39,10 @@ defmodule Aikido.HooksScopeTest.Agent do
     middleware [Aikido.HooksScopeTest.Observe]
 
     schema do
-      attribute :observed, :map, default: %{}
+      attribute :observed, :map do
+        description "Caller context or runtime value captured by the receiving reducer."
+        default %{}
+      end
     end
 
     slice :ai, Aikido.Slices.AiReact

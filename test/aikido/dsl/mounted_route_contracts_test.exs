@@ -38,7 +38,10 @@ defmodule Aikido.Dsl.MountedRouteContractsTest.Counter do
     name "mounted_routes"
 
     schema do
-      attribute :count, :integer, default: 0
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 0
+      end
     end
 
     route "mounted.local", {__MODULE__, :local}
@@ -112,7 +115,10 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
             name "mounted_route_contracts"
             instance #{inspect(__MODULE__.Runtime)}
             schema do
-              attribute :count, :integer, default: 100
+              attribute :count, :integer do
+                description "Current counter value updated by routed signals."
+                default 100
+              end
             end
             slice :counter, #{inspect(Counter)}
             slice :other, #{inspect(Counter)}

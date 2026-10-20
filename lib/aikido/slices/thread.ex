@@ -33,48 +33,55 @@ defmodule Aikido.Slices.Thread do
     description "Append-only conversation history thread for the agent."
 
     schema do
-      attribute :id, :string,
-        default: "thread",
-        public?: true,
-        allow_nil?: false,
-        description: "Thread identifier within the owning agent",
-        constraints: [trim?: false, allow_empty?: true]
+      attribute :id, :string do
+        description "Thread identifier within the owning agent"
+        default "thread"
+        public? true
+        allow_nil? false
+        constraints trim?: false, allow_empty?: true
+      end
 
-      attribute :rev, :integer,
-        public?: true,
-        allow_nil?: false,
-        default: 0,
-        description: "Monotonic revision, increments on append"
+      attribute :rev, :integer do
+        description "Monotonic revision, increments on append"
+        public? true
+        allow_nil? false
+        default 0
+      end
 
-      attribute :entries, {:array, Aikido.Slices.Thread.Entry},
-        public?: true,
-        allow_nil?: false,
-        default: [],
-        description: "Ordered list of Entry structs"
+      attribute :entries, {:array, Aikido.Slices.Thread.Entry} do
+        description "Ordered list of Entry structs"
+        public? true
+        allow_nil? false
+        default []
+      end
 
-      attribute :created_at, :integer,
-        default: 0,
-        public?: true,
-        allow_nil?: false,
-        description: "Creation timestamp (ms)"
+      attribute :created_at, :integer do
+        description "Creation timestamp (ms)"
+        default 0
+        public? true
+        allow_nil? false
+      end
 
-      attribute :updated_at, :integer,
-        default: 0,
-        public?: true,
-        allow_nil?: false,
-        description: "Last update timestamp (ms)"
+      attribute :updated_at, :integer do
+        description "Last update timestamp (ms)"
+        default 0
+        public? true
+        allow_nil? false
+      end
 
-      attribute :metadata, :map,
-        public?: true,
-        allow_nil?: false,
-        default: %{},
-        description: "Arbitrary metadata"
+      attribute :metadata, :map do
+        description "Arbitrary metadata"
+        public? true
+        allow_nil? false
+        default %{}
+      end
 
-      attribute :stats, :map,
-        public?: true,
-        allow_nil?: false,
-        default: %{entry_count: 0},
-        description: "Cached aggregates"
+      attribute :stats, :map do
+        description "Cached aggregates"
+        public? true
+        allow_nil? false
+        default %{entry_count: 0}
+      end
     end
 
     route Aikido.Signals.Thread.Ensure, Aikido.Slices.Thread.Implementation

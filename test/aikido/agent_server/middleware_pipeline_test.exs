@@ -29,7 +29,10 @@ defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.MiddlewareAgent do
     path :app
 
     schema do
-      attribute :last_tags, {:array, :term}, default: []
+      attribute :last_tags, {:array, :term} do
+        description "Middleware tags recorded for the latest signal."
+        default []
+      end
     end
 
     route "inspect",

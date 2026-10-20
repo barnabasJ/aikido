@@ -21,123 +21,163 @@ defmodule Aikido.AgentServer.State do
   use Ash.TypedStruct
 
   typed_struct do
-    field :id, :string,
-      allow_nil?: false,
-      description: "Instance ID",
-      constraints: [trim?: false, allow_empty?: true]
+    field :id, :string do
+      allow_nil? false
+      description "Stable agent identity used for runtime addressing and durable persistence."
+      constraints trim?: false, allow_empty?: true
+    end
 
-    field :agent_module, :atom, allow_nil?: false, description: "Agent module"
-    field :agent, :term, allow_nil?: false, description: "The Aikido.Agent struct"
+    field :agent_module, :atom do
+      allow_nil? false
+      description "Ash resource that owns this runtime's state schema and signal actions."
+    end
 
-    field :status, :atom,
-      allow_nil?: false,
-      default: :initializing,
-      description: "Current server status"
+    field :agent, :term do
+      allow_nil? false
+      description "Currently adopted immutable agent identity and domain state."
+    end
 
-    field :parent, :term, allow_nil?: true, description: "Parent reference"
+    field :status, :atom do
+      allow_nil? false
+      default :initializing
+      description "Current server status"
+    end
 
-    field :orphaned_from, :term,
-      allow_nil?: true,
-      description: "Former parent reference after orphaning"
+    field :parent, :term do
+      allow_nil? true
+      description "Parent reference"
+    end
 
-    field :children, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Map of tag => ChildInfo"
+    field :orphaned_from, :term do
+      allow_nil? true
+      description "Former parent reference after orphaning"
+    end
 
-    field :on_parent_death, :atom,
-      allow_nil?: false,
-      default: :stop,
-      constraints: [one_of: [:stop, :continue, :emit_orphan]],
-      description: "Behavior on parent death"
+    field :children, :map do
+      allow_nil? false
+      default %{}
+      description "Map of tag => ChildInfo"
+    end
 
-    field :cron_jobs, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Map of job_id => scheduler job name"
+    field :on_parent_death, :atom do
+      allow_nil? false
+      default :stop
+      constraints one_of: [:stop, :continue, :emit_orphan]
+      description "Behavior on parent death"
+    end
 
-    field :cron_monitors, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Map of job_id => monitor_ref for cron jobs"
+    field :cron_jobs, :map do
+      allow_nil? false
+      default %{}
+      description "Map of job_id => scheduler job name"
+    end
 
-    field :cron_monitor_refs, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Map of monitor_ref => job_id for cron jobs"
+    field :cron_monitors, :map do
+      allow_nil? false
+      default %{}
+      description "Map of job_id => monitor_ref for cron jobs"
+    end
 
-    field :cron_restart_attempts, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Map of job_id => restart attempt count for cron jobs"
+    field :cron_monitor_refs, :map do
+      allow_nil? false
+      default %{}
+      description "Map of monitor_ref => job_id for cron jobs"
+    end
 
-    field :cron_restart_timers, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Map of job_id => timer_ref for cron restarts"
+    field :cron_restart_attempts, :map do
+      allow_nil? false
+      default %{}
+      description "Map of job_id => restart attempt count for cron jobs"
+    end
 
-    field :cron_restart_timer_refs, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Map of timer_ref => job_id for cron restarts"
+    field :cron_restart_timers, :map do
+      allow_nil? false
+      default %{}
+      description "Map of job_id => timer_ref for cron restarts"
+    end
 
-    field :cron_specs, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Map of job_id => durable cron registration spec"
+    field :cron_restart_timer_refs, :map do
+      allow_nil? false
+      default %{}
+      description "Map of timer_ref => job_id for cron restarts"
+    end
 
-    field :cron_runtime_specs, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Map of job_id => runtime cron restart spec"
+    field :cron_specs, :map do
+      allow_nil? false
+      default %{}
+      description "Map of job_id => durable cron registration spec"
+    end
 
-    field :skip_schedules, :boolean,
-      allow_nil?: false,
-      default: false,
-      description: "Skip registering slice schedules"
+    field :cron_runtime_specs, :map do
+      allow_nil? false
+      default %{}
+      description "Map of job_id => runtime cron restart spec"
+    end
 
-    field :aikido, :atom, allow_nil?: false, description: "Aikido instance name (required)"
+    field :skip_schedules, :boolean do
+      allow_nil? false
+      default false
+      description "Skip registering slice schedules"
+    end
 
-    field :partition, :term,
-      allow_nil?: true,
-      description: "Logical partition within the Aikido instance"
+    field :aikido, :atom do
+      allow_nil? false
+      description "Aikido instance name (required)"
+    end
 
-    field :middleware_chain, :term,
-      allow_nil?: true,
-      description: "Composed middleware chain function (Signal, ctx -> {ctx, dirs})"
+    field :partition, :term do
+      allow_nil? true
+      description "Logical partition within the Aikido instance"
+    end
 
-    field :signal_router, :term,
-      allow_nil?: true,
-      description: "Aikido.Signal.Router for signal routing"
+    field :middleware_chain, :term do
+      allow_nil? true
+      description "Composed middleware chain function (Signal, ctx -> {ctx, dirs})"
+    end
 
-    field :durable_server, :atom, description: "DurableServer supervisor"
-    field :durable_key, :term, description: "Logical DurableServer key"
+    field :signal_router, :term do
+      allow_nil? true
+      description "Aikido.Signal.Router for signal routing"
+    end
 
-    field :signal_subscribers, :map,
-      allow_nil?: false,
-      default: %{},
-      description:
-        "Map of sub_ref => %{pattern_compiled, selector, target, monitor_ref, once} for subscribe"
+    field :durable_server, :atom do
+      description "DurableServer supervisor"
+    end
 
-    field :ready_waiters, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Map of ref => pid waiting on lifecycle.ready"
+    field :durable_key, :term do
+      description "Logical DurableServer key"
+    end
 
-    field :debug, :boolean,
-      allow_nil?: false,
-      default: false,
-      description: "Whether debug mode is enabled"
+    field :signal_subscribers, :map do
+      allow_nil? false
+      default %{}
 
-    field :debug_events, {:array, :term},
-      allow_nil?: false,
-      default: [],
-      description: "Ring buffer of debug events (max 500)"
+      description "Map of sub_ref => %{pattern_compiled, selector, target, monitor_ref, once} for subscribe"
+    end
 
-    field :debug_max_events, :integer,
-      allow_nil?: false,
-      default: 500,
-      description: "Max debug events in ring buffer"
+    field :ready_waiters, :map do
+      allow_nil? false
+      default %{}
+      description "Map of ref => pid waiting on lifecycle.ready"
+    end
+
+    field :debug, :boolean do
+      allow_nil? false
+      default false
+      description "Whether debug mode is enabled"
+    end
+
+    field :debug_events, {:array, :term} do
+      allow_nil? false
+      default []
+      description "Ring buffer of debug events (max 500)"
+    end
+
+    field :debug_max_events, :integer do
+      allow_nil? false
+      default 500
+      description "Max debug events in ring buffer"
+    end
   end
 
   @type t :: %__MODULE__{}

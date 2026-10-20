@@ -57,23 +57,33 @@ defmodule Aikido.Directives.SpawnAgent do
   use Aikido.Directive
 
   typed_struct do
-    field :agent, :module,
-      allow_nil?: false,
-      description: "Agent Ash resource module"
+    field :agent, :module do
+      allow_nil? false
+      description "Agent Ash resource module"
+    end
 
-    field :tag, :term, allow_nil?: false, description: "Tag for tracking this child"
+    field :tag, :term do
+      allow_nil? false
+      description "Tag for tracking this child"
+    end
 
-    field :opts, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Options for child AgentServer"
+    field :opts, :map do
+      allow_nil? false
+      default %{}
+      description "Options for child AgentServer"
+    end
 
-    field :meta, :map, allow_nil?: false, default: %{}, description: "Metadata to pass to child"
+    field :meta, :map do
+      allow_nil? false
+      default %{}
+      description "Metadata to pass to child"
+    end
 
-    field :restart?, :boolean,
-      allow_nil?: false,
-      default: true,
-      description: "Let DurableServer automatically recover the child after a crash"
+    field :restart?, :boolean do
+      allow_nil? false
+      default true
+      description "Let DurableServer automatically recover the child after a crash"
+    end
   end
 
   @doc """

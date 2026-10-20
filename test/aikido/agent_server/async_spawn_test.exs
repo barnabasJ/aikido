@@ -27,7 +27,10 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest.Harness do
     name "async_spawn_harness"
 
     schema do
-      attribute :count, :integer, default: 42
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 42
+      end
     end
 
     route "test.spawn", :emit
@@ -50,9 +53,19 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest.SlowAgent do
     name "async_spawn_slow_agent"
 
     schema do
-      attribute :observer, :term
-      attribute :block?, :boolean, default: false
-      attribute :orphan_count, :integer, default: 0
+      attribute :observer, :term do
+        description "Process receiving asynchronous fixture notifications."
+      end
+
+      attribute :block?, :boolean do
+        description "Whether startup work waits for the test's release signal."
+        default false
+      end
+
+      attribute :orphan_count, :integer do
+        description "Number of orphan lifecycle signals handled by the agent."
+        default 0
+      end
     end
 
     route "aikido.agent.orphaned", :orphaned

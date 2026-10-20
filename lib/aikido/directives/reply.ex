@@ -45,10 +45,25 @@ defmodule Aikido.Directives.Reply do
   use Aikido.Directive
 
   typed_struct do
-    field :input_signal, :term, allow_nil?: false
-    field :reply_type, :string, allow_nil?: false
-    field :error_type, :string, allow_nil?: false
-    field :build, :term, allow_nil?: false
+    field :input_signal, :term do
+      description "Original query signal supplying the correlation identity and reply destination."
+      allow_nil? false
+    end
+
+    field :reply_type, :string do
+      description "Signal type returned when the reply builder succeeds."
+      allow_nil? false
+    end
+
+    field :error_type, :string do
+      description "Signal type returned when the reply builder reports an error."
+      allow_nil? false
+    end
+
+    field :build, :term do
+      description "MFA callback that receives live runtime state and returns reply data or an error."
+      allow_nil? false
+    end
   end
 
   @type builder ::

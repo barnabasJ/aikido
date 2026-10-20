@@ -41,14 +41,45 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent do
     path :domain
 
     schema do
-      attribute :action_ran, :boolean, default: false
-      attribute :key_a, :boolean, default: false
-      attribute :key_b, :boolean, default: false
-      attribute :key_c, :boolean, default: false
-      attribute :saw_action, :boolean, default: false
-      attribute :saw_a, :boolean, default: false
-      attribute :saw_b, :boolean, default: false
-      attribute :saw_c, :boolean, default: false
+      attribute :action_ran, :boolean do
+        description "Whether the reducer completed before directive execution."
+        default false
+      end
+
+      attribute :key_a, :boolean do
+        description "Whether the first directive's state marker was recorded."
+        default false
+      end
+
+      attribute :key_b, :boolean do
+        description "Whether the second directive's state marker was recorded."
+        default false
+      end
+
+      attribute :key_c, :boolean do
+        description "Whether the third directive's state marker was recorded."
+        default false
+      end
+
+      attribute :saw_action, :boolean do
+        description "Whether observers saw the reducer's committed state."
+        default false
+      end
+
+      attribute :saw_a, :boolean do
+        description "Whether observers saw the first directive's state marker."
+        default false
+      end
+
+      attribute :saw_b, :boolean do
+        description "Whether observers saw the second directive's state marker."
+        default false
+      end
+
+      attribute :saw_c, :boolean do
+        description "Whether observers saw the third directive's state marker."
+        default false
+      end
     end
 
     route "set_multiple",

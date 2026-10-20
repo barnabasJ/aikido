@@ -6,12 +6,11 @@ defmodule Aikido.Signals.Thread.Append do
     type "aikido.thread.append"
 
     schema do
-      attribute :entry, :union,
-        description: "Entry map (or list of entry maps) to append.",
-        allow_nil?: false,
-        constraints: [
-          types: [entry: [type: :map], entries: [type: {:array, :map}]]
-        ]
+      attribute :entry, :union do
+        description "Entry map (or list of entry maps) to append."
+        allow_nil? false
+        constraints types: [entry: [type: :map], entries: [type: {:array, :map}]]
+      end
     end
   end
 end

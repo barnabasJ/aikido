@@ -18,7 +18,9 @@ defmodule Aikido.AgentServer.Signal.PartitionAssigned do
     type "aikido.agent.identity.partition_assigned"
 
     schema do
-      attribute :partition, :term, description: "Logical partition or nil"
+      attribute :partition, :term do
+        description "Logical partition or nil"
+      end
     end
   end
 end

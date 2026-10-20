@@ -24,7 +24,10 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest.WatcherAgent do
     path :app
 
     schema do
-      attribute :identity_events, {:array, :term}, default: []
+      attribute :identity_events, {:array, :term} do
+        description "Identity lifecycle events observed by the fixture."
+        default []
+      end
     end
 
     route "aikido.agent.identity.partition_assigned",

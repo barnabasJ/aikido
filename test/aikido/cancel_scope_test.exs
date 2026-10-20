@@ -26,8 +26,15 @@ defmodule Aikido.CancelScopeTest.Agent do
     name "scoped_cancel"
 
     schema do
-      attribute :status, :atom, default: :running
-      attribute :observed, :map, default: %{}
+      attribute :status, :atom do
+        description "Current lifecycle or processing status of the fixture."
+        default :running
+      end
+
+      attribute :observed, :map do
+        description "Caller context or runtime value captured by the receiving reducer."
+        default %{}
+      end
     end
 
     route "ai.react.cancel", :cancel_run

@@ -7,7 +7,10 @@ defmodule AgentExamples.Checklist.Signals.Add do
     source "/examples/checklist"
 
     schema do
-      attribute :item, :string, allow_nil?: false
+      attribute :item, :string do
+        description "Checklist item selected for this command."
+        allow_nil? false
+      end
     end
   end
 end
@@ -21,7 +24,10 @@ defmodule AgentExamples.Checklist.Signals.Complete do
     source "/examples/checklist"
 
     schema do
-      attribute :item, :string, allow_nil?: false
+      attribute :item, :string do
+        description "Checklist item selected for this command."
+        allow_nil? false
+      end
     end
   end
 end

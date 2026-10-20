@@ -3,10 +3,26 @@ defmodule Aikido.Hooks.Execute do
   use Aikido.Directive
 
   typed_struct do
-    field :hook, :struct, constraints: [instance_of: Aikido.Hooks.Hook], allow_nil?: false
-    field :event, :map, allow_nil?: false
-    field :token, :integer, allow_nil?: false
-    field :request_id, :string, allow_nil?: false
+    field :hook, :struct do
+      description "Validated Lua hook configuration executed within the configured resource limits."
+      constraints instance_of: Aikido.Hooks.Hook
+      allow_nil? false
+    end
+
+    field :event, :map do
+      description "Lifecycle event data made available to the Lua script."
+      allow_nil? false
+    end
+
+    field :token, :integer do
+      description "Gate identity used to correlate this hook result with the waiting pipeline step."
+      allow_nil? false
+    end
+
+    field :request_id, :string do
+      description "AI run identity carried into hook callbacks and completion signals."
+      allow_nil? false
+    end
   end
 
   @impl true

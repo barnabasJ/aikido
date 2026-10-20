@@ -7,7 +7,10 @@ defmodule AikidoTest.AgentServerCoverageTest.SimpleTestAgent do
     path :domain
 
     schema do
-      attribute :counter, :integer, default: 0
+      attribute :counter, :integer do
+        description "Counter used to observe routed state transitions."
+        default 0
+      end
     end
 
     route "increment", {AikidoTest.TestActions, :increment}

@@ -9,8 +9,14 @@ defmodule Aikido.Directives.Emit do
   use Aikido.Directive
 
   typed_struct do
-    field :signal, :term, allow_nil?: false
-    field :target, :term, description: "Destination PID; defaults to the current agent"
+    field :signal, :term do
+      description "Signal descriptor materialized and delivered with the originating caller scope."
+      allow_nil? false
+    end
+
+    field :target, :term do
+      description "Destination PID; defaults to the current agent"
+    end
   end
 
   @impl true

@@ -3,7 +3,12 @@ defmodule AgentExamples.Journal do
   use Ash.Resource, data_layer: :embedded, extensions: [Aikido.Ash.Slice]
 
   attributes do
-    attribute :entries, {:array, :string}, public?: true, allow_nil?: false, default: []
+    attribute :entries, {:array, :string} do
+      description "Journal entries appended in their original order."
+      public? true
+      allow_nil? false
+      default []
+    end
   end
 
   slice do

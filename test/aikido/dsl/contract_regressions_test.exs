@@ -32,7 +32,10 @@ defmodule Aikido.Dsl.ContractRegressionsTest.Counter do
     instance Aikido.Dsl.ContractRegressionsTest.Runtime
 
     schema do
-      attribute :count, :integer, default: 0
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 0
+      end
     end
 
     signal :increase, "contract.increase", :increment
@@ -71,7 +74,10 @@ defmodule Aikido.Dsl.ContractRegressionsTest.ScheduledSlice do
     name "scheduled_contract"
 
     schema do
-      attribute :count, :integer, default: 0
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        default 0
+      end
     end
   end
 

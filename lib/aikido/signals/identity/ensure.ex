@@ -6,9 +6,10 @@ defmodule Aikido.Signals.Identity.Ensure do
     type "aikido.identity.ensure"
 
     schema do
-      attribute :profile, :map,
-        description: "Initial profile map for new identities.",
-        default: %{age: nil}
+      attribute :profile, :map do
+        description "Initial profile map for new identities."
+        default %{age: nil}
+      end
     end
   end
 end

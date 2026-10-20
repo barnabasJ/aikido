@@ -8,7 +8,11 @@ defmodule AikidoTest.AshPersistence.Permanent do
     instance AikidoTest.AshPersistence.Instance
 
     schema do
-      attribute :value, :integer, default: 0, public?: true
+      attribute :value, :integer do
+        description "Domain value used to verify state transitions and native contracts."
+        default 0
+        public? true
+      end
     end
   end
 end
@@ -24,7 +28,11 @@ defmodule AikidoTest.AshPersistence.Temporary do
     persistence :temporary
 
     schema do
-      attribute :value, :integer, default: 0, public?: true
+      attribute :value, :integer do
+        description "Domain value used to verify state transitions and native contracts."
+        default 0
+        public? true
+      end
     end
   end
 end

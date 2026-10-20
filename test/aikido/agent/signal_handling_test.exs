@@ -22,8 +22,15 @@ defmodule AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent do
     path :domain
 
     schema do
-      attribute :counter, :integer, default: 0
-      attribute :messages, {:array, :term}, default: []
+      attribute :counter, :integer do
+        description "Counter used to observe routed state transitions."
+        default 0
+      end
+
+      attribute :messages, {:array, :term} do
+        description "Messages retained by the agent in delivery order."
+        default []
+      end
     end
 
     route "increment", {AikidoTest.TestActions, :increment}

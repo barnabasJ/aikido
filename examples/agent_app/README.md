@@ -96,7 +96,8 @@ Agent state uses `schema do` blocks with native Ash `attribute` declarations.
 The transformer installs them as resource attributes; no separate state module is needed.
 
 Each signal defines its payload once with `use Aikido.Signal` and a `signal do`
-block containing its type, source, and schema. Agent declarations bind that
+block containing its type, source, and schema. Each attribute uses a `do/end`
+block with a description of its role. Agent declarations bind that
 contract directly to an Ash action implementation:
 
 ```elixir

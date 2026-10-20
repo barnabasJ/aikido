@@ -6,12 +6,18 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice do
     name "simple_slice"
 
     schema do
-      attribute :counter, :integer, allow_nil?: false, default: 0
+      attribute :counter, :integer do
+        description "Counter used to observe routed state transitions."
+        allow_nil? false
+        default 0
+      end
 
-      attribute :label, :string,
-        allow_nil?: false,
-        default: "default",
-        constraints: [trim?: false, allow_empty?: true]
+      attribute :label, :string do
+        description "Label identifying the directive or fixture result."
+        allow_nil? false
+        default "default"
+        constraints trim?: false, allow_empty?: true
+      end
     end
 
     route "simple.noop", {AikidoTest.TestActions, :noop}
@@ -26,7 +32,11 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest.RoutedSlice do
     name "routed_slice"
 
     schema do
-      attribute :count, :integer, allow_nil?: false, default: 0
+      attribute :count, :integer do
+        description "Current counter value updated by routed signals."
+        allow_nil? false
+        default 0
+      end
     end
 
     route "absolute.path.one", {AikidoTest.TestActions, :noop}
@@ -42,7 +52,10 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest.OtherSlice do
     name "other_slice"
 
     schema do
-      attribute :value, :term, allow_nil?: true
+      attribute :value, :term do
+        description "Domain value used to verify state transitions and native contracts."
+        allow_nil? true
+      end
     end
 
     route "other.noop", {AikidoTest.TestActions, :noop}
@@ -159,7 +172,10 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
           name "simple_dup"
 
           schema do
-            attribute :value, :term, allow_nil?: true
+            attribute :value, :term do
+              description "Domain value used to verify state transitions and native contracts."
+              allow_nil? true
+            end
           end
 
           route "simple_dup.noop", {AikidoTest.TestActions, :noop}

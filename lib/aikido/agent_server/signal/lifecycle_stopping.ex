@@ -15,7 +15,9 @@ defmodule Aikido.AgentServer.Signal.LifecycleStopping do
     type "aikido.agent.lifecycle.stopping"
 
     schema do
-      attribute :reason, :term, description: "Termination reason"
+      attribute :reason, :term do
+        description "Termination reason"
+      end
     end
   end
 end

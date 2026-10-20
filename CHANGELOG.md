@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Document every field and attribute with a description in native DSL blocks,
+  including runtime descriptors, signal schemas, examples and test fixtures.
+
 - Generate native reducer actions from typed Signal definitions and required Ash
   implementation modules. Validate state against its owning resource schema;
   route lists through one native Ash union selected by the concrete signal type.

@@ -10,8 +10,14 @@ defmodule Aikido.Directive do
         use Aikido.Directive
 
         typed_struct do
-          field :recipient, :term, allow_nil?: false
-          field :message, :term
+          field :recipient, :term do
+            description "Process that receives the message when this directive executes."
+            allow_nil? false
+          end
+
+          field :message, :term do
+            description "Message delivered to the recipient after the action's state is adopted."
+          end
         end
 
         @impl true

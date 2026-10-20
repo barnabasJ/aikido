@@ -23,24 +23,60 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   require Ash.Tracer
 
   typed_struct do
-    field :mode, :atom,
-      default: :normal,
-      allow_nil?: false,
-      constraints: [one_of: [:normal, :handoff, :resume]]
+    field :mode, :atom do
+      description "Whether this request performs a normal turn, a handoff summary or a resumed turn."
+      default :normal
+      allow_nil? false
+      constraints one_of: [:normal, :handoff, :resume]
+    end
 
-    field :handoff_id, :integer
-    field :options, Aikido.AI.Options, default: %Aikido.AI.Options{}, allow_nil?: false
-    field :iteration, :integer, default: 1
-    field :model, :term, allow_nil?: false
-    field :client, :module, allow_nil?: false, default: ReqLLM.Generation
-    field :context, :term, allow_nil?: false
-    field :tools, {:array, :term}, allow_nil?: false, default: []
+    field :handoff_id, :integer do
+      description "Identifier correlating a summary response with the pending context handoff."
+    end
 
-    field :request_id, :string, allow_nil?: false
+    field :options, Aikido.AI.Options do
+      description "Execution policy controlling model-call attempts, deadlines and streaming."
+      default %Aikido.AI.Options{}
+      allow_nil? false
+    end
 
-    field :llm_opts, {:array, :tuple},
-      constraints: [items: [fields: [key: [type: :atom], value: [type: :term]]]],
-      default: []
+    field :iteration, :integer do
+      description "Model turn number attached to the resulting response and stream signals."
+      default 1
+    end
+
+    field :model, :term do
+      description "Model identifier or configuration passed to the generation callback."
+      allow_nil? false
+    end
+
+    field :client, :module do
+      description "Module providing the generation callback for this model request."
+      allow_nil? false
+      default ReqLLM.Generation
+    end
+
+    field :context, :term do
+      description "Native ReqLLM conversation passed to the generation callback."
+      allow_nil? false
+    end
+
+    field :tools, {:array, :term} do
+      description "Prepared tool descriptions supplied with the model request."
+      allow_nil? false
+      default []
+    end
+
+    field :request_id, :string do
+      description "Run identifier used to correlate the model response with the owning slice."
+      allow_nil? false
+    end
+
+    field :llm_opts, {:array, :tuple} do
+      description "Provider generation options applied to this model request."
+      constraints items: [fields: [key: [type: :atom], value: [type: :term]]]
+      default []
+    end
   end
 
   alias Aikido.AgentServer

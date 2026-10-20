@@ -5,8 +5,14 @@ defmodule Aikido.AICleanupTest.Owner do
     name "cleanup_owner"
 
     schema do
-      attribute :request_id, :string
-      attribute :status, :atom, default: :running
+      attribute :request_id, :string do
+        description "Correlation identifier for the active work request."
+      end
+
+      attribute :status, :atom do
+        description "Current lifecycle or processing status of the fixture."
+        default :running
+      end
     end
   end
 end

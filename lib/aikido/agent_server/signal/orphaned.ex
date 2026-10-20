@@ -22,23 +22,30 @@ defmodule Aikido.AgentServer.Signal.Orphaned do
     type "aikido.agent.orphaned"
 
     schema do
-      attribute :parent_id, :string,
-        allow_nil?: false,
-        description: "ID of the parent agent that died"
+      attribute :parent_id, :string do
+        allow_nil? false
+        description "ID of the parent agent that died"
+      end
 
-      attribute :parent_pid, :term,
-        allow_nil?: false,
-        description: "PID of the parent process that died"
+      attribute :parent_pid, :term do
+        allow_nil? false
+        description "PID of the parent process that died"
+      end
 
-      attribute :tag, :term, allow_nil?: false, description: "Tag assigned by the former parent"
+      attribute :tag, :term do
+        allow_nil? false
+        description "Tag assigned by the former parent"
+      end
 
-      attribute :meta, :map,
-        default: %{},
-        description: "Metadata copied from the former parent reference"
+      attribute :meta, :map do
+        default %{}
+        description "Metadata copied from the former parent reference"
+      end
 
-      attribute :reason, :term,
-        allow_nil?: false,
-        description: "Exit reason from the parent process"
+      attribute :reason, :term do
+        allow_nil? false
+        description "Exit reason from the parent process"
+      end
     end
   end
 end

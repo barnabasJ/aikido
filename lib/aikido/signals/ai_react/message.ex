@@ -6,7 +6,10 @@ defmodule Aikido.Signals.AiReact.Message do
     type "ai.react.message"
 
     schema do
-      attribute :text, :string, allow_nil?: false
+      attribute :text, :string do
+        description "User message to append immediately or queue at the next safe model boundary."
+        allow_nil? false
+      end
     end
   end
 end

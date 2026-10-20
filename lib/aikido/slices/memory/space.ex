@@ -23,17 +23,23 @@ defmodule Aikido.Slices.Memory.Space do
   use Ash.TypedStruct
 
   typed_struct do
-    field :data, :term,
-      allow_nil?: false,
-      default: %{},
-      description: "Space contents — a map or list"
+    field :data, :term do
+      description "Space contents — a map or list"
+      allow_nil? false
+      default %{}
+    end
 
-    field :rev, :integer,
-      allow_nil?: false,
-      default: 0,
-      description: "Per-space revision, increments on mutation"
+    field :rev, :integer do
+      description "Per-space revision, increments on mutation"
+      allow_nil? false
+      default 0
+    end
 
-    field :metadata, :map, allow_nil?: false, default: %{}, description: "Space-level metadata"
+    field :metadata, :map do
+      description "Space-level metadata"
+      allow_nil? false
+      default %{}
+    end
   end
 
   @type t :: %__MODULE__{}

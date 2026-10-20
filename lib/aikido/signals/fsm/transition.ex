@@ -6,7 +6,11 @@ defmodule Aikido.Signals.FSM.Transition do
     type "aikido.fsm.transition"
 
     schema do
-      attribute :to, :string, allow_nil?: false, constraints: [trim?: false, allow_empty?: true]
+      attribute :to, :string do
+        description "Destination state requested for the finite-state-machine transition."
+        allow_nil? false
+        constraints trim?: false, allow_empty?: true
+      end
     end
   end
 end

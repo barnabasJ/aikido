@@ -31,35 +31,41 @@ defmodule Aikido.Directives.AsyncTask do
   use Aikido.Directive
 
   typed_struct do
-    field :work, :term,
-      allow_nil?: false,
-      description: "MFA or function to execute in a supervised task"
+    field :work, :term do
+      allow_nil? false
+      description "MFA or function to execute in a supervised task"
+    end
 
-    field :success_type, :string,
-      allow_nil?: false,
-      default: @default_success_type,
-      description: "Signal type emitted for successful non-signal results",
-      constraints: [trim?: false, allow_empty?: true]
+    field :success_type, :string do
+      allow_nil? false
+      default @default_success_type
+      description "Signal type emitted for successful non-signal results"
+      constraints trim?: false, allow_empty?: true
+    end
 
-    field :error_type, :string,
-      allow_nil?: false,
-      default: @default_error_type,
-      description: "Signal type emitted for errors, exits, throws, and crashes",
-      constraints: [trim?: false, allow_empty?: true]
+    field :error_type, :string do
+      allow_nil? false
+      default @default_error_type
+      description "Signal type emitted for errors, exits, throws, and crashes"
+      constraints trim?: false, allow_empty?: true
+    end
 
-    field :payload, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Static payload merged into reply data"
+    field :payload, :map do
+      allow_nil? false
+      default %{}
+      description "Static payload merged into reply data"
+    end
 
-    field :source, :string,
-      allow_nil?: true,
-      description: "Signal source for generated reply signals",
-      constraints: [trim?: false, allow_empty?: true]
+    field :source, :string do
+      allow_nil? true
+      description "Signal source for generated reply signals"
+      constraints trim?: false, allow_empty?: true
+    end
 
-    field :target, :term,
-      allow_nil?: true,
-      description: "GenServer target for reply signals; defaults to originating agent"
+    field :target, :term do
+      allow_nil? true
+      description "GenServer target for reply signals; defaults to originating agent"
+    end
   end
 
   alias Aikido.AgentServer

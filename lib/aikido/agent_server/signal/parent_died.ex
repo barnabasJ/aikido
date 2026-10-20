@@ -20,13 +20,15 @@ defmodule Aikido.AgentServer.Signal.ParentDied do
     type "aikido.agent.identity.parent_died"
 
     schema do
-      attribute :former_parent, :term,
-        allow_nil?: false,
-        description: "%ParentRef{} of the parent that died"
+      attribute :former_parent, :term do
+        allow_nil? false
+        description "%ParentRef{} of the parent that died"
+      end
 
-      attribute :reason, :term,
-        allow_nil?: false,
-        description: "Exit reason from the parent process"
+      attribute :reason, :term do
+        allow_nil? false
+        description "Exit reason from the parent process"
+      end
     end
   end
 end

@@ -30,6 +30,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Supply AI tools as Ash AI tool names plus native `tool_options`. Setup builds the tool descriptions and registry once per run; callers do not wrap executable callbacks.
 
 ## Library Author Patterns
+- Give every `field` and `attribute` a purpose-specific `description` inside its `do … end` block, including in examples and fixtures.
 - Author actions for domain behavior; let agents orchestrate state + directive emission.
 - Use `Aikido.Directives.SpawnAgent` / `Aikido.Directives.StopChild` for hierarchy, not ad-hoc child tracking.
 - Use signals for cross-agent communication instead of direct process coupling.

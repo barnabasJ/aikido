@@ -7,8 +7,18 @@ defmodule Aikido.Ash.Team.Topology do
   use Ash.TypedStruct
 
   typed_struct do
-    field :nodes, :map, allow_nil?: false, default: %{}
-    field :version, :integer, allow_nil?: false, default: 1, constraints: [min: 1]
+    field :nodes, :map do
+      description "Member definitions indexed by name, including resources, ownership and activation dependencies."
+      allow_nil? false
+      default %{}
+    end
+
+    field :version, :integer do
+      description "Topology revision incremented when the desired member graph changes."
+      allow_nil? false
+      default 1
+      constraints min: 1
+    end
   end
 
   def build(definition, instance, limit \\ 128)

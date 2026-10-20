@@ -6,9 +6,15 @@ defmodule Aikido.Signals.Memory.AppendToSpace do
     type "aikido.memory.append_to_space"
 
     schema do
-      attribute :space, :atom, description: "List space name.", allow_nil?: false
+      attribute :space, :atom do
+        description "List space name."
+        allow_nil? false
+      end
 
-      attribute :item, :term, description: "Item to append.", allow_nil?: false
+      attribute :item, :term do
+        description "Item to append."
+        allow_nil? false
+      end
     end
   end
 end

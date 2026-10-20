@@ -23,13 +23,39 @@ defmodule Aikido.AgentServer.Signal.ChildStarted do
     source "/agent"
 
     schema do
-      attribute :parent_id, :string, allow_nil?: false, description: "ID of the parent agent"
-      attribute :child_id, :string, allow_nil?: false, description: "ID of the child agent"
-      attribute :child_partition, :term, description: "Partition of the child agent"
-      attribute :child_module, :term, allow_nil?: false, description: "Module of the child agent"
-      attribute :tag, :term, allow_nil?: false, description: "Tag used when spawning"
-      attribute :pid, :term, allow_nil?: false, description: "PID of the child process"
-      attribute :meta, :map, default: %{}, description: "Metadata passed during spawn"
+      attribute :parent_id, :string do
+        allow_nil? false
+        description "ID of the parent agent"
+      end
+
+      attribute :child_id, :string do
+        allow_nil? false
+        description "ID of the child agent"
+      end
+
+      attribute :child_partition, :term do
+        description "Partition of the child agent"
+      end
+
+      attribute :child_module, :term do
+        allow_nil? false
+        description "Module of the child agent"
+      end
+
+      attribute :tag, :term do
+        allow_nil? false
+        description "Tag used when spawning"
+      end
+
+      attribute :pid, :term do
+        allow_nil? false
+        description "PID of the child process"
+      end
+
+      attribute :meta, :map do
+        default %{}
+        description "Metadata passed during spawn"
+      end
     end
   end
 end

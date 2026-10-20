@@ -7,14 +7,23 @@ defmodule AgentExamples.Worker do
     persistence :temporary
 
     schema do
-      attribute :status, :atom,
-        allow_nil?: false,
-        default: :idle,
-        constraints: [one_of: [:idle, :working, :completed, :failed]],
-        public?: true
+      attribute :status, :atom do
+        description "Current stage of background work."
+        allow_nil? false
+        default :idle
+        constraints one_of: [:idle, :working, :completed, :failed]
+        public? true
+      end
 
-      attribute :result, :string, public?: true
-      attribute :error, :term, public?: true
+      attribute :result, :string do
+        description "Uppercase text returned by the background task."
+        public? true
+      end
+
+      attribute :error, :term do
+        description "Failure reason recorded when background work fails."
+        public? true
+      end
     end
 
     signal :run, AgentExamples.Worker.Signals.Run, AgentExamples.Worker.Work

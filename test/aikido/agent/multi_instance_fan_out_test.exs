@@ -41,11 +41,13 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest.SlackSlice do
     name "slack_slice"
 
     schema do
-      attribute :messages, {:array, :string},
-        public?: true,
-        allow_nil?: false,
-        default: [],
-        constraints: [items: [trim?: false, allow_empty?: true]]
+      attribute :messages, {:array, :string} do
+        description "Messages retained by the agent in delivery order."
+        public? true
+        allow_nil? false
+        default []
+        constraints items: [trim?: false, allow_empty?: true]
+      end
     end
 
     route "slack.send", :send
@@ -104,10 +106,12 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest.HostSlackAgent do
     path :host
 
     schema do
-      attribute :messages, {:array, :string},
-        allow_nil?: false,
-        default: [],
-        constraints: [items: [trim?: false, allow_empty?: true]]
+      attribute :messages, {:array, :string} do
+        description "Messages retained by the agent in delivery order."
+        allow_nil? false
+        default []
+        constraints items: [trim?: false, allow_empty?: true]
+      end
     end
 
     slice :slack_support, Aikido.Agent.MultiInstanceFanOutTest.SlackSlice,

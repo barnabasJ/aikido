@@ -7,7 +7,10 @@ defmodule AgentExamples.Journal.Signals.Append do
     source "/examples/journal"
 
     schema do
-      attribute :text, :string, allow_nil?: false
+      attribute :text, :string do
+        description "Text to append to the notebook journal."
+        allow_nil? false
+      end
     end
   end
 end

@@ -6,9 +6,15 @@ defmodule Aikido.Signals.AiReact.Failed do
     type "ai.react.failed"
 
     schema do
-      attribute :reason, :term, allow_nil?: false
+      attribute :reason, :term do
+        description "Failure reason reported by the supervised operation."
+        allow_nil? false
+      end
 
-      attribute :request_id, :string, allow_nil?: false
+      attribute :request_id, :string do
+        description "Run identifier used to correlate this event with the active request."
+        allow_nil? false
+      end
     end
   end
 end

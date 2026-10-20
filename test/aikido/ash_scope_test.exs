@@ -21,7 +21,10 @@ defmodule AikidoTest.ScopedAgent do
     name "scope_test"
 
     schema do
-      attribute :observed, :map, default: %{}
+      attribute :observed, :map do
+        description "Caller context or runtime value captured by the receiving reducer."
+        default %{}
+      end
     end
 
     signal :observe, "scope.observe", {__MODULE__, :reduce}

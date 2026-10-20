@@ -22,13 +22,21 @@ defmodule Aikido.Directives.AdoptChild do
   use Aikido.Directive
 
   typed_struct do
-    field :child, :term, allow_nil?: false, description: "Child PID or child id"
-    field :tag, :term, allow_nil?: false, description: "Tag for tracking this adopted child"
+    field :child, :term do
+      allow_nil? false
+      description "Child PID or child id"
+    end
 
-    field :meta, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Metadata to pass to the adopted child"
+    field :tag, :term do
+      allow_nil? false
+      description "Tag for tracking this adopted child"
+    end
+
+    field :meta, :map do
+      allow_nil? false
+      default %{}
+      description "Metadata to pass to the adopted child"
+    end
   end
 
   @doc "Send one attachment command; the child's startup signal acknowledges the new binding."

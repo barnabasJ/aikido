@@ -12,7 +12,10 @@ defmodule Aikido.AgentServer.Signal.CronCancelRequested do
     type "aikido.agent.cron.cancel.requested"
 
     schema do
-      attribute :job_id, :term, allow_nil?: false, description: "Logical cron job id"
+      attribute :job_id, :term do
+        allow_nil? false
+        description "Logical cron job id"
+      end
     end
   end
 end

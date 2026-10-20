@@ -6,7 +6,10 @@ defmodule Aikido.Signals.Memory.DeleteSpace do
     type "aikido.memory.delete_space"
 
     schema do
-      attribute :space, :atom, description: "Space name to delete.", allow_nil?: false
+      attribute :space, :atom do
+        description "Space name to delete."
+        allow_nil? false
+      end
     end
   end
 end

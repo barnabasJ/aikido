@@ -45,7 +45,10 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest.CronTickAgent do
     path :domain
 
     schema do
-      attribute :tick_count, :integer, default: 0
+      attribute :tick_count, :integer do
+        description "Number of scheduled ticks handled by the agent."
+        default 0
+      end
     end
 
     route "register_cron",

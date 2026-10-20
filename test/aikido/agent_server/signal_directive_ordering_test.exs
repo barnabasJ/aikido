@@ -54,9 +54,20 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent do
     path :domain
 
     schema do
-      attribute :step1_action_ran, :boolean, default: false
-      attribute :step1_followup_ran, :boolean, default: false
-      attribute :step2_saw_action_ran, :boolean, default: false
+      attribute :step1_action_ran, :boolean do
+        description "Whether the first reducer step has completed."
+        default false
+      end
+
+      attribute :step1_followup_ran, :boolean do
+        description "Whether the first step's follow-up signal has been handled."
+        default false
+      end
+
+      attribute :step2_saw_action_ran, :boolean do
+        description "Whether the second step saw the first step's committed state."
+        default false
+      end
     end
 
     route "step1", {AikidoTest.AgentServer.SignalDirectiveOrderingTest.OrderingAgent, :step1}

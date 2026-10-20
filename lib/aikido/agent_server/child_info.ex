@@ -12,25 +12,42 @@ defmodule Aikido.AgentServer.ChildInfo do
   use Ash.TypedStruct
 
   typed_struct do
-    field :pid, :term, allow_nil?: false, description: "Child process PID"
-    field :ref, :term, allow_nil?: false, description: "Monitor reference for the child process"
-    field :module, :atom, allow_nil?: false, description: "Child agent module"
+    field :pid, :term do
+      allow_nil? false
+      description "Child process PID"
+    end
 
-    field :id, :string,
-      allow_nil?: false,
-      description: "Child instance ID",
-      constraints: [trim?: false, allow_empty?: true]
+    field :ref, :term do
+      allow_nil? false
+      description "Monitor reference for the child process"
+    end
 
-    field :partition, :term,
-      allow_nil?: true,
-      description: "Logical partition of the child agent"
+    field :module, :atom do
+      allow_nil? false
+      description "Child agent module"
+    end
 
-    field :tag, :term, allow_nil?: true, description: "Tag used when spawning"
+    field :id, :string do
+      allow_nil? false
+      description "Child instance ID"
+      constraints trim?: false, allow_empty?: true
+    end
 
-    field :meta, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Metadata passed during spawn"
+    field :partition, :term do
+      allow_nil? true
+      description "Logical partition of the child agent"
+    end
+
+    field :tag, :term do
+      allow_nil? true
+      description "Tag used when spawning"
+    end
+
+    field :meta, :map do
+      allow_nil? false
+      default %{}
+      description "Metadata passed during spawn"
+    end
   end
 
   @type t :: %__MODULE__{}

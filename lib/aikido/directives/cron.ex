@@ -35,17 +35,25 @@ defmodule Aikido.Directives.Cron do
   use Aikido.Directive
 
   typed_struct do
-    field :job_id, :term, allow_nil?: true, description: "Logical cron job id within the agent"
+    field :job_id, :term do
+      allow_nil? true
+      description "Logical cron job id within the agent"
+    end
 
-    field :cron, :term,
-      allow_nil?: false,
-      description: "Cron expression (e.g. \"* * * * *\", \"@daily\")"
+    field :cron, :term do
+      allow_nil? false
+      description "Cron expression (e.g. \"* * * * *\", \"@daily\")"
+    end
 
-    field :message, :term,
-      allow_nil?: false,
-      description: "Signal or message to send on each tick"
+    field :message, :term do
+      allow_nil? false
+      description "Signal or message to send on each tick"
+    end
 
-    field :timezone, :term, allow_nil?: true, description: "Timezone identifier (optional)"
+    field :timezone, :term do
+      allow_nil? true
+      description "Timezone identifier (optional)"
+    end
   end
 
   @typedoc false

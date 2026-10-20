@@ -13,12 +13,16 @@ defmodule Aikido.Directives.Schedule do
   use Aikido.Directive
 
   typed_struct do
-    field :delay_ms, :integer,
-      allow_nil?: false,
-      description: "Delay in milliseconds",
-      constraints: [min: 0]
+    field :delay_ms, :integer do
+      allow_nil? false
+      description "Delay in milliseconds"
+      constraints min: 0
+    end
 
-    field :message, :term, allow_nil?: false, description: "Message to send after delay"
+    field :message, :term do
+      allow_nil? false
+      description "Message to send after delay"
+    end
   end
 
   alias Aikido.AgentServer.Signal.Scheduled

@@ -10,7 +10,10 @@ defmodule Aikido.Directives.CronCancel do
   use Aikido.Directive
 
   typed_struct do
-    field :job_id, :term, allow_nil?: false, description: "Logical cron job id within the agent"
+    field :job_id, :term do
+      allow_nil? false
+      description "Logical cron job id within the agent"
+    end
   end
 
   require Logger

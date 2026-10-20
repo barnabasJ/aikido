@@ -20,7 +20,10 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.TestAgent do
     path :domain
 
     schema do
-      attribute :counter, :integer, default: 0
+      attribute :counter, :integer do
+        description "Counter used to observe routed state transitions."
+        default 0
+      end
     end
 
     route "test.directive", {AikidoTest.AgentServer.DirectiveExecTest.TestAgent, :emit_directive}
@@ -70,8 +73,15 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest.StopAwareAgent do
     path :domain
 
     schema do
-      attribute :observer_pid, :term, default: nil
-      attribute :stop_reason, :term, default: nil
+      attribute :observer_pid, :term do
+        description "Process receiving asynchronous fixture notifications."
+        default nil
+      end
+
+      attribute :stop_reason, :term do
+        description "Reason supplied when the directive requests agent shutdown."
+        default nil
+      end
     end
 
     route "aikido.agent.stop",

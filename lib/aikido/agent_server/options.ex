@@ -17,61 +17,75 @@ defmodule Aikido.AgentServer.Options do
   use Ash.TypedStruct
 
   typed_struct do
-    field :agent_module, :module,
-      allow_nil?: false,
-      constraints: [behaviour: Aikido.Agent],
-      description: "Agent module; required. Initialized through its :initialize Ash action."
+    field :agent_module, :module do
+      allow_nil? false
+      constraints behaviour: Aikido.Agent
+      description "Agent module; required. Initialized through its :initialize Ash action."
+    end
 
-    field :aikido, :atom,
-      allow_nil?: false,
-      default: Aikido.Default,
-      description: "Aikido instance name for DurableServer scoping (default: Aikido.Default)"
+    field :aikido, :atom do
+      allow_nil? false
+      default Aikido.Default
+      description "Aikido instance name for DurableServer scoping (default: Aikido.Default)"
+    end
 
-    field :partition, :term,
-      allow_nil?: true,
-      description: "Logical partition within a Aikido instance"
+    field :partition, :term do
+      allow_nil? true
+      description "Logical partition within a Aikido instance"
+    end
 
-    field :id, :string,
-      allow_nil?: false,
-      description: "Instance ID (auto-generated if not provided)",
-      constraints: [trim?: false, allow_empty?: true]
+    field :id, :string do
+      allow_nil? false
+      description "Instance ID (auto-generated if not provided)"
+      constraints trim?: false, allow_empty?: true
+    end
 
-    field :initial_state, :map,
-      allow_nil?: false,
-      default: %{},
-      description: "Initial agent state"
+    field :initial_state, :map do
+      allow_nil? false
+      default %{}
+      description "Initial own-state and mounted slice values supplied to native initialization."
+    end
 
-    field :middleware, {:array, :term},
-      allow_nil?: false,
-      default: [],
-      description:
-        "Runtime-appended middleware modules. Each entry is a bare module or {Mod, opts_map}."
+    field :middleware, {:array, :term} do
+      allow_nil? false
+      default []
 
-    field :parent, ParentRef, allow_nil?: true, description: "Parent reference for hierarchy"
+      description "Runtime-appended middleware modules. Each entry is a bare module or {Mod, opts_map}."
+    end
 
-    field :on_parent_death, :atom,
-      allow_nil?: false,
-      default: :stop,
-      description: "Behavior when parent dies",
-      constraints: [one_of: [:stop, :continue, :emit_orphan]]
+    field :parent, ParentRef do
+      allow_nil? true
+      description "Parent reference for hierarchy"
+    end
 
-    field :skip_schedules, :boolean,
-      allow_nil?: false,
-      default: false,
-      description: "Skip registering slice schedules (useful for tests)"
+    field :on_parent_death, :atom do
+      allow_nil? false
+      default :stop
+      description "Behavior when parent dies"
+      constraints one_of: [:stop, :continue, :emit_orphan]
+    end
 
-    field :durable_server, :atom,
-      allow_nil?: true,
-      description: "Owning DurableServer supervisor"
+    field :skip_schedules, :boolean do
+      allow_nil? false
+      default false
+      description "Skip registering slice schedules (useful for tests)"
+    end
 
-    field :durable_key, :term,
-      allow_nil?: true,
-      description: "Logical DurableServer identity"
+    field :durable_server, :atom do
+      allow_nil? true
+      description "Owning DurableServer supervisor"
+    end
 
-    field :debug, :boolean,
-      allow_nil?: false,
-      default: false,
-      description: "Enable debug mode with event buffer"
+    field :durable_key, :term do
+      allow_nil? true
+      description "Logical DurableServer identity"
+    end
+
+    field :debug, :boolean do
+      allow_nil? false
+      default false
+      description "Enable debug mode with event buffer"
+    end
   end
 
   @type t :: %__MODULE__{}

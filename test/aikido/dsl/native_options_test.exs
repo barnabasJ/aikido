@@ -62,7 +62,10 @@ defmodule AikidoTest.NativeOptions.Directive do
   use Aikido.Directive, extensions: [AikidoTest.NativeOptions.Extension]
 
   typed_struct do
-    field :value, :integer, default: 1
+    field :value, :integer do
+      description "Domain value used to verify state transitions and native contracts."
+      default 1
+    end
   end
 
   custom_options do

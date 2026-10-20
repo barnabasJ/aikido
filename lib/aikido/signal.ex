@@ -9,15 +9,51 @@ defmodule Aikido.Signal do
   use Ash.TypedStruct
 
   typed_struct do
-    field :id, :string
-    field :time, :string
-    field :type, :string, allow_nil?: false, constraints: [trim?: false]
-    field :source, :string, allow_nil?: false, default: "/aikido", constraints: [trim?: false]
-    field :subject, :string, constraints: [trim?: false, allow_empty?: true]
-    field :data, :term
-    field :scope, :map, allow_nil?: false, default: %{}
-    field :tracer_context, :map, allow_nil?: false, default: %{}
-    field :reply_to, :term
+    field :id, :string do
+      description "Signal identity used for correlation and processing receipts."
+    end
+
+    field :time, :string do
+      description "UTC timestamp recorded when the signal is materialized at an I/O boundary."
+    end
+
+    field :type, :string do
+      description "Concrete event type matched against the receiving agent's routes."
+      allow_nil? false
+      constraints trim?: false
+    end
+
+    field :source, :string do
+      description "Origin identifier attached by the component that emits the signal."
+      allow_nil? false
+      default "/aikido"
+      constraints trim?: false
+    end
+
+    field :subject, :string do
+      description "Optional subject or originating request identity used to correlate replies."
+      constraints trim?: false, allow_empty?: true
+    end
+
+    field :data, :term do
+      description "Payload delivered to the routed action, including arbitrary native terms."
+    end
+
+    field :scope, :map do
+      description "Native Ash actor, tenant, authorization and application context carried with the signal."
+      allow_nil? false
+      default %{}
+    end
+
+    field :tracer_context, :map do
+      description "Native Ash tracer span context transferred across process boundaries."
+      allow_nil? false
+      default %{}
+    end
+
+    field :reply_to, :term do
+      description "Destination used by request/reply directives to return a correlated response."
+    end
   end
 
   @type t :: %__MODULE__{}
