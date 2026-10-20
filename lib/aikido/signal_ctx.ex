@@ -30,7 +30,7 @@ defmodule Aikido.SignalCtx do
   @doc """
   Returns the full ctx map carried on the signal (default `%{}`).
   """
-  @spec ctx(Signal.t()) :: ctx()
+  @spec ctx(%Signal{}) :: ctx()
   def ctx(%Signal{} = signal) do
     Map.get(extensions(signal), @ctx_key, %{})
   end
@@ -38,7 +38,7 @@ defmodule Aikido.SignalCtx do
   @doc """
   Replaces the entire ctx on the signal.
   """
-  @spec put_ctx(Signal.t(), ctx()) :: Signal.t()
+  @spec put_ctx(%Signal{}, ctx()) :: %Signal{}
   def put_ctx(%Signal{} = signal, %{} = new_ctx) do
     put_extensions(signal, Map.put(extensions(signal), @ctx_key, new_ctx))
   end
@@ -46,7 +46,7 @@ defmodule Aikido.SignalCtx do
   @doc """
   Sets a single key in the signal's ctx, creating the ctx if missing.
   """
-  @spec put(Signal.t(), atom(), term()) :: Signal.t()
+  @spec put(%Signal{}, atom(), term()) :: %Signal{}
   def put(%Signal{} = signal, key, value) when is_atom(key) do
     put_ctx(signal, Map.put(ctx(signal), key, value))
   end
@@ -54,7 +54,7 @@ defmodule Aikido.SignalCtx do
   @doc """
   Reads a key from the signal's ctx.
   """
-  @spec get(Signal.t(), atom(), term()) :: term()
+  @spec get(%Signal{}, atom(), term()) :: term()
   def get(%Signal{} = signal, key, default \\ nil) when is_atom(key) do
     Map.get(ctx(signal), key, default)
   end
@@ -62,7 +62,7 @@ defmodule Aikido.SignalCtx do
   @doc """
   Merges `additions` into the signal's ctx (right-biased).
   """
-  @spec merge(Signal.t(), map()) :: Signal.t()
+  @spec merge(%Signal{}, map()) :: %Signal{}
   def merge(%Signal{} = signal, %{} = additions) do
     put_ctx(signal, Map.merge(ctx(signal), additions))
   end
@@ -70,7 +70,7 @@ defmodule Aikido.SignalCtx do
   @doc """
   Removes a key from the signal's ctx.
   """
-  @spec delete(Signal.t(), atom()) :: Signal.t()
+  @spec delete(%Signal{}, atom()) :: %Signal{}
   def delete(%Signal{} = signal, key) when is_atom(key) do
     put_ctx(signal, Map.delete(ctx(signal), key))
   end
@@ -79,7 +79,7 @@ defmodule Aikido.SignalCtx do
   Copies ctx from `source` onto `target`. If `target` already has a ctx, the
   source ctx is merged into it (target keys win).
   """
-  @spec inherit(Signal.t(), Signal.t()) :: Signal.t()
+  @spec inherit(%Signal{}, %Signal{}) :: %Signal{}
   def inherit(%Signal{} = target, %Signal{} = source) do
     src = ctx(source)
     dst = ctx(target)
