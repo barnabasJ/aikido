@@ -121,7 +121,15 @@ defmodule Aikido.AI.Context do
 
   @doc "Close an interrupted final tool batch so the next user turn has valid history."
   def close_tool_calls(context) do
+    # Builtins are provider observations; exclude them only from pending-call detection.
     context.messages
+    |> Enum.map(fn
+      %{role: :assistant, tool_calls: calls} = message when is_list(calls) ->
+        %{message | tool_calls: Enum.reject(calls, &ToolCall.builtin?/1)}
+
+      message ->
+        message
+    end)
     |> AshAi.ToolLoop.pending_tool_calls()
     |> Enum.reduce(context, fn call, context ->
       Context.append(

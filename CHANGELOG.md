@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Exclude provider-executed builtin tools from interruption repair while keeping
+  canonical conversation content and provider metadata intact. Repair only missing
+  application tool results across subsequent asks and restoration.
+
 - Inherit public mounted actions from local and remote tuple targets, preserve
   route predicates and priorities, and generate one canonical command for a
   reducer with multiple signal types. Deduplicate identical normalized mount
