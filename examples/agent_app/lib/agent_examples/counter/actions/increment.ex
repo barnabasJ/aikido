@@ -1,4 +1,4 @@
-defmodule AgentExamples.Counter.Increment do
+defmodule AgentExamples.Counter.Actions.Increment do
   @moduledoc "Adds the supplied amount to the counter state."
   use Ash.Resource.Actions.Implementation
   @impl true

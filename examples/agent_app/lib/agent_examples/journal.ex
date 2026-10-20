@@ -13,6 +13,6 @@ defmodule AgentExamples.Journal do
 
   slice do
     name "example_journal"
-    route AgentExamples.Journal.Signals.Append, AgentExamples.Journal.AppendEntry
+    route AgentExamples.Journal.Signals.Append, AgentExamples.Journal.Actions.AppendEntry
   end
 end

@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Keep feature-owned native action implementations in matching `Actions` namespaces
+  and `actions/` folders alongside their signal and directive contracts.
+
 - Build hook VMs through AshLua with serializable action-surface configuration
   and per-invocation caller scope. Demonstrate an Ash action called from a hook.
 
@@ -419,7 +422,7 @@
   defaults; remove the custom union type.
 
 - Make FSM a native `Aikido.Ash.Slice` resource that owns its `:transition`
-  action; keep `FSM.Transition` solely as the Ash action implementation.
+  action; keep `FSM.Actions.Transition` solely as the Ash action implementation.
 - Move production and example generic-action callbacks into dedicated
   `Ash.Resource.Actions.Implementation` modules; remove legacy reducer wrappers
   and show implementation sources alongside the runnable examples.

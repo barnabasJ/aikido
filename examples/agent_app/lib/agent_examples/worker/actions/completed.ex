@@ -1,4 +1,4 @@
-defmodule AgentExamples.Worker.Completed do
+defmodule AgentExamples.Worker.Actions.Completed do
   @moduledoc "Records the result returned by the worker task and marks it completed."
   use Ash.Resource.Actions.Implementation
 

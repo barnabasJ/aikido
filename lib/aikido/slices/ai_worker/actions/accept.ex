@@ -1,4 +1,4 @@
-defmodule Aikido.Slices.AiWorker.Accept do
+defmodule Aikido.Slices.AiWorker.Actions.Accept do
   @moduledoc """
   Pure reducer that accepts a correlated team task and its caller scope.
 
@@ -34,7 +34,13 @@ defmodule Aikido.Slices.AiWorker.Accept do
   @doc false
   def start_task(state, data, context) do
     if is_nil(data[:model] || context.agent.state.ai.model) do
-      Aikido.Slices.AiWorker.Settle.complete_task(state, data, :failed, :no_model, context)
+      Aikido.Slices.AiWorker.Actions.Settle.complete_task(
+        state,
+        data,
+        :failed,
+        :no_model,
+        context
+      )
     else
       launch_task(state, data, context)
     end

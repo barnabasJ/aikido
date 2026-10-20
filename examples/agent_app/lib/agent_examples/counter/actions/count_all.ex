@@ -1,4 +1,4 @@
-defmodule AgentExamples.Counter.CountAll do
+defmodule AgentExamples.Counter.Actions.CountAll do
   @moduledoc "Count every routed signal, including signals without a typed handler."
   use Ash.Resource.Actions.Implementation
 

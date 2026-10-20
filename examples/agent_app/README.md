@@ -105,12 +105,12 @@ block with a description of its role. Agent declarations bind that
 contract directly to an Ash action implementation:
 
 ```elixir
-route AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Increment
+route AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Actions.Increment
 
 route [AgentExamples.Counter.Signals.Increase, AgentExamples.Counter.Signals.Decrease],
-      AgentExamples.Counter.Adjust
+      AgentExamples.Counter.Actions.Adjust
 
-route "**", AgentExamples.Counter.CountAll
+route "**", AgentExamples.Counter.Actions.CountAll
 ```
 
 The public `add` command receives the fields declared by its signal. The list
@@ -170,11 +170,12 @@ Start with [the domain](lib/agent_examples/agents.ex), then
 [Add](lib/agent_examples/counter/signals/add.ex),
 [Increase](lib/agent_examples/counter/signals/increase.ex), and
 [Decrease](lib/agent_examples/counter/signals/decrease.ex) signals and
-[pure action](lib/agent_examples/counter/increment.ex). Resource files sit
-beside their own signal and implementation folders. Compare
+[pure action](lib/agent_examples/counter/actions/increment.ex). Resource files sit
+beside their own `signals/`, `actions/` and, when needed, `directives/` folders.
+The module namespaces match those folders. Compare
 [Notebook](lib/agent_examples/notebook.ex) with its
 [embedded Journal](lib/agent_examples/journal.ex).
-[Work](lib/agent_examples/worker/work.ex) shows the complete asynchronous
+[Work](lib/agent_examples/worker/actions/work.ex) shows the complete asynchronous
 signal chain; its uppercase task is a local stand-in for one blocking tool call.
 [Demo](lib/agent_examples/demo.ex) subscribes before sending work so it can
 observe completion through subscriptions. The tests cover these behaviors.

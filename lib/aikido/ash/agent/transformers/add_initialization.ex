@@ -22,7 +22,7 @@ defmodule Aikido.Ash.Agent.Transformers.AddInitialization do
              public?: false,
              arguments: [id, state],
              run:
-               {Aikido.Ash.Agent.Initialize,
+               {Aikido.Ash.Agent.Actions.Initialize,
                 path: Spark.Dsl.Extension.get_opt(dsl, [:agent], :path),
                 slices: Spark.Dsl.Transformer.get_persisted(dsl, :slice_instances, [])}
            ) do

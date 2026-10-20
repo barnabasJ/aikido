@@ -22,7 +22,7 @@ defmodule AgentExamples.Checklist do
       end
     end
 
-    route AgentExamples.Checklist.Signals.Add, AgentExamples.Checklist.Add
-    route AgentExamples.Checklist.Signals.Complete, AgentExamples.Checklist.Complete
+    route AgentExamples.Checklist.Signals.Add, AgentExamples.Checklist.Actions.Add
+    route AgentExamples.Checklist.Signals.Complete, AgentExamples.Checklist.Actions.Complete
   end
 end

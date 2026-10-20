@@ -1,4 +1,4 @@
-defmodule Aikido.Ash.Agent.Initialize do
+defmodule Aikido.Ash.Agent.Actions.Initialize do
   @moduledoc """
   Builds an immutable agent from its `id` and initial `state` arguments.
 

@@ -50,8 +50,10 @@ helpers contain reusable mechanics rather than selecting another action by name.
 Signal declarations generate the native Ash actions on the existing resource;
 the implementation modules provide their callbacks without creating resources.
 
-Place each resource beside its owned implementations and signal definitions.
-For example, `counter.ex`, `counter/increment.ex` and
+Place each resource beside its owned `actions/`, `signals/` and `directives/` folders.
+Their modules use matching `Actions`, `Signals` and `Directives` namespaces;
+ordinary shared helpers stay directly under the feature.
+For example, `counter.ex`, `counter/actions/increment.ex` and
 `counter/signals/add.ex` keep the example counter's state, reducer and payload
 contract together, with each filename matching its module.
 

@@ -1,4 +1,4 @@
-defmodule AgentExamples.Checklist.Add do
+defmodule AgentExamples.Checklist.Actions.Add do
   @moduledoc "Appends an item to the pending checklist."
   use Ash.Resource.Actions.Implementation
   @impl true

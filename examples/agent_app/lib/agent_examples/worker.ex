@@ -26,9 +26,12 @@ defmodule AgentExamples.Worker do
       end
     end
 
-    route AgentExamples.Worker.Signals.Run, AgentExamples.Worker.Work
-    route AgentExamples.Worker.Signals.Completed, AgentExamples.Worker.Completed, public?: false
-    route AgentExamples.Worker.Signals.Failed, AgentExamples.Worker.Failed, public?: false
+    route AgentExamples.Worker.Signals.Run, AgentExamples.Worker.Actions.Work
+
+    route AgentExamples.Worker.Signals.Completed, AgentExamples.Worker.Actions.Completed,
+      public?: false
+
+    route AgentExamples.Worker.Signals.Failed, AgentExamples.Worker.Actions.Failed, public?: false
   end
 
   def uppercase(text) do

@@ -1,4 +1,4 @@
-defmodule Aikido.Slices.AiWorker.Cancel do
+defmodule Aikido.Slices.AiWorker.Actions.Cancel do
   @moduledoc """
   Pure reducer that removes `task_id` from the worker queue.
 

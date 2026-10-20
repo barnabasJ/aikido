@@ -1,4 +1,4 @@
-defmodule Aikido.Slices.AiWorker.Settle do
+defmodule Aikido.Slices.AiWorker.Actions.Settle do
   @moduledoc """
   Pure reducer that correlates an observation with the pending task's AI run.
 
@@ -51,7 +51,7 @@ defmodule Aikido.Slices.AiWorker.Settle do
     case Map.get(state, :queue, []) do
       [data | rest] ->
         {:ok, result} =
-          Aikido.Slices.AiWorker.Accept.start_task(%{state | queue: rest}, data, context)
+          Aikido.Slices.AiWorker.Actions.Accept.start_task(%{state | queue: rest}, data, context)
 
         Aikido.Types.ActionResult.new(
           state: result.state,

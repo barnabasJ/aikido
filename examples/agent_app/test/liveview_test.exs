@@ -88,24 +88,25 @@ defmodule AgentExamplesWeb.LiveViewTest do
     definition = Enum.find(worker, &(&1.module == AgentExamples.Worker))
     assert definition.code =~ "route AgentExamples.Worker.Signals.Run"
 
-    assert definition.code =~
-             "route AgentExamples.Worker.Signals.Completed, AgentExamples.Worker.Completed, public?: false"
+    assert String.replace(definition.code, ~r/\s+/, " ") =~
+             "route AgentExamples.Worker.Signals.Completed, AgentExamples.Worker.Actions.Completed, public?: false"
 
     assert definition.code =~
-             "route AgentExamples.Worker.Signals.Failed, AgentExamples.Worker.Failed, public?: false"
+             "route AgentExamples.Worker.Signals.Failed, AgentExamples.Worker.Actions.Failed, public?: false"
 
     refute definition.code =~ "argument :"
     assert definition.open?
 
-    work = Enum.find(worker, &(&1.module == AgentExamples.Worker.Work))
+    work = Enum.find(worker, &(&1.module == AgentExamples.Worker.Actions.Work))
     assert work.code =~ "use Ash.Resource.Actions.Implementation"
     assert work.code =~ "Aikido.Directives.async_task"
-    assert work.path == "examples/agent_app/lib/agent_examples/worker/work.ex"
+    assert work.path == "examples/agent_app/lib/agent_examples/worker/actions/work.ex"
     refute work.open?
 
     for {slug, module, path} <- [
-          {"counter", AgentExamples.Counter.Increment, "counter/increment.ex"},
-          {"notebook", AgentExamples.Journal.AppendEntry, "journal/append_entry.ex"}
+          {"counter", AgentExamples.Counter.Actions.Increment, "counter/actions/increment.ex"},
+          {"notebook", AgentExamples.Journal.Actions.AppendEntry,
+           "journal/actions/append_entry.ex"}
         ] do
       definition =
         Catalog.find(slug)
@@ -144,7 +145,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
           {Aikido.Slices.AiReact.Hooks.Hook, :support},
           {Aikido.Slices.AiReact.Directives.ExecuteHook, :directive},
           {Aikido.Slices.AiWorker.Signals.Accept, :signal},
-          {Aikido.Slices.AiWorker.Accept, :action}
+          {Aikido.Slices.AiWorker.Actions.Accept, :action}
         ] do
       definition = Enum.find(research, &(&1.module == module))
       assert definition.category == category
@@ -191,8 +192,18 @@ defmodule AgentExamplesWeb.LiveViewTest do
   test "counter union controls and wildcard notices update the signal visual", %{conn: conn} do
     {:ok, view, html} = live(conn, "/examples/counter")
     assert html =~ "native Ash union"
-    assert has_element?(view, "#definition-AgentExamples-Counter-Adjust code", "%Ash.Union")
-    assert has_element?(view, "#definition-AgentExamples-Counter-CountAll code", "signals_seen")
+
+    assert has_element?(
+             view,
+             "#definition-AgentExamples-Counter-Actions-Adjust code",
+             "%Ash.Union"
+           )
+
+    assert has_element?(
+             view,
+             "#definition-AgentExamples-Counter-Actions-CountAll code",
+             "signals_seen"
+           )
 
     assert has_element?(
              view,

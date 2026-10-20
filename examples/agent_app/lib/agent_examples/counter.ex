@@ -21,11 +21,11 @@ defmodule AgentExamples.Counter do
       end
     end
 
-    route AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Increment
+    route AgentExamples.Counter.Signals.Add, AgentExamples.Counter.Actions.Increment
 
     route [AgentExamples.Counter.Signals.Increase, AgentExamples.Counter.Signals.Decrease],
-          AgentExamples.Counter.Adjust
+          AgentExamples.Counter.Actions.Adjust
 
-    route "**", AgentExamples.Counter.CountAll
+    route "**", AgentExamples.Counter.Actions.CountAll
   end
 end

@@ -1,4 +1,4 @@
-defmodule AgentExamples.Counter.Adjust do
+defmodule AgentExamples.Counter.Actions.Adjust do
   @moduledoc "One native Ash union handles both typed adjustment signals."
   use Ash.Resource.Actions.Implementation
 

@@ -1,4 +1,4 @@
-defmodule Aikido.Slices.AiWorker.Observe do
+defmodule Aikido.Slices.AiWorker.Actions.Observe do
   @moduledoc """
   Pure reducer that defers worker settlement until AI state has been committed.
 

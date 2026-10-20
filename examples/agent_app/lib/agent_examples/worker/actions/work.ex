@@ -1,4 +1,4 @@
-defmodule AgentExamples.Worker.Work do
+defmodule AgentExamples.Worker.Actions.Work do
   @moduledoc "Marks the worker busy and returns a directive for the uppercase task."
   use Ash.Resource.Actions.Implementation
   @impl true

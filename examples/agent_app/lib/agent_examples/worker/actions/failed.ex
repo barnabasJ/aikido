@@ -1,4 +1,4 @@
-defmodule AgentExamples.Worker.Failed do
+defmodule AgentExamples.Worker.Actions.Failed do
   @moduledoc "Records the worker task failure and marks the work failed."
   use Ash.Resource.Actions.Implementation
 

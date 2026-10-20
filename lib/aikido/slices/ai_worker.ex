@@ -37,11 +37,17 @@ defmodule Aikido.Slices.AiWorker do
       end
     end
 
-    route Aikido.Slices.AiWorker.Signals.Accept, Aikido.Slices.AiWorker.Accept, public?: false
-    route Aikido.Slices.AiWorker.Signals.CancelTask, Aikido.Slices.AiWorker.Cancel, public?: false
-    route "ai.react.**", Aikido.Slices.AiWorker.Observe
-    route "aikido.todo.changed", Aikido.Slices.AiWorker.Observe, public?: false
-    route Aikido.Slices.AiWorker.Signals.Settle, Aikido.Slices.AiWorker.Settle, public?: false
+    route Aikido.Slices.AiWorker.Signals.Accept, Aikido.Slices.AiWorker.Actions.Accept,
+      public?: false
+
+    route Aikido.Slices.AiWorker.Signals.CancelTask, Aikido.Slices.AiWorker.Actions.Cancel,
+      public?: false
+
+    route "ai.react.**", Aikido.Slices.AiWorker.Actions.Observe
+    route "aikido.todo.changed", Aikido.Slices.AiWorker.Actions.Observe, public?: false
+
+    route Aikido.Slices.AiWorker.Signals.Settle, Aikido.Slices.AiWorker.Actions.Settle,
+      public?: false
   end
 
   @doc false

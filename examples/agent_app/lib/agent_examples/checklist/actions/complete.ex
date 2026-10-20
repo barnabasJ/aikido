@@ -1,4 +1,4 @@
-defmodule AgentExamples.Checklist.Complete do
+defmodule AgentExamples.Checklist.Actions.Complete do
   @moduledoc "Removes a pending item and increments the completed count."
   use Ash.Resource.Actions.Implementation
 

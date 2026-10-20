@@ -1,4 +1,4 @@
-defmodule Aikido.Slices.FSM.Transition do
+defmodule Aikido.Slices.FSM.Actions.Transition do
   @moduledoc """
   Pure reducer for a finite-state machine transition to `to`.
 
