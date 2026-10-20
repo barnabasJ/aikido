@@ -99,6 +99,54 @@ defmodule Aikido.TodoTest do
     end
   end
 
+  test "obsolete expiry preserves removed and reused IDs while current expiry still blocks" do
+    run = fn action, state, data ->
+      Aikido.Slices.Todo
+      |> Ash.ActionInput.for_action(action, Map.put(data, :state, state),
+        context: %{aikido: %{agent_pid: self()}}
+      )
+      |> Ash.run_action!()
+    end
+
+    initial = Ash.create!(Aikido.Slices.Todo, %{}, action: :create)
+    added = run.(:todo_add, initial, %{id: "same", text: "original", timeout_ms: 100})
+    [original] = added.state.items
+    assert length(added.directives) == 2
+    removed = run.(:todo_remove, added.state, %{id: "same"})
+    stale = %{id: "same", revision: original.revision}
+
+    assert %Aikido.Types.ActionResult{state: state, directives: []} =
+             run.(:expire, removed.state, stale)
+
+    assert state == removed.state
+    assert run.(:expire, removed.state, stale).state == state
+
+    reused = run.(:todo_add, removed.state, %{id: "same", text: "replacement"})
+    [replacement] = reused.state.items
+    assert replacement.revision > original.revision
+
+    assert %Aikido.Types.ActionResult{state: state, directives: []} =
+             run.(:expire, reused.state, stale)
+
+    assert state == reused.state
+
+    expired = run.(:expire, reused.state, %{id: "same", revision: replacement.revision})
+    assert [%{status: :blocked, reason: :timeout}] = expired.state.items
+    assert length(expired.directives) == 1
+
+    for action <- [:todo_activate, :todo_complete, :todo_block, :todo_remove] do
+      input =
+        Ash.ActionInput.for_action(
+          Aikido.Slices.Todo,
+          action,
+          %{state: removed.state, id: "same", reason: :unknown},
+          skip_unknown_inputs: [:*]
+        )
+
+      assert {:error, %Ash.Error.Unknown{}} = Ash.run_action(input)
+    end
+  end
+
   test "a todo deadline fails a waiting run and codecs never leave a lost timer active", ctx do
     pid = start_server(ctx, Aikido.TodoTest.Agent)
     {:ok, _} = command(pid, "aikido.todo.add", %{id: "one", text: "wait", timeout_ms: 100})

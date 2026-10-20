@@ -55,6 +55,9 @@ defmodule Aikido.Slices.Todo.Implementation do
       action == :add && item ->
         {:error, "Todo ID already exists"}
 
+      action == :expire && is_nil(item) ->
+        Aikido.Types.ActionResult.new(state: state)
+
       action != :add && is_nil(item) ->
         {:error, "Unknown todo ID"}
 

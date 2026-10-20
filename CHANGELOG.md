@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Ignore obsolete expiry signals for removed todos while retaining revision
+  protection when an ID is reused and errors for unknown user commands.
+
 - Remove lazy initialization fallbacks from Identity, Memory and Thread reducers;
   native actions require their initialized owning slice state.
 
