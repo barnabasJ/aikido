@@ -130,7 +130,7 @@ defmodule AikidoTest.AshTest do
              AikidoTest.AshFixtures.Domain.counter_list!(%{filter: [count: 4]})
   end
 
-  test "signal targets generate typed Ash update arguments without an actions block" do
+  test "signal targets generate typed generic command arguments without an actions block" do
     resource = AikidoTest.AshFixtures.GeneratedCounter
     action = Ash.Resource.Info.action(resource, :add)
 
@@ -283,7 +283,7 @@ defmodule AikidoTest.AshTest do
              )
   end
 
-  test "team creation starts members, send delivers a signal, and destroy stops children" do
+  test "team start activates members, send delivers a signal, and stop shuts down children" do
     assert {:ok, team} = snapshot_result(AikidoTest.AshFixtures.Domain.team_start(%{id: "team"}))
     worker = team.team.members.worker
     reviewer = team.team.members.reviewer

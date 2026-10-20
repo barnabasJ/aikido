@@ -23,7 +23,7 @@ defmodule AikidoTest.Memory.SliceTest do
       assert Map.get(Aikido.Ash.Slice.Info.slice_options(Aikido.Slices.Memory), :name) == "memory"
     end
 
-    test "exposes the eight Aikido.Slices.Memory.* modules via actions/1" do
+    test "exposes eight native Memory action references via actions/1" do
       action_set = MapSet.new(Aikido.Ash.Slice.Info.actions(Aikido.Slices.Memory))
 
       assert MapSet.equal?(

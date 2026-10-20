@@ -1,4 +1,4 @@
-defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysAction.Implementation do
+defmodule AikidoTest.AgentServer.StateAtomicityTest.SetMultipleKeysAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -13,7 +13,7 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysActi
   end
 end
 
-defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Implementation do
+defmodule AikidoTest.AgentServer.StateAtomicityTest.ObserveAction.Implementation do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
@@ -32,7 +32,7 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Imple
   end
 end
 
-defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent do
+defmodule AikidoTest.AgentServer.StateAtomicityTest.AtomicityAgent do
   @moduledoc false
   use Aikido.Agent
 
@@ -42,22 +42,22 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent do
 
     schema do
       attribute :action_ran, :boolean do
-        description "Whether the reducer completed before directive execution."
+        description "Whether the first signal's reducer committed its transition marker."
         default false
       end
 
       attribute :key_a, :boolean do
-        description "Whether the first directive's state marker was recorded."
+        description "Whether the reducer committed its first state marker."
         default false
       end
 
       attribute :key_b, :boolean do
-        description "Whether the second directive's state marker was recorded."
+        description "Whether the reducer committed its second state marker."
         default false
       end
 
       attribute :key_c, :boolean do
-        description "Whether the third directive's state marker was recorded."
+        description "Whether the reducer committed its third state marker."
         default false
       end
 
@@ -67,50 +67,50 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent do
       end
 
       attribute :saw_a, :boolean do
-        description "Whether observers saw the first directive's state marker."
+        description "Whether the next reducer observed the first committed state marker."
         default false
       end
 
       attribute :saw_b, :boolean do
-        description "Whether observers saw the second directive's state marker."
+        description "Whether the next reducer observed the second committed state marker."
         default false
       end
 
       attribute :saw_c, :boolean do
-        description "Whether observers saw the third directive's state marker."
+        description "Whether the next reducer observed the third committed state marker."
         default false
       end
     end
 
     route "set_multiple",
-          {AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent, :set_multiple}
+          {AikidoTest.AgentServer.StateAtomicityTest.AtomicityAgent, :set_multiple}
 
-    route "observe", {AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent, :observe}
+    route "observe", {AikidoTest.AgentServer.StateAtomicityTest.AtomicityAgent, :observe}
   end
 
   actions do
     action :set_multiple, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.AgentServer.MultiDirectiveAtomicityTest.SetMultipleKeysAction.Implementation
+      run AikidoTest.AgentServer.StateAtomicityTest.SetMultipleKeysAction.Implementation
     end
 
     action :observe, Aikido.Types.ActionResult do
       argument :state, :term
 
-      run AikidoTest.AgentServer.MultiDirectiveAtomicityTest.ObserveAction.Implementation
+      run AikidoTest.AgentServer.StateAtomicityTest.ObserveAction.Implementation
     end
   end
 end
 
-defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest do
+defmodule AikidoTest.AgentServer.StateAtomicityTest do
   @moduledoc """
   Directives mutate no state. Action results own domain state changes;
   cascade callbacks invoked from `process_signal/2` own runtime bookkeeping.
   An action returning a multi-key slice is committed atomically before the
   next signal is pulled from the mailbox.
 
-  Signal A's action returns a slice with `{a: true, b: true, c: true}`.
+  Signal A's action returns a slice with `{key_a: true, key_b: true, key_c: true}`.
   Signal B is cast right after. With inline signal processing, signal B's
   `action` must observe **all three keys** set —
   not a partial prefix.
@@ -122,7 +122,7 @@ defmodule AikidoTest.AgentServer.MultiDirectiveAtomicityTest do
       pid =
         start_server(
           %{aikido: aikido},
-          AikidoTest.AgentServer.MultiDirectiveAtomicityTest.AtomicityAgent
+          AikidoTest.AgentServer.StateAtomicityTest.AtomicityAgent
         )
 
       Aikido.AgentServer.cast(pid, signal("set_multiple", %{}))

@@ -215,7 +215,7 @@ defmodule AikidoTest.AgentTest do
                )
     end
 
-    test "action error returns {:error, %Aikido.Error{}}" do
+    test "invalid action input returns the prior agent and a native Ash invalid error" do
       agent = AikidoTest.TestAgents.Basic.initialize!()
 
       assert {:error, _, %Ash.Error.Invalid{}} =

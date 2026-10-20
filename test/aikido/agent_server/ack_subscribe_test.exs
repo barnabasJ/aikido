@@ -198,7 +198,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
     end
 
     test(
-      "delivers {:error, %Aikido.Error{}} verbatim when the action errors; selector is skipped",
+      "delivers the native Ash error when the action fails; selector is skipped",
       %{aikido: aikido}
     ) do
       pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.TestAgent)
