@@ -11,7 +11,6 @@ defmodule Aikido.Identity.Slice do
 
   ## Routes
 
-      route Aikido.Identity.Signals.Ensure, Aikido.Identity.Actions.Ensure
       route Aikido.Identity.Signals.Evolve, Aikido.Identity.Actions.Evolve
       route Aikido.Identity.Signals.UpdateProfile, Aikido.Identity.Actions.UpdateProfile
 
@@ -57,7 +56,6 @@ defmodule Aikido.Identity.Slice do
       end
     end
 
-    route Aikido.Identity.Signals.Ensure, Aikido.Identity.Actions.Ensure
     route Aikido.Identity.Signals.Evolve, Aikido.Identity.Actions.Evolve
 
     route Aikido.Identity.Signals.UpdateProfile,

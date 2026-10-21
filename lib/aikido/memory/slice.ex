@@ -14,8 +14,7 @@ defmodule Aikido.Memory.Slice do
   Each `aikido.memory.*` signal type maps to a native action on
   `Aikido.Memory.Slice`:
 
-      # ensure / put / update / delete
-      route Aikido.Memory.Signals.Ensure, Aikido.Memory.Actions.Ensure
+      # put / update / delete
       route Aikido.Memory.Signals.PutSpace, Aikido.Memory.Actions.PutSpace
       route Aikido.Memory.Signals.UpdateSpace, Aikido.Memory.Actions.UpdateSpace
       route Aikido.Memory.Signals.EnsureSpace, Aikido.Memory.Actions.EnsureSpace
@@ -95,7 +94,6 @@ defmodule Aikido.Memory.Slice do
       end
     end
 
-    route Aikido.Memory.Signals.Ensure, Aikido.Memory.Actions.Ensure
     route Aikido.Memory.Signals.PutSpace, Aikido.Memory.Actions.PutSpace
     route Aikido.Memory.Signals.UpdateSpace, Aikido.Memory.Actions.UpdateSpace
     route Aikido.Memory.Signals.EnsureSpace, Aikido.Memory.Actions.EnsureSpace

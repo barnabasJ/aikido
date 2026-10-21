@@ -4,20 +4,18 @@ defmodule Aikido.Dsl.ExtensionComposeTest.MultiHost do
 
   agent do
     name "multi_host"
-    route "memory.ensure", {Aikido.Memory.Slice, :ensure}, name: :ensure
     slice :short_term, Aikido.Memory.Slice
     slice :who, Aikido.Identity.Slice
     slice :history, Aikido.Thread.Slice
   end
 end
 
-defmodule Aikido.Dsl.ExtensionComposeTest.HostNoBlocks do
+defmodule Aikido.Dsl.ExtensionComposeTest.DefaultPaths do
   @moduledoc false
   use Aikido.Agent
 
   agent do
-    name "host_no_blocks"
-    route "memory.ensure", {Aikido.Memory.Slice, :ensure}, name: :ensure
+    name "host_default_paths"
     slice :memory, Aikido.Memory.Slice
     slice :identity, Aikido.Identity.Slice
   end
@@ -42,7 +40,7 @@ defmodule Aikido.Dsl.ExtensionComposeTest do
   describe("explicit mounts") do
     test "still produce slice instances at the slice's declared path" do
       instances =
-        Aikido.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.HostNoBlocks)
+        Aikido.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.DefaultPaths)
 
       memory = Enum.find(instances, &(&1.module == Aikido.Memory.Slice))
       identity = Enum.find(instances, &(&1.module == Aikido.Identity.Slice))

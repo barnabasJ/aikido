@@ -1,22 +1,25 @@
 defmodule Aikido.InitializedStateTest do
   use ExUnit.Case, async: true
 
-  test "native ensure requires the owning state and preserves initialized values" do
-    for resource <- [Aikido.Identity.Slice, Aikido.Memory.Slice, Aikido.Thread.Slice] do
+  test "native reducers validate owning resource state before execution" do
+    for {resource, action, arguments} <- [
+          {Aikido.Identity.Slice, :evolve, %{years: 1}},
+          {Aikido.Memory.Slice, :put_in_space, %{space: :world, key: :x, value: 1}},
+          {Aikido.Thread.Slice, :append, %{entry: %{kind: :note}}}
+        ] do
       state = Ash.create!(resource, %{rev: 7, created_at: 10, updated_at: 20}, action: :create)
 
-      input = Ash.ActionInput.for_action(resource, :ensure, %{state: state})
+      input = Ash.ActionInput.for_action(resource, action, Map.put(arguments, :state, state))
       validated = input.arguments.state
 
-      assert %Aikido.Types.ActionResult{state: ^validated, directives: []} =
-               Ash.run_action!(input)
+      assert %Aikido.Types.ActionResult{directives: []} = Ash.run_action!(input)
 
       assert validated.rev == 7
       assert validated.created_at == 10
       assert validated.updated_at == 20
 
       for invalid <- [nil, %Aikido.Todo.Slice{}] do
-        input = Ash.ActionInput.for_action(resource, :ensure, %{state: invalid})
+        input = Ash.ActionInput.for_action(resource, action, Map.put(arguments, :state, invalid))
         refute input.valid?
         assert Enum.any?(input.errors, &(&1.field == :state || :state in &1.path))
         assert {:error, %Ash.Error.Invalid{}} = Ash.run_action(input)

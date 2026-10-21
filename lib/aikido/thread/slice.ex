@@ -11,7 +11,6 @@ defmodule Aikido.Thread.Slice do
 
   ## Routes
 
-      route Aikido.Thread.Signals.Ensure, Aikido.Thread.Actions.Ensure
       route Aikido.Thread.Signals.Append, Aikido.Thread.Actions.Append
       route Aikido.Thread.Signals.Clear, Aikido.Thread.Actions.Clear
 
@@ -84,7 +83,6 @@ defmodule Aikido.Thread.Slice do
       end
     end
 
-    route Aikido.Thread.Signals.Ensure, Aikido.Thread.Actions.Ensure
     route Aikido.Thread.Signals.Append, Aikido.Thread.Actions.Append
     route Aikido.Thread.Signals.Clear, Aikido.Thread.Actions.Clear
   end

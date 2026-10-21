@@ -29,7 +29,6 @@ defmodule AikidoTest.Thread.SliceTest do
       assert MapSet.equal?(
                action_set,
                MapSet.new([
-                 {Aikido.Thread.Slice, :ensure},
                  {Aikido.Thread.Slice, :append},
                  {Aikido.Thread.Slice, :clear}
                ])
@@ -45,7 +44,6 @@ defmodule AikidoTest.Thread.SliceTest do
           {type, _action, _opts} -> type
         end)
 
-      assert "aikido.thread.ensure" in route_types
       assert "aikido.thread.append" in route_types
       assert "aikido.thread.clear" in route_types
     end
@@ -86,31 +84,6 @@ defmodule AikidoTest.Thread.SliceTest do
       refute Aikido.Thread.Slice in Aikido.Agent.Info.slices(
                AikidoTest.Thread.SliceTest.AgentWithoutThread
              )
-    end
-
-    test "Ensure preserves the mounted thread resource" do
-      agent = AikidoTest.Thread.SliceTest.AgentWithThread.initialize!()
-
-      {:ok, %{agent: agent}, []} =
-        Aikido.AgentServer.apply_actions(
-          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
-          Map.merge(
-            Aikido.Signal.ctx(%Aikido.Signal{
-              id: nil,
-              type: "test.action",
-              data: %{},
-              source: "/test"
-            }),
-            Map.merge(%{}, %{
-              agent_module: AikidoTest.Thread.SliceTest.AgentWithThread,
-              agent: agent,
-              agent_id: agent.id
-            })
-          ),
-          [{{Aikido.Thread.Slice, :ensure}, %{}}]
-        )
-
-      assert %Aikido.Thread.Slice{} = agent.state[:thread]
     end
 
     test "Append action mutates agent.state.thread" do

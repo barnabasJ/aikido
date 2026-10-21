@@ -23,13 +23,12 @@ defmodule AikidoTest.Memory.SliceTest do
       assert Map.get(Aikido.Slice.Info.slice_options(Aikido.Memory.Slice), :name) == "memory"
     end
 
-    test "exposes eight native Memory action references via actions/1" do
+    test "exposes seven native Memory action references via actions/1" do
       action_set = MapSet.new(Aikido.Slice.Info.actions(Aikido.Memory.Slice))
 
       assert MapSet.equal?(
                action_set,
                MapSet.new([
-                 {Aikido.Memory.Slice, :ensure},
                  {Aikido.Memory.Slice, :put_space},
                  {Aikido.Memory.Slice, :update_space},
                  {Aikido.Memory.Slice, :ensure_space},
@@ -50,7 +49,6 @@ defmodule AikidoTest.Memory.SliceTest do
           {type, _action, _opts} -> type
         end)
 
-      assert "aikido.memory.ensure" in route_types
       assert "aikido.memory.put_space" in route_types
       assert "aikido.memory.update_space" in route_types
       assert "aikido.memory.ensure_space" in route_types
@@ -175,31 +173,6 @@ defmodule AikidoTest.Memory.SliceTest do
       refute Aikido.Memory.Slice in Aikido.Agent.Info.slices(
                AikidoTest.Memory.SliceTest.AgentWithoutMemory
              )
-    end
-
-    test "Ensure preserves the mounted memory resource" do
-      agent = AikidoTest.Memory.SliceTest.AgentWithMemory.initialize!()
-
-      {:ok, %{agent: agent}, []} =
-        Aikido.AgentServer.apply_actions(
-          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
-          Map.merge(
-            Aikido.Signal.ctx(%Aikido.Signal{
-              id: nil,
-              type: "test.action",
-              data: %{},
-              source: "/test"
-            }),
-            Map.merge(%{}, %{
-              agent_module: AikidoTest.Memory.SliceTest.AgentWithMemory,
-              agent: agent,
-              agent_id: agent.id
-            })
-          ),
-          [{{Aikido.Memory.Slice, :ensure}, %{}}]
-        )
-
-      assert %Aikido.Memory.Slice{} = agent.state[:memory]
     end
 
     test "PutInSpace action mutates agent.state.memory.spaces[:world]" do

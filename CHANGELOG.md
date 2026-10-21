@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Remove no-op identity, memory and thread `ensure` commands. Their native create
+  actions already initialize state before routed reducers run.
+
 - Remove the memory slice’s parallel state API and timestamp option wrapper.
   Native actions own mutations, share space bookkeeping, and return structured
   argument errors. Move the space payload contract to `Aikido.Memory.Types.Space`.

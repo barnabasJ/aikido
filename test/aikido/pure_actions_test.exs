@@ -14,19 +14,17 @@ defmodule Aikido.PureActionsTest do
           {Aikido.Thread.Slice, %{}}
         ] do
       state = AikidoTest.SliceState.new(resource, params)
-      initialized = replay(resource, :ensure, %{state: state} |> Map.merge(params), signal)
-      assert initialized.state == state
 
       result =
         case resource do
           Aikido.Identity.Slice ->
-            replay(resource, :evolve, %{state: initialized.state, years: 1}, signal)
+            replay(resource, :evolve, %{state: state, years: 1}, signal)
 
           Aikido.Memory.Slice ->
             replay(
               resource,
               :put_in_space,
-              %{state: initialized.state, space: :world, key: :hello, value: "world"},
+              %{state: state, space: :world, key: :hello, value: "world"},
               signal
             )
 
@@ -35,7 +33,7 @@ defmodule Aikido.PureActionsTest do
               resource,
               :append,
               %{
-                state: initialized.state,
+                state: state,
                 entry: [%{payload: %{text: "one"}}, %{payload: %{text: "two"}}]
               },
               signal
@@ -43,9 +41,9 @@ defmodule Aikido.PureActionsTest do
         end
 
       if resource in [Aikido.Memory.Slice, Aikido.Thread.Slice],
-        do: assert(result.state.id == initialized.state.id)
+        do: assert(result.state.id == state.id)
 
-      assert result.state.created_at == initialized.state.created_at
+      assert result.state.created_at == state.created_at
       assert result.state.updated_at == timestamp
 
       if resource == Aikido.Thread.Slice do

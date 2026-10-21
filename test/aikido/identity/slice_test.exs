@@ -30,7 +30,6 @@ defmodule AikidoTest.Identity.SliceTest do
       assert MapSet.equal?(
                action_set,
                MapSet.new([
-                 {Aikido.Identity.Slice, :ensure},
                  {Aikido.Identity.Slice, :evolve},
                  {Aikido.Identity.Slice, :update_profile}
                ])
@@ -46,7 +45,6 @@ defmodule AikidoTest.Identity.SliceTest do
           {type, _action, _opts} -> type
         end)
 
-      assert "aikido.identity.ensure" in route_types
       assert "aikido.identity.evolve" in route_types
       assert "aikido.identity.update_profile" in route_types
     end
@@ -68,31 +66,6 @@ defmodule AikidoTest.Identity.SliceTest do
       refute Aikido.Identity.Slice in Aikido.Agent.Info.slices(
                AikidoTest.Identity.SliceTest.AgentWithoutIdentity
              )
-    end
-
-    test "Ensure preserves the mounted identity resource" do
-      agent = AikidoTest.Identity.SliceTest.AgentWithIdentity.initialize!()
-
-      {:ok, %{agent: agent}, []} =
-        Aikido.AgentServer.apply_actions(
-          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
-          Map.merge(
-            Aikido.Signal.ctx(%Aikido.Signal{
-              id: nil,
-              type: "test.action",
-              data: %{},
-              source: "/test"
-            }),
-            Map.merge(%{}, %{
-              agent_module: AikidoTest.Identity.SliceTest.AgentWithIdentity,
-              agent: agent,
-              agent_id: agent.id
-            })
-          ),
-          [{{Aikido.Identity.Slice, :ensure}, %{}}]
-        )
-
-      assert %Aikido.Identity.Slice{} = agent.state[:identity]
     end
 
     test "UpdateProfile action mutates agent.state.identity" do
