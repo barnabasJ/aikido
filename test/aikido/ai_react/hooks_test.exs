@@ -142,7 +142,7 @@ defmodule Aikido.HooksTest do
     {:ok, result} = Aikido.Types.ActionResult.new(state: state, directives: [model])
 
     {:ok, %{state: waiting, directives: [gate]}} =
-      Aikido.AiReact.Hooks.queue_event_hooks({:ok, result}, :run_started, %{})
+      Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :run_started, %{})
 
     assert %ExecuteHook{} = gate
 
@@ -188,7 +188,7 @@ defmodule Aikido.HooksTest do
         )
 
       {:ok, %{state: waiting, directives: [gate]}} =
-        Aikido.AiReact.Hooks.queue_event_hooks({:ok, result}, :run_started, %{})
+        Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :run_started, %{})
 
       {:ok, %{state: failed, directives: []}} = complete(waiting, gate, response)
       assert failed.status == :failed
@@ -274,7 +274,7 @@ defmodule Aikido.HooksTest do
       )
 
     {:ok, %{state: waiting, directives: [gate]}} =
-      Aikido.AiReact.Hooks.queue_event_hooks({:ok, result}, :run_started, %{})
+      Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :run_started, %{})
 
     signal = Aikido.Signal.new!("ai.react.cancel", %{request_id: "run"})
 
@@ -306,7 +306,7 @@ defmodule Aikido.HooksTest do
       )
 
     {:ok, %{state: ready, directives: [observer, %LLMCall{}]}} =
-      Aikido.AiReact.Hooks.queue_event_hooks({:ok, result}, :run_started, %{})
+      Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :run_started, %{})
 
     {:ok, %{state: recorded, directives: []}} =
       complete(ready, observer, {:error, "observer failed"})
@@ -341,7 +341,7 @@ defmodule Aikido.HooksTest do
     {:ok, result} = Aikido.Types.ActionResult.new(state: state)
 
     {:ok, %{state: waiting, directives: [gate]}} =
-      Aikido.AiReact.Hooks.queue_event_hooks({:ok, result}, :after_model, %{})
+      Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :after_model, %{})
 
     assert waiting.status == :running
     assert waiting.hook_terminal == :completed
@@ -396,7 +396,7 @@ defmodule Aikido.HooksTest do
       )
 
     {:ok, %{state: ready, directives: [%LLMCall{} = call]}} =
-      Aikido.AiReact.Hooks.queue_event_hooks({:ok, result}, :run_started, %{})
+      Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :run_started, %{})
 
     assert ready.hook_context == []
 

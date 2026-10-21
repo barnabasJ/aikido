@@ -1,15 +1,15 @@
 defmodule Aikido.AiReact.Actions.Failed do
   @moduledoc "Records a correlated execution failure unless the run is settled or handing off."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Completion}
+  alias Aikido.AiReact.RunState
 
   @impl true
   def run(input, _opts, _context) do
     if is_nil(Map.get(input.arguments.state, :hook_terminal)) do
       input
       |> record_execution_failure()
-      |> Completion.apply_completion_requirements(input)
-      |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(
+      |> RunState.resolve_run_outcome(input)
+      |> Aikido.AiReact.HookQueue.queue_event_hooks_if_changed(
         input,
         :run_failed,
         Map.take(input.arguments, [:query, :tool_call_id, :name, :content, :reason, :metadata])

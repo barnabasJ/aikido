@@ -1,6 +1,13 @@
-defmodule Aikido.AiReact.Run do
-  @moduledoc "Builds initial conversation state and requests tool setup for a new run."
-  alias Aikido.AiReact.Context
+defmodule Aikido.AiReact.RunState do
+  @moduledoc """
+  Initializes and settles the state of a ReAct run.
+
+  Opening a run applies its configuration, prepares conversation history and
+  returns a tool-setup descriptor. Settling a reducer result consults
+  `Aikido.AiReact.TodoRequirements` and clears transient tools and handoff data
+  only when the resulting run is completed or failed. Every operation is pure.
+  """
+  alias Aikido.AiReact.Conversation
 
   @doc "Initialize conversation state and request tool setup before the first model call."
   def begin_run(data, state) do
@@ -14,6 +21,38 @@ defmodule Aikido.AiReact.Run do
       |> request_tool_setup()
     end
   end
+
+  @doc "Resolve todo-dependent run status and discard finished-run resources in an action result."
+  def resolve_run_outcome({:ok, %{state: state, directives: []}} = unchanged, input)
+      when state == input.arguments.state,
+      do: unchanged
+
+  def resolve_run_outcome(
+        {:ok, %{state: %{status: :completed} = state} = result},
+        input
+      ) do
+    agent_state = (input.context.aikido[:agent] && input.context.aikido.agent.state) || %{}
+
+    state =
+      state
+      |> Aikido.AiReact.TodoRequirements.resolve_run_status(agent_state)
+      |> clear_tools_and_handoff()
+
+    {:ok, %{result | state: state}}
+  end
+
+  def resolve_run_outcome({:ok, %{state: %{status: :failed} = state} = result}, _input) do
+    {:ok, %{result | state: clear_tools_and_handoff(state)}}
+  end
+
+  def resolve_run_outcome(result, _input), do: result
+
+  @doc "Discard prepared tools and pending handoff only after a run completes or fails."
+  def clear_tools_and_handoff(%{status: status} = state) when status in [:completed, :failed] do
+    Map.merge(state, %{prepared_tools: nil, handoff_pending: nil})
+  end
+
+  def clear_tools_and_handoff(state), do: state
 
   defp resolve_configuration(data, state) do
     model = data[:model] || Map.get(state, :model)
@@ -43,14 +82,14 @@ defmodule Aikido.AiReact.Run do
         %ReqLLM.Context{} = context -> context
         _ -> ReqLLM.Context.new()
       end
-      |> Context.append_interrupted_tool_results()
+      |> Conversation.append_interrupted_tool_results()
       |> replace_system_prompt(system_prompt)
 
     cached = Map.get(state, :estimated_tokens)
 
     if Map.get(state, :context) == context && is_integer(cached) && cached > 0,
       do: state,
-      else: Context.replace_context(state, context)
+      else: Conversation.replace_context(state, context)
   end
 
   defp replace_system_prompt(context, system_prompt) do
@@ -66,7 +105,7 @@ defmodule Aikido.AiReact.Run do
       |> Enum.concat([query])
       |> Enum.map(&ReqLLM.Context.user/1)
 
-    Context.append_messages(state, messages)
+    Conversation.append_messages(state, messages)
   end
 
   defp reset_run(state, data, configuration) do

@@ -110,6 +110,6 @@ defmodule Aikido.NativeToolResultsTest do
     assert ai.iteration == 2
     assert ai.pending_tool_calls == []
     assert ai.tool_results_received == []
-    assert ai.estimated_tokens == Aikido.AiReact.Context.estimate_tokens(ai.context)
+    assert ai.estimated_tokens == Aikido.AiReact.Conversation.estimate_tokens(ai.context)
   end
 end

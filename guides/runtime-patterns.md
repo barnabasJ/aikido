@@ -54,16 +54,27 @@ reducer rather than calling a helper that combines both:
 
 ```elixir
 result
-|> Aikido.AiReact.Completion.apply_completion_requirements(input)
-|> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(input, :after_tool, payload)
+|> Aikido.AiReact.RunState.resolve_run_outcome(input)
+|> Aikido.AiReact.HookQueue.queue_event_hooks_if_changed(input, :after_tool, payload)
 ```
+
+The ReAct helpers have distinct owners:
+
+- `RunState` initializes a run, resolves its proposed outcome and clears finished-run data.
+- `TodoRequirements` evaluates blocking todos; it does not execute or complete them.
+- `Conversation` owns message history and its cached token counts.
+- `ConversationHandoff` plans a model-written replacement conversation.
+- `HookQueue` orders hook events and releases their pending effects.
+- `RunCaller` binds a run to its actor and tenant.
+- `CancellableTask` owns supervised I/O attempts, deadlines, retries and cleanup.
+- `ModelStream` batches deltas from a ReqLLM response stream.
 
 Helpers follow the same style: pure transformations compose through pipelines,
 and fallible operations compose through `with`. For example,
 `Aikido.Slice.Config.cast_config/2` casts supplied configuration without reading
 application configuration; `resolve_config/2` adds application config lookup.
-Handoff eligibility (`Handoff.required?/2`) is separate from constructing the
-request (`Handoff.prepare_request/2`). These operations describe state and effects;
+Handoff eligibility (`ConversationHandoff.required?/2`) is separate from constructing the
+request (`ConversationHandoff.prepare_request/2`). These operations describe state and effects;
 only the action return value adopts state and only directives execute effects.
 
 

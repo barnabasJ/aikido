@@ -1,7 +1,10 @@
-defmodule Aikido.AiReact.Streaming do
-  @moduledoc false
-  # ReqLLM owns tool-call assembly and response metadata. This adapter only
-  # observes its stream and batches UI-facing deltas before native conversion.
+defmodule Aikido.AiReact.ModelStream do
+  @moduledoc """
+  Batches model text and thinking deltas while consuming a native ReqLLM stream.
+
+  ReqLLM assembles tool calls and response metadata. The supplied callbacks
+  receive deltas, progress and cleanup work; this adapter never writes state.
+  """
   def call(client, model, messages, opts, emit, notify, batch_bytes, batch_ms) do
     with {:ok, response} <- client.stream_text(model, messages, opts) do
       notify.({:cleanup, fn -> ReqLLM.StreamResponse.close(response) end})

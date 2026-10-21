@@ -1,8 +1,8 @@
 defmodule Aikido.AiReact.Actions.LlmTurn do
   @moduledoc "Adopts model responses, accumulates usage and continues with tools or queued messages."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Completion, Handoff}
-  alias Aikido.AiReact.Context
+  alias Aikido.AiReact.RunState
+  alias Aikido.AiReact.Conversation
 
   @impl true
   def run(input, _opts, _context) do
@@ -17,8 +17,8 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
       |> record_response_content(turn)
       |> append_model_message(response)
       |> continue_from_classified_response(turn)
-      |> Completion.apply_completion_requirements(input)
-      |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(
+      |> RunState.resolve_run_outcome(input)
+      |> Aikido.AiReact.HookQueue.queue_event_hooks_if_changed(
         input,
         :after_model,
         model_hook_payload(input.arguments)
@@ -44,7 +44,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
 
     Map.merge(state, %{
       usage: accumulated,
-      last_input_tokens: Handoff.input_tokens(ReqLLM.Response.usage(response))
+      last_input_tokens: Conversation.provider_input_tokens(ReqLLM.Response.usage(response))
     })
   end
 
@@ -58,7 +58,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
 
   defp append_model_message(state, response) do
     state
-    |> Context.append_message(response.message)
+    |> Conversation.append_message(response.message)
     |> Map.update!(:iteration, &(&1 + 1))
   end
 

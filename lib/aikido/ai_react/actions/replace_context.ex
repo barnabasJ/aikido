@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.ReplaceContext do
   @moduledoc "Installs caller-supplied conversation history while idle and refreshes the cached token estimate."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.Context
+  alias Aikido.AiReact.Conversation
 
   @impl true
   def run(input, _opts, _context) do
@@ -11,7 +11,7 @@ defmodule Aikido.AiReact.Actions.ReplaceContext do
       {:error, :busy}
     else
       with {:ok, context} <- ReqLLM.Context.normalize(input.arguments.messages) do
-        Aikido.Types.ActionResult.new(state: Context.replace_context(state, context))
+        Aikido.Types.ActionResult.new(state: Conversation.replace_context(state, context))
       end
     end
   end

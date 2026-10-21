@@ -122,7 +122,7 @@ defmodule Aikido.AiReact.Directives.ToolExec do
     options = d.options
 
     result =
-      Aikido.AiReact.Execution.run_cancellable_attempts(
+      Aikido.AiReact.CancellableTask.run_cancellable_attempts(
         agent_pid,
         d.request_id,
         supervisor,

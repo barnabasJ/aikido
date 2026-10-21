@@ -401,9 +401,11 @@ defmodule Aikido.AiReact.Slice do
         else: state
 
     context =
-      if(state.context, do: Aikido.AiReact.Context.append_interrupted_tool_results(state.context))
+      if(state.context,
+        do: Aikido.AiReact.Conversation.append_interrupted_tool_results(state.context)
+      )
 
-    state = Aikido.AiReact.Context.replace_context(state, context)
+    state = Aikido.AiReact.Conversation.replace_context(state, context)
 
     Map.merge(state, %{
       handoff_pending: nil,

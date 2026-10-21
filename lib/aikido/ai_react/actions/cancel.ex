@@ -1,14 +1,14 @@
 defmodule Aikido.AiReact.Actions.Cancel do
   @moduledoc "Fails a matching active run and clears its pending hooks."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Completion}
+  alias Aikido.AiReact.RunState
 
   @impl true
   def run(input, _opts, _context) do
     input
     |> cancel_matching_run()
-    |> Completion.apply_completion_requirements(input)
-    |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(
+    |> RunState.resolve_run_outcome(input)
+    |> Aikido.AiReact.HookQueue.queue_event_hooks_if_changed(
       input,
       :run_cancelled,
       Map.take(input.arguments, [:query, :tool_call_id, :name, :content, :reason, :metadata])

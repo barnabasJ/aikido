@@ -1,4 +1,4 @@
-defmodule Aikido.AiReact.Hooks do
+defmodule Aikido.AiReact.HookQueue do
   @moduledoc """
   Pure lifecycle planning for Lua hooks. Actions own queues and decisions;
   `Aikido.AiReact.Directives.ExecuteHook` evaluates one script outside the agent mailbox.
@@ -125,8 +125,8 @@ defmodule Aikido.AiReact.Hooks do
     effect = %{effect | context: state.context}
 
     {state, effect} =
-      if Aikido.AiReact.Handoff.required?(state, effect),
-        do: Aikido.AiReact.Handoff.prepare_request(state, effect),
+      if Aikido.AiReact.ConversationHandoff.required?(state, effect),
+        do: Aikido.AiReact.ConversationHandoff.prepare_request(state, effect),
         else: {state, effect}
 
     release_queued_steps(state, rest, status, directives ++ [effect])
@@ -140,7 +140,7 @@ defmodule Aikido.AiReact.Hooks do
     messages = Enum.map(state.queued_messages, &ReqLLM.Context.user/1)
 
     state
-    |> Aikido.AiReact.Context.append_messages(messages)
+    |> Aikido.AiReact.Conversation.append_messages(messages)
     |> Map.put(:queued_messages, [])
   end
 
@@ -153,7 +153,7 @@ defmodule Aikido.AiReact.Hooks do
   end
 
   defp append_hook_message(entry, state) do
-    Aikido.AiReact.Context.append_message(
+    Aikido.AiReact.Conversation.append_message(
       state,
       ReqLLM.Context.user("""
       [Hook context: #{entry.name}]

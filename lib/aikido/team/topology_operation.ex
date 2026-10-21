@@ -1,6 +1,12 @@
-defmodule Aikido.Team.Operation do
-  @moduledoc "Pure topology plan validation, lifecycle sequencing and operation correlation."
-  alias Aikido.Team.{Tasks, Topology}
+defmodule Aikido.Team.TopologyOperation do
+  @moduledoc """
+  Plans and tracks one team topology change through member start/stop signals.
+
+  Validates worker limits, orders member changes and records the currently
+  awaited step. Member exits and operation failures also settle affected tasks.
+  Returned directives request process effects; this module performs no I/O.
+  """
+  alias Aikido.Team.{TaskDelivery, Topology}
   alias Aikido.Directives
   alias Aikido.Signal
 
@@ -143,13 +149,13 @@ defmodule Aikido.Team.Operation do
 
   defp recovered_task_notifications(state, context) do
     Enum.flat_map(Map.get(state, :recovered_tasks, []), fn id ->
-      Tasks.task_result_delivery_directives(state.tasks[id], state, context)
+      TaskDelivery.task_result_delivery_directives(state.tasks[id], state, context)
     end)
   end
 
   defp request_member_stop(state, name, pid, config) do
     effect =
-      Directives.async_task({Aikido.Team.Runtime, :stop_member, [config.instance, pid]},
+      Directives.async_task({Aikido.Team.MemberProcesses, :stop_member, [config.instance, pid]},
         success_type: "aikido.ash.team.stopped",
         error_type: "aikido.ash.team.failed",
         payload: %{member: name, operation_id: state.operation.id, pid: pid}
@@ -165,7 +171,7 @@ defmodule Aikido.Team.Operation do
 
     effect =
       Directives.async_task(
-        {Aikido.Team.Runtime, :start_member,
+        {Aikido.Team.MemberProcesses, :start_member,
          [spec.resource, member_id(context.agent_id, name), initial, parent, context]},
         success_type: "aikido.ash.team.started",
         error_type: "aikido.ash.team.failed",
@@ -234,7 +240,10 @@ defmodule Aikido.Team.Operation do
 
   defp result_with_task_notifications(state, ids, context) do
     directives =
-      Enum.flat_map(ids, &Tasks.task_result_delivery_directives(state.tasks[&1], state, context))
+      Enum.flat_map(
+        ids,
+        &TaskDelivery.task_result_delivery_directives(state.tasks[&1], state, context)
+      )
 
     {:ok, state, directives}
   end

@@ -1,8 +1,11 @@
-defmodule Aikido.AiReact.Execution do
-  @moduledoc false
-  # Runs inside an I/O task, never inside directive execution or an action.
-  # The inner task performs one bounded attempt. This owner handles cancellation,
-  # deadlines and cleanup; it never writes agent state.
+defmodule Aikido.AiReact.CancellableTask do
+  @moduledoc """
+  Owns cancellable I/O attempts for a ReAct model call or tool setup/execution.
+
+  Runs in supervised work outside the agent mailbox. It retries eligible
+  failures, enforces total and progress deadlines, and releases cleanup
+  callbacks when work finishes or the owning run ends. It never writes state.
+  """
   require Ash.Tracer
   require Logger
 

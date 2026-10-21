@@ -1,15 +1,15 @@
 defmodule Aikido.Agent.Commands.Stop do
   @moduledoc "External Ash command boundary. Stops a live durable agent and returns its identity and stopped status."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Agent.Runtime
+  alias Aikido.Agent.CommandRuntime
 
   @impl true
   def run(input, _opts, _context) do
     resource = input.resource
     agent = input.arguments.agent
 
-    Runtime.catch_runtime_exit(fn ->
-      with {:ok, {id, pid}} <- Runtime.resolve(resource, agent),
+    CommandRuntime.catch_runtime_exit(fn ->
+      with {:ok, {id, pid}} <- CommandRuntime.resolve(resource, agent),
            :ok <-
              Aikido.Durable.stop(
                Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource)),

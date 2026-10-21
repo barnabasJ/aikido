@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.HandoffFailed do
   @moduledoc "Fails a matching pending context handoff and plans failure hooks."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Handoff, Hooks}
+  alias Aikido.AiReact.{ConversationHandoff, HookQueue}
 
   @impl true
   def run(input, _opts, _context) do
@@ -11,7 +11,7 @@ defmodule Aikido.AiReact.Actions.HandoffFailed do
 
   @doc false
   def fail_pending_handoff(state, data) do
-    if Handoff.active?(state, data) do
+    if ConversationHandoff.active?(state, data) do
       state =
         Map.merge(state, %{
           status: :failed,
@@ -19,9 +19,9 @@ defmodule Aikido.AiReact.Actions.HandoffFailed do
           handoff_pending: nil,
           hooks_pending: %{}
         })
-        |> Aikido.AiReact.Completion.clear_tools_and_handoff()
+        |> Aikido.AiReact.RunState.clear_tools_and_handoff()
 
-      Hooks.queue_event_hooks(
+      HookQueue.queue_event_hooks(
         Aikido.Types.ActionResult.new(state: state),
         :run_failed,
         %{

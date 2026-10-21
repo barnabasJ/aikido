@@ -38,7 +38,7 @@ does not permit other runtime effects inside reducers.
 - `Aikido.Agent`: immutable identity/state struct and a convenience macro over `Ash.Resource` with `Aikido.Agent.Extension`
 - `Aikido.Agent.Extension`: resource extension that compiles state declarations into attributes and exposes generic lifecycle/signal actions
 - `Aikido.Domain.Extension`: domain interfaces named `<agent>_<action>`; start returns a reference, signal commands return processing receipts, and inspect/list explicitly read live state
-- `Aikido.Agent.Commands`: dedicated native I/O implementations for public lifecycle, inspection, list and signal commands; `Aikido.Agent.Runtime` contains only shared helpers
+- `Aikido.Agent.Commands`: dedicated native I/O implementations for public lifecycle, inspection, list and signal commands; `Aikido.Agent.CommandRuntime` contains only shared helpers
 - `Aikido.Slice.Extension`: embedded resource extension; slices own their attributes, native reducer actions and routes
 - `Aikido.Team.Extension`: topology and coordination on an agent resource, including nested teams and dynamic workers
 - `Aikido.AgentServer`: signal routing, native Ash reducer execution, directive execution and runtime bookkeeping, hosted by DurableServer
@@ -75,6 +75,7 @@ does not permit other runtime effects inside reducers.
 
 ## Standards
 - Break multi-step logic into helpers named for the operations they perform. Pipe state through pure transformation steps and use `with` for steps that can fail. Apply this to helpers, runtime code, DSL expansion and examples as well as reducers. Expose smaller documented operations when an umbrella helper mixes concerns, rather than inventing another vague wrapper. Keep cohesive declarations and required behaviour callback names.
+- Name helper modules for the data or lifecycle they own, and keep only operations with that shared responsibility together. Separate policy checks from unrelated cleanup or runtime effects; avoid generic names such as `Completion`, `Context` or `Execution` when a concrete subject can be named.
 - Give each operation one canonical name. Call shared operations directly instead of adding differently named forwarding helpers; keep adapters only when they perform a distinct conversion or policy step.
 - Keep Ash reducer actions pure: the same input returns the same state and directives
 - Directives mutate **no** state — neither `agent.state` (domain) nor `%AgentServer.State{}` (runtime). State changes flow through the action's return value; runtime bookkeeping flows through GenServer callbacks and `process_signal/2` cascade callbacks

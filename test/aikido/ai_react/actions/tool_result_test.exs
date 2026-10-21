@@ -79,7 +79,7 @@ defmodule Aikido.AiReact.ToolResultTest do
     assert directive.tools == elem(slice.prepared_tools, 0)
 
     assert new_slice.estimated_tokens ==
-             Aikido.AiReact.Context.estimate_tokens(new_slice.context)
+             Aikido.AiReact.Conversation.estimate_tokens(new_slice.context)
 
     assert directive.request_id == slice.request_id
     assert directive.llm_opts == slice.llm_opts

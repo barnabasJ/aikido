@@ -1,14 +1,14 @@
 defmodule Aikido.Team.Actions.AssignTask do
   @moduledoc "Tracks a task and dispatches it to its member, activating a lazy member when needed."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Team.{Inputs, Tasks}
+  alias Aikido.Team.ActionAdapter
   alias Aikido.Directives
   alias Aikido.Signal
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.unpack_team_action(input)
-    Inputs.to_action_result(assign_or_activate_member(signal, state, context, config))
+    {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
+    ActionAdapter.to_action_result(assign_or_activate_member(signal, state, context, config))
   end
 
   defp assign_or_activate_member(signal, state, context, config) do
@@ -46,7 +46,7 @@ defmodule Aikido.Team.Actions.AssignTask do
     id = Map.get(data, :task_id) || signal.id
 
     with true <- !Map.has_key?(state.tasks, id) || {:error, {:task_exists, id}},
-         {:ok, pid} <- Tasks.fetch_running_member_pid(state, data.member) do
+         {:ok, pid} <- Aikido.Team.MemberProcesses.fetch_running_member_pid(state, data.member) do
       task = dispatched_task(id, data, state.incarnations[data.member])
 
       state

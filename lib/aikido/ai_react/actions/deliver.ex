@@ -8,11 +8,11 @@ defmodule Aikido.AiReact.Actions.Deliver do
   must respect the active run's actor and tenant.
   """
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Hooks, Run, Scope}
+  alias Aikido.AiReact.{HookQueue, RunState, RunCaller}
 
   @impl true
   def run(input, _opts, _context) do
-    with :ok <- Scope.validate_run_caller(input.arguments.state, input) do
+    with :ok <- RunCaller.validate_run_caller(input.arguments.state, input) do
       if input.arguments.state.status in [:setup, :running] do
         queue_incoming_conversation_text(input)
       else
@@ -42,7 +42,7 @@ defmodule Aikido.AiReact.Actions.Deliver do
 
   defp start_run_from_incoming_text(input) do
     with {:ok, result} <-
-           Run.begin_run(
+           RunState.begin_run(
              %{
                query: input.arguments.text,
                request_id: input.arguments.request_id,
@@ -51,8 +51,8 @@ defmodule Aikido.AiReact.Actions.Deliver do
              input.arguments.state
            ) do
       {:ok, result}
-      |> Scope.bind_run_caller(input)
-      |> Hooks.queue_event_hooks(:run_started, %{query: input.arguments.text})
+      |> RunCaller.bind_run_caller(input)
+      |> HookQueue.queue_event_hooks(:run_started, %{query: input.arguments.text})
     end
   end
 end

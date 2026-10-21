@@ -140,7 +140,7 @@ defmodule Aikido.HookRequestsTest do
     assert answer =~ "Lua received blue"
     assert answer =~ "queued while the hook waits"
     assert {:ok, ai} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai})
-    assert ai.estimated_tokens == Aikido.AiReact.Context.estimate_tokens(ai.context)
+    assert ai.estimated_tokens == Aikido.AiReact.Conversation.estimate_tokens(ai.context)
 
     assert {:ok, false} =
              Aikido.AgentServer.state(

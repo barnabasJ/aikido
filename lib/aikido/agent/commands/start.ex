@@ -1,7 +1,7 @@
 defmodule Aikido.Agent.Commands.Start do
   @moduledoc "External Ash command boundary. Starts a durable agent through native scoped initialization and completes its initial team topology."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Agent.Runtime
+  alias Aikido.Agent.CommandRuntime
 
   @impl true
   def run(input, _opts, context) do
@@ -34,7 +34,7 @@ defmodule Aikido.Agent.Commands.Start do
 
     options = activation_options(resource, input, context, runtime_options)
 
-    Runtime.catch_runtime_exit(fn ->
+    CommandRuntime.catch_runtime_exit(fn ->
       with {:ok, pid} <- Aikido.Durable.start(pool, input.arguments.id, options) do
         configure_topology_or_stop_agent(resource, input, context, topology, pid, runtime_options)
       end
@@ -42,7 +42,7 @@ defmodule Aikido.Agent.Commands.Start do
   end
 
   defp activation_options(resource, input, context, runtime_options) do
-    initialization = input |> Runtime.command_context(context) |> Map.to_list()
+    initialization = input |> CommandRuntime.command_context(context) |> Map.to_list()
 
     [
       agent: resource,
@@ -58,7 +58,7 @@ defmodule Aikido.Agent.Commands.Start do
 
     with {:ok, _} <-
            configure_initial_topology(resource, input, context, topology, pid, runtime_options) do
-      {:ok, Runtime.reference(resource, input.arguments.id, pid)}
+      {:ok, CommandRuntime.reference(resource, input.arguments.id, pid)}
     else
       error ->
         Aikido.Durable.stop(pool, pid)
@@ -77,7 +77,7 @@ defmodule Aikido.Agent.Commands.Start do
         resource,
         pid,
         topology.nodes,
-        Runtime.command_context(input, context)
+        CommandRuntime.command_context(input, context)
       )
     else
       {:ok, :ready}

@@ -1,13 +1,13 @@
 defmodule Aikido.Team.Actions.Started do
   @moduledoc "Adopts a correlated member activation and advances the lifecycle plan, cleaning up late activations."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Team.{Inputs, Operation}
+  alias Aikido.Team.{ActionAdapter, TopologyOperation}
   alias Aikido.Directives
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.unpack_team_action(input)
-    Inputs.to_action_result(adopt_started_member(signal.data, state, context, config))
+    {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
+    ActionAdapter.to_action_result(adopt_started_member(signal.data, state, context, config))
   end
 
   defp adopt_started_member(
@@ -16,7 +16,7 @@ defmodule Aikido.Team.Actions.Started do
          context,
          config
        ) do
-    if Operation.awaited?(state, id, {:start, name}) do
+    if TopologyOperation.awaited?(state, id, {:start, name}) do
       state
       |> record_activation(name, id, pid)
       |> advance_after_activation(data, context, config)
@@ -49,14 +49,14 @@ defmodule Aikido.Team.Actions.Started do
             incarnations: Map.delete(state.incarnations, name)
         }
 
-        Operation.fail_operation_and_pending_tasks(
+        TopologyOperation.fail_operation_and_pending_tasks(
           %{operation_id: id, reason: {:member_exited, name, reason}},
           state,
           context
         )
 
       _ ->
-        Operation.advance_member_lifecycle(state, context, config)
+        TopologyOperation.advance_member_lifecycle(state, context, config)
     end
   end
 
@@ -66,7 +66,8 @@ defmodule Aikido.Team.Actions.Started do
       if pid in Map.values(state.members),
         do: [],
         else: [
-          Directives.async_task({Aikido.Team.Runtime, :stop_member, [config.instance, pid]},
+          Directives.async_task(
+            {Aikido.Team.MemberProcesses, :stop_member, [config.instance, pid]},
             success_type: "aikido.ash.team.cleanup",
             error_type: "aikido.ash.team.cleanup"
           )

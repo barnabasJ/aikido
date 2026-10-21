@@ -30,7 +30,10 @@ defmodule Aikido.AiReact.ReplaceContextTest do
              |> Ash.run_action!()
 
     assert replaced.context.messages == messages
-    assert replaced.estimated_tokens == Aikido.AiReact.Context.estimate_tokens(replaced.context)
+
+    assert replaced.estimated_tokens ==
+             Aikido.AiReact.Conversation.estimate_tokens(replaced.context)
+
     assert replaced.last_input_tokens == nil
     assert replaced.run_scope == scope
   end

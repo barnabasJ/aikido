@@ -45,7 +45,7 @@ defmodule Aikido.AiReact.Directives.PrepareTools do
 
   defp prepare_tools_and_build_ready_signal(directive, scope, owner, supervisor) do
     with {:ok, prepared} <-
-           Aikido.AiReact.Execution.run_cancellable_attempts(
+           Aikido.AiReact.CancellableTask.run_cancellable_attempts(
              owner,
              directive.request_id,
              supervisor,

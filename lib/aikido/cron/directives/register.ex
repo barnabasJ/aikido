@@ -30,7 +30,7 @@ defmodule Aikido.Cron.Directives.Register do
   require Logger
 
   alias Aikido.AgentServer
-  alias Aikido.AgentServer.{State}
+  alias Aikido.AgentServer.State
 
   use Aikido.Directive
 

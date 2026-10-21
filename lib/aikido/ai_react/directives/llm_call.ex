@@ -133,7 +133,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
     messages = Context.to_list(d.context)
     llm_opts = model_options(d)
 
-    Aikido.AiReact.Execution.run_cancellable_attempts(
+    Aikido.AiReact.CancellableTask.run_cancellable_attempts(
       agent_pid,
       d.request_id,
       supervisor,
@@ -168,7 +168,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
 
   defp request_model_response(d, messages, options, notify, emit) do
     if streaming?(d) do
-      Aikido.AiReact.Streaming.call(
+      Aikido.AiReact.ModelStream.call(
         d.client,
         d.model,
         messages,

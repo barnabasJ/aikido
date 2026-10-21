@@ -190,7 +190,7 @@ Each public command uses its own native implementation under `Aikido.Agent.Comma
 These implementations live in `lib/aikido/agent/commands/` and perform I/O at the
 external domain boundary. Agent/slice `actions/` contain pure reducer implementations.
 The transformer attaches each command implementation directly. Shared reference resolution,
-snapshot projection and caller-scope helpers live in `lib/aikido/agent/runtime.ex`.
+snapshot projection and caller-scope helpers live in `lib/aikido/agent/command_runtime.ex`.
 
 The generated public actions are all generic Ash actions: `start`, `stop`,
 `delete`, `inspect`, `list`, and the declared signals. These public commands do

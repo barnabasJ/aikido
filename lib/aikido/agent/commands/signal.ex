@@ -1,7 +1,7 @@
 defmodule Aikido.Agent.Commands.Signal do
   @moduledoc "External Ash command boundary. Delivers a public command with native caller scope and returns a compact signal-processing receipt."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Agent.Runtime
+  alias Aikido.Agent.CommandRuntime
 
   @impl true
   def run(input, _opts, context) do
@@ -29,13 +29,13 @@ defmodule Aikido.Agent.Commands.Signal do
           else: arguments
       end
 
-    Runtime.catch_runtime_exit(fn ->
-      with {:ok, {id, pid}} <- Runtime.resolve(resource, input.arguments.agent),
+    CommandRuntime.catch_runtime_exit(fn ->
+      with {:ok, {id, pid}} <- CommandRuntime.resolve(resource, input.arguments.agent),
            {:ok, signal} <- Aikido.Signal.new(definition.type, payload, source: "/ash"),
-           signal = Aikido.Signal.put_ctx(signal, Runtime.command_context(input, context)),
+           signal = Aikido.Signal.put_ctx(signal, CommandRuntime.command_context(input, context)),
            {:ok, _} <- dispatch(resource, pid, signal) do
         {:ok,
-         Map.merge(Runtime.reference(resource, id, pid), %{
+         Map.merge(CommandRuntime.reference(resource, id, pid), %{
            signal_id: signal.id,
            status: :processed
          })}

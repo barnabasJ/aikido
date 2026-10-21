@@ -148,30 +148,28 @@ defmodule Aikido.PureActionsTest do
       |> Path.wildcard()
       |> Enum.reject(&String.starts_with?(&1, "examples/agent_app/lib/agent_examples/ai/tools/"))
 
+    shared_reducer_paths = [
+      "lib/aikido/team/action_adapter.ex",
+      "lib/aikido/team/topology_operation.ex",
+      "lib/aikido/team/task_delivery.ex",
+      "lib/aikido/ai_react/conversation.ex",
+      "lib/aikido/ai_react/conversation_handoff.ex",
+      "lib/aikido/ai_react/hook_queue.ex",
+      "lib/aikido/ai_react/run_caller.ex",
+      "lib/aikido/ai_react/run_state.ex",
+      "lib/aikido/ai_react/todo_requirements.ex"
+    ]
+
     paths =
       Path.wildcard("lib/aikido/actions/**/*.ex") ++
         Path.wildcard("lib/aikido/*/actions/**/*.ex") ++
         Path.wildcard("lib/aikido/team/actions/*.ex") ++
-        example_paths ++
-        [
-          "lib/aikido/team/inputs.ex",
-          "lib/aikido/team/operation.ex",
-          "lib/aikido/team/tasks.ex",
-          "lib/aikido/ai_react/handoff.ex",
-          "lib/aikido/ai_react/hooks.ex"
-        ]
+        example_paths ++ shared_reducer_paths
 
     violations =
       for path <- paths,
           ast = path |> File.read!() |> Code.string_to_quoted!(),
-          reducer?(ast) ||
-            path in [
-              "lib/aikido/team/inputs.ex",
-              "lib/aikido/team/operation.ex",
-              "lib/aikido/team/tasks.ex",
-              "lib/aikido/ai_react/handoff.ex",
-              "lib/aikido/ai_react/hooks.ex"
-            ],
+          reducer?(ast) || path in shared_reducer_paths,
           violation <- effect_calls(ast),
           do: {path, violation}
 

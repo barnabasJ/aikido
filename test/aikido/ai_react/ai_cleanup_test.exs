@@ -37,7 +37,7 @@ defmodule Aikido.AICleanupTest do
     log =
       ExUnit.CaptureLog.capture_log(fn ->
         assert {:ok, :primary_result} =
-                 Aikido.AiReact.Execution.run_cancellable_attempts(
+                 Aikido.AiReact.CancellableTask.run_cancellable_attempts(
                    owner,
                    request_id,
                    supervisor,

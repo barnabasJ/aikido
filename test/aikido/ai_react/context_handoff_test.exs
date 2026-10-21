@@ -69,7 +69,7 @@ defmodule Aikido.ContextHandoffTest do
              ai(pid)
 
     assert resumed.estimated_tokens ==
-             Aikido.AiReact.Context.estimate_tokens(resumed.context)
+             Aikido.AiReact.Conversation.estimate_tokens(resumed.context)
 
     assert resumed.last_input_tokens == nil
 

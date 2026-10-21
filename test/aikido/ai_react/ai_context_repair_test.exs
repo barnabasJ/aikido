@@ -1,7 +1,7 @@
 defmodule Aikido.AI.ContextRepairTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.AiReact.Context, as: Conversation
+  alias Aikido.AiReact.Conversation
 
   alias ReqLLM.{Context, ToolCall}
   alias ReqLLM.Message.ContentPart

@@ -1,18 +1,18 @@
 defmodule Aikido.Team.Actions.ChildExit do
   @moduledoc "Records a member exit, fails its active tasks and schedules reconciliation of its owned subtree."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Team.{Inputs, Tasks, Topology}
+  alias Aikido.Team.{ActionAdapter, TaskDelivery, Topology}
   alias Aikido.Directives
   alias Aikido.Signal
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, _config} = Inputs.unpack_team_action(input)
+    {signal, state, context, _config} = ActionAdapter.unpack_team_action(input)
     data = Map.put(signal.data, :member, signal.data.tag)
 
     state
     |> record_member_exit(data, context)
-    |> Inputs.to_action_result()
+    |> ActionAdapter.to_action_result()
   end
 
   defp record_member_exit(state, %{member: name, pid: pid} = data, context) do
@@ -75,7 +75,7 @@ defmodule Aikido.Team.Actions.ChildExit do
   defp failed_task_notifications(state, previous, context) do
     for {id, task} <- state.tasks,
         task.status == :failed and previous.tasks[id].status == :dispatched,
-        directive <- Tasks.task_result_delivery_directives(task, state, context),
+        directive <- TaskDelivery.task_result_delivery_directives(task, state, context),
         do: directive
   end
 

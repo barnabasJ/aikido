@@ -1,5 +1,12 @@
-defmodule Aikido.AiReact.Context do
-  @moduledoc "Lossless conversation helpers: token estimates, tool grouping and interruption repair."
+defmodule Aikido.AiReact.Conversation do
+  @moduledoc """
+  Maintains ReAct conversation history together with its cached token counts.
+
+  Appending messages updates only their token cost; replacing history refreshes
+  the full estimate. Interrupted tool calls receive matching error results so
+  the next request contains valid model history. Provider usage counts and
+  estimated input size live here because both describe this conversation.
+  """
 
   alias ReqLLM.Context
   alias ReqLLM.Message
@@ -67,6 +74,20 @@ defmodule Aikido.AiReact.Context do
 
     content_tokens + tool_calls_tokens + name_tokens + id_tokens + @entry_overhead_tokens
   end
+
+  @doc "Use the greater of the cached conversation estimate and the last provider input count."
+  def input_token_count(state),
+    do: max(Map.get(state, :last_input_tokens) || 0, Map.get(state, :estimated_tokens, 0))
+
+  @doc "Read a positive input-token count from native provider usage metadata."
+  def provider_input_tokens(usage) when is_map(usage) do
+    case usage[:input_tokens] || usage["input_tokens"] do
+      value when is_integer(value) and value > 0 -> value
+      _ -> nil
+    end
+  end
+
+  def provider_input_tokens(_), do: nil
 
   defp estimate_string_tokens(nil), do: 0
 

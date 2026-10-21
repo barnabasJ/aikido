@@ -1,4 +1,4 @@
-defmodule Aikido.AiReact.Handoff do
+defmodule Aikido.AiReact.ConversationHandoff do
   @moduledoc "Model-written context handoff at clean ReAct turn boundaries."
   alias Aikido.AiReact.Directives.LLMCall
   alias ReqLLM.Context
@@ -28,7 +28,8 @@ defmodule Aikido.AiReact.Handoff do
     state.status == :running && is_nil(state.handoff_pending) &&
       state.pending_tool_calls == [] && options.handoff &&
       is_integer(options.context_max_tokens) &&
-      current_tokens(state) >= max(options.context_max_tokens - options.handoff_buffer_tokens, 0)
+      Aikido.AiReact.Conversation.input_token_count(state) >=
+        max(options.context_max_tokens - options.handoff_buffer_tokens, 0)
   end
 
   def required?(_state, _directive), do: false
@@ -51,18 +52,4 @@ defmodule Aikido.AiReact.Handoff do
     do:
       state.status == :running && state.request_id == data.request_id &&
         not is_nil(Map.get(state, :handoff_pending)) && state.handoff_pending == data.handoff_id
-
-  @doc false
-  def current_tokens(state),
-    do: max(Map.get(state, :last_input_tokens) || 0, Map.get(state, :estimated_tokens, 0))
-
-  @doc false
-  def input_tokens(usage) when is_map(usage) do
-    case usage[:input_tokens] || usage["input_tokens"] do
-      value when is_integer(value) and value > 0 -> value
-      _ -> nil
-    end
-  end
-
-  def input_tokens(_), do: nil
 end

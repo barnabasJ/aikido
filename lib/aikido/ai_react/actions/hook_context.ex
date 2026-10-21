@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.HookContext do
   @moduledoc "Queues hook context for the matching active run’s next model request."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Hooks}
+  alias Aikido.AiReact.HookQueue
 
   @impl true
   def run(input, _opts, _context) do
@@ -14,7 +14,11 @@ defmodule Aikido.AiReact.Actions.HookContext do
     state =
       if state.request_id == data.request_id && state.status in [:setup, :running],
         do:
-          Hooks.queue_hook_text_for_next_model_request(state, data[:name] || "async", data.text),
+          HookQueue.queue_hook_text_for_next_model_request(
+            state,
+            data[:name] || "async",
+            data.text
+          ),
         else: state
 
     Aikido.Types.ActionResult.new(state: state)

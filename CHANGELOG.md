@@ -6,6 +6,12 @@
 
 ### Changed
 
+- Give helper modules responsibility-specific names. Separate ReAct todo
+  requirements from run-state initialization and cleanup; keep conversation
+  token accounting outside the handoff protocol. Group team member process
+  access separately from task-result delivery. Rename files and callers to
+  match, and document which helpers describe state versus perform runtime I/O.
+
 - Remove differently named forwarding helpers for interrupted tool results,
   terminal cleanup, server lookup, debug configuration, Lua capabilities and
   cron signal construction. Call each shared operation by its canonical name.

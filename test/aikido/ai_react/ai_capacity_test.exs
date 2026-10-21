@@ -51,7 +51,7 @@ defmodule Aikido.AICapacityTest.Launch do
         pending_tool_calls: pending,
         prepared_tools: {[], %{}}
       })
-      |> Aikido.AiReact.Context.replace_context(context)
+      |> Aikido.AiReact.Conversation.replace_context(context)
 
     Aikido.Types.ActionResult.new(
       state: %Aikido.Types.SliceUpdate{slices: %{ai: ai}},

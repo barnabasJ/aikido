@@ -1,5 +1,10 @@
-defmodule Aikido.AiReact.Scope do
-  @moduledoc "Pure caller scope validation and binding for ReAct runs."
+defmodule Aikido.AiReact.RunCaller do
+  @moduledoc """
+  Binds each ReAct run to its opening actor and tenant.
+
+  Incoming messages must match that caller while the run is active. This is a
+  run-ownership check; native Ash scope still carries authorization and context.
+  """
 
   @doc "Require incoming actor and tenant to match an active run’s caller."
   def validate_run_caller(state, input) do

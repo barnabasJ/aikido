@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.ToolsReady do
   @moduledoc "Installs prepared tools and starts the matching run's first model request."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.Hooks
+  alias Aikido.AiReact.HookQueue
   alias Aikido.AiReact.Directives.LLMCall
 
   @impl true
@@ -28,7 +28,7 @@ defmodule Aikido.AiReact.Actions.ToolsReady do
         tools: tools
       }
 
-      Hooks.queue_before_model_hooks(state, directive)
+      HookQueue.queue_before_model_hooks(state, directive)
     else
       Aikido.Types.ActionResult.new(state: state)
     end

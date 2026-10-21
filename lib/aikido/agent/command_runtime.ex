@@ -1,5 +1,11 @@
-defmodule Aikido.Agent.Runtime do
-  @moduledoc false
+defmodule Aikido.Agent.CommandRuntime do
+  @moduledoc """
+  Shared runtime access for external domain commands.
+
+  Resolves agent references, reads live snapshots, forwards caller scope and
+  translates process exits at the public command boundary. These helpers may
+  perform runtime I/O and are separate from pure agent and slice reducers.
+  """
   alias Aikido.AgentServer
 
   def command_context(input, context) do

@@ -1,7 +1,7 @@
 defmodule Aikido.Bench.Context do
   @moduledoc false
 
-  alias Aikido.AiReact.Context, as: Conversation
+  alias Aikido.AiReact.Conversation
   alias ReqLLM.Context
 
   def run(settings) do

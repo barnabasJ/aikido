@@ -87,7 +87,7 @@ defmodule Aikido.ReactFeaturesTest do
     send(third, {:answer, {:ok, Responses.final_answer_response("three")}})
     assert {:ok, "three"} = Task.await(next)
     assert {:ok, ai} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai})
-    assert ai.estimated_tokens == Aikido.AiReact.Context.estimate_tokens(ai.context)
+    assert ai.estimated_tokens == Aikido.AiReact.Conversation.estimate_tokens(ai.context)
   end
 
   setup do
@@ -237,7 +237,7 @@ defmodule Aikido.ReactFeaturesTest do
     assert {:ok, replaced} = replace_context.([ReqLLM.Context.user("previous summary")])
 
     assert replaced.estimated_tokens ==
-             Aikido.AiReact.Context.estimate_tokens(replaced.context)
+             Aikido.AiReact.Conversation.estimate_tokens(replaced.context)
 
     assert replaced.last_input_tokens == nil
     task = Task.async(fn -> Aikido.AI.ask_sync(pid, "continue", ctx.options) end)
@@ -298,7 +298,7 @@ defmodule Aikido.ReactFeaturesTest do
     assert restored.error == :interrupted
 
     assert restored.estimated_tokens ==
-             Aikido.AiReact.Context.estimate_tokens(restored.context)
+             Aikido.AiReact.Conversation.estimate_tokens(restored.context)
 
     assert restored.last_input_tokens == nil
     assert restored.run_scope == %{}
@@ -316,7 +316,7 @@ defmodule Aikido.ReactFeaturesTest do
         ReqLLM.Context.assistant("call", tool_calls: [%{id: "one", name: "tool", arguments: %{}}])
       ])
 
-    repaired = Aikido.AiReact.Context.append_interrupted_tool_results(context)
+    repaired = Aikido.AiReact.Conversation.append_interrupted_tool_results(context)
     assert List.last(repaired.messages).role == :tool
 
     assert hd(repaired.messages).role == :system

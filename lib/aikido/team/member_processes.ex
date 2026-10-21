@@ -1,7 +1,11 @@
-defmodule Aikido.Team.Runtime do
-  @moduledoc false
+defmodule Aikido.Team.MemberProcesses do
+  @moduledoc """
+  Starts, stops and looks up the processes backing team members.
 
-  # Each function is one AsyncTask unit. No function changes agent state.
+  Start and stop run as individual AsyncTask work units and report results
+  through lifecycle signals. PID lookup reads supplied membership without I/O.
+  No function changes team or agent state.
+  """
   def start_member(resource, id, initial_state, parent, scope) do
     options =
       scope
@@ -45,5 +49,13 @@ defmodule Aikido.Team.Runtime do
     :exit, {:normal, _} -> {:ok, :stopped}
     :exit, {:shutdown, _} -> {:ok, :stopped}
     :exit, {{:shutdown, _}, _} -> {:ok, :stopped}
+  end
+
+  @doc "Look up a live member PID in the supplied team state without performing I/O."
+  def fetch_running_member_pid(state, name) do
+    case Map.fetch(state.members, name) do
+      {:ok, pid} -> {:ok, pid}
+      :error -> {:error, {:member_not_running, name}}
+    end
   end
 end

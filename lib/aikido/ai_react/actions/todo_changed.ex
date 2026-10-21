@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.TodoChanged do
   @moduledoc "Reevaluates a waiting run against blocking todos and plans its completion hooks."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Completion, Hooks}
+  alias Aikido.AiReact.{RunState, TodoRequirements, HookQueue}
 
   @impl true
   def run(input, _opts, _context) do
@@ -10,10 +10,10 @@ defmodule Aikido.AiReact.Actions.TodoChanged do
     if state.status == :waiting do
       state =
         state
-        |> Completion.resolve_todo_status(input.context.aikido.agent.state)
-        |> Completion.clear_tools_and_handoff()
+        |> TodoRequirements.resolve_run_status(input.context.aikido.agent.state)
+        |> RunState.clear_tools_and_handoff()
 
-      Hooks.queue_event_hooks(
+      HookQueue.queue_event_hooks(
         Aikido.Types.ActionResult.new(state: state),
         :after_model,
         %{

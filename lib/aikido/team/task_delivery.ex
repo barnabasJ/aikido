@@ -1,5 +1,11 @@
-defmodule Aikido.Team.Tasks do
-  @moduledoc "Pure task notification construction and live member lookup."
+defmodule Aikido.Team.TaskDelivery do
+  @moduledoc """
+  Builds conversation-message descriptors for finished team tasks.
+
+  Resolves each task’s configured notification recipient and describes the text
+  and correlation metadata to deliver. These functions perform no delivery I/O;
+  the returned directives send the messages after state adoption.
+  """
   alias Aikido.Directives
   alias Aikido.Signal
 
@@ -36,12 +42,5 @@ defmodule Aikido.Team.Tasks do
       },
       source: "/aikido"
     }
-  end
-
-  def fetch_running_member_pid(state, name) do
-    case Map.fetch(state.members, name) do
-      {:ok, pid} -> {:ok, pid}
-      :error -> {:error, {:member_not_running, name}}
-    end
   end
 end

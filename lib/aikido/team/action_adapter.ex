@@ -1,5 +1,11 @@
-defmodule Aikido.Team.Inputs do
-  @moduledoc "Extract native team action inputs and construct reducer results."
+defmodule Aikido.Team.ActionAdapter do
+  @moduledoc """
+  Adapts native Ash team actions to the shared topology and task transition functions.
+
+  Input extraction keeps the signal payload, team state, caller context and
+  configuration together. Result conversion preserves transition errors and
+  casts successful state/directive tuples to the native action-result type.
+  """
 
   @doc "Return the payload-enriched signal, team state, runtime context and team configuration."
   def unpack_team_action(input) do

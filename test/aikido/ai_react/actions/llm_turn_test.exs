@@ -70,7 +70,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
       assert List.last(state.context.messages) == message
 
       assert state.estimated_tokens ==
-               Aikido.AiReact.Context.estimate_tokens(state.context)
+               Aikido.AiReact.Conversation.estimate_tokens(state.context)
     end
   end
 
@@ -266,7 +266,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
         assert Enum.count(result.state.context.messages, &(&1 == message)) == 1
 
         assert result.state.estimated_tokens ==
-                 Aikido.AiReact.Context.estimate_tokens(result.state.context)
+                 Aikido.AiReact.Conversation.estimate_tokens(result.state.context)
 
         refute Enum.any?(result.directives, &match?(%ToolExec{}, &1))
 

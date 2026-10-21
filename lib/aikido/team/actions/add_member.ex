@@ -1,16 +1,16 @@
 defmodule Aikido.Team.Actions.AddMember do
   @moduledoc "Adds a member from a worker template or resource and activates eager members."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Team.{Inputs, Operation, Topology}
+  alias Aikido.Team.{ActionAdapter, TopologyOperation, Topology}
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.unpack_team_action(input)
-    Inputs.to_action_result(add_member_and_activate(signal, state, context, config))
+    {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
+    ActionAdapter.to_action_result(add_member_and_activate(signal, state, context, config))
   end
 
   defp add_member_and_activate(signal, state, context, config) do
-    Operation.begin_topology_change(signal, state, context, config, fn ->
+    TopologyOperation.begin_topology_change(signal, state, context, config, fn ->
       plan_member_addition(signal.data, state, config)
     end)
   end

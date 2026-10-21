@@ -1,7 +1,7 @@
-defmodule Aikido.AI.ContextTest do
+defmodule Aikido.AiReact.ConversationTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.AiReact.Context, as: Conversation
+  alias Aikido.AiReact.Conversation
   alias ReqLLM.Context
   alias ReqLLM.Message
   alias ReqLLM.Message.ContentPart
@@ -60,9 +60,9 @@ defmodule Aikido.AI.ContextTest do
       last_input_tokens: 987
     }
 
-    assert Aikido.AiReact.Handoff.current_tokens(state) == 1_234
+    assert Aikido.AiReact.Conversation.input_token_count(state) == 1_234
 
-    assert Aikido.AiReact.Handoff.current_tokens(%{state | last_input_tokens: 1_500}) ==
+    assert Aikido.AiReact.Conversation.input_token_count(%{state | last_input_tokens: 1_500}) ==
              1_500
   end
 

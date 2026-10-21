@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.HookCompleted do
   @moduledoc "Applies correlated hook decisions and resumes serialized synchronous continuations."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Hooks}
+  alias Aikido.AiReact.HookQueue
 
   @impl true
   def run(input, _opts, _context) do
@@ -35,15 +35,15 @@ defmodule Aikido.AiReact.Actions.HookCompleted do
         state = Map.put(state, :hooks_pending, pending)
 
         case data.result do
-          {:ok, %Hooks.Decision{decision: :continue, context: context}} ->
+          {:ok, %Aikido.AiReact.Hooks.Decision{decision: :continue, context: context}} ->
             state =
               if context,
-                do: Hooks.queue_hook_text_for_next_model_request(state, data.name, context),
+                do: HookQueue.queue_hook_text_for_next_model_request(state, data.name, context),
                 else: state
 
-            Hooks.release_queued_steps(state, continuation.queue, continuation.status, [])
+            HookQueue.release_queued_steps(state, continuation.queue, continuation.status, [])
 
-          {:ok, %Hooks.Decision{decision: :deny, message: message}} ->
+          {:ok, %Aikido.AiReact.Hooks.Decision{decision: :deny, message: message}} ->
             fail_run_and_clear_hooks(state, {:hook_denied, data.name, message})
 
           {:error, reason} ->
@@ -70,7 +70,7 @@ defmodule Aikido.AiReact.Actions.HookCompleted do
       |> Map.put(:error, reason)
       |> Map.put(:hooks_pending, %{})
       |> Map.put(:hook_terminal, nil)
-      |> Aikido.AiReact.Completion.clear_tools_and_handoff()
+      |> Aikido.AiReact.RunState.clear_tools_and_handoff()
 
     Aikido.Types.ActionResult.new(state: state)
   end

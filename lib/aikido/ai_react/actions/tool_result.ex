@@ -3,8 +3,8 @@ defmodule Aikido.AiReact.Actions.ToolResult do
   use Ash.Resource.Actions.Implementation
 
   @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
-  alias Aikido.AiReact.Completion
-  alias Aikido.AiReact.Context
+  alias Aikido.AiReact.RunState
+  alias Aikido.AiReact.Conversation
 
   @impl true
   def run(input, _opts, _context) do
@@ -16,8 +16,8 @@ defmodule Aikido.AiReact.Actions.ToolResult do
       |> append_tool_message(data)
       |> record_received_result(data)
       |> resume_when_batch_complete()
-      |> Completion.apply_completion_requirements(input)
-      |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(
+      |> RunState.resolve_run_outcome(input)
+      |> Aikido.AiReact.HookQueue.queue_event_hooks_if_changed(
         input,
         :after_tool,
         Map.take(data, [:query, :tool_call_id, :name, :content, :reason, :metadata])
@@ -37,7 +37,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
 
   defp append_tool_message(state, data) do
     message = ReqLLM.Context.tool_result(data.tool_call_id, data.name, data.content)
-    Context.append_message(state, message)
+    Conversation.append_message(state, message)
   end
 
   defp record_received_result(state, data) do
@@ -87,7 +87,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
 
   defp maybe_append_cycle_warning(state, previous_signature, current_signature)
        when is_binary(previous_signature) and previous_signature == current_signature do
-    Context.append_message(state, ReqLLM.Context.user(@cycle_warning))
+    Conversation.append_message(state, ReqLLM.Context.user(@cycle_warning))
   end
 
   defp maybe_append_cycle_warning(state, _previous, _current), do: state
