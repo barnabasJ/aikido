@@ -43,16 +43,7 @@ defmodule AgentExamples.Playground do
         if String.trim(query) == "" do
           {:reply, {:error, "Enter a prompt first."}, state}
         else
-          task =
-            Task.Supervisor.async_nolink(
-              AgentExamples.WebTasks,
-              fn ->
-                AI.ask(run.record, query,
-                  timeout: 180_000,
-                  metadata: %{playground: %{owner: owner, slug: slug}}
-                )
-              end
-            )
+          task = start_prompt_task(run.record, query, owner, slug)
 
           run = %{
             run
@@ -285,6 +276,15 @@ defmodule AgentExamples.Playground do
 
   def handle_info(_, state), do: {:noreply, state}
 
+  defp start_prompt_task(record, query, owner, slug) do
+    Task.Supervisor.async_nolink(AgentExamples.WebTasks, fn ->
+      AI.ask(record, query,
+        timeout: 180_000,
+        metadata: %{playground: %{owner: owner, slug: slug}}
+      )
+    end)
+  end
+
   defp dispatch_command(%{record: %{resource: AgentExamples.Counter}} = run, action, input)
        when action in [:increase, :decrease] do
     definition =
@@ -467,45 +467,12 @@ defmodule AgentExamples.Playground do
 
   defp attributes(example, options) do
     if Catalog.ai?(example) do
-      overrides =
-        Enum.reduce([:system_prompt, :max_iterations], %{}, fn key, attributes ->
-          case Map.fetch(options, Atom.to_string(key)) do
-            {:ok, value} -> Map.put(attributes, key, value)
-            :error -> attributes
-          end
-        end)
-
-      tools = AI.Tools.for_assistant()
-      tools = if options["lua"] == "true", do: tools ++ AI.Tools.for_lua(), else: tools
-
-      tools =
-        if example.kind == :ai_team && options["lua"] != "true" do
-          tools ++ [:team_roster, :spawn_worker, :delegate]
-        else
-          tools
-        end
-
-      if options["mode"] == "live" do
-        with key when is_binary(key) and key != "" <- System.get_env("ZAI_API_KEY"),
-             [provider, id] when id != "" <- String.split(options["model"] || "", ":", parts: 2),
-             true <- provider in ["zai", "zai_coder"] do
-          {:ok,
-           Map.merge(overrides, %{
-             tools: tools,
-             client: ReqLLM.Generation,
-             model: %{provider: if(provider == "zai", do: :zai, else: :zai_coder), id: id}
-           })}
-        else
-          _ ->
-            {:error, "Live mode needs ZAI_API_KEY on the server and a model such as zai:glm-5.3."}
-        end
-      else
-        attributes = AI.offline(Map.put(overrides, :tools, tools))
-
+      with {:ok, model} <- model_attributes(example, options) do
         attributes =
-          if example.slug == "conversation",
-            do: Map.put(attributes, :client, AI.StreamingClient),
-            else: attributes
+          options
+          |> ai_overrides()
+          |> Map.merge(model)
+          |> Map.put(:tools, example_tools(example, options))
 
         {:ok, attributes}
       end
@@ -514,38 +481,56 @@ defmodule AgentExamples.Playground do
     end
   end
 
+  defp ai_overrides(options) do
+    Enum.reduce([:system_prompt, :max_iterations], %{}, fn key, attributes ->
+      case Map.fetch(options, Atom.to_string(key)) do
+        {:ok, value} -> Map.put(attributes, key, value)
+        :error -> attributes
+      end
+    end)
+  end
+
+  defp example_tools(example, options) do
+    tools = AI.Tools.for_assistant()
+
+    cond do
+      options["lua"] == "true" -> tools ++ AI.Tools.for_lua()
+      example.kind == :ai_team -> tools ++ [:team_roster, :spawn_worker, :delegate]
+      true -> tools
+    end
+  end
+
+  defp model_attributes(_example, %{"mode" => "live"} = options) do
+    with key when is_binary(key) and key != "" <- System.get_env("ZAI_API_KEY"),
+         [provider, id] when id != "" <- String.split(options["model"] || "", ":", parts: 2),
+         true <- provider in ["zai", "zai_coder"] do
+      {:ok,
+       %{
+         client: ReqLLM.Generation,
+         model: %{provider: if(provider == "zai", do: :zai, else: :zai_coder), id: id}
+       }}
+    else
+      _ -> {:error, "Live mode needs ZAI_API_KEY on the server and a model such as zai:glm-5.3."}
+    end
+  end
+
+  defp model_attributes(example, _options) do
+    attributes = AI.offline()
+
+    attributes =
+      if example.slug == "conversation",
+        do: Map.put(attributes, :client, AI.StreamingClient),
+        else: attributes
+
+    {:ok, attributes}
+  end
+
   defp snapshot(state) do
     resource = state.agent_module
-
-    fixed =
-      if resource && !is_nil(Aikido.Agent.Info.team_config(resource)),
-        do: Map.keys(Aikido.Agent.Info.team_config(resource).topology.nodes),
-        else: []
 
     own = Map.get(state.agent.state, :state, %{})
     ai = Map.get(state.agent.state, :ai, %{})
     team = Map.get(state.agent.state, :team, %{})
-
-    members =
-      for {name, pid} <- Map.get(team, :members, %{}) do
-        nodes = team |> Map.get(:topology, %{}) |> Map.get(:nodes, %{})
-        node = nodes[name]
-
-        %{
-          name: to_string(name),
-          key: name,
-          pid: pid,
-          owner: if(node && node.owner, do: to_string(node.owner), else: nil),
-          dynamic: name not in fixed,
-          alive: Process.alive?(pid)
-        }
-      end
-
-    tasks =
-      team
-      |> Map.get(:tasks, %{})
-      |> Map.values()
-      |> Enum.map(&Map.take(&1, [:id, :member, :status, :result]))
 
     {:ok,
      %{
@@ -578,9 +563,41 @@ defmodule AgentExamples.Playground do
          ])
          |> Map.put(:hook_messages, hook_messages(ai)),
        todos: Map.get(Map.get(state.agent.state, :todos, %{}), :items, []),
-       members: Enum.sort_by(members, & &1.name),
-       tasks: tasks
+       members: member_snapshots(team, resource),
+       tasks: task_snapshots(team)
      }}
+  end
+
+  defp member_snapshots(team, resource) do
+    fixed =
+      if resource && !is_nil(Aikido.Agent.Info.team_config(resource)),
+        do: Map.keys(Aikido.Agent.Info.team_config(resource).topology.nodes),
+        else: []
+
+    nodes = team |> Map.get(:topology, %{}) |> Map.get(:nodes, %{})
+
+    team
+    |> Map.get(:members, %{})
+    |> Enum.map(fn {name, pid} ->
+      node = nodes[name]
+
+      %{
+        name: to_string(name),
+        key: name,
+        pid: pid,
+        owner: if(node && node.owner, do: to_string(node.owner), else: nil),
+        dynamic: name not in fixed,
+        alive: Process.alive?(pid)
+      }
+    end)
+    |> Enum.sort_by(& &1.name)
+  end
+
+  defp task_snapshots(team) do
+    team
+    |> Map.get(:tasks, %{})
+    |> Map.values()
+    |> Enum.map(&Map.take(&1, [:id, :member, :status, :result]))
   end
 
   defp hook_messages(%{context: %ReqLLM.Context{} = context}) do

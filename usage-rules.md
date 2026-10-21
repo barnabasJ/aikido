@@ -39,6 +39,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Use `Aikido.Directives.SpawnAgent` / `Aikido.Directives.StopChild` for hierarchy, not ad-hoc child tracking.
 - Use signals for cross-agent communication instead of direct process coupling.
 - Keep slice state and actions isolated and composable.
+- Structure multi-step functions as named operations: pipe pure transformations and use `with` for fallible native calls. Apply this to helpers, runtime code, DSL expansion, tests and examples. Expose smaller documented operations when an umbrella function mixes concerns; retain cohesive declarations and required callback names.
 
 ## QA Patterns
 - Start with pure Ash action tests, then add AgentServer integration tests.

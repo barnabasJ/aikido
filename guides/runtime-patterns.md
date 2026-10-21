@@ -49,6 +49,24 @@ is the runtime callback implementation hosted by DurableServer. Configure
 return state transitions and directives without performing side effects. All
 side effects belong in directives; results return through signals.
 
+Keep completion requirements and hook planning visible as separate steps in a
+reducer rather than calling a helper that combines both:
+
+```elixir
+result
+|> Aikido.AiReact.Completion.settle_result(input)
+|> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(input, :after_tool, payload)
+```
+
+Helpers follow the same style: pure transformations compose through pipelines,
+and fallible operations compose through `with`. For example,
+`Aikido.Slice.Config.cast_config/2` casts supplied configuration without reading
+application configuration; `resolve_config/2` adds application config lookup.
+Handoff eligibility (`Handoff.required?/2`) is separate from constructing the
+request (`Handoff.prepare_request/2`). These operations describe state and effects;
+only the action return value adopts state and only directives execute effects.
+
+
 If a directive raises, the runtime stops that effect batch and retains the
 already adopted state. Subscribers observe that state, synchronous callers
 receive the error, and DurableServer checkpoints the state as usual. Effects

@@ -10,33 +10,14 @@ defmodule AgentExamples.AI.ScriptedClient do
 
   @impl true
   def generate_text(_model, messages, options) do
-    current =
-      messages
-      |> Enum.with_index()
-      |> Enum.reverse()
-      |> Enum.find(fn {message, _} ->
-        message.role == :user && !String.starts_with?(message_text(message), "[Hook context:")
-      end)
-
-    messages = Enum.drop(messages, if(current, do: elem(current, 1), else: 0))
+    messages = current_request_messages(messages)
     query = messages |> Enum.find(&(&1.role == :user)) |> message_text()
     results = Enum.filter(messages, &(&1.role == :tool))
     tools = Keyword.fetch!(options, :tools) |> Enum.map(& &1.name)
 
     cond do
       tools == [] && String.starts_with?(query, "This conversation is about to be replaced") ->
-        {:ok,
-         %ReqLLM.Response{
-           id: "scripted",
-           model: "offline",
-           context: ReqLLM.Context.new(),
-           message:
-             ReqLLM.Context.assistant(
-               "Offline handoff demonstration. Follow the system instructions and continue the conversation with the supplied tools. Next action: process the latest user instruction and report the result.",
-               tool_calls: []
-             ),
-           finish_reason: :stop
-         }}
+        handoff_response()
 
       String.starts_with?(query, "orchestrate:") &&
           ("spawn_worker" in tools || "run_lua" in tools) ->
@@ -46,23 +27,54 @@ defmodule AgentExamples.AI.ScriptedClient do
         plan_worker_delegation(results, query, "run_lua" in tools)
 
       results == [] ->
-        calls =
-          for name <- tools,
-              name in ["text_stats", "team_roster", "stamp", "run_lua"],
-              do: new_tool_call(name, tool_arguments(name, query))
-
-        {:ok,
-         %ReqLLM.Response{
-           id: "scripted",
-           model: "offline",
-           context: ReqLLM.Context.new(),
-           message: ReqLLM.Context.assistant("", tool_calls: calls),
-           finish_reason: :tool_calls
-         }}
+        initial_tool_response(tools, query)
 
       true ->
         respond_with_tool_results(results)
     end
+  end
+
+  defp current_request_messages(messages) do
+    current =
+      messages
+      |> Enum.with_index()
+      |> Enum.reverse()
+      |> Enum.find(fn {message, _} ->
+        message.role == :user && !String.starts_with?(message_text(message), "[Hook context:")
+      end)
+
+    Enum.drop(messages, if(current, do: elem(current, 1), else: 0))
+  end
+
+  defp handoff_response do
+    {:ok,
+     %ReqLLM.Response{
+       id: "scripted",
+       model: "offline",
+       context: ReqLLM.Context.new(),
+       message:
+         ReqLLM.Context.assistant(
+           "Offline handoff demonstration. Follow the system instructions and continue the conversation with the supplied tools. Next action: process the latest user instruction and report the result.",
+           tool_calls: []
+         ),
+       finish_reason: :stop
+     }}
+  end
+
+  defp initial_tool_response(tools, query) do
+    calls =
+      for name <- tools,
+          name in ["text_stats", "team_roster", "stamp", "run_lua"],
+          do: new_tool_call(name, tool_arguments(name, query))
+
+    {:ok,
+     %ReqLLM.Response{
+       id: "scripted",
+       model: "offline",
+       context: ReqLLM.Context.new(),
+       message: ReqLLM.Context.assistant("", tool_calls: calls),
+       finish_reason: :tool_calls
+     }}
   end
 
   defp tool_arguments(name, query) when name in ["text_stats", "stamp"],

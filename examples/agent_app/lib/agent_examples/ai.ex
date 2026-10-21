@@ -19,25 +19,8 @@ defmodule AgentExamples.AI do
     resource = Map.get(record, :resource) || record.__struct__
     ash_opts = Keyword.get(opts, :ash, [])
 
-    pid =
-      case Aikido.Durable.lookup(
-             Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource)),
-             record.id
-           ) do
-        {:ok, pid} -> pid
-        :error -> nil
-      end
-
-    observe = fn state ->
-      ai = state.agent.state.ai
-
-      cond do
-        ai.request_id != request_id -> :skip
-        ai.status == :completed -> {:ok, ai.result}
-        ai.status == :failed -> {:error, ai.error}
-        true -> :skip
-      end
-    end
+    pid = lookup_agent_pid(resource, record.id)
+    observe = &select_ai_result(&1, request_id)
 
     Aikido.AgentServer.call_until(
       pid,
@@ -68,22 +51,8 @@ defmodule AgentExamples.AI do
     resource = Map.get(team, :resource) || team.__struct__
     ash_opts = Keyword.get(opts, :ash, [])
 
-    pid =
-      case Aikido.Durable.lookup(
-             Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource)),
-             team.id
-           ) do
-        {:ok, pid} -> pid
-        :error -> nil
-      end
-
-    observe = fn state ->
-      case state.agent.state.team.tasks[task_id] do
-        %{status: :completed, result: result} -> {:ok, result}
-        %{status: :failed, result: reason} -> {:error, reason}
-        _ -> :skip
-      end
-    end
+    pid = lookup_agent_pid(resource, team.id)
+    observe = &select_task_result(&1, task_id)
 
     Aikido.AgentServer.call_until(
       pid,
@@ -106,5 +75,34 @@ defmodule AgentExamples.AI do
       observe,
       timeout: timeout + 1_000
     )
+  end
+
+  defp lookup_agent_pid(resource, id) do
+    case Aikido.Durable.lookup(
+           Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource)),
+           id
+         ) do
+      {:ok, pid} -> pid
+      :error -> nil
+    end
+  end
+
+  defp select_ai_result(runtime, request_id) do
+    ai = runtime.agent.state.ai
+
+    cond do
+      ai.request_id != request_id -> :skip
+      ai.status == :completed -> {:ok, ai.result}
+      ai.status == :failed -> {:error, ai.error}
+      true -> :skip
+    end
+  end
+
+  defp select_task_result(runtime, task_id) do
+    case runtime.agent.state.team.tasks[task_id] do
+      %{status: :completed, result: result} -> {:ok, result}
+      %{status: :failed, result: reason} -> {:error, reason}
+      _ -> :skip
+    end
   end
 end

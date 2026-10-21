@@ -6,6 +6,14 @@
 
 ### Changed
 
+- Separate completion requirements, resource release and hook queueing into
+  composable operations. Expose handoff decisions and request construction,
+  task notification descriptions, and pure slice configuration casting.
+- Express runtime, persistence, directive execution and DSL expansion as named
+  steps; chain fallible native Ash/Spark operations explicitly with `with`.
+- Apply the same structure to example command handling, configuration, snapshots
+  and offline model responses.
+
 - Split ReAct run setup, model/tool result handling, handoff adoption and team
   member recovery into named transformation steps. Handoff validation uses an
   explicit error chain before replacing conversation state.
