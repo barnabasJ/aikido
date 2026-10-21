@@ -1,5 +1,9 @@
 # Aikido
 
+Thank you to the [Jido project](https://github.com/agentjido/jido) and its
+contributors. Aikido started as a fork of Jido and gradually evolved into an
+independent project. Their work provided the foundation for what Aikido is today.
+
 [![CI](https://github.com/barnabasJ/aikido/actions/workflows/ci.yml/badge.svg)](https://github.com/barnabasJ/aikido/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
