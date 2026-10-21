@@ -57,7 +57,7 @@ defmodule AikidoTest.Thread.SliceTest do
     for entries <- [entry, [entry, entry]] do
       input =
         Ash.ActionInput.for_action(Aikido.Thread.Slice, :append, %{
-          state: Aikido.Thread.Slice.new(),
+          state: Ash.create!(Aikido.Thread.Slice, %{}),
           entry: entries
         })
 
@@ -135,7 +135,7 @@ defmodule AikidoTest.Thread.SliceTest do
           [{{Aikido.Thread.Slice, :append}, %{entry: %{kind: :message, payload: %{text: "hi"}}}}]
         )
 
-      assert Aikido.Thread.Slice.entry_count(agent.state.thread) == 1
+      assert agent.state.thread.stats.entry_count == 1
     end
   end
 end

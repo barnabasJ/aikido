@@ -1,4 +1,4 @@
-defmodule Aikido.Thread.Entry do
+defmodule Aikido.Thread.Types.Entry do
   @moduledoc """
   A single entry in a Thread. Typed by `kind` with kind-specific payload.
 

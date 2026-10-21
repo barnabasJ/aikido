@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Remove the thread slice’s parallel constructor, mutation and read helper API.
+  Native Ash actions own append/clear transitions; their entry payload type lives
+  at `Aikido.Thread.Types.Entry`. Explicit nil entry fields follow native type
+  constraints rather than being replaced with defaults.
+
 - Consolidate cron scheduling under `Aikido.Cron`, including declarations,
   expansion, scheduler jobs, runtime specifications, actions, directives and signals.
 

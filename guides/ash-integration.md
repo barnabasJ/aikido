@@ -79,6 +79,13 @@ are DSL declarations, their `*Schedules` helpers expand them, and `Scheduler`,
 state-owning callbacks. One-shot delayed signals use the general `Schedule`
 directive rather than the cron scheduler.
 
+The thread feature keeps its resource at `Aikido.Thread.Slice`, reducers in
+`Thread.Actions`, signal definitions in `Thread.Signals` and its entry contract
+at `Thread.Types.Entry`. Use its native create and routed append/clear actions;
+read entries and aggregates directly from resource attributes. Append assigns
+sequence numbers, deterministic IDs and signal-derived timestamps before native
+Ash type casting. It preserves supplied entry IDs and timestamps.
+
 Shared reusable implementations such as `Aikido.Actions.Broadcast` and
 `Aikido.Actions.Forward` live directly under `Aikido.Actions`.
 
