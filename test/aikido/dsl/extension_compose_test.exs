@@ -4,10 +4,10 @@ defmodule Aikido.Dsl.ExtensionComposeTest.MultiHost do
 
   agent do
     name "multi_host"
-    route "memory.ensure", {Aikido.Slices.Memory, :ensure}, name: :ensure
-    slice :short_term, Aikido.Slices.Memory
-    slice :who, Aikido.Slices.Identity
-    slice :history, Aikido.Slices.Thread
+    route "memory.ensure", {Aikido.Memory.Slice, :ensure}, name: :ensure
+    slice :short_term, Aikido.Memory.Slice
+    slice :who, Aikido.Identity.Slice
+    slice :history, Aikido.Thread.Slice
   end
 end
 
@@ -17,9 +17,9 @@ defmodule Aikido.Dsl.ExtensionComposeTest.HostNoBlocks do
 
   agent do
     name "host_no_blocks"
-    route "memory.ensure", {Aikido.Slices.Memory, :ensure}, name: :ensure
-    slice :memory, Aikido.Slices.Memory
-    slice :identity, Aikido.Slices.Identity
+    route "memory.ensure", {Aikido.Memory.Slice, :ensure}, name: :ensure
+    slice :memory, Aikido.Memory.Slice
+    slice :identity, Aikido.Identity.Slice
   end
 end
 
@@ -29,10 +29,10 @@ defmodule Aikido.Dsl.ExtensionComposeTest do
 
   describe("multiple mounts compose") do
     test "all three slices mount at the agent-declared paths" do
-      instances = Aikido.Ash.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.MultiHost)
-      memory = Enum.find(instances, &(&1.module == Aikido.Slices.Memory))
-      identity = Enum.find(instances, &(&1.module == Aikido.Slices.Identity))
-      thread = Enum.find(instances, &(&1.module == Aikido.Slices.Thread))
+      instances = Aikido.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.MultiHost)
+      memory = Enum.find(instances, &(&1.module == Aikido.Memory.Slice))
+      identity = Enum.find(instances, &(&1.module == Aikido.Identity.Slice))
+      thread = Enum.find(instances, &(&1.module == Aikido.Thread.Slice))
       assert memory.path == :short_term
       assert identity.path == :who
       assert thread.path == :history
@@ -42,10 +42,10 @@ defmodule Aikido.Dsl.ExtensionComposeTest do
   describe("explicit mounts") do
     test "still produce slice instances at the slice's declared path" do
       instances =
-        Aikido.Ash.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.HostNoBlocks)
+        Aikido.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.HostNoBlocks)
 
-      memory = Enum.find(instances, &(&1.module == Aikido.Slices.Memory))
-      identity = Enum.find(instances, &(&1.module == Aikido.Slices.Identity))
+      memory = Enum.find(instances, &(&1.module == Aikido.Memory.Slice))
+      identity = Enum.find(instances, &(&1.module == Aikido.Identity.Slice))
       assert memory.path == :memory
       assert identity.path == :identity
     end

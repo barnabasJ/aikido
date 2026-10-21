@@ -35,7 +35,7 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest.SlackSlice do
   use Ash.Resource,
     data_layer: :embedded,
     validate_domain_inclusion?: false,
-    extensions: [Aikido.Ash.Slice]
+    extensions: [Aikido.Slice.Extension]
 
   slice do
     name "slack_slice"
@@ -158,7 +158,7 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
 
     test "slice_paths_for_action contains both mount paths for the shared action" do
       table =
-        Aikido.Ash.Agent.Info.slice_paths_for_action(
+        Aikido.Agent.Info.slice_paths_for_action(
           Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent
         )
 
@@ -170,9 +170,7 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest do
 
     test "mount_config_map exposes per-mount config" do
       configs =
-        Aikido.Ash.Agent.Info.mount_config_map(
-          Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent
-        )
+        Aikido.Agent.Info.mount_config_map(Aikido.Agent.MultiInstanceFanOutTest.MultiSlackAgent)
 
       assert configs[:slack_support][:token] == "support-token"
       assert configs[:slack_sales][:token] == "sales-token"

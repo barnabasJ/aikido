@@ -43,7 +43,7 @@ defmodule AgentExamples.AI.Tools.Actions.SpawnWorker do
   end
 
   defp resolve_template(team, name) do
-    case Enum.find(Aikido.Ash.Agent.Info.team_config(team.__struct__).workers, fn {key, _} ->
+    case Enum.find(Aikido.Agent.Info.team_config(team.__struct__).workers, fn {key, _} ->
            to_string(key) == name
          end) do
       {key, %{resource: resource}} -> {:ok, key, resource}

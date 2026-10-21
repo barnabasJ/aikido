@@ -1,0 +1,73 @@
+defmodule AikidoTest.IdentityTest do
+  use ExUnit.Case, async: true
+
+  alias Aikido.Identity.Slice, as: State
+
+  describe "new/1" do
+    test "creates identity with default values" do
+      identity = State.new()
+
+      assert identity.rev == 0
+      assert identity.profile == %{age: nil}
+    end
+
+    test "accepts custom profile" do
+      identity = State.new(profile: %{age: 5, origin: "lab"})
+
+      assert identity.profile == %{age: 5, origin: "lab"}
+    end
+
+    test "sets created_at and updated_at timestamps" do
+      now = 1_000_000
+      identity = State.new(now: now)
+
+      assert identity.created_at == now
+      assert identity.updated_at == now
+    end
+  end
+
+  describe "evolve/2" do
+    test "increments rev by 1" do
+      identity = State.new() |> State.evolve()
+
+      assert identity.rev == 1
+    end
+
+    test "increments age by years" do
+      identity = State.new(profile: %{age: 0}) |> State.evolve(years: 3)
+
+      assert identity.profile[:age] == 3
+    end
+
+    test "increments age by days" do
+      identity = State.new(profile: %{age: 0}) |> State.evolve(days: 730)
+
+      assert identity.profile[:age] == 2
+    end
+
+    test "increments age by combined years and days" do
+      identity = State.new(profile: %{age: 0}) |> State.evolve(years: 1, days: 365)
+
+      assert identity.profile[:age] == 2
+    end
+
+    test "handles nil age" do
+      identity = State.new() |> State.evolve(years: 5)
+
+      assert identity.profile[:age] == 5
+    end
+
+    test "updates updated_at timestamp" do
+      identity = State.new(now: 1_000) |> State.evolve(now: 2_000)
+
+      assert identity.created_at == 1_000
+      assert identity.updated_at == 2_000
+    end
+
+    test "preserves other profile keys" do
+      identity = State.new(profile: %{age: 0, origin: "lab"}) |> State.evolve(years: 1)
+
+      assert identity.profile[:origin] == "lab"
+    end
+  end
+end

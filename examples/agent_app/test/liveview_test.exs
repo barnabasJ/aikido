@@ -65,9 +65,9 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
       if example.slug in ["team", "nested-teams", "research-team"] do
         for {module, category, open?} <- [
-              {Aikido.Ash.Team.State, :slice, true},
-              {Aikido.Ash.Team.Actions.Start, :action, false},
-              {Aikido.Ash.Team.Actions.AssignTask, :action, false}
+              {Aikido.Team.Slice, :slice, true},
+              {Aikido.Team.Actions.Start, :action, false},
+              {Aikido.Team.Actions.AssignTask, :action, false}
             ] do
           definition = Enum.find(definitions, &(&1.module == module))
           assert definition, "Missing #{inspect(module)} on #{example.slug}"
@@ -75,13 +75,13 @@ defmodule AgentExamplesWeb.LiveViewTest do
           assert definition.open? == open?
         end
 
-        activation = Enum.find(definitions, &(&1.module == Aikido.Ash.Team.Types.Activation))
+        activation = Enum.find(definitions, &(&1.module == Aikido.Team.Types.Activation))
         assert activation
         refute activation.open?
       end
 
       if Catalog.ai?(example) do
-        assert Enum.any?(definitions, &(&1.module == Aikido.Slices.AiReact.Types.Status))
+        assert Enum.any?(definitions, &(&1.module == Aikido.AiReact.Types.Status))
       end
 
       for definition <- definitions do
@@ -137,7 +137,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     directive =
       Catalog.find("research-team")
       |> AgentExamples.Source.for_example()
-      |> Enum.find(&(&1.module == Aikido.Slices.AiReact.Directives.LLMCall))
+      |> Enum.find(&(&1.module == Aikido.AiReact.Directives.LLMCall))
 
     assert directive.category == :directive
     assert directive.code =~ "use Aikido.Directive"
@@ -149,12 +149,12 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
     for {module, category} <- [
           {Aikido.AI, :support},
-          {Aikido.Slices.AiReact.Options, :support},
-          {Aikido.Slices.AiReact.Hooks, :support},
-          {Aikido.Slices.AiReact.Hooks.Hook, :support},
-          {Aikido.Slices.AiReact.Directives.ExecuteHook, :directive},
-          {Aikido.Slices.AiWorker.Signals.Accept, :signal},
-          {Aikido.Slices.AiWorker.Actions.Accept, :action}
+          {Aikido.AiReact.Options, :support},
+          {Aikido.AiReact.Hooks, :support},
+          {Aikido.AiReact.Hooks.Hook, :support},
+          {Aikido.AiReact.Directives.ExecuteHook, :directive},
+          {Aikido.AiWorker.Signals.Accept, :signal},
+          {Aikido.AiWorker.Actions.Accept, :action}
         ] do
       definition = Enum.find(research, &(&1.module == module))
       assert definition.category == category
@@ -312,7 +312,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     view |> form("#prompt-form", %{query: "What came before?"}) |> render_submit()
     await(owner, "conversation", &(&1.status == :completed), 10_000)
     assert has_element?(view, "#messages", "I remember 2 user messages")
-    assert has_element?(view, "#definition-Aikido-Slices-Todo[open]")
+    assert has_element?(view, "#definition-Aikido-Todo-Slice[open]")
   end
 
   test "a Lua request can be answered from LiveView and the same script continues", %{conn: conn} do

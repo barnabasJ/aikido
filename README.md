@@ -79,7 +79,7 @@ end
 defmodule MyApp.Counter do
   use Ash.Resource,
     domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "counter"
@@ -100,7 +100,7 @@ defmodule MyApp.Counter do
 end
 
 defmodule MyApp.Agents do
-  use Ash.Domain, otp_app: :my_app, extensions: [Aikido.Ash.Domain]
+  use Ash.Domain, otp_app: :my_app, extensions: [Aikido.Domain.Extension]
 
   agents do
     agent :counter, MyApp.Counter
@@ -141,9 +141,9 @@ resource extensions.
 
 ## Teams, AI, and persistence
 
-Add `Aikido.Ash.Team` for fixed members, dynamic workers, ownership, dependencies,
+Add `Aikido.Team.Extension` for fixed members, dynamic workers, ownership, dependencies,
 and nested teams. A team can accept its initial `topology` in the start call.
-Add `Aikido.Ash.AI` for model turns; pass the model, tools, and optional prompt and
+Add `Aikido.AI.Extension` for model turns; pass the model, tools, and optional prompt and
 iteration settings at runtime. AshAI and AshLua tools can expose management and
 delegation capabilities to AI agents. Supply Ash AI tool names in `tools` and
 native builder options in `tool_options`. Each request enters `:setup`, prepares
@@ -165,12 +165,12 @@ Both checkpoint while running. The separate `delete` action stops an agent and
 removes its snapshot regardless of retention, including by ID after stop.
 Recovery does not replay in-flight tools or resume a waiting Lua VM.
 
-`Aikido.Ash.Agent` is a resource extension. Choosing a separate Ash data layer does
+`Aikido.Agent.Extension` is a resource extension. Choosing a separate Ash data layer does
 not automatically persist live agent state or make process effects transactional.
 
 ## State and effects
 
-External domain commands run through `Aikido.Ash.Commands` in `ash/commands/`.
+External domain commands run through `Aikido.Agent.Commands` in `agent/commands/`.
 They perform runtime I/O such as starting agents and delivering signals. Inside
 the agent pipeline, reducer implementations live in their owning `actions/` folders.
 

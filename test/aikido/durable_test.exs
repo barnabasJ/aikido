@@ -3,7 +3,7 @@ defmodule AikidoTest.DurableTest.ThreadAgent do
 
   agent do
     name "durable_thread"
-    slice :thread, Aikido.Slices.Thread
+    slice :thread, Aikido.Thread.Slice
   end
 end
 

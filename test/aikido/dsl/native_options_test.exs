@@ -43,7 +43,7 @@ defmodule AikidoTest.NativeOptions.Slice do
 end
 
 defmodule AikidoTest.NativeOptions.Domain do
-  use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+  use Ash.Domain, extensions: [Aikido.Domain.Extension], validate_config_inclusion?: false
 
   agents do
     agent :configured, AikidoTest.NativeOptions.Agent
@@ -84,7 +84,7 @@ defmodule AikidoTest.NativeOptionsTest do
     assert Ash.Resource.Info.domain(resource) == AikidoTest.NativeOptions.Domain
     assert Ash.DataLayer.data_layer(resource) == Ash.DataLayer.Ets
     assert Ash.Resource.Info.authorizers(resource) == [Ash.Policy.Authorizer]
-    assert Aikido.Ash.Agent in Spark.extensions(resource)
+    assert Aikido.Agent.Extension in Spark.extensions(resource)
     assert Spark.Dsl.Extension.get_opt(resource, [:custom_options], :label) == "agent"
 
     input = Ash.ActionInput.for_action(resource, :start, %{})
@@ -96,7 +96,7 @@ defmodule AikidoTest.NativeOptionsTest do
     resource = AikidoTest.NativeOptions.Slice
     assert Ash.Resource.Info.domain(resource) == AikidoTest.NativeOptions.Domain
     assert Ash.Resource.Info.embedded?(resource)
-    assert Aikido.Ash.Slice in Spark.extensions(resource)
+    assert Aikido.Slice.Extension in Spark.extensions(resource)
     assert Spark.Dsl.Extension.get_opt(resource, [:custom_options], :label) == "slice"
   end
 

@@ -1,7 +1,7 @@
 defmodule AikidoTest.AshPersistence.Permanent do
   use Ash.Resource,
     domain: AikidoTest.AshPersistence.Domain,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "permanent"
@@ -20,7 +20,7 @@ end
 defmodule AikidoTest.AshPersistence.Temporary do
   use Ash.Resource,
     domain: AikidoTest.AshPersistence.Domain,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "temporary"
@@ -38,7 +38,7 @@ defmodule AikidoTest.AshPersistence.Temporary do
 end
 
 defmodule AikidoTest.AshPersistence.Domain do
-  use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+  use Ash.Domain, extensions: [Aikido.Domain.Extension], validate_config_inclusion?: false
 
   agents do
     agent :permanent, AikidoTest.AshPersistence.Permanent

@@ -72,7 +72,7 @@ end
 defmodule AgentExamples.NativeLuaToolsTest.Assistant do
   use Ash.Resource,
     domain: AgentExamples.NativeLuaToolsTest.Domain,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
 
   agent do
     name "native_scoped_lua"

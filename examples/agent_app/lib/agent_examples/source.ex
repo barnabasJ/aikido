@@ -5,17 +5,14 @@ defmodule AgentExamples.Source do
            [
              "examples/agent_app/lib/agent_examples/**/*.ex",
              "lib/aikido/ai.ex",
-             "lib/aikido/slices/ai_react.ex",
-             "lib/aikido/slices/ai_react/**/*.ex",
-             "lib/aikido/slices/ai_worker.ex",
-             "lib/aikido/slices/ai_worker/**/*.ex",
-             "lib/aikido/slices/todo.ex",
-             "lib/aikido/slices/todo/**/*.ex",
-             "lib/aikido/ash/ai.ex",
-             "lib/aikido/ash/team.ex",
-             "lib/aikido/ash/team/*.ex",
-             "lib/aikido/ash/team/actions/*.ex",
-             "lib/aikido/ash/team/types/*.ex"
+             "lib/aikido/ai_react/**/*.ex",
+             "lib/aikido/ai_worker/**/*.ex",
+             "lib/aikido/todo/**/*.ex",
+             "lib/aikido/ai/extension.ex",
+             "lib/aikido/team/extension.ex",
+             "lib/aikido/team/*.ex",
+             "lib/aikido/team/actions/*.ex",
+             "lib/aikido/team/types/*.ex"
            ],
            &Path.wildcard(Path.join(@root, &1))
          )
@@ -64,13 +61,26 @@ defmodule AgentExamples.Source do
 
                      category =
                        cond do
-                         Aikido.Signal in contracts -> :signal
-                         Aikido.Ash.Agent in contracts || Aikido.Agent in contracts -> :agent
-                         Aikido.Ash.Slice in contracts || Aikido.Slice in contracts -> :slice
-                         Aikido.Directive in contracts -> :directive
-                         Ash.Resource.Actions.Implementation in contracts -> :action
-                         Ash.Domain in contracts -> :domain
-                         true -> :support
+                         Aikido.Signal in contracts ->
+                           :signal
+
+                         Aikido.Agent.Extension in contracts || Aikido.Agent in contracts ->
+                           :agent
+
+                         Aikido.Slice.Extension in contracts || Aikido.Slice in contracts ->
+                           :slice
+
+                         Aikido.Directive in contracts ->
+                           :directive
+
+                         Ash.Resource.Actions.Implementation in contracts ->
+                           :action
+
+                         Ash.Domain in contracts ->
+                           :domain
+
+                         true ->
+                           :support
                        end
 
                      [
@@ -94,9 +104,9 @@ defmodule AgentExamples.Source do
   @ai_owners [
     AgentExamples.AI,
     Aikido.AI,
-    Aikido.Ash.AI,
-    Aikido.Slices.AiReact,
-    Aikido.Slices.AiWorker
+    Aikido.AI.Extension,
+    Aikido.AiReact,
+    Aikido.AiWorker
   ]
 
   def for_example(example) do
@@ -128,7 +138,7 @@ defmodule AgentExamples.Source do
 
   defp modules("hook-requests"), do: [AgentExamples.Playground]
 
-  defp modules("conversation"), do: [Aikido.Slices.Todo]
+  defp modules("conversation"), do: [Aikido.Todo]
 
   defp modules("counter"), do: []
   defp modules("checklist"), do: []
@@ -137,7 +147,7 @@ defmodule AgentExamples.Source do
 
   defp modules("team"),
     do: [
-      Aikido.Ash.Team,
+      Aikido.Team,
       AgentExamples.Counter,
       AgentExamples.Notebook,
       AgentExamples.Worker,
@@ -149,7 +159,7 @@ defmodule AgentExamples.Source do
       AgentExamples.Researcher,
       AgentExamples.Reviewer,
       AgentExamples.ResearchSquad,
-      Aikido.Ash.Team
+      Aikido.Team
     ]
 
   defp modules("nested-teams"),

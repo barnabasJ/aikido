@@ -1,7 +1,6 @@
 defmodule AikidoTest.AshTeamActionsTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Ash.Team.State
   alias AikidoTest.AshFixtures.DynamicTeam
 
   test "the native action owns its operation independently of the signal envelope type" do
@@ -10,7 +9,7 @@ defmodule AikidoTest.AshTeamActionsTest do
 
     input =
       Ash.ActionInput.for_action(
-        State,
+        Aikido.Team.Slice,
         :send,
         %{state: state, member: :worker, type: "worker.notice", payload: %{value: 7}},
         context: %{

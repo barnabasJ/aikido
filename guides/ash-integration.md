@@ -1,8 +1,8 @@
 # Ash domains, agents, slices, and teams
 
 Define your public API on an Ash domain. Agents are Ash resources extended by
-`Aikido.Ash.Agent`; slices are embedded Ash resources with `Aikido.Ash.Slice`;
-teams are agent resources with `Aikido.Ash.Team`.
+`Aikido.Agent.Extension`; slices are embedded Ash resources with `Aikido.Slice.Extension`;
+teams are agent resources with `Aikido.Team.Extension`.
 
 The project uses Ash 3.36 or later. Configure Ash's required string length
 behavior in your application's `config/config.exs`:
@@ -19,7 +19,7 @@ executes them after applying the action result.
 AgentServer runs the original resource module. Its attributes, actions, slice mounts
 and middleware configuration are reused directly; no companion resource is generated.
 Own-state fields, AI flags and team configuration live in Spark and are read through
-`Aikido.Ash.Agent.Info.state_fields/1`, `ai?/1` and `team_config/1`.
+`Aikido.Agent.Info.state_fields/1`, `ai?/1` and `team_config/1`.
 
 A private `:initialize` generic action uses a shared implementation, configured
 by the transformer with the state path and slice mounts. Native create actions
@@ -44,8 +44,15 @@ native resource options and defaults to the embedded data layer.
 
 ## Source organization
 
+Built-in features use one folder and namespace. For example, `Aikido.FSM.Slice`
+lives at `lib/aikido/fsm/slice.ex`, beside `actions/transition.ex`,
+`signals/transition.ex` and `changes/initialize.ex`. AI and team extensions live
+at `Aikido.AI.Extension` and `Aikido.Team.Extension`; their supporting modules stay
+within the same feature folders. Agent, slice and domain extensions follow the
+same `Extension` convention.
+
 Each distinct action has its own native implementation module, such as
-`Aikido.Slices.AiReact.Actions.Ask`. Its route binds that module directly. Shared
+`Aikido.AiReact.Actions.Ask`. Its route binds that module directly. Shared
 helpers contain reusable mechanics rather than selecting another action by name.
 Signal declarations generate the native Ash actions on the existing resource;
 the implementation modules provide their callbacks without creating resources.
@@ -57,7 +64,7 @@ Result contracts live under `Aikido.Types`, including `ActionResult`,
 `SliceUpdate` and `Directive`.
 
 Finite states and modes use feature-owned `Ash.Type.Enum` modules. For example,
-`Aikido.Slices.AiReact.Types.Status` defines `idle`, `setup`, `running`, `waiting`,
+`Aikido.AiReact.Types.Status` defines `idle`, `setup`, `running`, `waiting`,
 `completed` and `failed`. The same type flows into resource attributes, generated
 reducer arguments and native storage casting. Open-ended names and paths remain atoms.
 
@@ -69,9 +76,11 @@ For example, `counter.ex`, `counter/actions/increment.ex` and
 contract together, with each filename matching its module.
 
 Library features follow the same rule: ReAct signals, hooks, execution helpers
-and directives live under `Aikido.Slices.AiReact`; runtime protocol signals live
-under `Aikido.AgentServer.Signals`. Each Ash extension owns its `Info`,
-`Transformers` and `Verifiers` modules. Shared envelopes, routing infrastructure
+and directives live under `Aikido.AiReact`; its resource is `Aikido.AiReact.Slice`.
+Runtime protocol signals live
+under `Aikido.AgentServer.Signals`. Feature metadata lives in its `Info` module;
+extension expansion and validation live under `Extension.Transformers` and
+`Extension.Verifiers`. Shared envelopes, routing infrastructure
 and reusable directives remain in their shared subsystems.
 
 ## An agent resource
@@ -84,7 +93,7 @@ children = [
 ]
 ```
 
-Add `Aikido.Ash.Agent` to the resource extensions:
+Add `Aikido.Agent.Extension` to the resource extensions:
 
 ```elixir
 defmodule MyApp.Signals.Add do
@@ -115,7 +124,7 @@ end
 defmodule MyApp.Counter do
   use Ash.Resource,
     domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "counter"
@@ -148,11 +157,11 @@ command. Attributes carry Ash types, constraints, defaults, visibility and nil
 validation. Mounted slices become additional attributes. Internally the runtime
 groups the agent's own fields under `:state`; `path :other_name` changes that path.
 
-Each public command uses its own native implementation under `Aikido.Ash.Commands`.
-These implementations live in `lib/aikido/ash/commands/` and perform I/O at the
+Each public command uses its own native implementation under `Aikido.Agent.Commands`.
+These implementations live in `lib/aikido/agent/commands/` and perform I/O at the
 external domain boundary. Agent/slice `actions/` contain pure reducer implementations.
 The transformer attaches each command implementation directly. Shared reference resolution,
-snapshot projection and caller-scope helpers live in `lib/aikido/ash/runtime.ex`.
+snapshot projection and caller-scope helpers live in `lib/aikido/agent/runtime.ex`.
 
 The generated public actions are all generic Ash actions: `start`, `stop`,
 `delete`, `inspect`, `list`, and the declared signals. These public commands do
@@ -347,7 +356,7 @@ agent throughput guarantees. Signal delivery remains handled by directives.
 
 ```elixir
 defmodule MyApp.Agents do
-  use Ash.Domain, extensions: [Aikido.Ash.Domain]
+  use Ash.Domain, extensions: [Aikido.Domain.Extension]
 
   agents do
     agent :counter, MyApp.Counter
@@ -405,7 +414,7 @@ Slices package state and the Ash actions that operate on it:
 defmodule MyApp.CounterSlice do
   use Ash.Resource,
     data_layer: :embedded,
-    extensions: [Aikido.Ash.Slice]
+    extensions: [Aikido.Slice.Extension]
 
   slice do
     name "counter_slice"
@@ -425,7 +434,7 @@ end
 defmodule MyApp.ComposedAgent do
   use Ash.Resource,
     domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "composed"
@@ -484,7 +493,7 @@ A team is an agent resource that lists its member resources:
 defmodule MyApp.ReviewTeam do
   use Ash.Resource,
     domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
 
   agent do
     name "review_team"

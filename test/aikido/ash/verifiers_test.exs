@@ -2,14 +2,14 @@ defmodule AikidoTest.AshVerifiersTest do
   use ExUnit.Case, async: false
 
   test "AI requires an agent host" do
-    output = compile_resource([Aikido.Ash.AI], "ai do max_iterations 2 end")
-    assert output =~ "AI requires Aikido.Ash.Agent"
+    output = compile_resource([Aikido.AI.Extension], "ai do max_iterations 2 end")
+    assert output =~ "AI requires Aikido.Agent.Extension"
   end
 
   test "slices require the embedded data layer" do
     output =
       compile_resource(
-        [Aikido.Ash.Slice],
+        [Aikido.Slice.Extension],
         """
         attributes do
           uuid_primary_key :id do
@@ -24,14 +24,14 @@ defmodule AikidoTest.AshVerifiersTest do
         embedded?: false
       )
 
-    assert output =~ "Aikido.Ash.Slice requires data_layer: :embedded"
+    assert output =~ "Aikido.Slice.Extension requires data_layer: :embedded"
   end
 
   test "slice routes and schedules require reducer action contracts" do
     for declaration <- [~s(route "invalid.run", :invalid), ~s(schedule "* * * * *", :invalid)] do
       output =
         compile_resource(
-          [Aikido.Ash.Slice],
+          [Aikido.Slice.Extension],
           """
           slice do
             name "invalid_reducer"
@@ -55,7 +55,7 @@ defmodule AikidoTest.AshVerifiersTest do
 
   test "explicitly public agent routes require concrete types" do
     output =
-      compile_resource([Aikido.Ash.Agent], """
+      compile_resource([Aikido.Agent.Extension], """
       agent do
         name "wildcard"
         route "counter.*", {AikidoTest.AshFixtures.CounterSlice, :increment}, name: :increment, public?: true
@@ -68,7 +68,7 @@ defmodule AikidoTest.AshVerifiersTest do
   test "explicitly public wildcard slice routes are rejected" do
     output =
       compile_resource(
-        [Aikido.Ash.Slice],
+        [Aikido.Slice.Extension],
         """
         slice do
           name "wildcard"
@@ -83,7 +83,7 @@ defmodule AikidoTest.AshVerifiersTest do
 
   test "duplicate public route names are checked before declarations are lost" do
     output =
-      compile_resource([Aikido.Ash.Agent], """
+      compile_resource([Aikido.Agent.Extension], """
       agent do
         name "duplicate_signals"
         route "counter.one", {AikidoTest.AshFixtures.CounterSlice, :increment}, name: :increment
@@ -96,7 +96,7 @@ defmodule AikidoTest.AshVerifiersTest do
 
   test "attributes cannot shadow the agent state path" do
     output =
-      compile_resource([Aikido.Ash.Agent], """
+      compile_resource([Aikido.Agent.Extension], """
       agent do
         name "shadowed_state"
         schema do
@@ -113,7 +113,7 @@ defmodule AikidoTest.AshVerifiersTest do
 
   test "middleware behaviour validation uses Spark after compilation" do
     output =
-      compile_resource([Aikido.Ash.Agent], """
+      compile_resource([Aikido.Agent.Extension], """
       agent do
         name "invalid_middleware"
         middleware [String]
@@ -126,7 +126,7 @@ defmodule AikidoTest.AshVerifiersTest do
 
   test "team topology is reserved for startup configuration" do
     output =
-      compile_resource([Aikido.Ash.Agent, Aikido.Ash.Team], """
+      compile_resource([Aikido.Agent.Extension, Aikido.Team.Extension], """
       agent do
         name "reserved_topology"
         schema do
@@ -146,7 +146,7 @@ defmodule AikidoTest.AshVerifiersTest do
 
   test "identity cannot be used as the agent state path" do
     output =
-      compile_resource([Aikido.Ash.Agent], """
+      compile_resource([Aikido.Agent.Extension], """
       agent do
         name "reserved_identity"
         path :id
@@ -159,7 +159,7 @@ defmodule AikidoTest.AshVerifiersTest do
   test "Ash enforces uniqueness across schema and resource attributes" do
     error =
       assert_raise Spark.Error.DslError, fn ->
-        compile_resource([Aikido.Ash.Agent], """
+        compile_resource([Aikido.Agent.Extension], """
         agent do
           name "duplicate_fields"
           schema do
@@ -190,7 +190,7 @@ defmodule AikidoTest.AshVerifiersTest do
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
         Code.compile_string("""
         defmodule #{inspect(module)} do
-          use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+          use Ash.Domain, extensions: [Aikido.Domain.Extension], validate_config_inclusion?: false
 
           agents do
             agent :slice, AikidoTest.AshFixtures.CounterSlice
@@ -199,7 +199,7 @@ defmodule AikidoTest.AshVerifiersTest do
         """)
       end)
 
-    assert output =~ "Domain agents must use the Aikido.Ash.Agent extension"
+    assert output =~ "Domain agents must use the Aikido.Agent.Extension extension"
   end
 
   defp compile_resource(extensions, body, opts \\ []) do

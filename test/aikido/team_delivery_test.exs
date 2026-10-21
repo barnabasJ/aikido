@@ -28,7 +28,7 @@ end
 defmodule Aikido.TeamDeliveryTest.Worker do
   use Ash.Resource,
     domain: Aikido.TeamDeliveryTest.Domain,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
 
   agent do
     name "delivery_worker"
@@ -43,7 +43,7 @@ end
 defmodule Aikido.TeamDeliveryTest.Team do
   use Ash.Resource,
     domain: Aikido.TeamDeliveryTest.Domain,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team, Aikido.Ash.AI]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension, Aikido.AI.Extension]
 
   agent do
     name "delivery_team"
@@ -60,7 +60,7 @@ defmodule Aikido.TeamDeliveryTest.Team do
 end
 
 defmodule Aikido.TeamDeliveryTest.Domain do
-  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Ash.Domain]
+  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Domain.Extension]
 
   agents do
     agent :delivery, Aikido.TeamDeliveryTest.Team
@@ -320,7 +320,7 @@ defmodule Aikido.TeamDeliveryTest do
   end
 
   test "restoration marks interrupted tasks explicitly instead of replaying effects" do
-    state = %Aikido.Ash.Team.State{
+    state = %Aikido.Team.Slice{
       tasks: %{
         "job" => %{
           id: "job",
@@ -334,7 +334,7 @@ defmodule Aikido.TeamDeliveryTest do
       }
     }
 
-    restored = Aikido.Ash.Team.State.reinstate(state)
+    restored = Aikido.Team.Slice.reinstate(state)
     assert restored.tasks["job"].status == :failed
     assert restored.tasks["job"].result == :interrupted
     assert restored.recovered_tasks == ["job"]

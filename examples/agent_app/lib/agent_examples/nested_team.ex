@@ -2,7 +2,7 @@ defmodule AgentExamples.NestedTeam do
   @moduledoc "An extensible mixed tree: agents can own agents or teams, and teams can nest recursively."
   use Ash.Resource,
     domain: AgentExamples.Agents,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
 
   agent do
     name "example_nested_team"

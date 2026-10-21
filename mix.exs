@@ -49,8 +49,9 @@ defmodule Aikido.MixProject do
             # These finite names come from compiled Spark declarations, not runtime input.
             # Exact generated anchors fail closed if compiler output changes.
             {:unsafe_input,
-             {Aikido.Ash.Agent.Transformers.Build, :"-resolve_local_actions/3-fun-1-", 3}},
-            {:unsafe_input, {Aikido.Ash.Domain.Transformers.Build, :"-register/2-fun-1-", 2}},
+             {Aikido.Agent.Extension.Transformers.Build, :"-resolve_local_actions/3-fun-1-", 3}},
+            {:unsafe_input,
+             {Aikido.Domain.Extension.Transformers.Build, :"-register/2-fun-1-", 2}},
             # Reads our trusted, compressed backend snapshots, including native callbacks.
             {:unsafe_input, {Aikido.Durable.AgentServer, :load_state, 2}},
             # Task-capacity fallback kills only the already retired scheduler PID.
@@ -123,10 +124,12 @@ defmodule Aikido.MixProject do
       formatters: ["html"],
       skip_undefined_reference_warnings_on: ["CHANGELOG.md", "LICENSE"],
       groups_for_modules: [
-        "Ash Integration": [~r/^Aikido\.Ash(?:\.|$)/],
+        "Resource Extensions": [~r/^Aikido\.(?:Agent|Slice|Domain)\.Extension(?:\.|$)/],
         Durability: [~r/^Aikido\.Durable(?:\.|$)/],
         "Actions and Effects": [~r/^Aikido\.(?:Actions|Directives)(?:\.|$)/],
-        Slices: [~r/^Aikido\.(?:Slice|Slices)(?:\.|$)/],
+        Features: [
+          ~r/^Aikido\.(?:FSM|AiReact|AiWorker|AI|Identity|Memory|Thread|Todo|Team)(?:\.|$)/
+        ],
         Runtime: [Aikido, Aikido.Agent, Aikido.AgentServer, ~r/^Aikido\.AgentServer\./],
         "Types and DSL": [~r/^Aikido\.(?:Types|Dsl)(?:\.|$)/],
         Observability: [~r/^Aikido\.(?:Observe|Debug|Telemetry|Tracing)(?:\.|$)/]
@@ -192,8 +195,8 @@ defmodule Aikido.MixProject do
   defp aliases do
     dsl_extensions =
       Enum.join(
-        ~w(Aikido.Instance.Dsl Aikido.Ash.Agent Aikido.Ash.Slice
-           Aikido.Ash.Team Aikido.Ash.AI Aikido.Ash.Domain
+        ~w(Aikido.Instance.Dsl Aikido.Agent.Extension Aikido.Slice.Extension
+           Aikido.Team.Extension Aikido.AI.Extension Aikido.Domain.Extension
            Ash.TypedStruct.Dsl Aikido.Signal.Dsl),
         ","
       )

@@ -15,10 +15,11 @@ Preserve tagged tuple and structured error contracts at public boundaries.
 
 ## Layout
 
-- `lib/aikido/ash/`: resource/domain extensions, generic actions, and team coordination.
+- `lib/aikido/agent/`, `slice/`, and `domain/`: native resource/domain extensions and agent commands.
 - `lib/aikido/agent_server/`: runtime callbacks and effect execution.
 - `lib/aikido/durable/`: DurableServer integration and snapshot handling.
-- `lib/aikido/actions/`, `lib/aikido/directives/`, and `lib/aikido/slices/`: reusable behavior.
+- Feature folders such as `lib/aikido/fsm/`, `ai_react/`, and `team/`: each feature’s slice, extension, actions, signals, directives, and types.
+- `lib/aikido/actions/` and `lib/aikido/directives/`: behavior shared by features.
 - `test/`: pure, integration, and runtime tests with shared support helpers.
 - `examples/agent_app/`: the runnable Phoenix/LiveView example application.
 - `guides/`: the current Ash, teams, runtime, and partition guides.

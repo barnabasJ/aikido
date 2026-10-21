@@ -37,7 +37,7 @@ defmodule AgentExamples.AI.Tools.Context do
            |> Ash.ActionInput.for_action(:inspect, %{agent: caller.agent_id}, opts)
            |> Ash.run_action(opts) do
       cond do
-        !is_nil(Aikido.Ash.Agent.Info.team_config(resource)) ->
+        !is_nil(Aikido.Agent.Info.team_config(resource)) ->
           {:ok, record, nil, record}
 
         caller.parent && caller.parent.meta[:team_resource] ->

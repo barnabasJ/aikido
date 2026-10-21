@@ -201,7 +201,7 @@ defmodule Aikido.NativeRuntimeScopeTest.Resource do
 end
 
 defmodule Aikido.NativeRuntimeScopeTest.Team do
-  use Aikido.Agent, extensions: [Aikido.Ash.Team]
+  use Aikido.Agent, extensions: [Aikido.Team.Extension]
 
   agent do
     name "native_scope_team"

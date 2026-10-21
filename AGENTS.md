@@ -35,12 +35,12 @@ does not permit other runtime effects inside reducers.
 - `mix docs` (local docs)
 
 ## Architecture Snapshot
-- `Aikido.Agent`: immutable identity/state struct and a convenience macro over `Ash.Resource` with `Aikido.Ash.Agent`
-- `Aikido.Ash.Agent`: resource extension that compiles state declarations into attributes and exposes generic lifecycle/signal actions
-- `Aikido.Ash.Domain`: domain interfaces named `<agent>_<action>`; start returns a reference, signal commands return processing receipts, and inspect/list explicitly read live state
-- `Aikido.Ash.Commands`: dedicated native I/O implementations for public lifecycle, inspection, list and signal commands; `Aikido.Ash.Runtime` contains only shared helpers
-- `Aikido.Ash.Slice`: embedded resource extension; slices own their attributes, native reducer actions and routes
-- `Aikido.Ash.Team`: topology and coordination on an agent resource, including nested teams and dynamic workers
+- `Aikido.Agent`: immutable identity/state struct and a convenience macro over `Ash.Resource` with `Aikido.Agent.Extension`
+- `Aikido.Agent.Extension`: resource extension that compiles state declarations into attributes and exposes generic lifecycle/signal actions
+- `Aikido.Domain.Extension`: domain interfaces named `<agent>_<action>`; start returns a reference, signal commands return processing receipts, and inspect/list explicitly read live state
+- `Aikido.Agent.Commands`: dedicated native I/O implementations for public lifecycle, inspection, list and signal commands; `Aikido.Agent.Runtime` contains only shared helpers
+- `Aikido.Slice.Extension`: embedded resource extension; slices own their attributes, native reducer actions and routes
+- `Aikido.Team.Extension`: topology and coordination on an agent resource, including nested teams and dynamic workers
 - `Aikido.AgentServer`: signal routing, native Ash reducer execution, directive execution and runtime bookkeeping, hosted by DurableServer
 - `Aikido.Directive`: Spark/Ash typed-struct host and execution behaviour; concrete descriptors live under `Aikido.Directives` or their owning feature
 - `Aikido.Types.ActionResult`: typed reducer result containing next state and validated directives
@@ -56,7 +56,7 @@ does not permit other runtime effects inside reducers.
 - Supply AI tools as Ash AI tool names plus native `tool_options`. Tool setup builds descriptions and registry once per run. Prepared callbacks are transient and are rebuilt for a new run.
 - Internal messages use `Aikido.Signal`; define typed payloads with its Spark `signal`/`schema` DSL. Scope and native tracer context travel directly on the envelope. Pure reducers return literals; constructors that generate IDs or timestamps belong at I/O boundaries. Deliver to agents directly; publish native Ash notifications through directives after state adoption.
 - The purity rules apply to agent/slice state reducers. Public lifecycle/signal adapters and tool implementations are I/O boundaries, not reducers; invoke tools through directives or supervised work rather than from a reducer.
-- Put external domain command implementations in `Aikido.Ash.Commands` and `ash/commands/`. Their runtime I/O stays outside the reducer pipeline; agent/slice `Actions` and `actions/` contain reducers. Tool implementations remain separate I/O boundaries.
+- Put external domain command implementations in `Aikido.Agent.Commands` and `agent/commands/`. Their runtime I/O stays outside the reducer pipeline; agent/slice `Actions` and `actions/` contain reducers. Tool implementations remain separate I/O boundaries.
 
 ## Persistence and Completion
 - DurableServer is the sole persistence/activation path. Do not introduce parallel storage adapters or an instance manager.
@@ -67,6 +67,7 @@ does not permit other runtime effects inside reducers.
 - Subscribe before triggering asynchronous work. Use one-shot subscriptions or `Aikido.AgentServer.call_until/5` from external callers. Never poll for completion, and never wait for completion inside directive execution.
 
 ## Source organization
+- Use feature-first namespaces and paths: `Aikido.FSM.Slice` in `fsm/slice.ex`, with sibling `Actions`, `Signals`, `Directives`, `Changes` and `Types`. Put Spark extensions at `<Feature>.Extension` with their transformers and verifiers beneath them.
 - Keep feature-specific contracts and implementation beneath their owning resource or feature. Put native implementations in `Actions` and `actions/`, concrete signal definitions in `Signals` and `signals/`, and effects in `Directives` and `directives/`. Keep shared helpers beside these folders and reusable signal infrastructure under `Aikido.Signal`.
 - Keep each Ash extension's metadata, transformers and verifiers beneath that extension. Retain genuinely reusable actions, directives and runtime contracts in their shared subsystems.
 - Place example resources beside their own implementation and signal files. Keep source-viewer paths and categories aligned with the declared native contracts when files move.

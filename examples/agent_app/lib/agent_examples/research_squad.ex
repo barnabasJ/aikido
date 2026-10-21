@@ -2,7 +2,7 @@ defmodule AgentExamples.ResearchSquad do
   @moduledoc "A dynamically spawned AI team whose members use the same Lua management tools."
   use Ash.Resource,
     domain: AgentExamples.Agents,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension, Aikido.Team.Extension]
 
   agent do
     name "example_research_squad"

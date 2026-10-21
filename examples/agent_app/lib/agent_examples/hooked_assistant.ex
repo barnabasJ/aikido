@@ -5,7 +5,7 @@ defmodule AgentExamples.HookedAssistant do
   """
   use Ash.Resource,
     domain: AgentExamples.Agents,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
 
   agent do
     name "example_hooked_assistant"

@@ -37,7 +37,7 @@ flowchart TD
 
 ## One outside interface
 
-`Aikido.Ash.AI` contributes the same `ask` and `cancel` generic Ash actions to a
+`Aikido.AI.Extension` contributes the same `ask` and `cancel` generic Ash actions to a
 single agent and a team. `ai do` supplies defaults, and callers can override
 `model`, `client`, `system_prompt`, `max_iterations`, `tools`, and `tool_context`
 through the generic `start` action arguments. `client` defaults to `ReqLLM.Generation`,

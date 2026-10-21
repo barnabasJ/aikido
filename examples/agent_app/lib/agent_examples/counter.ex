@@ -1,6 +1,6 @@
 defmodule AgentExamples.Counter do
   @moduledoc "Typed signals, a shared union handler, and a wildcard signal counter."
-  use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Ash.Agent]
+  use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Agent.Extension]
 
   agent do
     name "example_counter"

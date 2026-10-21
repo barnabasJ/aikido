@@ -4,7 +4,7 @@ defmodule Aikido.Dsl.SliceMountPathTest.RenamedMemoryHost do
 
   agent do
     name "renamed_memory_host"
-    slice :short_term, Aikido.Slices.Memory
+    slice :short_term, Aikido.Memory.Slice
   end
 end
 
@@ -14,7 +14,7 @@ defmodule Aikido.Dsl.SliceMountPathTest.MemoryHost do
 
   agent do
     name "memory_host"
-    slice :memory, Aikido.Slices.Memory
+    slice :memory, Aikido.Memory.Slice
   end
 end
 
@@ -25,18 +25,18 @@ defmodule Aikido.Dsl.SliceMountPathTest do
   describe("agent-declared mount path") do
     test "uses an agent-declared path independently of the slice name" do
       instances =
-        Aikido.Ash.Agent.Info.slice_instances(Aikido.Dsl.SliceMountPathTest.RenamedMemoryHost)
+        Aikido.Agent.Info.slice_instances(Aikido.Dsl.SliceMountPathTest.RenamedMemoryHost)
 
-      memory = Enum.find(instances, &(&1.module == Aikido.Slices.Memory))
+      memory = Enum.find(instances, &(&1.module == Aikido.Memory.Slice))
       assert memory
       assert memory.path == :short_term
     end
 
     test "uses the explicit agent slice mount path" do
       instances =
-        Aikido.Ash.Agent.Info.slice_instances(Aikido.Dsl.SliceMountPathTest.MemoryHost)
+        Aikido.Agent.Info.slice_instances(Aikido.Dsl.SliceMountPathTest.MemoryHost)
 
-      memory = Enum.find(instances, &(&1.module == Aikido.Slices.Memory))
+      memory = Enum.find(instances, &(&1.module == Aikido.Memory.Slice))
       assert memory
       assert memory.path == :memory
     end
@@ -44,9 +44,9 @@ defmodule Aikido.Dsl.SliceMountPathTest do
 
   describe("Slice.Instance.new/2 path arg") do
     test "uses the supplied path" do
-      instance = Aikido.Ash.Slice.Instance.new(Aikido.Slices.Memory, :short_term)
+      instance = Aikido.Slice.Instance.new(Aikido.Memory.Slice, :short_term)
       assert instance.path == :short_term
-      assert instance.module == Aikido.Slices.Memory
+      assert instance.module == Aikido.Memory.Slice
     end
   end
 end

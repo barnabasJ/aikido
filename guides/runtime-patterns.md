@@ -1,8 +1,8 @@
 # Choosing a Runtime Pattern
 
-Use Ash agent resources (`Aikido.Ash.Agent`) for typed agent state and domain actions.
-Add `Aikido.Ash.Team` when an agent manages a named topology of workers or nested
-teams. Add `Aikido.Ash.AI` for model turns and dynamically supplied tools.
+Use Ash agent resources (`Aikido.Agent.Extension`) for typed agent state and domain actions.
+Add `Aikido.Team.Extension` when an agent manages a named topology of workers or nested
+teams. Add `Aikido.AI.Extension` for model turns and dynamically supplied tools.
 
 The default `Aikido` supervision tree uses DurableServer for activation, snapshots,
 and recovery. Configure its backend with `durable: [...]`. Use `Aikido.Durable`
@@ -329,8 +329,8 @@ options %{
 }
 ```
 
-Options use the `Aikido.Slices.AiReact.Options` typed struct. Hook decisions likewise use
-`Aikido.Slices.AiReact.Hooks.Decision`; neither requires a resource or create action. Hook
+Options use the `Aikido.AiReact.Options` typed struct. Hook decisions likewise use
+`Aikido.AiReact.Hooks.Decision`; neither requires a resource or create action. Hook
 configuration retains its embedded resource so native casting handles an
 omitted or nil `:function` request callback correctly.
 A per-request options value
@@ -384,7 +384,7 @@ calls, Lua VMs and tool side effects are not replayed automatically.
 
 ### Optional todos
 
-Mount `slice :todos, Aikido.Slices.Todo` to expose `todo_add`, `todo_activate`,
+Mount `slice :todos, Aikido.Todo.Slice` to expose `todo_add`, `todo_activate`,
 `todo_complete`, `todo_block` and `todo_remove` on the domain interface. Each
 item has a caller-supplied stable ID, text, blocking flag, metadata, status and
 completion result. Repeated completion does not replace existing evidence.

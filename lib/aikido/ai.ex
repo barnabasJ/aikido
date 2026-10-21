@@ -1,9 +1,9 @@
 defmodule Aikido.AI do
   @moduledoc """
-  Public API for ReAct agents built on `Aikido.Slices.AiReact`.
+  Public API for ReAct agents built on `Aikido.AiReact.Slice`.
 
-  Works against any `pid` whose agent uses `Aikido.Ash.AI` or explicitly
-  mounts `Aikido.Slices.AiReact` at `:ai`. The slice owns run configuration
+  Works against any `pid` whose agent uses `Aikido.AI.Extension` or explicitly
+  mounts `Aikido.AiReact.Slice` at `:ai`. The slice owns run configuration
   (model, tools, system_prompt, max_iterations, llm_opts), seeded from the
   AI configuration or slice mount options; per-call opts override.
 
@@ -27,7 +27,7 @@ defmodule Aikido.AI do
   ## Example
 
       defmodule MyApp.SupportAgent do
-        use Ash.Resource, domain: MyApp.Agents, extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+        use Ash.Resource, domain: MyApp.Agents, extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
 
         agent do
           name "support"
@@ -35,7 +35,7 @@ defmodule Aikido.AI do
       end
 
       defmodule MyApp.Agents do
-        use Ash.Domain, extensions: [Aikido.Ash.Domain]
+        use Ash.Domain, extensions: [Aikido.Domain.Extension]
 
         agents do
           agent :support, MyApp.SupportAgent

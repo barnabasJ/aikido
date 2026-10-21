@@ -38,7 +38,7 @@ defmodule Aikido.RuntimeNativeContractTest.ScopedWorker do
   use Ash.Resource,
     domain: Aikido.RuntimeDomain,
     validate_domain_inclusion?: false,
-    extensions: [Aikido.Ash.Agent],
+    extensions: [Aikido.Agent.Extension],
     authorizers: [Ash.Policy.Authorizer]
 
   agent do
@@ -56,7 +56,7 @@ defmodule Aikido.RuntimeNativeContractTest.ScopedTeam do
   use Ash.Resource,
     domain: Aikido.RuntimeDomain,
     validate_domain_inclusion?: false,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
 
   agent do
     name "scoped_team"

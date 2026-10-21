@@ -1,6 +1,6 @@
 defmodule AgentExamples.Notebook do
   @moduledoc "Own state plus a mounted, embedded Ash slice."
-  use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Ash.Agent]
+  use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Agent.Extension]
 
   agent do
     name "example_notebook"

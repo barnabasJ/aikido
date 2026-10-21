@@ -41,7 +41,7 @@ defmodule Aikido.Directives do
   - `Aikido.Directives.Reply` — reply to a synchronous call
 
   Slice-owned directives live next to their slice (e.g.
-  `Aikido.Slices.AiReact.Directives.LLMCall`).
+  `Aikido.AiReact.Directives.LLMCall`).
 
   ## Usage
 

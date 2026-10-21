@@ -303,7 +303,7 @@ defmodule AikidoTest.TypedRoutesTest.PublicMounted do
 end
 
 defmodule AikidoTest.TypedRoutesTest.Domain do
-  use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+  use Ash.Domain, extensions: [Aikido.Domain.Extension], validate_config_inclusion?: false
 
   agents do
     agent :counter, AikidoTest.TypedRoutesTest.PublicMounted

@@ -2,7 +2,7 @@ defmodule Aikido.Agent do
   @moduledoc """
   Immutable agent identity and typed state.
 
-  Declare agents as Ash resources with `Aikido.Ash.Agent`. The convenience
+  Declare agents as Ash resources with `Aikido.Agent.Extension`. The convenience
   `use Aikido.Agent` merges that extension into native `Ash.Resource` options.
   Pass `domain: MyApp.Agents` for your application's domain. The shared runtime
   domain is the default; ordinary Ash domain-inclusion validation stays enabled.
@@ -15,7 +15,7 @@ defmodule Aikido.Agent do
     opts =
       opts
       |> Keyword.put_new(:domain, Aikido.RuntimeDomain)
-      |> Keyword.update(:extensions, [Aikido.Ash.Agent], &[Aikido.Ash.Agent | &1])
+      |> Keyword.update(:extensions, [Aikido.Agent.Extension], &[Aikido.Agent.Extension | &1])
 
     quote do
       use Ash.Resource, unquote(opts)

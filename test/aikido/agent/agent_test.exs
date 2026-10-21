@@ -24,21 +24,21 @@ defmodule AikidoTest.AgentTest do
 
   describe("module definition") do
     test "defines metadata accessors via Info" do
-      assert Map.get(Aikido.Ash.Agent.Info.agent_options(AikidoTest.TestAgents.Basic), :name) ==
+      assert Map.get(Aikido.Agent.Info.agent_options(AikidoTest.TestAgents.Basic), :name) ==
                "basic_agent"
 
       assert Map.get(
-               Aikido.Ash.Agent.Info.agent_options(AikidoTest.TestAgents.Basic),
+               Aikido.Agent.Info.agent_options(AikidoTest.TestAgents.Basic),
                :description
              ) == "A basic test agent"
     end
 
     test "minimal agent has default values" do
-      assert Map.get(Aikido.Ash.Agent.Info.agent_options(AikidoTest.TestAgents.Minimal), :name) ==
+      assert Map.get(Aikido.Agent.Info.agent_options(AikidoTest.TestAgents.Minimal), :name) ==
                "minimal_agent"
 
       assert Map.get(
-               Aikido.Ash.Agent.Info.agent_options(AikidoTest.TestAgents.Minimal),
+               Aikido.Agent.Info.agent_options(AikidoTest.TestAgents.Minimal),
                :description
              ) == nil
 
@@ -48,12 +48,12 @@ defmodule AikidoTest.AgentTest do
 
   describe("signal routes configuration") do
     test "agent route declarations are exposed via Agent.Info.signal_routes/1" do
-      routes = Aikido.Ash.Agent.Info.signal_routes(AikidoTest.AgentTest.ConfiguredRoutesAgent)
+      routes = Aikido.Agent.Info.signal_routes(AikidoTest.AgentTest.ConfiguredRoutesAgent)
       assert routes == [{"configured.route", {AikidoTest.TestActions, :optional_input}, 0}]
     end
 
     test "Agent.Info.signal_routes/1 returns configured routes for agents with multiple routes" do
-      routes = Aikido.Ash.Agent.Info.signal_routes(AikidoTest.AgentTest.ExtendingRoutesAgent)
+      routes = Aikido.Agent.Info.signal_routes(AikidoTest.AgentTest.ExtendingRoutesAgent)
       assert {"base.route", {AikidoTest.TestActions, :optional_input}, 0} in routes
       assert {"extended.route", {AikidoTest.TestActions, :basic_action}, 0} in routes
       assert length(routes) == 2

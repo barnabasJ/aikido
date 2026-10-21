@@ -1,0 +1,44 @@
+defmodule Aikido.Todo.Items do
+  @moduledoc false
+
+  def find(input), do: Enum.find(input.arguments.state.items, &(&1.id == input.arguments.id))
+
+  def append(input, item, effects) do
+    item = cast_item(item)
+    commit(input, input.arguments.state.items ++ [item], %{id: item.id, item: item}, effects)
+  end
+
+  def replace(input, item) do
+    item = cast_item(item)
+
+    items =
+      Enum.map(input.arguments.state.items, fn existing ->
+        if existing.id == item.id, do: item, else: existing
+      end)
+
+    commit(input, items, %{id: item.id, item: item})
+  end
+
+  def commit(input, items, changed, effects \\ []) do
+    state = input.arguments.state
+
+    signal = %Aikido.Signal{
+      id: nil,
+      type: "aikido.todo.changed",
+      data: changed,
+      source: "/aikido"
+    }
+
+    Aikido.Types.ActionResult.new(
+      state: %{state | items: items, revision: state.revision + 1},
+      directives: [
+        Aikido.Directives.emit_to_pid(signal, input.context.aikido.agent_pid) | effects
+      ]
+    )
+  end
+
+  defp cast_item(%_{} = item), do: item
+
+  defp cast_item(item),
+    do: Aikido.Todo.Item.new!(Map.reject(item, fn {_, value} -> is_nil(value) end))
+end

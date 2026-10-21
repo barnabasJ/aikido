@@ -37,7 +37,7 @@ defmodule Aikido.Dsl.NativeRoutesTest do
   use ExUnit.Case, async: true
 
   test "slice predicates and priorities survive native route expansion" do
-    [route] = Aikido.Ash.Agent.Info.routes(Aikido.Dsl.NativeRoutesTest.Agent)
+    [route] = Aikido.Agent.Info.routes(Aikido.Dsl.NativeRoutesTest.Agent)
     assert {"gated.run", predicate, {Aikido.Dsl.NativeRoutesTest.Slice, :reduce}, -12} = route
     assert is_function(predicate, 1)
     router = Aikido.Signal.Router.new!([route])

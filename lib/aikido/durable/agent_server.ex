@@ -262,12 +262,12 @@ defmodule Aikido.Durable.AgentServer do
 
   defp durable_domain_state(state) do
     case state[:team] do
-      %Aikido.Ash.Team.State{} = team ->
+      %Aikido.Team.Slice{} = team ->
         Map.put(state, :team, %{
           team
           | members: %{},
             incarnations: %{},
-            operation: %Aikido.Ash.Team.State{}.operation
+            operation: %Aikido.Team.Slice{}.operation
         })
 
       _ ->
@@ -278,7 +278,7 @@ defmodule Aikido.Durable.AgentServer do
   defp maybe_reconcile(runtime) do
     resource = runtime.agent_module
 
-    if Aikido.Ash.Agent.Info.team_config(resource) do
+    if Aikido.Agent.Info.team_config(resource) do
       send(self(), {:signal, Aikido.Signal.new!("aikido.ash.team.reconcile", %{})})
     end
   end

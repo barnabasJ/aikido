@@ -57,7 +57,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest.Counter do
 end
 
 defmodule Aikido.Dsl.ContractRegressionsTest.NodesTeam do
-  use Aikido.Agent, extensions: [Aikido.Ash.Team]
+  use Aikido.Agent, extensions: [Aikido.Team.Extension]
 
   agent do
     name "nodes_team"
@@ -150,7 +150,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
 
   test "local alternate routes and earlier shared signals keep the reducer alias" do
     resource = Aikido.Dsl.ContractRegressionsTest.Counter
-    routes = Aikido.Ash.Agent.Info.signal_routes(resource)
+    routes = Aikido.Agent.Info.signal_routes(resource)
     targets = for {type, target, _priority} <- routes, type != "contract.remote", do: target
 
     assert {"contract.remote", {Aikido.Dsl.ContractRegressionsTest.RemoteSlice, :increment}, 0} in routes
@@ -194,7 +194,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
     resource = Aikido.Dsl.ContractRegressionsTest.Counter
 
     assert {:ok, topology} =
-             Aikido.Ash.Team.Topology.build(
+             Aikido.Team.Topology.build(
                %{nodes: %{resource: resource}, sibling: %{resource: resource}},
                Aikido.Dsl.ContractRegressionsTest.Runtime
              )
@@ -214,11 +214,11 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
 
   test "distinct schedules for one slice action own separate jobs and dispatch once per occurrence" do
     resource = Aikido.Dsl.ContractRegressionsTest.ScheduledAgent
-    specs = Aikido.Ash.Agent.Info.schedules(resource)
+    specs = Aikido.Agent.Info.schedules(resource)
     assert length(specs) == 2
     assert length(Enum.uniq_by(specs, & &1.job_id)) == 2
 
-    routes = Aikido.Ash.Agent.Info.routes(resource)
+    routes = Aikido.Agent.Info.routes(resource)
     assert [{"clock.__schedule__.tick", _, _}] = routes
     reference = resource |> Ash.ActionInput.for_action(:start, %{}) |> Ash.run_action!()
     assert {:ok, jobs} = Aikido.AgentServer.state(reference.pid, &{:ok, &1.cron_jobs})
@@ -244,14 +244,14 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
 
   test "slice schedule identity includes every normalized behavior field" do
     target = {Aikido.Dsl.ContractRegressionsTest.ScheduledSlice, :tick}
-    instance = %Aikido.Ash.Slice.Instance{module: elem(target, 0), path: :clock}
-    [base | _] = Aikido.Ash.Slice.Schedules.expand_schedules(instance)
+    instance = %Aikido.Slice.Instance{module: elem(target, 0), path: :clock}
+    [base | _] = Aikido.Slice.Schedules.expand_schedules(instance)
 
     assert base.job_id ==
              {:slice_schedule, :clock, {target, "@yearly", "Etc/UTC", base.signal_type, %{}}}
 
     variants =
-      Aikido.Ash.Slice.Schedules.expand_schedules(%Aikido.Ash.Slice.Instance{
+      Aikido.Slice.Schedules.expand_schedules(%Aikido.Slice.Instance{
         module: Aikido.Dsl.ContractRegressionsTest.ScheduleVariants,
         path: :clock
       })
@@ -311,7 +311,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
     end
     """)
 
-    assert Enum.map(Aikido.Ash.Agent.Info.schedules(module), & &1.job_id) == [
+    assert Enum.map(Aikido.Agent.Info.schedules(module), & &1.job_id) == [
              {:agent_schedule, "distinct_schedules", :first},
              {:agent_schedule, "distinct_schedules", :second},
              {:agent_schedule, "distinct_schedules", false},

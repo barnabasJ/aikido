@@ -1,7 +1,7 @@
 defmodule AikidoTest.AshTeamTest do
   use AikidoTest.Case, async: false
   alias AikidoTest.AshFixtures.{Counter, Domain, DynamicTeam}
-  alias Aikido.Ash.Team.Topology
+  alias Aikido.Team.Topology
 
   setup do
     start_supervised!(
@@ -14,14 +14,14 @@ defmodule AikidoTest.AshTeamTest do
   test "team commands derive their public arguments from the owning reducer" do
     for name <- [:add_member, :send] do
       public = Ash.Resource.Info.action(DynamicTeam, name)
-      reducer = Ash.Resource.Info.action(Aikido.Ash.Team.State, name)
+      reducer = Ash.Resource.Info.action(Aikido.Team.Slice, name)
 
       assert Enum.map(public.arguments, & &1.name) -- [:agent] ==
                Enum.map(reducer.arguments, & &1.name) -- [:state]
     end
 
     input =
-      Ash.ActionInput.for_action(Aikido.Ash.Team.State, :add_member, %{
+      Ash.ActionInput.for_action(Aikido.Team.Slice, :add_member, %{
         state: %{},
         member: "worker",
         activation: "lazy"
@@ -33,7 +33,7 @@ defmodule AikidoTest.AshTeamTest do
     assert input.arguments.depends_on == []
 
     assert {:error, %Ash.Error.Invalid{}} =
-             Aikido.Ash.Team.State
+             Aikido.Team.Slice
              |> Ash.ActionInput.for_action(:add_member, %{
                state: %{},
                member: "worker",
@@ -349,7 +349,7 @@ defmodule AikidoTest.AshTeamTest do
     assert {:error, _} =
              Topology.build(%{"missing" => %{resource: String}}, AikidoTest.AshFixtures.Instance)
 
-    config = Aikido.Ash.Agent.Info.team_config(DynamicTeam)
+    config = Aikido.Agent.Info.team_config(DynamicTeam)
     assert config.max_members == 5
     assert config.workers.counter.max_members == 2
   end

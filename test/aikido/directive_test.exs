@@ -47,13 +47,13 @@ defmodule Aikido.DirectiveTest do
   end
 
   test "the directive host generates the public struct type" do
-    assert {:ok, types} = Code.Typespec.fetch_types(Aikido.Slices.AiReact.Directives.ToolExec)
+    assert {:ok, types} = Code.Typespec.fetch_types(Aikido.AiReact.Directives.ToolExec)
 
     assert Enum.any?(types, fn
              {:type, {:t, {:type, _, :map, fields}, []}} ->
                Enum.any?(fields, fn
                  {:type, _, :map_field_exact,
-                  [{:atom, _, :__struct__}, {:atom, _, Aikido.Slices.AiReact.Directives.ToolExec}]} ->
+                  [{:atom, _, :__struct__}, {:atom, _, Aikido.AiReact.Directives.ToolExec}]} ->
                    true
 
                  _ ->

@@ -2,7 +2,7 @@ defmodule AgentExamples.ResearchTeam do
   @moduledoc "The team is the orchestrator: fixed members and bounded dynamic subworkers."
   use Ash.Resource,
     domain: AgentExamples.Agents,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension, Aikido.Team.Extension]
 
   agent do
     name "example_research_team"

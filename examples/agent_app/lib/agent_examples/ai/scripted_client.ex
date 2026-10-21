@@ -6,7 +6,7 @@ defmodule AgentExamples.AI.ScriptedClient do
   analyst (which starts and delegates to its own helper), then asks the fixed
   reviewer and the specialist. Ordinary requests use text_stats and team_roster.
   """
-  @behaviour Aikido.Slices.AiReact.Client
+  @behaviour Aikido.AiReact.Client
 
   @impl true
   def generate_text(_model, messages, options) do

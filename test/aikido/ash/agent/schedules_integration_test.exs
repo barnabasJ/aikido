@@ -89,19 +89,19 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest do
 
   describe("agent with schedules") do
     test "Info.schedules/1 typespec includes slice and agent schedule specs" do
-      module = Aikido.Ash.Agent.Info
+      module = Aikido.Agent.Info
       {:ok, specs} = Code.Typespec.fetch_specs(module)
       {{:schedules, 1}, [spec]} = List.keyfind(specs, {:schedules, 1}, 0)
 
       rendered = :schedules |> Code.Typespec.spec_to_quoted(spec) |> Macro.to_string()
-      assert String.contains?(rendered, "Aikido.Ash.Slice.Schedules.schedule_spec()")
-      assert String.contains?(rendered, "Aikido.Ash.Agent.Schedules.schedule_spec()")
+      assert String.contains?(rendered, "Aikido.Slice.Schedules.schedule_spec()")
+      assert String.contains?(rendered, "Aikido.Agent.Schedules.schedule_spec()")
       assert String.contains?(rendered, "|")
     end
 
     test "Info.schedules/1 includes agent schedules" do
       schedules =
-        Aikido.Ash.Agent.Info.schedules(AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent)
+        Aikido.Agent.Info.schedules(AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent)
 
       agent_schedules =
         Enum.filter(schedules, fn spec -> match?({:agent_schedule, _, _}, spec.job_id) end)
@@ -111,7 +111,7 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest do
 
     test "agent schedules have correct job_id namespacing" do
       schedules =
-        Aikido.Ash.Agent.Info.schedules(AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent)
+        Aikido.Agent.Info.schedules(AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent)
 
       agent_schedule =
         Enum.find(schedules, fn spec -> match?({:agent_schedule, _, _}, spec.job_id) end)
@@ -121,7 +121,7 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest do
 
     test "agent schedules have correct signal_type" do
       schedules =
-        Aikido.Ash.Agent.Info.schedules(AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent)
+        Aikido.Agent.Info.schedules(AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent)
 
       agent_schedule =
         Enum.find(schedules, fn spec -> match?({:agent_schedule, _, _}, spec.job_id) end)
@@ -131,7 +131,7 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest do
 
     test "agent with no schedules has no agent schedules in schedules" do
       schedules =
-        Aikido.Ash.Agent.Info.schedules(AikidoTest.Agent.SchedulesIntegrationTest.NoScheduleAgent)
+        Aikido.Agent.Info.schedules(AikidoTest.Agent.SchedulesIntegrationTest.NoScheduleAgent)
 
       agent_schedules =
         Enum.filter(schedules, fn spec -> match?({:agent_schedule, _, _}, spec.job_id) end)
@@ -141,9 +141,7 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest do
 
     test "multiple schedules are all included" do
       schedules =
-        Aikido.Ash.Agent.Info.schedules(
-          AikidoTest.Agent.SchedulesIntegrationTest.MultiScheduleAgent
-        )
+        Aikido.Agent.Info.schedules(AikidoTest.Agent.SchedulesIntegrationTest.MultiScheduleAgent)
 
       agent_schedules =
         Enum.filter(schedules, fn spec -> match?({:agent_schedule, _, _}, spec.job_id) end)

@@ -9,7 +9,7 @@ defmodule AgentExamples.AI.Tools.Actions.TeamRoster do
       members = team.team.members |> Map.keys() |> Enum.map(&to_string/1) |> Enum.sort()
 
       templates =
-        Aikido.Ash.Agent.Info.team_config(team.__struct__).workers
+        Aikido.Agent.Info.team_config(team.__struct__).workers
         |> Map.keys()
         |> Enum.map(&to_string/1)
         |> Enum.sort()

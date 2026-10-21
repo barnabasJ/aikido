@@ -1,6 +1,6 @@
 defmodule AikidoTest.AshTeamTopologyTest do
   use ExUnit.Case, async: true
-  alias Aikido.Ash.Team.Topology
+  alias Aikido.Team.Topology
   alias AikidoTest.AshFixtures.{Counter, Instance}
 
   defp member_spec(options \\ []), do: Map.new([resource: Counter] ++ options)

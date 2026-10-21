@@ -1,6 +1,8 @@
 defmodule AgentExamples.Agents do
   @moduledoc "The public interface to all example agents."
-  use Ash.Domain, otp_app: :agent_examples, extensions: [Aikido.Ash.Domain, AshAi, AshLua.Domain]
+  use Ash.Domain,
+    otp_app: :agent_examples,
+    extensions: [Aikido.Domain.Extension, AshAi, AshLua.Domain]
 
   resources do
     resource AgentExamples.AI.Tools

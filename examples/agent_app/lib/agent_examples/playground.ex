@@ -518,8 +518,8 @@ defmodule AgentExamples.Playground do
     resource = state.agent_module
 
     fixed =
-      if resource && !is_nil(Aikido.Ash.Agent.Info.team_config(resource)),
-        do: Map.keys(Aikido.Ash.Agent.Info.team_config(resource).topology.nodes),
+      if resource && !is_nil(Aikido.Agent.Info.team_config(resource)),
+        do: Map.keys(Aikido.Agent.Info.team_config(resource).topology.nodes),
         else: []
 
     own = Map.get(state.agent.state, :state, %{})
@@ -551,7 +551,7 @@ defmodule AgentExamples.Playground do
      %{
        id: state.id,
        resource: resource,
-       team?: resource && !is_nil(Aikido.Ash.Agent.Info.team_config(resource)),
+       team?: resource && !is_nil(Aikido.Agent.Info.team_config(resource)),
        children: %{},
        own:
          Map.take(own, [

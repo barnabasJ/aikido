@@ -2,7 +2,7 @@ defmodule AikidoTest.AshTeamVerifierTest.ForeignAgent do
   use Ash.Resource,
     domain: nil,
     validate_domain_inclusion?: false,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "foreign"
@@ -19,7 +19,7 @@ defmodule AikidoTest.AshTeamVerifierTest do
 
   test "requires the agent extension" do
     errors = compile_team("", agent?: false)
-    assert_team_error(errors, "requires the Aikido.Ash.Agent extension")
+    assert_team_error(errors, "requires the Aikido.Agent.Extension extension")
   end
 
   test "rejects duplicate member declarations before they disappear into a map" do
@@ -67,7 +67,11 @@ defmodule AikidoTest.AshTeamVerifierTest do
   defp compile_team(body, opts \\ []) do
     module = Module.concat(__MODULE__, "Team#{System.unique_integer([:positive])}")
     agent? = Keyword.get(opts, :agent?, true)
-    extensions = if agent?, do: [Aikido.Ash.Agent, Aikido.Ash.Team], else: [Aikido.Ash.Team]
+
+    extensions =
+      if agent?,
+        do: [Aikido.Agent.Extension, Aikido.Team.Extension],
+        else: [Aikido.Team.Extension]
 
     agent =
       if agent? do

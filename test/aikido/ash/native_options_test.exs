@@ -39,7 +39,7 @@ defmodule AikidoTest.AshNativeOptionsTest do
     assert input.arguments.llm_opts == options
 
     assert {:ok, directive} =
-             Aikido.Slices.AiReact.Directives.PrepareTools.new(
+             Aikido.AiReact.Directives.PrepareTools.new(
                request_id: "options",
                tool_options: options
              )
@@ -90,10 +90,10 @@ defmodule AikidoTest.AshNativeOptionsTest do
 
   defp ask_input(arguments) do
     state =
-      Aikido.Slices.AiReact
+      Aikido.AiReact.Slice
       |> Ash.Changeset.for_create(:create, %{})
       |> Ash.create!()
 
-    Ash.ActionInput.for_action(Aikido.Slices.AiReact, :ask, Map.put(arguments, :state, state))
+    Ash.ActionInput.for_action(Aikido.AiReact.Slice, :ask, Map.put(arguments, :state, state))
   end
 end

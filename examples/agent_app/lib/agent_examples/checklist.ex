@@ -1,6 +1,6 @@
 defmodule AgentExamples.Checklist do
   @moduledoc "Two commands share a state contract and preserve state on a business error."
-  use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Ash.Agent]
+  use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Agent.Extension]
 
   agent do
     name "example_checklist"

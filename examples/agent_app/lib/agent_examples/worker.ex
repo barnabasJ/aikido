@@ -1,6 +1,6 @@
 defmodule AgentExamples.Worker do
   @moduledoc "Action -> AsyncTask -> result signal -> action; no blocking agent calls."
-  use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Ash.Agent]
+  use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Agent.Extension]
 
   agent do
     name "example_worker"

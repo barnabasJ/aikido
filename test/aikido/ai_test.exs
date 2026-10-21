@@ -5,7 +5,7 @@ defmodule Aikido.AITest.MathAgent do
   agent do
     name "math"
 
-    slice :ai, Aikido.Slices.AiReact,
+    slice :ai, Aikido.AiReact.Slice,
       options: [
         model: "anthropic:claude-haiku-4-5-20251001",
         tools: [:test_add],
@@ -23,7 +23,7 @@ defmodule Aikido.AITest.FailingAgent do
   agent do
     name "failing"
 
-    slice :ai, Aikido.Slices.AiReact,
+    slice :ai, Aikido.AiReact.Slice,
       options: [
         model: "anthropic:claude-haiku-4-5-20251001",
         tools: [:test_fails],
@@ -40,7 +40,7 @@ defmodule Aikido.AITest.TightAgent do
   agent do
     name "tight"
 
-    slice :ai, Aikido.Slices.AiReact,
+    slice :ai, Aikido.AiReact.Slice,
       options: [
         model: "anthropic:claude-haiku-4-5-20251001",
         tools: [:test_add],
@@ -56,7 +56,7 @@ defmodule Aikido.AITest.NoModelAgent do
 
   agent do
     name "no_model"
-    slice :ai, Aikido.Slices.AiReact, options: [tools: [:test_add], max_iterations: 2]
+    slice :ai, Aikido.AiReact.Slice, options: [tools: [:test_add], max_iterations: 2]
   end
 end
 
@@ -197,7 +197,7 @@ defmodule Aikido.AITest do
           text
         end
 
-      assert Enum.any?(texts, &(&1 == Aikido.Slices.AiReact.cycle_warning()))
+      assert Enum.any?(texts, &(&1 == Aikido.AiReact.Slice.cycle_warning()))
     end
 
     test("tool errors are returned as JSON in tool.completed (not as :failed)", ctx) do
@@ -386,7 +386,7 @@ defmodule Aikido.AITest do
         agent do
           name "slice_key"
 
-          slice :ai, Aikido.Slices.AiReact,
+          slice :ai, Aikido.AiReact.Slice,
             options: [
               model: "anthropic:claude-haiku-4-5-20251001",
               tools: [],
@@ -415,7 +415,7 @@ defmodule Aikido.AITest do
         agent do
           name "slice_key_override"
 
-          slice :ai, Aikido.Slices.AiReact,
+          slice :ai, Aikido.AiReact.Slice,
             options: [
               model: "anthropic:claude-haiku-4-5-20251001",
               tools: [],

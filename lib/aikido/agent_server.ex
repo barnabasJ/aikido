@@ -82,7 +82,7 @@ defmodule Aikido.AgentServer do
   a run; later model and tool result signals let its actions update the run state.
 
   This external-caller example assumes `server` is a running agent with
-  `Aikido.Ash.AI` and a configured model. It waits for one particular AI run:
+  `Aikido.AI.Extension` and a configured model. It waits for one particular AI run:
 
       request_id = Ash.UUIDv7.generate()
 
@@ -1774,7 +1774,7 @@ defmodule Aikido.AgentServer do
   # wrap, the last entry the innermost. Duplicate-module detection is left
   # to user discretion — the chain runs whatever is declared, in order.
   defp build_middleware_chain(agent_module, %Options{middleware: runtime_mw}) do
-    compile_mw = Aikido.Ash.Agent.Info.middleware(agent_module)
+    compile_mw = Aikido.Agent.Info.middleware(agent_module)
     all_entries = compile_mw ++ runtime_mw
     compose_chain(all_entries, &core_next/2)
   end
@@ -1827,7 +1827,7 @@ defmodule Aikido.AgentServer do
     Enum.reduce_while(targets, {:ok, ctx, []}, fn {reference, params}, {:ok, current, effects} ->
       paths =
         current.agent_module
-        |> Aikido.Ash.Agent.Info.slice_paths_for_action()
+        |> Aikido.Agent.Info.slice_paths_for_action()
         |> Map.get(reference, [Spark.Dsl.Extension.get_opt(current.agent_module, [:agent], :path)])
 
       Enum.reduce_while(paths, {:ok, current, effects}, fn path, {:ok, current, effects} ->
@@ -1882,7 +1882,7 @@ defmodule Aikido.AgentServer do
       Map.merge(ctx, %{
         signal: %{signal | data: params},
         slice_path: path,
-        slice_config: Map.get(Aikido.Ash.Agent.Info.mount_config_map(ctx.agent_module), path, %{})
+        slice_config: Map.get(Aikido.Agent.Info.mount_config_map(ctx.agent_module), path, %{})
       })
 
     options =
@@ -1924,7 +1924,7 @@ defmodule Aikido.AgentServer do
 
   defp register_slice_schedules(%State{} = state) do
     agent_module = state.agent_module
-    schedules = Aikido.Ash.Agent.Info.schedules(agent_module)
+    schedules = Aikido.Agent.Info.schedules(agent_module)
 
     Enum.reduce(schedules, state, fn schedule_spec, acc_state ->
       register_schedule(acc_state, schedule_spec)

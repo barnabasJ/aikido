@@ -76,7 +76,7 @@ end
 defmodule AikidoTest.TracePropagation.Pipeline do
   use Ash.Resource,
     domain: AikidoTest.TracePropagation.Domain,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "trace_pipeline"
@@ -127,7 +127,7 @@ defmodule AikidoTest.TracePropagation.Pipeline do
 end
 
 defmodule AikidoTest.TracePropagation.Domain do
-  use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+  use Ash.Domain, extensions: [Aikido.Domain.Extension], validate_config_inclusion?: false
 
   agents do
     agent :pipeline, AikidoTest.TracePropagation.Pipeline

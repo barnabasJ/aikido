@@ -6,11 +6,16 @@
 
 ### Changed
 
+- Group built-in slices and their contracts under feature namespaces, such as
+  `Aikido.FSM.Slice`, `Aikido.FSM.Actions` and `Aikido.FSM.Signals`. Resource and
+  domain extensions use `<Feature>.Extension`; public agent commands live under
+  `Aikido.Agent.Commands`.
+
 - Use feature-owned native Ash enum types for lifecycle states, hook events and
   decisions, model/completion modes, parent-death and retention policies, and team activation.
 
-- Separate external Ash command implementations into `Aikido.Ash.Commands` and
-  `ash/commands/`, making their runtime I/O boundary explicit.
+- Separate external Ash command implementations into `Aikido.Agent.Commands` and
+  `agent/commands/`, making their runtime I/O boundary explicit.
 
 - Place the typed multi-slice result descriptor at `Aikido.Types.SliceUpdate`,
   alongside `ActionResult` and `Directive`.
@@ -89,7 +94,7 @@
 
 - Attach dedicated native implementations to public lifecycle, inspection, list
   and signal actions. Remove the action-name dispatcher and retain only shared
-  reference, snapshot, scope and error helpers in `Aikido.Ash.Runtime`.
+  reference, snapshot, scope and error helpers in `Aikido.Agent.Runtime`.
 
 - Validate emitted signals and reply inputs with the native `Aikido.Signal` type
   while keeping signal ID and timestamp generation at I/O boundaries.
@@ -314,7 +319,7 @@
 
 - Store agent state fields, AI flags and team configuration in Spark instead of
   generating functions on every resource.
-  Read it through `Aikido.Ash.Agent.Info`.
+  Read it through `Aikido.Agent.Info`.
 
 - Replace generated agent constructors, setters and whole-agent validators with
   a configured native initialization action and Ash code interface. Embedded
@@ -433,7 +438,7 @@
 - Use Ash’s native `:union` arguments for thread entries and memory space
   defaults; remove the custom union type.
 
-- Make FSM a native `Aikido.Ash.Slice` resource that owns its `:transition`
+- Make FSM a native `Aikido.Slice.Extension` resource that owns its `:transition`
   action; keep `FSM.Actions.Transition` solely as the Ash action implementation.
 - Move production and example generic-action callbacks into dedicated
   `Ash.Resource.Actions.Implementation` modules; remove legacy reducer wrappers

@@ -63,7 +63,7 @@ defmodule Aikido.Dsl.AgentExtensionsOrderTest do
              {Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareA, _},
              {Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareB, _},
              {Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareC, _}
-           ] = Aikido.Ash.Agent.Info.middleware(Aikido.Dsl.AgentExtensionsOrderTest.OrderedAgent)
+           ] = Aikido.Agent.Info.middleware(Aikido.Dsl.AgentExtensionsOrderTest.OrderedAgent)
   end
 
   test "user-chosen order is preserved verbatim" do
@@ -72,8 +72,6 @@ defmodule Aikido.Dsl.AgentExtensionsOrderTest do
              {Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareC, _},
              {Aikido.Dsl.AgentExtensionsOrderTest.MiddlewareB, _}
            ] =
-             Aikido.Ash.Agent.Info.middleware(
-               Aikido.Dsl.AgentExtensionsOrderTest.InterleavedAgent
-             )
+             Aikido.Agent.Info.middleware(Aikido.Dsl.AgentExtensionsOrderTest.InterleavedAgent)
   end
 end

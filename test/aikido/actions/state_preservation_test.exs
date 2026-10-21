@@ -152,7 +152,7 @@ defmodule AikidoTest.Actions.StatePreservationTest do
     assert {:ok, result} = run_action(:cancel, %{state: state, reason: :requested})
     assert result.state == %{state | status: :failed, error: {:cancelled, :requested}}
 
-    assert {:error, _} = run_action(:cancel, %{state: %Aikido.Slices.Memory{}})
+    assert {:error, _} = run_action(:cancel, %{state: %Aikido.Memory.Slice{}})
 
     assert {:error, _} =
              run_action(:cancel, %{state: %__MODULE__.RestrictedState{status: :running}})

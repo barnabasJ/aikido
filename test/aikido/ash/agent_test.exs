@@ -84,8 +84,8 @@ defmodule AikidoTest.AshTest do
     resource = AikidoTest.AshFixtures.GeneratedCounter
     assert Ash.DataLayer.data_layer(AikidoTest.AshFixtures.Counter) == Ash.DataLayer.Simple
     assert Ash.DataLayer.data_layer(resource) == Ash.DataLayer.Ets
-    refute function_exported?(Aikido.Ash.Agent, :can?, 2)
-    refute function_exported?(Aikido.Ash.Agent, :resource_to_query, 2)
+    refute function_exported?(Aikido.Agent.Extension, :can?, 2)
+    refute function_exported?(Aikido.Agent.Extension, :resource_to_query, 2)
 
     reference =
       AikidoTest.AshFixtures.Domain.generated_counter_start!(%{id: "custom-layer", count: 3})
@@ -369,7 +369,7 @@ defmodule AikidoTest.AshTest do
     slice = AikidoTest.AshFixtures.CounterSlice
 
     assert [{"0 0 1 1 *", {AikidoTest.AshFixtures.CounterSlice, :tick}, options}] =
-             Aikido.Ash.Slice.Info.schedules(slice)
+             Aikido.Slice.Info.schedules(slice)
 
     assert options[:data] == %{amount: 1}
   end
@@ -436,7 +436,7 @@ defmodule AikidoTest.AshTest do
     output =
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
         defmodule Elixir.AikidoTest.AshTest.DuplicatePaths do
-          use Ash.Resource, domain: nil, extensions: [Aikido.Ash.Agent]
+          use Ash.Resource, domain: nil, extensions: [Aikido.Agent.Extension]
 
           agent do
             name "duplicate_paths"
@@ -455,7 +455,7 @@ defmodule AikidoTest.AshTest do
         assert_raise CompileError, fn ->
           Code.compile_string("""
           defmodule AikidoTest.MissingSignalTarget do
-            use Ash.Resource, extensions: [Aikido.Ash.Agent]
+            use Ash.Resource, extensions: [Aikido.Agent.Extension]
 
             agent do
               name "unrouted"
@@ -475,7 +475,7 @@ defmodule AikidoTest.AshTest do
     [signal] =
       Enum.filter(
         Spark.Dsl.Extension.get_entities(resource, [:agent]),
-        &match?(%Aikido.Ash.Agent.Route{}, &1)
+        &match?(%Aikido.Agent.Route{}, &1)
       )
 
     assert signal.name == :increment
@@ -484,10 +484,10 @@ defmodule AikidoTest.AshTest do
     refute Ash.Resource.Info.action(resource, :tick)
     refute function_exported?(AikidoTest.AshFixtures.Domain, :composed_internal, 1)
 
-    assert Aikido.Ash.Agent.Info.signal_routes(resource) ==
+    assert Aikido.Agent.Info.signal_routes(resource) ==
              []
 
-    assert Aikido.Ash.Agent.Info.slice_paths_for_action(resource)[
+    assert Aikido.Agent.Info.slice_paths_for_action(resource)[
              signal.action
            ] == [:counter]
 
@@ -503,7 +503,7 @@ defmodule AikidoTest.AshTest do
     output =
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
         defmodule Elixir.AikidoTest.AshTest.DuplicateDomain do
-          use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+          use Ash.Domain, extensions: [Aikido.Domain.Extension], validate_config_inclusion?: false
 
           agents do
             agent :counter, AikidoTest.AshFixtures.Counter
