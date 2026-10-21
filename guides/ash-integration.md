@@ -50,6 +50,9 @@ helpers contain reusable mechanics rather than selecting another action by name.
 Signal declarations generate the native Ash actions on the existing resource;
 the implementation modules provide their callbacks without creating resources.
 
+Shared reusable implementations such as `Aikido.Actions.Broadcast` and
+`Aikido.Actions.Forward` live directly under `Aikido.Actions`.
+
 Place each resource beside its owned `actions/`, `signals/` and `directives/` folders.
 Their modules use matching `Actions`, `Signals` and `Directives` namespaces;
 ordinary shared helpers stay directly under the feature.

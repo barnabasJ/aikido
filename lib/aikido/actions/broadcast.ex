@@ -1,4 +1,4 @@
-defmodule Aikido.Actions.Control.Broadcast do
+defmodule Aikido.Actions.Broadcast do
   @moduledoc """
   Pure reducer preparing a native Ash PubSub notification.
 

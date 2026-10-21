@@ -1,4 +1,4 @@
-defmodule Aikido.Actions.Control.Reply do
+defmodule Aikido.Actions.Reply do
   @moduledoc """
   Pure reducer that replies to the PID in the current signal's `data.reply_to`.
 

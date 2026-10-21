@@ -1,4 +1,4 @@
-defmodule Aikido.Actions.Control.Forward do
+defmodule Aikido.Actions.Forward do
   @moduledoc """
   Pure reducer that forwards the current signal to `target_pid`.
 

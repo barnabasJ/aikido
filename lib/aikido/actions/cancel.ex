@@ -1,4 +1,4 @@
-defmodule Aikido.Actions.Control.Cancel do
+defmodule Aikido.Actions.Cancel do
   @moduledoc """
   Pure reducer that marks the supplied `state` as failed with a cancellation reason.
 

@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Flatten the shared `Broadcast`, `Cancel`, `Forward`, `Noop` and `Reply`
+  implementations into `Aikido.Actions`.
+
 - Keep feature-owned native action implementations in matching `Actions` namespaces
   and `actions/` folders alongside their signal and directive contracts.
 

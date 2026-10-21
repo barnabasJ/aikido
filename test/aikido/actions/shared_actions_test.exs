@@ -1,4 +1,4 @@
-defmodule AikidoTest.Actions.ControlTest do
+defmodule AikidoTest.Actions.SharedActionsTest do
   use ExUnit.Case, async: true
   alias Aikido.Directives
   alias Aikido.Signal

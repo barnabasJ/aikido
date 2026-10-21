@@ -1,4 +1,4 @@
-defmodule Aikido.Actions.Control.Noop do
+defmodule Aikido.Actions.Noop do
   @moduledoc """
   Pure reducer that returns the supplied `state` unchanged with no directives.
   """

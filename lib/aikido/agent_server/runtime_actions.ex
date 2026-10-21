@@ -12,13 +12,13 @@ defmodule Aikido.AgentServer.RuntimeActions do
       argument :state, :term
       argument :reason, :term, description: "Cancellation reason", default: :cancelled
       description "Handle cancellation requests"
-      run Aikido.Actions.Control.Cancel
+      run Aikido.Actions.Cancel
     end
 
     action :noop, Aikido.Types.ActionResult do
       argument :state, :term
       description "No-operation, acknowledges signal without changes"
-      run Aikido.Actions.Control.Noop
+      run Aikido.Actions.Noop
     end
 
     action :forward, Aikido.Types.ActionResult do
@@ -28,7 +28,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       argument :payload, :map, description: "New payload (optional)", default: nil
       argument :source, :string, description: "New source (optional)", default: nil
       description "Forward a signal to another agent"
-      run Aikido.Actions.Control.Forward
+      run Aikido.Actions.Forward
     end
 
     action :broadcast, Aikido.Types.ActionResult do
@@ -43,7 +43,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       argument :payload, :map, description: "Signal payload", default: %{}
       argument :source, :string, description: "Signal source", default: "/broadcast"
       description "Broadcast a signal via PubSub"
-      run Aikido.Actions.Control.Broadcast
+      run Aikido.Actions.Broadcast
     end
 
     action :reply, Aikido.Types.ActionResult do
@@ -51,7 +51,7 @@ defmodule Aikido.AgentServer.RuntimeActions do
       argument :signal_type, :string, description: "Reply signal type", allow_nil?: false
       argument :payload, :map, description: "Reply payload", default: %{}
       description "Reply to the signal source"
-      run Aikido.Actions.Control.Reply
+      run Aikido.Actions.Reply
     end
 
     action :notify_parent, Aikido.Types.ActionResult do
