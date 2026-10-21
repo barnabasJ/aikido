@@ -55,9 +55,9 @@ defmodule Aikido.MixProject do
             # Reads our trusted, compressed backend snapshots, including native callbacks.
             {:unsafe_input, {Aikido.Durable.AgentServer, :load_state, 2}},
             # Task-capacity fallback kills only the already retired scheduler PID.
-            {:failure, {Aikido.Directives.CronCancel, :shutdown_io, 3}},
+            {:failure, {Aikido.Cron.Directives.Cancel, :shutdown_io, 3}},
             # Flushes only a queued worker EXIT after unlink, with a zero timeout.
-            {:blocking, {Aikido.Scheduler.Job, :handle_info, 2}}
+            {:blocking, {Aikido.Cron.Job, :handle_info, 2}}
           ]
         ]
       ]
@@ -128,7 +128,7 @@ defmodule Aikido.MixProject do
         Durability: [~r/^Aikido\.Durable(?:\.|$)/],
         "Actions and Effects": [~r/^Aikido\.(?:Actions|Directives)(?:\.|$)/],
         Features: [
-          ~r/^Aikido\.(?:FSM|AiReact|AiWorker|AI|Identity|Memory|Thread|Todo|Team)(?:\.|$)/
+          ~r/^Aikido\.(?:Cron|FSM|AiReact|AiWorker|AI|Identity|Memory|Thread|Todo|Team)(?:\.|$)/
         ],
         Runtime: [Aikido, Aikido.Agent, Aikido.AgentServer, ~r/^Aikido\.AgentServer\./],
         "Types and DSL": [~r/^Aikido\.(?:Types|Dsl)(?:\.|$)/],

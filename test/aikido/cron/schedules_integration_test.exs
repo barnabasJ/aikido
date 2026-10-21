@@ -94,8 +94,8 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest do
       {{:schedules, 1}, [spec]} = List.keyfind(specs, {:schedules, 1}, 0)
 
       rendered = :schedules |> Code.Typespec.spec_to_quoted(spec) |> Macro.to_string()
-      assert String.contains?(rendered, "Aikido.Slice.Schedules.schedule_spec()")
-      assert String.contains?(rendered, "Aikido.Agent.Schedules.schedule_spec()")
+      assert String.contains?(rendered, "Aikido.Cron.SliceSchedules.schedule_spec()")
+      assert String.contains?(rendered, "Aikido.Cron.AgentSchedules.schedule_spec()")
       assert String.contains?(rendered, "|")
     end
 

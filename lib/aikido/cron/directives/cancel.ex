@@ -1,4 +1,4 @@
-defmodule Aikido.Directives.CronCancel do
+defmodule Aikido.Cron.Directives.Cancel do
   @moduledoc """
   Cancel a recurring cron job in supervised work without blocking the agent.
 
@@ -21,7 +21,7 @@ defmodule Aikido.Directives.CronCancel do
   @impl true
   def exec(%{job_id: logical_id}, input_signal, state) do
     request =
-      Aikido.AgentServer.Signals.CronCancelRequested.new!(%{job_id: logical_id},
+      Aikido.Cron.Signals.CancelRequested.new!(%{job_id: logical_id},
         source: "/agent/#{state.id}"
       )
 
@@ -35,10 +35,10 @@ defmodule Aikido.Directives.CronCancel do
 
     task = %Aikido.Directives.AsyncTask{
       work: fn ->
-        if is_pid(pid), do: Aikido.Scheduler.cancel(pid)
+        if is_pid(pid), do: Aikido.Cron.Scheduler.cancel(pid)
         Aikido.AgentServer.emit_cron_telemetry_event(state, :cancel, %{job_id: logical_id})
 
-        Aikido.AgentServer.Signals.CronCancelled.new!(
+        Aikido.Cron.Signals.Cancelled.new!(
           %{job_id: logical_id, pid: pid, monitor_ref: state.cron_monitors[logical_id]},
           source: "/agent/#{state.id}"
         )

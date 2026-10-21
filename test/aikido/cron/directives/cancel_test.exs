@@ -1,32 +1,31 @@
-defmodule AikidoTest.Agent.Directives.CronCancelTest do
+defmodule AikidoTest.Cron.Directives.CancelTest do
   use ExUnit.Case, async: true
 
   alias Aikido.Directives
-  alias Aikido.Directives.CronCancel
 
-  describe "CronCancel directive creation" do
+  describe "Aikido.Cron.Directives.Cancel directive creation" do
     test "creates cron cancel directive with atom job_id" do
-      directive = %CronCancel{job_id: :heartbeat}
+      directive = %Aikido.Cron.Directives.Cancel{job_id: :heartbeat}
 
-      assert %CronCancel{} = directive
+      assert %Aikido.Cron.Directives.Cancel{} = directive
       assert directive.job_id == :heartbeat
     end
 
     test "creates cron cancel directive with string job_id" do
-      directive = %CronCancel{job_id: "daily_cleanup"}
+      directive = %Aikido.Cron.Directives.Cancel{job_id: "daily_cleanup"}
 
       assert directive.job_id == "daily_cleanup"
     end
 
     test "creates cron cancel directive with reference job_id" do
       ref = make_ref()
-      directive = %CronCancel{job_id: ref}
+      directive = %Aikido.Cron.Directives.Cancel{job_id: ref}
 
       assert directive.job_id == ref
     end
 
     test "creates cron cancel directive with integer job_id" do
-      directive = %CronCancel{job_id: 123}
+      directive = %Aikido.Cron.Directives.Cancel{job_id: 123}
 
       assert directive.job_id == 123
     end
@@ -36,7 +35,7 @@ defmodule AikidoTest.Agent.Directives.CronCancelTest do
     test "creates cron cancel directive with atom" do
       directive = Directives.cron_cancel(:heartbeat)
 
-      assert %CronCancel{} = directive
+      assert %Aikido.Cron.Directives.Cancel{} = directive
       assert directive.job_id == :heartbeat
     end
 
@@ -65,7 +64,7 @@ defmodule AikidoTest.Agent.Directives.CronCancelTest do
 
       for id <- test_ids do
         directive = Directives.cron_cancel(id)
-        assert %CronCancel{} = directive
+        assert %Aikido.Cron.Directives.Cancel{} = directive
         assert directive.job_id == id
       end
     end
@@ -73,17 +72,17 @@ defmodule AikidoTest.Agent.Directives.CronCancelTest do
 
   describe "schema validation" do
     test "has valid schema" do
-      assert Ash.Type.ash_type?(CronCancel)
+      assert Ash.Type.ash_type?(Aikido.Cron.Directives.Cancel)
     end
 
     test "enforces required job_id key" do
       assert_raise ArgumentError, fn ->
-        struct!(CronCancel, %{})
+        struct!(Aikido.Cron.Directives.Cancel, %{})
       end
     end
 
     test "allows valid struct creation" do
-      directive = %CronCancel{job_id: :test}
+      directive = %Aikido.Cron.Directives.Cancel{job_id: :test}
       assert directive.job_id == :test
     end
   end

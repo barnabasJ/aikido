@@ -149,14 +149,14 @@ defmodule Aikido.AgentServer.RuntimeActions do
       argument :payload, :map, description: "Signal payload data", default: %{}
       argument :timezone, :string, description: "Timezone for cron evaluation", default: nil
       description "Schedule a recurring signal using cron expression"
-      run Aikido.Actions.Scheduling.ScheduleCron
+      run Aikido.Cron.Actions.Schedule
     end
 
     action :cancel_cron, Aikido.Types.ActionResult do
       argument :state, :term
       argument :job_id, :term, description: "Job identifier to cancel", allow_nil?: false
       description "Cancel a scheduled cron job"
-      run Aikido.Actions.Scheduling.CancelCron
+      run Aikido.Cron.Actions.Cancel
     end
   end
 end

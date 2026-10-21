@@ -51,7 +51,7 @@ defmodule Aikido.Agent.Extension do
   }
   @schedule %Spark.Dsl.Entity{
     name: :schedule,
-    target: Aikido.Agent.Schedule,
+    target: Aikido.Cron.AgentSchedule,
     args: [:cron, :signal_type],
     schema: [
       cron: [type: :string, required: true],

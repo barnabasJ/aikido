@@ -1,4 +1,4 @@
-defmodule Aikido.AgentServer.Signals.CronRestarted do
+defmodule Aikido.Cron.Signals.Restarted do
   @moduledoc """
   Emitted by the `:cron_restart` timer handler after `register_runtime_cron_job/3`
   succeeds in re-registering a cron-job that previously died abnormally.

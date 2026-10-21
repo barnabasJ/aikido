@@ -55,8 +55,8 @@ defmodule Aikido.Agent.Info do
 
   @doc "Returns the expanded slice and agent schedules."
   @spec schedules(module()) :: [
-          Aikido.Slice.Schedules.schedule_spec()
-          | Aikido.Agent.Schedules.schedule_spec()
+          Aikido.Cron.SliceSchedules.schedule_spec()
+          | Aikido.Cron.AgentSchedules.schedule_spec()
         ]
   def schedules(module) do
     Extension.get_persisted(module, :expanded_slice_schedules, []) ++

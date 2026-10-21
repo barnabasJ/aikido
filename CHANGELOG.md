@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Consolidate cron scheduling under `Aikido.Cron`, including declarations,
+  expansion, scheduler jobs, runtime specifications, actions, directives and signals.
+
 - Configure a slice’s default create action with `initialize ChangeModule` or a
   module/options tuple. FSM uses this option for its derived initial state.
 

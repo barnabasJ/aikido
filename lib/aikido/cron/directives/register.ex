@@ -1,4 +1,4 @@
-defmodule Aikido.Directives.Cron do
+defmodule Aikido.Cron.Directives.Register do
   @moduledoc """
   Register or update a recurring cron job for this agent.
 
@@ -18,19 +18,19 @@ defmodule Aikido.Directives.Cron do
   ## Examples
 
       # Every minute, send a tick signal
-      %Cron{cron: "* * * * *", message: tick_signal, job_id: :heartbeat}
+      %Aikido.Cron.Directives.Register{cron: "* * * * *", message: tick_signal, job_id: :heartbeat}
 
       # Daily at midnight, send a cleanup signal
-      %Cron{cron: "@daily", message: cleanup_signal, job_id: :daily_cleanup}
+      %Aikido.Cron.Directives.Register{cron: "@daily", message: cleanup_signal, job_id: :daily_cleanup}
 
       # Every 5 minutes with timezone
-      %Cron{cron: "*/5 * * * *", message: check_signal, job_id: :check, timezone: "America/New_York"}
+      %Aikido.Cron.Directives.Register{cron: "*/5 * * * *", message: check_signal, job_id: :check, timezone: "America/New_York"}
   """
 
   require Logger
 
   alias Aikido.AgentServer
-  alias Aikido.AgentServer.{CronRuntimeSpec, State}
+  alias Aikido.AgentServer.{State}
 
   use Aikido.Directive
 
@@ -84,10 +84,11 @@ defmodule Aikido.Directives.Cron do
   def register_io(%State{} = state, cron_expr, message, logical_id, tz, origin \\ nil) do
     logical_id = if is_nil(logical_id), do: make_ref(), else: logical_id
 
-    with {:ok, cron_spec} <- Aikido.Scheduler.validate_and_build_cron_spec(cron_expr, message, tz),
+    with {:ok, cron_spec} <-
+           Aikido.Cron.Scheduler.validate_and_build_cron_spec(cron_expr, message, tz),
          # Keep inherited authority transient; cron_spec is persisted outside agent codecs.
          runtime_spec =
-           CronRuntimeSpec.dynamic(
+           Aikido.Cron.RuntimeSpec.dynamic(
              cron_spec.cron_expression,
              cron_spec.message,
              cron_spec.timezone,
@@ -108,8 +109,6 @@ defmodule Aikido.Directives.Cron do
     }
   end
 
-  alias Aikido.AgentServer.Signals.CronRegistered
-
   @impl true
   def exec(
         %{cron: cron_expr, message: message, job_id: logical_id, timezone: tz},
@@ -118,10 +117,17 @@ defmodule Aikido.Directives.Cron do
       ) do
     origin = Aikido.Signal.capture_tracing(input_signal)
 
-    case Aikido.Directives.Cron.register_io(state, cron_expr, message, logical_id, tz, origin) do
+    case Aikido.Cron.Directives.Register.register_io(
+           state,
+           cron_expr,
+           message,
+           logical_id,
+           tz,
+           origin
+         ) do
       {:ok, io_result} ->
         signal =
-          CronRegistered.new!(
+          Aikido.Cron.Signals.Registered.new!(
             %{
               job_id: io_result.job_id,
               pid: io_result.pid,

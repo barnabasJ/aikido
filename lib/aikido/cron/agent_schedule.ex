@@ -1,4 +1,4 @@
-defmodule Aikido.Agent.Schedule do
+defmodule Aikido.Cron.AgentSchedule do
   @moduledoc false
 
   defstruct [:cron, :signal_type, :data, :job_id, :timezone, __spark_metadata__: nil]

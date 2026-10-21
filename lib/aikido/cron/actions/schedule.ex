@@ -1,4 +1,4 @@
-defmodule Aikido.Actions.Scheduling.ScheduleCron do
+defmodule Aikido.Cron.Actions.Schedule do
   @moduledoc """
   Pure reducer that prepares a recurring signal from `cron` and `signal_type`.
 

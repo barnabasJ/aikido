@@ -1,4 +1,4 @@
-defmodule Aikido.AgentServer.Signals.CronTick do
+defmodule Aikido.Cron.Signals.Tick do
   @moduledoc false
 
   use Aikido.Signal

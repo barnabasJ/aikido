@@ -1,4 +1,4 @@
-defmodule Aikido.Slice.Schedules do
+defmodule Aikido.Cron.SliceSchedules do
   @moduledoc """
   Utilities for expanding and managing slice schedules.
 

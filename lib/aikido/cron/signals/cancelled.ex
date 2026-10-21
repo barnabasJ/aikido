@@ -1,4 +1,4 @@
-defmodule Aikido.AgentServer.Signals.CronCancelled do
+defmodule Aikido.Cron.Signals.Cancelled do
   @moduledoc """
   Completion of an intentional cron scheduler shutdown.
 

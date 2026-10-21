@@ -72,6 +72,13 @@ helpers contain reusable mechanics rather than selecting another action by name.
 Signal declarations generate the native Ash actions on the existing resource;
 the implementation modules provide their callbacks without creating resources.
 
+Cron scheduling lives under `Aikido.Cron`: `AgentSchedule` and `SliceSchedule`
+are DSL declarations, their `*Schedules` helpers expand them, and `Scheduler`,
+`Job` and `RuntimeSpec` support execution. Its `Actions`, `Directives` and
+`Signals` folders contain the cron-specific pipeline. AgentServer retains its
+state-owning callbacks. One-shot delayed signals use the general `Schedule`
+directive rather than the cron scheduler.
+
 Shared reusable implementations such as `Aikido.Actions.Broadcast` and
 `Aikido.Actions.Forward` live directly under `Aikido.Actions`.
 

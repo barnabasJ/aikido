@@ -6,7 +6,7 @@ defmodule Aikido.CronScopeTest.Register do
     Aikido.Types.ActionResult.new(
       state: input.arguments.state,
       directives: [
-        %Aikido.Directives.Cron{
+        %Aikido.Cron.Directives.Register{
           cron: "@yearly",
           message: input.arguments.message,
           job_id: input.arguments.job_id

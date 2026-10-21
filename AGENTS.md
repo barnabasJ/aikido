@@ -45,6 +45,7 @@ does not permit other runtime effects inside reducers.
 - `Aikido.Directive`: Spark/Ash typed-struct host and execution behaviour; concrete descriptors live under `Aikido.Directives` or their owning feature
 - `Aikido.Types.ActionResult`: typed reducer result containing next state and validated directives
 - `Aikido.Durable`: keyed activation and persistence through DurableServer; the default backend is local EKV
+- `Aikido.Cron`: recurring scheduling contracts, expansion, scheduler/jobs, actions, directives and signals; AgentServer owns live cron bookkeeping
 
 ## Native Ash and Spark Contracts
 - Give each distinct action its own implementation module under its owner and bind it directly from the route or action declaration. Name the module for what the action does; avoid generic `Implementation` names. Do not redispatch business actions by `input.action.name`, signal type or selector options inside a shared implementation. Share reusable pure mechanics through ordinary helper functions. A single union action or wildcard observer remains one action.

@@ -1,4 +1,4 @@
-defmodule Aikido.AgentServer.Signals.CronCancelRequested do
+defmodule Aikido.Cron.Signals.CancelRequested do
   @moduledoc """
   Ordered request to retire a logical cron job and start its shutdown.
 

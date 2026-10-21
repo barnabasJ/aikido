@@ -21,7 +21,7 @@ defmodule AikidoTest.SchedulerTest do
   describe("run_every/5 with module/function/args") do
     test "starts a cron job with module, function, and args" do
       assert {:ok, pid} =
-               Aikido.Scheduler.run_every(
+               Aikido.Cron.Scheduler.run_every(
                  AikidoTest.SchedulerTest.TestModule,
                  :test_func,
                  [self()],
@@ -30,12 +30,12 @@ defmodule AikidoTest.SchedulerTest do
 
       assert is_pid(pid)
       assert Process.alive?(pid)
-      Aikido.Scheduler.cancel(pid)
+      Aikido.Cron.Scheduler.cancel(pid)
     end
 
     test "accepts timezone option" do
       assert {:ok, pid} =
-               Aikido.Scheduler.run_every(
+               Aikido.Cron.Scheduler.run_every(
                  AikidoTest.SchedulerTest.TestModule,
                  :test_func,
                  [self()],
@@ -44,12 +44,12 @@ defmodule AikidoTest.SchedulerTest do
                )
 
       assert is_pid(pid)
-      Aikido.Scheduler.cancel(pid)
+      Aikido.Cron.Scheduler.cancel(pid)
     end
 
     test "returns {:error, reason} for invalid cron input" do
       assert {:error, {:invalid_cron, _reason}} =
-               Aikido.Scheduler.run_every(
+               Aikido.Cron.Scheduler.run_every(
                  AikidoTest.SchedulerTest.TestModule,
                  :test_func,
                  [self()],
@@ -59,7 +59,7 @@ defmodule AikidoTest.SchedulerTest do
 
     test "returns {:error, reason} for invalid cron type" do
       assert {:error, {:invalid_cron, :invalid_type}} =
-               Aikido.Scheduler.run_every(
+               Aikido.Cron.Scheduler.run_every(
                  AikidoTest.SchedulerTest.TestModule,
                  :test_func,
                  [self()],
@@ -69,7 +69,7 @@ defmodule AikidoTest.SchedulerTest do
 
     test "returns {:error, reason} for invalid timezone input" do
       assert {:error, {:invalid_timezone, _reason}} =
-               Aikido.Scheduler.run_every(
+               Aikido.Cron.Scheduler.run_every(
                  AikidoTest.SchedulerTest.TestModule,
                  :test_func,
                  [self()],
@@ -80,7 +80,7 @@ defmodule AikidoTest.SchedulerTest do
 
     test "returns {:error, reason} for invalid timezone type" do
       assert {:error, {:invalid_timezone, :invalid_type}} =
-               Aikido.Scheduler.run_every(
+               Aikido.Cron.Scheduler.run_every(
                  AikidoTest.SchedulerTest.TestModule,
                  :test_func,
                  [self()],
@@ -94,57 +94,57 @@ defmodule AikidoTest.SchedulerTest do
     test "starts a cron job with an anonymous function" do
       test_pid = self()
       fun = fn -> send(test_pid, :anon_func_called) end
-      assert {:ok, pid} = Aikido.Scheduler.run_every(fun, "* * * * *")
+      assert {:ok, pid} = Aikido.Cron.Scheduler.run_every(fun, "* * * * *")
       assert is_pid(pid)
       assert Process.alive?(pid)
-      Aikido.Scheduler.cancel(pid)
+      Aikido.Cron.Scheduler.cancel(pid)
     end
 
     test "accepts timezone option" do
       fun = fn -> :ok end
-      assert {:ok, pid} = Aikido.Scheduler.run_every(fun, "* * * * *", timezone: "Etc/UTC")
+      assert {:ok, pid} = Aikido.Cron.Scheduler.run_every(fun, "* * * * *", timezone: "Etc/UTC")
       assert is_pid(pid)
-      Aikido.Scheduler.cancel(pid)
+      Aikido.Cron.Scheduler.cancel(pid)
     end
 
     test "returns {:error, reason} for invalid cron input without crashing caller" do
       fun = fn -> :ok end
 
       assert {:error, {:invalid_cron, _reason}} =
-               Aikido.Scheduler.run_every(fun, "not-a-cron-expression")
+               Aikido.Cron.Scheduler.run_every(fun, "not-a-cron-expression")
     end
 
     test "returns error for invalid timezone identifier without crashing caller" do
       fun = fn -> :ok end
 
       assert {:error, {:invalid_timezone, _}} =
-               Aikido.Scheduler.run_every(fun, "* * * * *", timezone: "Invalid/Nowhere")
+               Aikido.Cron.Scheduler.run_every(fun, "* * * * *", timezone: "Invalid/Nowhere")
     end
 
     test "returns error for invalid timezone option type" do
       fun = fn -> :ok end
 
       assert {:error, {:invalid_timezone, :invalid_type}} =
-               Aikido.Scheduler.run_every(fun, "* * * * *", timezone: :america_chicago)
+               Aikido.Cron.Scheduler.run_every(fun, "* * * * *", timezone: :america_chicago)
     end
 
     test "uses configured time zone database without mutating the global calendar database" do
       Calendar.put_time_zone_database(Calendar.UTCOnlyTimeZoneDatabase)
 
       assert {:ok, pid} =
-               Aikido.Scheduler.run_every(fn -> :ok end, "* * * * *",
+               Aikido.Cron.Scheduler.run_every(fn -> :ok end, "* * * * *",
                  timezone: "America/New_York"
                )
 
       assert Calendar.get_time_zone_database() == Calendar.UTCOnlyTimeZoneDatabase
-      Aikido.Scheduler.cancel(pid)
+      Aikido.Cron.Scheduler.cancel(pid)
     end
 
     test "executes callbacks in an isolated worker process" do
       test_pid = self()
 
       assert {:ok, pid} =
-               Aikido.Scheduler.run_every(
+               Aikido.Cron.Scheduler.run_every(
                  fn -> send(test_pid, {:worker_tick, self()}) end,
                  "* * * * * * *"
                )
@@ -152,7 +152,7 @@ defmodule AikidoTest.SchedulerTest do
       assert_receive {:worker_tick, worker_pid}, 2000
       assert is_pid(worker_pid)
       refute worker_pid == pid
-      Aikido.Scheduler.cancel(pid)
+      Aikido.Cron.Scheduler.cancel(pid)
     end
   end
 
@@ -160,7 +160,7 @@ defmodule AikidoTest.SchedulerTest do
     parent = self()
 
     {:ok, job} =
-      Aikido.Scheduler.run_every(
+      Aikido.Cron.Scheduler.run_every(
         fn ->
           send(parent, {:blocked_callback, self()})
 
@@ -185,7 +185,7 @@ defmodule AikidoTest.SchedulerTest do
     parent = self()
 
     {:ok, job} =
-      Aikido.Scheduler.run_every(
+      Aikido.Cron.Scheduler.run_every(
         fn ->
           send(parent, {:blocked_callback, self()})
 
@@ -196,7 +196,7 @@ defmodule AikidoTest.SchedulerTest do
         "@hourly"
       )
 
-    on_exit(fn -> Aikido.Scheduler.cancel(job) end)
+    on_exit(fn -> Aikido.Cron.Scheduler.cancel(job) end)
     send(job, :tick)
     assert_receive {:blocked_callback, worker}
     worker_ref = Process.monitor(worker)
@@ -222,18 +222,18 @@ defmodule AikidoTest.SchedulerTest do
     state = %{callback_workers: %{ref => worker}, owner_ref: nil, owner_pid: nil}
 
     assert {:noreply, ^state} =
-             Aikido.Scheduler.Job.handle_info({:EXIT, worker, :shutdown}, state)
+             Aikido.Cron.Job.handle_info({:EXIT, worker, :shutdown}, state)
 
     send(self(), {:EXIT, worker, :shutdown})
 
     assert {:noreply, %{callback_workers: workers}} =
-             Aikido.Scheduler.Job.handle_info({:DOWN, ref, :process, worker, :shutdown}, state)
+             Aikido.Cron.Job.handle_info({:DOWN, ref, :process, worker, :shutdown}, state)
 
     assert workers == %{}
     refute_receive {:EXIT, ^worker, _}
 
     assert {:stop, :shutdown, _} =
-             Aikido.Scheduler.Job.handle_info({:EXIT, self(), :shutdown}, %{
+             Aikido.Cron.Job.handle_info({:EXIT, self(), :shutdown}, %{
                state
                | callback_workers: workers
              })
@@ -241,9 +241,9 @@ defmodule AikidoTest.SchedulerTest do
 
   describe("cancel/1") do
     test "cancels a running cron job" do
-      {:ok, pid} = Aikido.Scheduler.run_every(fn -> :ok end, "* * * * *")
+      {:ok, pid} = Aikido.Cron.Scheduler.run_every(fn -> :ok end, "* * * * *")
       assert Process.alive?(pid)
-      assert :ok = Aikido.Scheduler.cancel(pid)
+      assert :ok = Aikido.Cron.Scheduler.cancel(pid)
       AikidoTest.LifecycleWait.await_down(pid)
     end
 
@@ -251,7 +251,7 @@ defmodule AikidoTest.SchedulerTest do
       test_pid = self()
 
       {:ok, pid} =
-        Aikido.Scheduler.run_every(
+        Aikido.Cron.Scheduler.run_every(
           fn ->
             send(test_pid, {:worker_started, self()})
             Process.sleep(:infinity)
@@ -261,7 +261,7 @@ defmodule AikidoTest.SchedulerTest do
 
       assert_receive {:worker_started, worker_pid}, 2000
       assert is_pid(worker_pid)
-      assert :ok = Aikido.Scheduler.cancel(pid)
+      assert :ok = Aikido.Cron.Scheduler.cancel(pid)
       AikidoTest.LifecycleWait.await_down(pid)
       AikidoTest.LifecycleWait.await_down(worker_pid)
       refute_receive {:worker_started, _another_worker}, 1500
@@ -273,7 +273,7 @@ defmodule AikidoTest.SchedulerTest do
       owner =
         spawn(fn ->
           {:ok, pid} =
-            Aikido.Scheduler.run_every(
+            Aikido.Cron.Scheduler.run_every(
               fn ->
                 send(test_pid, {:callback_started, self()})
 
@@ -287,7 +287,7 @@ defmodule AikidoTest.SchedulerTest do
           send(test_pid, {:owner_started, self(), pid})
 
           receive do
-            :stop -> Aikido.Scheduler.cancel(pid)
+            :stop -> Aikido.Cron.Scheduler.cancel(pid)
           end
         end)
 
@@ -309,19 +309,19 @@ defmodule AikidoTest.SchedulerTest do
   describe("DST handling") do
     test "skips nonexistent spring-forward occurrences" do
       timezone = "America/Chicago"
-      {:ok, schedule} = Aikido.Scheduler.Job.prepare_schedule("30 2 * * *", timezone)
+      {:ok, schedule} = Aikido.Cron.Job.prepare_schedule("30 2 * * *", timezone)
       {:ok, now} = DateTime.from_naive(~N[2026-03-08 00:30:00], timezone, time_zone_database())
 
       {:ok, expected} =
         DateTime.from_naive(~N[2026-03-09 02:30:00], timezone, time_zone_database())
 
       assert {:ok, ^expected} =
-               Aikido.Scheduler.Job.next_scheduled_at(schedule.cron, timezone, now)
+               Aikido.Cron.Job.next_scheduled_at(schedule.cron, timezone, now)
     end
 
     test "chooses the later ambiguous fall-back occurrence" do
       timezone = "America/Chicago"
-      {:ok, schedule} = Aikido.Scheduler.Job.prepare_schedule("31 1 * * *", timezone)
+      {:ok, schedule} = Aikido.Cron.Job.prepare_schedule("31 1 * * *", timezone)
 
       {:ambiguous, _first_now, now} =
         DateTime.from_naive(~N[2026-11-01 01:30:30], timezone, time_zone_database())
@@ -330,7 +330,7 @@ defmodule AikidoTest.SchedulerTest do
         DateTime.from_naive(~N[2026-11-01 01:31:00], timezone, time_zone_database())
 
       assert {:ok, ^expected} =
-               Aikido.Scheduler.Job.next_scheduled_at(schedule.cron, timezone, now)
+               Aikido.Cron.Job.next_scheduled_at(schedule.cron, timezone, now)
 
       assert DateTime.diff(expected, now, :millisecond) == 30_000
     end
@@ -361,7 +361,7 @@ defmodule AikidoTest.SchedulerTest do
         owner =
           spawn(fn ->
             {:ok, pid} =
-              Aikido.Scheduler.run_every(
+              Aikido.Cron.Scheduler.run_every(
                 fn ->
                   if :persistent_term.get(tick_gate, false) do
                     send(test_pid, {:recovered_tick, owner_tag, self()})
@@ -374,7 +374,7 @@ defmodule AikidoTest.SchedulerTest do
             send(test_pid, {:job_started, owner_tag, self(), pid})
 
             receive do
-              :stop -> Aikido.Scheduler.cancel(pid)
+              :stop -> Aikido.Cron.Scheduler.cancel(pid)
             end
           end)
 

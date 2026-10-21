@@ -1,4 +1,4 @@
-defmodule Aikido.Scheduler.Job do
+defmodule Aikido.Cron.Job do
   @moduledoc false
 
   use GenServer

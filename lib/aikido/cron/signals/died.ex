@@ -1,4 +1,4 @@
-defmodule Aikido.AgentServer.Signals.CronDied do
+defmodule Aikido.Cron.Signals.Died do
   @moduledoc """
   Emitted by `handle_cron_job_down/4` when a cron-job process dies — both
   for normal exits and abnormal terminations.

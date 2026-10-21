@@ -133,7 +133,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
           id: "strict-cron"
         )
 
-      directive = %Aikido.Directives.Cron{
+      directive = %Aikido.Cron.Directives.Register{
         cron: "@hourly",
         message: :tick,
         job_id: :strict_cron,
@@ -177,7 +177,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
 
       Aikido.AgentServer.cast(
         pid,
-        signal_carrying_directive(%Aikido.Directives.CronCancel{job_id: :strict_cron})
+        signal_carrying_directive(%Aikido.Cron.Directives.Cancel{job_id: :strict_cron})
       )
     end
   end
@@ -195,7 +195,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
 
       Aikido.AgentServer.cast(
         pid,
-        signal_carrying_directive(%Aikido.Directives.Cron{
+        signal_carrying_directive(%Aikido.Cron.Directives.Register{
           cron: "@hourly",
           message: :tick,
           job_id: :cancel_target,
@@ -210,7 +210,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
           pattern: "aikido.agent.cron.registered"
         )
 
-      directive = %Aikido.Directives.CronCancel{job_id: :cancel_target}
+      directive = %Aikido.Cron.Directives.Cancel{job_id: :cancel_target}
 
       assert {:ok, _} =
                Aikido.AgentServer.call(pid, signal_carrying_directive(directive), fn runtime ->

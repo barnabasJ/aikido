@@ -1,8 +1,8 @@
-defmodule Aikido.Scheduler do
+defmodule Aikido.Cron.Scheduler do
   @moduledoc """
   Per-agent cron scheduling with internal timer processes.
 
-  `Aikido.Scheduler` is intentionally lightweight and process-local:
+  `Aikido.Cron.Scheduler` is intentionally lightweight and process-local:
   each registered cron job is backed by a dedicated process owned by the
   caller (typically the owning `Aikido.AgentServer`).
 
@@ -11,7 +11,7 @@ defmodule Aikido.Scheduler do
   DurableServer snapshots these definitions and restores the jobs on activation.
   """
 
-  alias Aikido.Scheduler.Job
+  alias Aikido.Cron.Job
 
   @default_timezone "Etc/UTC"
 
@@ -81,8 +81,8 @@ defmodule Aikido.Scheduler do
 
   ## Examples
 
-      {:ok, pid} = Aikido.Scheduler.run_every(MyModule, :work, [], "*/5 * * * *")
-      {:ok, pid} = Aikido.Scheduler.run_every(fn -> IO.puts("tick") end, "* * * * *")
+      {:ok, pid} = Aikido.Cron.Scheduler.run_every(MyModule, :work, [], "*/5 * * * *")
+      {:ok, pid} = Aikido.Cron.Scheduler.run_every(fn -> IO.puts("tick") end, "* * * * *")
   """
   @spec run_every(module(), atom(), list(), String.t(), keyword()) ::
           {:ok, pid()} | {:error, term()}
@@ -95,7 +95,7 @@ defmodule Aikido.Scheduler do
 
   ## Examples
 
-      {:ok, pid} = Aikido.Scheduler.run_every(fn -> IO.puts("tick") end, "* * * * *")
+      {:ok, pid} = Aikido.Cron.Scheduler.run_every(fn -> IO.puts("tick") end, "* * * * *")
   """
   @spec run_every((-> any()), term(), term()) :: {:ok, pid()} | {:error, term()}
   def run_every(fun, cron_expr, opts \\ [])
@@ -120,8 +120,8 @@ defmodule Aikido.Scheduler do
 
   ## Examples
 
-      {:ok, pid} = Aikido.Scheduler.run_every(MyModule, :work, [], "* * * * *")
-      :ok = Aikido.Scheduler.cancel(pid)
+      {:ok, pid} = Aikido.Cron.Scheduler.run_every(MyModule, :work, [], "* * * * *")
+      :ok = Aikido.Cron.Scheduler.cancel(pid)
   """
   @spec cancel(pid()) :: :ok
   def cancel(pid) when is_pid(pid) do

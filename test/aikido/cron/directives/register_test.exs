@@ -1,16 +1,16 @@
-defmodule AikidoTest.Agent.Directives.CronTest do
+defmodule AikidoTest.Cron.Directives.RegisterTest do
   use ExUnit.Case, async: true
 
   alias Aikido.Directives
-  alias Aikido.Directives.Cron
+
   alias Aikido.Signal
 
-  describe "Cron directive creation" do
+  describe "Aikido.Cron.Directives.Register directive creation" do
     test "creates cron directive with required fields" do
       message = Signal.new!(%{type: "test.tick", source: "/test", data: %{}})
-      directive = %Cron{cron: "* * * * *", message: message}
+      directive = %Aikido.Cron.Directives.Register{cron: "* * * * *", message: message}
 
-      assert %Cron{} = directive
+      assert %Aikido.Cron.Directives.Register{} = directive
       assert directive.cron == "* * * * *"
       assert directive.message == message
       assert directive.job_id == nil
@@ -20,7 +20,7 @@ defmodule AikidoTest.Agent.Directives.CronTest do
     test "creates cron directive with all fields" do
       message = Signal.new!(%{type: "test.tick", source: "/test", data: %{}})
 
-      directive = %Cron{
+      directive = %Aikido.Cron.Directives.Register{
         cron: "@daily",
         message: message,
         job_id: :cleanup,
@@ -34,13 +34,21 @@ defmodule AikidoTest.Agent.Directives.CronTest do
     end
 
     test "creates cron directive with atom job_id" do
-      directive = %Cron{cron: "*/5 * * * *", message: :tick_msg, job_id: :heartbeat}
+      directive = %Aikido.Cron.Directives.Register{
+        cron: "*/5 * * * *",
+        message: :tick_msg,
+        job_id: :heartbeat
+      }
 
       assert directive.job_id == :heartbeat
     end
 
     test "creates cron directive with string job_id" do
-      directive = %Cron{cron: "0 0 * * *", message: :daily, job_id: "daily_task"}
+      directive = %Aikido.Cron.Directives.Register{
+        cron: "0 0 * * *",
+        message: :daily,
+        job_id: "daily_task"
+      }
 
       assert directive.job_id == "daily_task"
     end
@@ -58,7 +66,7 @@ defmodule AikidoTest.Agent.Directives.CronTest do
       ]
 
       for expr <- test_expressions do
-        directive = %Cron{cron: expr, message: :test}
+        directive = %Aikido.Cron.Directives.Register{cron: expr, message: :test}
         assert directive.cron == expr
       end
     end
@@ -69,7 +77,7 @@ defmodule AikidoTest.Agent.Directives.CronTest do
       message = Signal.new!(%{type: "test.tick", source: "/test", data: %{}})
       directive = Directives.cron("* * * * *", message)
 
-      assert %Cron{} = directive
+      assert %Aikido.Cron.Directives.Register{} = directive
       assert directive.cron == "* * * * *"
       assert directive.message == message
       assert directive.job_id == nil
@@ -129,21 +137,21 @@ defmodule AikidoTest.Agent.Directives.CronTest do
 
   describe "schema validation" do
     test "has valid schema" do
-      assert Ash.Type.ash_type?(Cron)
+      assert Ash.Type.ash_type?(Aikido.Cron.Directives.Register)
     end
 
     test "enforces required keys" do
       assert_raise ArgumentError, fn ->
-        struct!(Cron, %{message: :test})
+        struct!(Aikido.Cron.Directives.Register, %{message: :test})
       end
 
       assert_raise ArgumentError, fn ->
-        struct!(Cron, %{cron: "* * * * *"})
+        struct!(Aikido.Cron.Directives.Register, %{cron: "* * * * *"})
       end
     end
 
     test "allows optional fields to be nil" do
-      directive = %Cron{cron: "* * * * *", message: :test}
+      directive = %Aikido.Cron.Directives.Register{cron: "* * * * *", message: :test}
 
       assert directive.job_id == nil
       assert directive.timezone == nil

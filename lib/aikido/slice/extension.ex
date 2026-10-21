@@ -64,7 +64,7 @@ defmodule Aikido.Slice.Extension do
   }
   @schedule %Spark.Dsl.Entity{
     name: :schedule,
-    target: Aikido.Slice.Schedule,
+    target: Aikido.Cron.SliceSchedule,
     args: [:cron, :action],
     schema: [
       cron: [type: :string, required: true],

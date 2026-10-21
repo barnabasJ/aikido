@@ -1,6 +1,6 @@
-defmodule Aikido.AgentServer.Signals.CronRegistered do
+defmodule Aikido.Cron.Signals.Registered do
   @moduledoc """
-  Synthesized by the `Aikido.Directives.Cron` impl after the
+  Synthesized by the `Aikido.Cron.Directives.Register` impl after the
   scheduler job spawns, then cast back to the
   agent so the cascade callback `maybe_track_cron_registered/2` can
   insert into `state.cron_specs`, `state.cron_jobs`, `state.cron_monitors`,
@@ -18,7 +18,7 @@ defmodule Aikido.AgentServer.Signals.CronRegistered do
   - `:pid` - PID of the spawned cron-job process
   - `:monitor_ref` - Monitor reference returned by `Process.monitor/1`
   - `:cron_spec` - The validated `%{cron_expression, message, timezone}` spec
-  - `:runtime_spec` - The `%CronRuntimeSpec{}` carrying scheduler details
+  - `:runtime_spec` - The `%Aikido.Cron.RuntimeSpec{}` carrying scheduler details
   """
 
   use Aikido.Signal
@@ -49,7 +49,7 @@ defmodule Aikido.AgentServer.Signals.CronRegistered do
 
       attribute :runtime_spec, :term do
         allow_nil? false
-        description "%CronRuntimeSpec{} carrying scheduler details"
+        description "%Aikido.Cron.RuntimeSpec{} carrying scheduler details"
       end
     end
   end

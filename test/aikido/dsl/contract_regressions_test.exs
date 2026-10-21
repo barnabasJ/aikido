@@ -245,13 +245,13 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
   test "slice schedule identity includes every normalized behavior field" do
     target = {Aikido.Dsl.ContractRegressionsTest.ScheduledSlice, :tick}
     instance = %Aikido.Slice.Instance{module: elem(target, 0), path: :clock}
-    [base | _] = Aikido.Slice.Schedules.expand_schedules(instance)
+    [base | _] = Aikido.Cron.SliceSchedules.expand_schedules(instance)
 
     assert base.job_id ==
              {:slice_schedule, :clock, {target, "@yearly", "Etc/UTC", base.signal_type, %{}}}
 
     variants =
-      Aikido.Slice.Schedules.expand_schedules(%Aikido.Slice.Instance{
+      Aikido.Cron.SliceSchedules.expand_schedules(%Aikido.Slice.Instance{
         module: Aikido.Dsl.ContractRegressionsTest.ScheduleVariants,
         path: :clock
       })

@@ -118,7 +118,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
         end)
 
       assert result == %{}
-      assert %Directives.Cron{} = directive
+      assert %Aikido.Cron.Directives.Register{} = directive
       assert directive.cron == "* * * * *"
       assert directive.job_id == :heartbeat
       assert directive.message.type == "agent.heartbeat"
@@ -162,7 +162,7 @@ defmodule AikidoTest.Actions.SchedulingTest do
         end)
 
       assert result == %{}
-      assert %Directives.CronCancel{} = directive
+      assert %Aikido.Cron.Directives.Cancel{} = directive
       assert directive.job_id == :heartbeat
     end
   end

@@ -1,4 +1,4 @@
-defmodule Aikido.Agent.Schedules do
+defmodule Aikido.Cron.AgentSchedules do
   @moduledoc "Expands agent cron declarations into signal schedules."
   @type schedule_spec :: %{
           cron_expression: String.t(),

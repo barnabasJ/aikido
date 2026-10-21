@@ -188,22 +188,11 @@ defmodule Aikido.AgentServer do
   require Ash.Tracer
   require Logger
 
-  alias Aikido.AgentServer.{
-    ChildInfo,
-    CronRuntimeSpec,
-    Options,
-    ParentRef,
-    SignalRouter,
-    State
-  }
-
-  alias Aikido.Directives
+  alias Aikido.AgentServer.{ChildInfo, Options, ParentRef, SignalRouter, State}
 
   alias Aikido.AgentServer.Signals.{
     ChildExit,
     ChildStarted,
-    CronDied,
-    CronRestarted,
     IdentityOrphaned,
     LifecycleReady,
     LifecycleStarting,
@@ -784,16 +773,20 @@ defmodule Aikido.AgentServer do
 
   # ---------------------------------------------------------------------------
   @doc false
-  @spec start_runtime_cron_job(State.t(), term(), CronRuntimeSpec.t()) ::
+  @spec start_runtime_cron_job(State.t(), term(), Aikido.Cron.RuntimeSpec.t()) ::
           {:ok, pid()} | {:error, term()}
-  def start_runtime_cron_job(%State{} = state, logical_id, %CronRuntimeSpec{} = runtime_spec) do
+  def start_runtime_cron_job(
+        %State{} = state,
+        logical_id,
+        %Aikido.Cron.RuntimeSpec{} = runtime_spec
+      ) do
     agent_pid = self()
     agent_id = state.id
 
-    Aikido.Scheduler.run_every(
+    Aikido.Cron.Scheduler.run_every(
       fn ->
         if Process.alive?(agent_pid) do
-          signal = CronRuntimeSpec.build_signal(runtime_spec, agent_id, logical_id)
+          signal = Aikido.Cron.RuntimeSpec.build_signal(runtime_spec, agent_id, logical_id)
           _ = Aikido.AgentServer.cast(agent_pid, signal)
         end
 
@@ -805,9 +798,13 @@ defmodule Aikido.AgentServer do
   end
 
   @doc false
-  @spec register_runtime_cron_job(State.t(), term(), CronRuntimeSpec.t()) ::
+  @spec register_runtime_cron_job(State.t(), term(), Aikido.Cron.RuntimeSpec.t()) ::
           {:ok, State.t()} | {:error, term(), State.t()}
-  def register_runtime_cron_job(%State{} = state, logical_id, %CronRuntimeSpec{} = runtime_spec) do
+  def register_runtime_cron_job(
+        %State{} = state,
+        logical_id,
+        %Aikido.Cron.RuntimeSpec{} = runtime_spec
+      ) do
     case start_runtime_cron_job(state, logical_id, runtime_spec) do
       {:ok, pid} ->
         {:ok, track_cron_job(state, logical_id, pid, runtime_spec: runtime_spec)}
@@ -821,11 +818,11 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  defp runtime_cron_log_label(%CronRuntimeSpec{kind: :dynamic}) do
+  defp runtime_cron_log_label(%Aikido.Cron.RuntimeSpec{kind: :dynamic}) do
     "runtime cron job"
   end
 
-  defp runtime_cron_log_label(%CronRuntimeSpec{kind: :schedule}) do
+  defp runtime_cron_log_label(%Aikido.Cron.RuntimeSpec{kind: :schedule}) do
     "schedule"
   end
 
@@ -850,7 +847,7 @@ defmodule Aikido.AgentServer do
       end
 
     state =
-      if is_struct(runtime_spec, CronRuntimeSpec) do
+      if is_struct(runtime_spec, Aikido.Cron.RuntimeSpec) do
         %{state | cron_runtime_specs: Map.put(state.cron_runtime_specs, logical_id, runtime_spec)}
       else
         state
@@ -914,7 +911,7 @@ defmodule Aikido.AgentServer do
     }
 
     if cancel? and is_pid(pid) and Process.alive?(pid) do
-      Aikido.Directives.CronCancel.shutdown_io(
+      Aikido.Cron.Directives.Cancel.shutdown_io(
         logical_id,
         opts[:input_signal] ||
           Aikido.Signal.new!("aikido.agent.cron.cancel", %{job_id: logical_id}),
@@ -1242,7 +1239,7 @@ defmodule Aikido.AgentServer do
         state = clear_cron_restart_timer(state, logical_id)
 
         case Map.get(state.cron_runtime_specs, logical_id) do
-          %CronRuntimeSpec{} = runtime_spec ->
+          %Aikido.Cron.RuntimeSpec{} = runtime_spec ->
             case register_runtime_cron_job(state, logical_id, runtime_spec) do
               {:ok, new_state} ->
                 emit_cron_telemetry_event(new_state, :restart_succeeded, %{
@@ -1296,7 +1293,7 @@ defmodule Aikido.AgentServer do
     # Clean up all cron jobs owned by this agent
     Enum.each(state.cron_jobs, fn {_job_id, pid} ->
       if is_pid(pid) and Process.alive?(pid) do
-        Aikido.Scheduler.cancel(pid)
+        Aikido.Cron.Scheduler.cancel(pid)
       end
     end)
 
@@ -1658,7 +1655,7 @@ defmodule Aikido.AgentServer do
          %Signal{type: "aikido.agent.cron.cancel.requested", data: %{job_id: job_id}} = signal
        ) do
     {_pid, next} = untrack_cron_job(state, job_id, drop_runtime_spec?: true)
-    Directives.CronCancel.shutdown_io(job_id, signal, state)
+    Aikido.Cron.Directives.Cancel.shutdown_io(job_id, signal, state)
     next
   end
 
@@ -1932,7 +1929,7 @@ defmodule Aikido.AgentServer do
   end
 
   defp restore_cron_specs(state, specs) do
-    {valid, invalid} = Aikido.Scheduler.classify_cron_specs(specs)
+    {valid, invalid} = Aikido.Cron.Scheduler.classify_cron_specs(specs)
 
     Enum.each(invalid, fn {job_id, spec, reason} ->
       Logger.error(
@@ -1987,7 +1984,7 @@ defmodule Aikido.AgentServer do
   # turns yet. On failure we drop the persisted spec so a broken entry
   # doesn't block boot.
   defp register_restored_cron_runtime(state, job_id, cron_expr, message, timezone) do
-    case Directives.Cron.register_io(state, cron_expr, message, job_id, timezone) do
+    case Aikido.Cron.Directives.Register.register_io(state, cron_expr, message, job_id, timezone) do
       {:ok, io_result} ->
         commit_cron_io_result(state, io_result)
 
@@ -2033,7 +2030,7 @@ defmodule Aikido.AgentServer do
     } = schedule_spec
 
     runtime_spec =
-      CronRuntimeSpec.schedule(
+      Aikido.Cron.RuntimeSpec.schedule(
         cron_expr,
         signal_type,
         timezone,
@@ -2074,13 +2071,13 @@ defmodule Aikido.AgentServer do
   end
 
   defp cron_died_signal(%State{} = state, logical_id, pid, reason) do
-    CronDied.new!(%{job_id: logical_id, pid: pid, reason: reason},
+    Aikido.Cron.Signals.Died.new!(%{job_id: logical_id, pid: pid, reason: reason},
       source: "/agent/#{state.id}/cron"
     )
   end
 
   defp cron_restarted_signal(%State{} = state, logical_id, pid) do
-    CronRestarted.new!(%{job_id: logical_id, pid: pid},
+    Aikido.Cron.Signals.Restarted.new!(%{job_id: logical_id, pid: pid},
       source: "/agent/#{state.id}/cron"
     )
   end

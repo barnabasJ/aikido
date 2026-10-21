@@ -1,4 +1,4 @@
-defmodule Aikido.Actions.Scheduling.CancelCron do
+defmodule Aikido.Cron.Actions.Cancel do
   @moduledoc """
   Pure reducer that requests cancellation of the cron job identified by `job_id`.
 

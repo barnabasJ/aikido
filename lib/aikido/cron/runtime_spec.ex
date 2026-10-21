@@ -1,7 +1,6 @@
-defmodule Aikido.AgentServer.CronRuntimeSpec do
+defmodule Aikido.Cron.RuntimeSpec do
   @moduledoc false
 
-  alias Aikido.AgentServer.Signals.CronTick
   alias Aikido.Signal
 
   @default_timezone "Etc/UTC"
@@ -80,7 +79,7 @@ defmodule Aikido.AgentServer.CronRuntimeSpec do
        do: Aikido.Directive.materialize_signal(signal)
 
   defp occurrence(%__MODULE__{kind: :dynamic, message: message}, agent_id, logical_id) do
-    CronTick.new!(
+    Aikido.Cron.Signals.Tick.new!(
       %{job_id: logical_id, message: message},
       source: "/agent/#{agent_id}"
     )
