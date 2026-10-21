@@ -23,10 +23,17 @@ defmodule Aikido.Slice.Extension.Transformers.Build do
       |> Enum.filter(& &1.writable?)
       |> Enum.map(& &1.name)
 
+    changes =
+      case Transformer.get_option(dsl, [:slice], :initialize) do
+        nil -> []
+        change -> [Ash.Resource.Builder.build_action_change(change)]
+      end
+
     {:ok, dsl} =
       Ash.Resource.Builder.add_new_action(dsl, :create, :create,
         primary?: true,
-        accept: accepted
+        accept: accepted,
+        changes: changes
       )
 
     {:ok, dsl} =

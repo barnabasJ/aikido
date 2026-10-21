@@ -66,16 +66,9 @@ defmodule Aikido.FSM.Slice do
     data_layer: :embedded,
     extensions: [Aikido.Slice.Extension]
 
-  actions do
-    create :create do
-      primary? true
-      accept :*
-      change Aikido.FSM.Changes.Initialize
-    end
-  end
-
   slice do
     name "fsm"
+    initialize Aikido.FSM.Changes.Initialize
 
     schema do
       attribute :state, :string do

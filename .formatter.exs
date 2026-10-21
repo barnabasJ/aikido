@@ -21,6 +21,7 @@ spark_locals_without_parens = [
   hooks: 1,
   inherit: 1,
   initial_state: 1,
+  initialize: 1,
   instance: 1,
   integer_primary_key: 1,
   integer_primary_key: 2,

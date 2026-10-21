@@ -18,6 +18,10 @@ defmodule Aikido.Slice.Extension do
   A slice is an embedded resource because its value lives inside an agent's
   state. Implementation modules use `Ash.Resource.Actions.Implementation`;
   they do not declare separate resources or duplicate the action contracts.
+
+  Configure `initialize MyApp.Changes.Initialize` in the `slice` block to attach
+  an Ash change to the generated create action. A module/options tuple is also
+  accepted. An explicitly declared `:create` action takes precedence.
   """
 
   @route %Spark.Dsl.Entity{
@@ -49,7 +53,12 @@ defmodule Aikido.Slice.Extension do
     schema: [
       name: [type: :string, required: true],
       description: [type: :string],
-      otp_app: [type: :atom]
+      otp_app: [type: :atom],
+      initialize: [
+        type: {:spark_behaviour, Ash.Resource.Change},
+        doc:
+          "Ash change, optionally with options, for the generated create action. An explicit :create action takes precedence."
+      ]
     ],
     entities: [@route]
   }

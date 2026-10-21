@@ -42,6 +42,21 @@ only when no domain is specified. Domain inclusion uses Ash's normal validation;
 register application agents in their domain. `use Aikido.Slice` likewise forwards
 native resource options and defaults to the embedded data layer.
 
+Slice initialization uses the generated native create action. For defaults that
+depend on other attributes, configure an Ash change instead of redeclaring it:
+
+```elixir
+slice do
+  name "fsm"
+  initialize Aikido.FSM.Changes.Initialize
+end
+```
+
+`initialize` accepts a change module or `{Module, options}`. It runs with the
+create action’s caller scope, validations and authorization. It does not run on
+updates. A resource that explicitly declares `create :create` owns that action
+and its changes instead.
+
 ## Source organization
 
 Built-in features use one folder and namespace. For example, `Aikido.FSM.Slice`

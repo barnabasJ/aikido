@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Configure a slice’s default create action with `initialize ChangeModule` or a
+  module/options tuple. FSM uses this option for its derived initial state.
+
 - Group built-in slices and their contracts under feature namespaces, such as
   `Aikido.FSM.Slice`, `Aikido.FSM.Actions` and `Aikido.FSM.Signals`. Resource and
   domain extensions use `<Feature>.Extension`; public agent commands live under
