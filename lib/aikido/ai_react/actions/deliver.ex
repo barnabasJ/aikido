@@ -13,35 +13,46 @@ defmodule Aikido.AiReact.Actions.Deliver do
   @impl true
   def run(input, _opts, _context) do
     with :ok <- Scope.validate(input.arguments.state, input) do
-      queue_delivery_or_start_run(input)
+      if input.arguments.state.status in [:setup, :running] do
+        queue_incoming_conversation_text(input)
+      else
+        start_run_from_incoming_text(input)
+      end
     end
   end
 
-  defp queue_delivery_or_start_run(input) do
-    if input.arguments.state.status in [:setup, :running] do
-      state =
-        input.arguments.state
-        |> Map.update(:queued_messages, [input.arguments.text], &(&1 ++ [input.arguments.text]))
-        |> Map.update(:run_metadata, %{}, fn metadata ->
-          delivery = Map.take(input.arguments, [:request_id, :metadata])
-          Map.update(metadata, :deliveries, [delivery], &(&1 ++ [delivery]))
-        end)
+  defp queue_incoming_conversation_text(input) do
+    input.arguments.state
+    |> queue_text_for_next_model_request(input.arguments.text)
+    |> record_incoming_message_metadata(input.arguments)
+    |> then(&Aikido.Types.ActionResult.new(state: &1))
+  end
 
-      Aikido.Types.ActionResult.new(state: state)
-    else
-      with {:ok, result} <-
-             Run.open(
-               %{
-                 query: input.arguments.text,
-                 request_id: input.arguments.request_id,
-                 metadata: input.arguments.metadata
-               },
-               input.arguments.state
-             ) do
-        {:ok, result}
-        |> Scope.bind(input)
-        |> Hooks.queue_event_hooks(:run_started, %{query: input.arguments.text})
-      end
+  defp queue_text_for_next_model_request(state, text) do
+    Map.update(state, :queued_messages, [text], &(&1 ++ [text]))
+  end
+
+  defp record_incoming_message_metadata(state, arguments) do
+    message = Map.take(arguments, [:request_id, :metadata])
+
+    Map.update(state, :run_metadata, %{}, fn metadata ->
+      Map.update(metadata, :deliveries, [message], &(&1 ++ [message]))
+    end)
+  end
+
+  defp start_run_from_incoming_text(input) do
+    with {:ok, result} <-
+           Run.open(
+             %{
+               query: input.arguments.text,
+               request_id: input.arguments.request_id,
+               metadata: input.arguments.metadata
+             },
+             input.arguments.state
+           ) do
+      {:ok, result}
+      |> Scope.bind(input)
+      |> Hooks.queue_event_hooks(:run_started, %{query: input.arguments.text})
     end
   end
 end

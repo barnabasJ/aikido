@@ -7,7 +7,7 @@ defmodule Aikido.Team.Tasks do
   def notification_directives(task, state, context) do
     case notification_target(task, state, context) do
       nil -> []
-      pid -> [Directives.emit_to_pid(result_signal(task), pid)]
+      pid -> [Directives.emit_to_pid(conversation_message_for_task_result(task), pid)]
     end
   end
 
@@ -20,8 +20,8 @@ defmodule Aikido.Team.Tasks do
     end
   end
 
-  @doc "Describe a task result as an AI delivery payload without delivering it."
-  def result_signal(task) do
+  @doc "Describe text to add to the receiving AI agent’s conversation when a task finishes."
+  def conversation_message_for_task_result(task) do
     text =
       "Task #{task.id} from #{task.member} #{task.status}: " <>
         inspect(task.result, limit: 100, printable_limit: 4_000)
