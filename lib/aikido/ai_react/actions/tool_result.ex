@@ -1,6 +1,8 @@
 defmodule Aikido.AiReact.Actions.ToolResult do
   @moduledoc "Adopts each pending tool result once and resumes the model after the complete batch."
   use Ash.Resource.Actions.Implementation
+
+  @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
   alias Aikido.AiReact.{Completion, DirectivePlan}
   alias Aikido.AiReact.Context
 
@@ -60,7 +62,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
   end
 
   defp finalize_batch(slice) do
-    current_signature = Aikido.AiReact.Slice.tool_call_signature(slice.pending_tool_calls)
+    current_signature = tool_call_signature(slice.pending_tool_calls)
 
     slice =
       maybe_append_cycle_warning(
@@ -103,11 +105,22 @@ defmodule Aikido.AiReact.Actions.ToolResult do
        when is_binary(previous_signature) and previous_signature == current_signature do
     Context.append_message(
       state,
-      ReqLLM.Context.user(Aikido.AiReact.Slice.cycle_warning())
+      ReqLLM.Context.user(@cycle_warning)
     )
   end
 
   defp maybe_append_cycle_warning(state, _previous, _current) do
     state
+  end
+
+  defp tool_call_signature(tool_calls) do
+    tool_calls
+    |> Enum.map(fn call ->
+      name = Map.get(call, :name) || Map.get(call, "name") || ""
+      arguments = Map.get(call, :arguments) || Map.get(call, "arguments") || ""
+      "#{name}:#{inspect(arguments)}"
+    end)
+    |> Enum.sort()
+    |> Enum.join("|")
   end
 end

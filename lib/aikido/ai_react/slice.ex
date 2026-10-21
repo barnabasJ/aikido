@@ -16,7 +16,6 @@ defmodule Aikido.AiReact.Slice do
   actions apply their results. Callers supply Ash AI tool names and native
   `tool_options`; prepared callbacks are rebuilt for each run and never saved.
   """
-  @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
   use Ash.Resource,
     data_layer: :embedded,
     extensions: [Aikido.Slice.Extension]
@@ -381,33 +380,6 @@ defmodule Aikido.AiReact.Slice do
           Aikido.AiReact.Actions.HookCompleted, public?: false
 
     route Aikido.AiReact.Signals.HookContext, Aikido.AiReact.Actions.HookContext, public?: false
-  end
-
-  @doc """
-  The cycle-warning user message appended to the context when the next
-  LLMCall would otherwise repeat the previous tool-call batch verbatim.
-  """
-  @spec cycle_warning() :: String.t()
-  def cycle_warning do
-    @cycle_warning
-  end
-
-  @doc """
-  Tool-call signature for cycle detection.
-
-  Stable, sortable, and tolerant of mixed atom/string keys (different
-  ReqLLM provider adapters return one or the other).
-  """
-  @spec tool_call_signature([map()]) :: String.t()
-  def tool_call_signature(tool_calls) when is_list(tool_calls) do
-    tool_calls
-    |> Enum.map(fn tc ->
-      name = Map.get(tc, :name) || Map.get(tc, "name") || ""
-      args = Map.get(tc, :arguments) || Map.get(tc, "arguments") || ""
-      "#{name}:#{inspect(args)}"
-    end)
-    |> Enum.sort()
-    |> Enum.join("|")
   end
 
   @behaviour Aikido.Durable.Codec

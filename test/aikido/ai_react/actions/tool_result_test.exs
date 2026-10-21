@@ -73,7 +73,7 @@ defmodule Aikido.AiReact.ToolResultTest do
 
     assert new_slice.pending_tool_calls == []
     assert new_slice.tool_results_received == []
-    assert new_slice.previous_tool_signature == Aikido.AiReact.Slice.tool_call_signature(calls)
+    assert is_binary(new_slice.previous_tool_signature)
     assert directive.context == new_slice.context
     assert directive.model == slice.model
     assert directive.tools == elem(slice.prepared_tools, 0)
@@ -87,8 +87,19 @@ defmodule Aikido.AiReact.ToolResultTest do
 
   test "appends the cycle warning when the batch repeats the previous signature" do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
-    previous_signature = Aikido.AiReact.Slice.tool_call_signature(calls)
-    slice = slice_with_pending(calls, previous_tool_signature: previous_signature)
+
+    first_result =
+      Aikido.AiReact.Slice
+      |> Ash.ActionInput.for_action(:tool_result, %{
+        state: slice_with_pending(calls),
+        request_id: "req_1",
+        tool_call_id: "call_1",
+        name: "test_add",
+        content: "{\"result\":3}"
+      })
+      |> Ash.run_action!()
+
+    slice = %{first_result.state | pending_tool_calls: calls}
 
     {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [%LLMCall{} = directive]}} =
       then(signal("req_1", "call_1", "test_add", "{\"result\":3}"), fn signal ->
@@ -104,7 +115,7 @@ defmodule Aikido.AiReact.ToolResultTest do
     last = List.last(messages)
     assert last.role == :user
     text = last.content |> hd() |> Map.get(:text)
-    assert text == Aikido.AiReact.Slice.cycle_warning()
+    assert text =~ "Do NOT repeat the same calls"
     assert directive.context == new_slice.context
   end
 
