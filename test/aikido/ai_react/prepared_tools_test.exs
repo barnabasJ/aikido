@@ -103,7 +103,6 @@ defmodule Aikido.PreparedToolsTest do
       AikidoTest.SliceState.new(Aikido.AiReact.Slice, %{
         status: :setup,
         request_id: "new",
-        tool_preparation: [:waiting],
         prepared_tools: nil
       })
 

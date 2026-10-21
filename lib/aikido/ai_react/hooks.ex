@@ -15,46 +15,47 @@ defmodule Aikido.AiReact.Hooks do
   def transition({:ok, result}, event, payload) do
     state = result.state
 
-    if Map.get(state, :hooks, []) == [] do
-      {:ok, result}
-    else
-      state =
-        Map.put(
-          state,
-          :hook_terminal,
-          if(state.status in [:completed, :failed], do: state.status)
+    state =
+      Map.put(
+        state,
+        :hook_terminal,
+        if(state.status in [:completed, :failed], do: state.status)
+      )
+
+    queue = [{:event, event, payload}] ++ Enum.flat_map(result.directives, &steps/1)
+
+    queue =
+      if state.status == :completed,
+        do: queue ++ [{:event, :run_completed, %{result: state.result}}],
+        else: queue
+
+    queue =
+      if state.status == :failed && event not in [:run_failed, :run_cancelled],
+        do: queue ++ [{:event, :run_failed, %{reason: state.error}}],
+        else: queue
+
+    case {state.status, Map.to_list(state.hooks_pending)} do
+      {status, [{token, continuation}]} when status != :failed ->
+        continuation = %{continuation | queue: continuation.queue ++ queue, status: status}
+
+        Aikido.Types.ActionResult.new(
+          state:
+            state
+            |> Map.put(:hooks_pending, %{token => continuation})
+            |> Map.put(:status, if(status == :setup, do: :setup, else: :running))
         )
 
-      queue = [{:event, event, payload}] ++ Enum.flat_map(result.directives, &steps/1)
-
-      queue =
-        if state.status == :completed,
-          do: queue ++ [{:event, :run_completed, %{result: state.result}}],
-          else: queue
-
-      queue =
-        if state.status == :failed && event not in [:run_failed, :run_cancelled],
-          do: queue ++ [{:event, :run_failed, %{reason: state.error}}],
-          else: queue
-
-      case {state.status, Map.to_list(state.hooks_pending)} do
-        {status, [{token, continuation}]} when status != :failed ->
-          continuation = %{continuation | queue: continuation.queue ++ queue, status: status}
-
-          Aikido.Types.ActionResult.new(
-            state:
-              state
-              |> Map.put(:hooks_pending, %{token => continuation})
-              |> Map.put(:status, if(status == :setup, do: :setup, else: :running))
-          )
-
-        _ ->
-          advance(Map.put(state, :hooks_pending, %{}), queue, state.status, [])
-      end
+      _ ->
+        advance(Map.put(state, :hooks_pending, %{}), queue, state.status, [])
     end
   end
 
   def transition(error, _event, _payload), do: error
+
+  @doc "Run before-model hooks, then release this model request with their accumulated context."
+  def before_model(state, %LLMCall{} = directive) do
+    advance(state, steps(directive), state.status, [])
+  end
 
   defp steps(%LLMCall{} = effect),
     do: [{:event, :before_model, %{}}, {:effect, effect}]
@@ -105,15 +106,22 @@ defmodule Aikido.AiReact.Hooks do
   end
 
   def advance(state, [{:effect, %LLMCall{} = effect} | rest], status, directives) do
-    {state, effect} = prepare_model(state, effect)
+    state =
+      Aikido.AiReact.Context.append_messages(
+        state,
+        Enum.map(state.queued_messages, &ReqLLM.Context.user/1)
+      )
+
+    state = %{state | queued_messages: []}
+    {state, effect} = apply_hook_context(state, effect)
+    {state, effect} = Aikido.AiReact.Handoff.before_model(state, effect)
     advance(state, rest, status, directives ++ [effect])
   end
 
   def advance(state, [{:effect, effect} | rest], status, directives),
     do: advance(state, rest, status, directives ++ [effect])
 
-  @doc false
-  def prepare_model(state, effect) do
+  defp apply_hook_context(state, effect) do
     state =
       Enum.reduce(Map.get(state, :hook_context, []), state, fn entry, state ->
         Aikido.AiReact.Context.append_message(

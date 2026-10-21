@@ -71,7 +71,7 @@ defmodule Aikido.AICancellationHooksTest do
              )
 
     assert_receive {:hook_waiting, :before_model, before_model}, 5_000
-    assert {:ok, :setup} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.status})
+    assert {:ok, :running} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.status})
     send(before_model, :release)
     assert_receive {:model_started, model}, 5_000
     monitor = Process.monitor(model)

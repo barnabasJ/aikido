@@ -1,16 +1,13 @@
 defmodule Aikido.AiReact.Actions.Deliver do
   @moduledoc "Queues scoped delivery during active work or opens a run with its delivery correlation."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Hooks, DirectivePlan, Run, Scope}
+  alias Aikido.AiReact.{Hooks, Run, Scope}
 
   @impl true
   def run(input, _opts, _context) do
-    result =
-      with :ok <- Scope.validate(input.arguments.state, input) do
-        reduce(input)
-      end
-
-    DirectivePlan.prepare_tools_and_handoff(result, input)
+    with :ok <- Scope.validate(input.arguments.state, input) do
+      reduce(input)
+    end
   end
 
   defp reduce(input) do

@@ -1,5 +1,5 @@
 defmodule Aikido.AiReact.Run do
-  @moduledoc "Pure run setup shared by ask, message and delivery actions."
+  @moduledoc "Builds initial run state and releases tool/handoff state at terminal transitions."
   alias Aikido.AiReact.Context
 
   @doc false
@@ -28,6 +28,11 @@ defmodule Aikido.AiReact.Run do
         Map.merge(Map.get(slice, :tool_context) || %{}, data[:tool_context] || %{})
       )
     end
+  end
+
+  @doc "Discard the prepared callbacks and pending handoff when a run settles."
+  def clear_tools_and_handoff(state) do
+    Map.merge(state, %{prepared_tools: nil, handoff_pending: nil})
   end
 
   defp build(
@@ -80,7 +85,6 @@ defmodule Aikido.AiReact.Run do
       handoff_count: 0,
       last_handoff: nil,
       last_input_tokens: nil,
-      tool_preparation: [],
       options: options,
       run_metadata: data[:metadata] || %{},
       queued_messages: [],
@@ -113,14 +117,11 @@ defmodule Aikido.AiReact.Run do
       llm_opts: llm_opts
     }
 
-    directive = %Aikido.AiReact.Directives.LLMCall{
+    directive = %Aikido.AiReact.Directives.PrepareTools{
       options: options,
-      iteration: 1,
-      client: client,
-      model: model,
-      context: context,
-      request_id: data.request_id,
-      llm_opts: llm_opts
+      tools: tools,
+      tool_options: new_slice.tool_options,
+      request_id: data.request_id
     }
 
     Aikido.Types.ActionResult.new(

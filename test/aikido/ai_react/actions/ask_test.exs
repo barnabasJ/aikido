@@ -1,6 +1,6 @@
 defmodule Aikido.AiReact.AskTest do
   use ExUnit.Case, async: true
-  alias Aikido.AiReact.Directives.{LLMCall, PrepareTools}
+  alias Aikido.AiReact.Directives.PrepareTools
   alias ReqLLM.Context
 
   defp ask_signal(overrides \\ %{}) do
@@ -89,15 +89,10 @@ defmodule Aikido.AiReact.AskTest do
 
     assert %PrepareTools{} = directive
 
-    assert [
-             %LLMCall{
-               model: "anthropic:claude-haiku-4-5-20251001",
-               request_id: "req_test_1",
-               llm_opts: [max_tokens: 64]
-             }
-           ] = new_slice.tool_preparation
-
-    assert hd(new_slice.tool_preparation).context == new_slice.context
+    assert directive.request_id == new_slice.request_id
+    assert directive.tools == new_slice.tools
+    assert directive.tool_options == new_slice.tool_options
+    assert new_slice.prepared_tools == nil
   end
 
   test "omits the system message when no system_prompt is given" do

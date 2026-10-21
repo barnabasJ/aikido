@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.Failed do
   @moduledoc "Records a correlated execution failure unless the run is settled or handing off."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Completion, DirectivePlan}
+  alias Aikido.AiReact.{Completion}
 
   @impl true
   def run(input, _opts, _context) do
@@ -13,7 +13,6 @@ defmodule Aikido.AiReact.Actions.Failed do
         :run_failed,
         Map.take(input.arguments, [:query, :tool_call_id, :name, :content, :reason, :metadata])
       )
-      |> DirectivePlan.prepare_tools_and_handoff(input)
     else
       Aikido.Types.ActionResult.new(state: input.arguments.state)
     end

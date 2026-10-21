@@ -133,10 +133,12 @@ defmodule Aikido.HookRequestsTest do
                    2_000
 
     assert is_binary(run_id)
-    assert {:ok, :setup} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.status})
+    assert {:ok, :running} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.status})
+    assert {:ok, :queued} = Aikido.AI.queue_message(pid, "queued while the hook waits")
     send(waiter, {:answer, %{value: "blue"}})
     assert {:ok, answer} = Task.await(task, 5_000)
     assert answer =~ "Lua received blue"
+    assert answer =~ "queued while the hook waits"
     assert {:ok, ai} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai})
     assert ai.estimated_tokens == Aikido.AiReact.Context.estimate_tokens(ai.context)
 

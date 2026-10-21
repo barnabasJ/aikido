@@ -110,6 +110,33 @@ defmodule Aikido.ReactSetupTest do
     assert_receive {:model_started, _}, 5_000
   end
 
+  test "a denied startup hook never launches tool preparation or a model request", ctx do
+    reject(AshAi, :build_tools_and_registry, 1)
+    pid = start_server(ctx, Agent)
+
+    assert {:error, {:hook_denied, "startup", "stop before setup"}} =
+             Aikido.AI.ask_sync(
+               pid,
+               "denied",
+               options(self()) ++
+                 [
+                   hooks: [
+                     %{
+                       name: "startup",
+                       event: :run_started,
+                       script: ~s(return {decision = "deny", message = "stop before setup"})
+                     }
+                   ]
+                 ]
+             )
+
+    assert {:ok, %{status: :failed, prepared_tools: nil, hooks_pending: pending}} =
+             Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai})
+
+    assert pending == %{}
+    refute_received {:model_started, _}
+  end
+
   test "preparation failure settles setup without starting the model", ctx do
     expect(AshAi, :build_tools_and_registry, fn _ -> raise "setup failed" end)
     pid = start_server(ctx, Agent)
@@ -117,7 +144,7 @@ defmodule Aikido.ReactSetupTest do
     assert {:error, %RuntimeError{message: "setup failed"}} =
              Aikido.AI.ask_sync(pid, "fail", options(self()))
 
-    assert {:ok, %{status: :failed, prepared_tools: nil, tool_preparation: []}} =
+    assert {:ok, %{status: :failed, prepared_tools: nil}} =
              Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai})
 
     refute_received {:model_started, _}

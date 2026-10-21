@@ -144,6 +144,39 @@ defmodule Aikido.AiReact.EventGatesTest do
     assert second == complete(first.state, second_token, %Decision{context: "second approval"})
   end
 
+  test "handoff planning sees context added by a before-model approval" do
+    hook = Ash.create!(Hook, %{name: "approval", event: :before_model, script: "return nil"})
+    options = Aikido.AiReact.Options.new!(context_max_tokens: 1_000, handoff_buffer_tokens: 0)
+    original = state(%{status: :setup, hooks: [hook], prepared_tools: nil, options: options})
+
+    ready = run(:tools_ready, original, %{request_id: "current", prepared_tools: {[], %{}}})
+    assert [%ExecuteHook{token: token}] = ready.directives
+    assert ready.state.handoff_pending == nil
+    assert ready.state.prepared_tools == {[], %{}}
+
+    approved =
+      complete(ready.state, token, %Decision{context: String.duplicate("evidence ", 500)})
+
+    assert [%LLMCall{mode: :handoff, tools: [], handoff_id: 1} = directive] = approved.directives
+    assert approved.state.handoff_pending == 1
+    assert approved.state.estimated_tokens >= 1_000
+
+    assert Enum.any?(directive.context.messages, fn message ->
+             Enum.any?(message.content, &String.contains?(&1.text || "", "evidence"))
+           end)
+  end
+
+  test "terminal completion clears callbacks before a synchronous terminal hook settles" do
+    hook = Ash.create!(Hook, %{name: "completion", event: :run_completed, script: "return nil"})
+    original = state(%{hooks: [hook], prepared_tools: {[], %{"tool" => fn _, _ -> :ok end}}})
+    response = Aikido.AI.Test.ResponseFixtures.final_answer_response("finished")
+    completed = run(:llm_turn, original, %{request_id: "current", turn: response})
+    assert [%ExecuteHook{}] = completed.directives
+    assert completed.state.hook_terminal == :completed
+    assert completed.state.prepared_tools == nil
+    assert completed.state.handoff_pending == nil
+  end
+
   test "a later synchronous denial and cancellation discard queued model work" do
     for outcome <- [:deny, :cancel] do
       {waiting, token} = parallel_results()

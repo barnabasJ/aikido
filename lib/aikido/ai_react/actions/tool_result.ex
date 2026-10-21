@@ -3,7 +3,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
   use Ash.Resource.Actions.Implementation
 
   @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
-  alias Aikido.AiReact.{Completion, DirectivePlan}
+  alias Aikido.AiReact.{Completion}
   alias Aikido.AiReact.Context
 
   @impl true
@@ -16,7 +16,6 @@ defmodule Aikido.AiReact.Actions.ToolResult do
         :after_tool,
         Map.take(input.arguments, [:query, :tool_call_id, :name, :content, :reason, :metadata])
       )
-      |> DirectivePlan.prepare_tools_and_handoff(input)
     else
       Aikido.Types.ActionResult.new(state: input.arguments.state)
     end
@@ -71,29 +70,22 @@ defmodule Aikido.AiReact.Actions.ToolResult do
         current_signature
       )
 
-    slice =
-      Context.append_messages(
-        slice,
-        Enum.map(Map.get(slice, :queued_messages, []), &ReqLLM.Context.user/1)
-      )
-
-    warned_context = slice.context
-    slice = Map.put(slice, :queued_messages, [])
-
     new_slice = %{
       slice
-      | context: warned_context,
-        pending_tool_calls: [],
+      | pending_tool_calls: [],
         tool_results_received: [],
         previous_tool_signature: current_signature
     }
 
+    {tools, _registry} = slice.prepared_tools
+
     directive = %Aikido.AiReact.Directives.LLMCall{
       options: Map.get(slice, :options, %{}),
       iteration: slice.iteration + 1,
+      tools: tools,
       client: Map.get(slice, :client, ReqLLM.Generation),
       model: slice.model,
-      context: warned_context,
+      context: slice.context,
       request_id: slice.request_id,
       llm_opts: slice.llm_opts
     }

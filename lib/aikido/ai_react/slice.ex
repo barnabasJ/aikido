@@ -59,12 +59,6 @@ defmodule Aikido.AiReact.Slice do
         description "Transient tool descriptions and callback registry prepared for the current run."
       end
 
-      attribute :tool_preparation, {:array, :term} do
-        description "Model or tool directives waiting for tool preparation to complete."
-        default []
-        allow_nil? false
-      end
-
       attribute :run_scope, :map do
         description "Caller actor and tenant bound to the current run for delivery and tool scope checks."
         default %{}
@@ -391,7 +385,6 @@ defmodule Aikido.AiReact.Slice do
       Map.merge(state, %{
         handoff_pending: nil,
         prepared_tools: nil,
-        tool_preparation: [],
         hooks_pending: %{},
         hook_terminal: nil,
         run_scope: %{},
@@ -413,7 +406,6 @@ defmodule Aikido.AiReact.Slice do
     Map.merge(state, %{
       handoff_pending: nil,
       prepared_tools: nil,
-      tool_preparation: [],
       hooks_pending: %{},
       hook_terminal: nil,
       run_scope: %{},

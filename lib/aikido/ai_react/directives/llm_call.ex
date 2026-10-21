@@ -2,8 +2,8 @@ defmodule Aikido.AiReact.Directives.LLMCall do
   @moduledoc """
   Side-effect directive: makes one call to `ReqLLM.Generation.generate_text/3`.
 
-  Emitted by the slice's `:ask` action (first turn) and `:tool_result` action
-  (subsequent turns, once all tool results in a batch have come back).
+  Emitted by `:tools_ready` after setup, and by model/tool result actions when
+  another turn is needed. Each descriptor already contains its prepared tools.
   The executor spawns a Task under the agent's task supervisor — the Task
   is the *only* place a blocking ReqLLM call lives, so the agent process
   stays free to handle other signals.

@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.LlmTurn do
   @moduledoc "Adopts model responses, accumulates usage and continues with tools or queued messages."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Completion, Handoff, DirectivePlan}
+  alias Aikido.AiReact.{Completion, Handoff}
   alias Aikido.AiReact.Context
 
   @impl true
@@ -18,7 +18,6 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
           Map.from_struct(input.arguments.turn)
         )
       )
-      |> DirectivePlan.prepare_tools_and_handoff(input)
     else
       Aikido.Types.ActionResult.new(state: input.arguments.state)
     end
@@ -76,24 +75,21 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
 
     if queued != [] && new_slice.iteration < slice.max_iterations do
       new_slice =
-        Context.append_messages(new_slice, Enum.map(queued, &ReqLLM.Context.user/1))
-
-      context = new_slice.context
-
-      new_slice =
         Map.merge(new_slice, %{
           status: :running,
           result: nil,
-          context: context,
-          queued_messages: [],
+          context: new_context,
           streaming_text: "",
           streaming_thinking: ""
         })
 
+      {tools, _registry} = slice.prepared_tools
+
       effect = %Aikido.AiReact.Directives.LLMCall{
+        tools: tools,
         client: Map.get(slice, :client, ReqLLM.Generation),
         model: slice.model,
-        context: context,
+        context: new_context,
         request_id: slice.request_id,
         llm_opts: slice.llm_opts,
         options: Map.get(slice, :options, %{}),
@@ -142,6 +138,8 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
   end
 
   defp dispatch_tools(slice, new_context, iteration, msg_calls) do
+    {_tools, registry} = slice.prepared_tools
+
     new_slice = %{
       slice
       | iteration: iteration,
@@ -155,6 +153,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
         %Aikido.AiReact.Directives.ToolExec{
           options: Map.get(slice, :options, %{}),
           tool_call: call,
+          registry: registry,
           tool_context: Map.get(slice, :tool_context, %{}),
           request_id: slice.request_id
         }

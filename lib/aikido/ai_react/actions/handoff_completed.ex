@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.HandoffCompleted do
   @moduledoc "Adopts a validated handoff document, retains usage and resumes the next model turn."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Handoff, Hooks, DirectivePlan}
+  alias Aikido.AiReact.{Handoff, Hooks}
   alias Aikido.AiReact.Directives.LLMCall
   alias Aikido.AiReact.Context
 
@@ -9,7 +9,6 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
   def run(input, _opts, _context) do
     input.arguments.state
     |> reduce(Map.delete(input.arguments, :state))
-    |> DirectivePlan.prepare_tools_and_handoff(input)
   end
 
   @doc false
@@ -85,8 +84,11 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
                 usage: usage
               })
 
+            {tools, _registry} = state.prepared_tools
+
             effect = %LLMCall{
               mode: :resume,
+              tools: tools,
               options: state.options,
               iteration: state.iteration + 1,
               model: state.model,

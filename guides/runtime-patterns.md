@@ -423,13 +423,22 @@ registry directly. There is no per-tool Aikido tuple or callback wrapper.
 Native tool action errors reach the model unchanged as Ash AI's formatted content;
 execution deadlines and crashes are handled by the bounded I/O task.
 
-A run starts in `:setup`. Startup hooks and tool preparation must finish before
-it enters `:running` and sends its first model request. Another start or
-`replace_context` is rejected during setup. Messages and deliveries from the same actor/tenant
-are queued and included in that first request. Cancellation stops an active
-preparation task; failures settle the run without calling the model. Late results
-cannot revive a cancelled or replaced run. Tool preparation uses the configured
-`model_timeout_ms` budget.
+A run starts in `:setup`. The opening action returns a `PrepareTools` directive,
+withheld until `run_started` hooks allow it. Its result signal routes to
+`ToolsReady`, which installs the descriptions/registry, enters `:running` and
+constructs the first model request. Before-model hooks then gate that request.
+Another start or `replace_context` is rejected during setup. Messages and
+deliveries from the same actor/tenant queue until the next model request is
+released, including messages arriving while a before-model hook waits.
+Cancellation stops active startup work; failures settle the run without calling
+the model. Late results cannot revive a cancelled or replaced run. Tool
+preparation uses the configured `model_timeout_ms` budget.
+
+Subsequent model/tool actions construct descriptors with the prepared descriptions
+or registry already attached. Hooks release each model request after adding hook
+context and queued messages; only that boundary checks whether a handoff is
+needed. Terminal transitions clear tool callbacks and pending handoffs. Streaming
+and context-only actions do not perform setup or rewrite returned directives.
 
 Aikido builds descriptions and the callback registry once per ReAct run, before
 its first model or tool effect. Later turns and parallel tool calls reuse them;

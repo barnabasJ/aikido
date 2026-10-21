@@ -21,42 +21,31 @@ defmodule Aikido.AiReact.Handoff do
     """
   end
 
-  @doc false
-  def plan({:ok, result}) do
-    state = result.state
+  @doc "Replace a ready normal model request with a handoff when the context budget is reached."
+  def before_model(state, %LLMCall{mode: :normal} = directive) do
     options = Map.get(state, :options) || %Aikido.AiReact.Options{}
 
-    if state.status == :running && is_nil(Map.get(state, :handoff_pending)) &&
-         Map.get(state, :pending_tool_calls, []) == [] && options.handoff &&
-         is_integer(options.context_max_tokens) do
-      Enum.reduce(result.directives, {:ok, %{result | directives: []}}, fn
-        %LLMCall{mode: :normal} = effect, {:ok, result} ->
-          if current_tokens(state) >=
-               max(options.context_max_tokens - options.handoff_buffer_tokens, 0) do
-            count = Map.get(state, :handoff_count, 0) + 1
+    if state.status == :running && is_nil(state.handoff_pending) &&
+         state.pending_tool_calls == [] && options.handoff &&
+         is_integer(options.context_max_tokens) &&
+         current_tokens(state) >=
+           max(options.context_max_tokens - options.handoff_buffer_tokens, 0) do
+      count = state.handoff_count + 1
 
-            context =
-              Context.append(
-                effect.context,
-                Context.user(options.handoff_prompt || instructions())
-              )
+      context =
+        Context.append(
+          directive.context,
+          Context.user(options.handoff_prompt || instructions())
+        )
 
-            effect = %{effect | mode: :handoff, handoff_id: count, context: context, tools: []}
-            state = Map.merge(result.state, %{handoff_count: count, handoff_pending: count})
-            {:ok, %{result | state: state, directives: result.directives ++ [effect]}}
-          else
-            {:ok, %{result | directives: result.directives ++ [effect]}}
-          end
-
-        effect, {:ok, result} ->
-          {:ok, %{result | directives: result.directives ++ [effect]}}
-      end)
+      directive = %{directive | mode: :handoff, handoff_id: count, context: context, tools: []}
+      {%{state | handoff_count: count, handoff_pending: count}, directive}
     else
-      {:ok, result}
+      {state, directive}
     end
   end
 
-  def plan(error), do: error
+  def before_model(state, directive), do: {state, directive}
 
   @doc false
   def active?(state, data),

@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Separate ReAct tool setup, directive construction, terminal cleanup and
+  model-boundary handoff planning. Remove the catch-all directive rewrite pass
+  and hidden setup directive queue. Messages queued during before-model hooks
+  join the request released after those hooks.
+
 - Remove no-op identity, memory and thread `ensure` commands. Their native create
   actions already initialize state before routed reducers run.
 
