@@ -109,9 +109,9 @@ defmodule Aikido.AiReact.Directives.LLMCall do
         :ok
 
       {:error, reason} ->
-        send_model_failure_to_agent(
+        send_model_result_to_agent(
+          {:error, reason},
           directive,
-          reason,
           agent_pid,
           source,
           Aikido.Signal.ctx(input_signal)
@@ -126,7 +126,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
     |> generate_response(agent_pid, source, scope, supervisor)
     |> send_model_result_to_agent(d, agent_pid, source, scope)
   rescue
-    exception -> send_model_failure_to_agent(d, exception, agent_pid, source, scope)
+    exception -> send_model_result_to_agent({:error, exception}, d, agent_pid, source, scope)
   end
 
   defp generate_response(d, agent_pid, source, scope, supervisor) do
@@ -223,9 +223,6 @@ defmodule Aikido.AiReact.Directives.LLMCall do
     data = %{reason: reason, request_id: d.request_id} |> include_handoff_id(d)
     Signal.new!(model_failure_signal_type(d), data, source: source)
   end
-
-  defp send_model_failure_to_agent(d, reason, pid, source, scope),
-    do: send_model_result_to_agent({:error, reason}, d, pid, source, scope)
 
   defp model_failure_signal_type(%{mode: :handoff}), do: "ai.react.context_handoff.failed"
   defp model_failure_signal_type(_), do: "ai.react.failed"

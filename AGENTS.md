@@ -75,6 +75,7 @@ does not permit other runtime effects inside reducers.
 
 ## Standards
 - Break multi-step logic into helpers named for the operations they perform. Pipe state through pure transformation steps and use `with` for steps that can fail. Apply this to helpers, runtime code, DSL expansion and examples as well as reducers. Expose smaller documented operations when an umbrella helper mixes concerns, rather than inventing another vague wrapper. Keep cohesive declarations and required behaviour callback names.
+- Give each operation one canonical name. Call shared operations directly instead of adding differently named forwarding helpers; keep adapters only when they perform a distinct conversion or policy step.
 - Keep Ash reducer actions pure: the same input returns the same state and directives
 - Directives mutate **no** state — neither `agent.state` (domain) nor `%AgentServer.State{}` (runtime). State changes flow through the action's return value; runtime bookkeeping flows through GenServer callbacks and `process_signal/2` cascade callbacks
 - Use **Ash types** for data contracts and **Spark.Options** for DSL/configuration validation

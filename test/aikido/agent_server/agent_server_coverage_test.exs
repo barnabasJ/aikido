@@ -25,7 +25,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
   use AikidoTest.Case, async: true
   @moduletag :capture_log
 
-  describe("resolve_server with {:via, ...}") do
+  describe("resolve with {:via, ...}") do
     test("via tuple that resolves to nil returns error", %{aikido: aikido}) do
       start_supervised!({Registry, keys: :unique, name: Module.concat(aikido, ExternalRegistry)})
 
@@ -66,7 +66,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
     end
   end
 
-  describe("resolve_server with string ID") do
+  describe("resolve with string ID") do
     test("string ID returns error with helpful message", %{aikido: _aikido}) do
       signal = Aikido.Signal.new!("increment", %{}, source: "/test")
 
@@ -88,7 +88,7 @@ defmodule AikidoTest.AgentServerCoverageTest do
     end
   end
 
-  describe("resolve_server with atom name") do
+  describe("resolve with atom name") do
     test("atom name that doesn't exist returns error", %{aikido: _aikido}) do
       signal = Aikido.Signal.new!("increment", %{}, source: "/test")
 

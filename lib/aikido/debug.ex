@@ -68,8 +68,11 @@ defmodule Aikido.Debug do
     end
   end
 
-  @spec maybe_enable_from_config(atom(), instance()) :: :ok
-  def maybe_enable_from_config(otp_app, instance) do
+  @doc "Apply the instance’s configured debug level, leaving it unchanged when no application is supplied."
+  @spec configure_from_application(atom() | nil, instance()) :: :ok
+  def configure_from_application(nil, _instance), do: :ok
+
+  def configure_from_application(otp_app, instance) do
     config = Application.get_env(otp_app, instance, [])
 
     case Keyword.get(config, :debug) do

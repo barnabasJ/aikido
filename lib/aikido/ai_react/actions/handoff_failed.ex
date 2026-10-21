@@ -19,7 +19,7 @@ defmodule Aikido.AiReact.Actions.HandoffFailed do
           handoff_pending: nil,
           hooks_pending: %{}
         })
-        |> Aikido.AiReact.Run.clear_tools_and_handoff()
+        |> Aikido.AiReact.Completion.clear_tools_and_handoff()
 
       Hooks.queue_event_hooks(
         Aikido.Types.ActionResult.new(state: state),

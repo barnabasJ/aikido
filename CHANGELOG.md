@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Remove differently named forwarding helpers for interrupted tool results,
+  terminal cleanup, server lookup, debug configuration, Lua capabilities and
+  cron signal construction. Call each shared operation by its canonical name.
+
 - Name internal operations for their state changes, message content and recipients,
   failure handling and return values across features, runtime, DSLs and examples.
   Replace ambiguous helpers such as `commit`, `safe` and `scope` with explicit names.

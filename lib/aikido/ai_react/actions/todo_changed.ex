@@ -11,7 +11,7 @@ defmodule Aikido.AiReact.Actions.TodoChanged do
       state =
         state
         |> Completion.resolve_todo_status(input.context.aikido.agent.state)
-        |> Completion.release_terminal_resources()
+        |> Completion.clear_tools_and_handoff()
 
       Hooks.queue_event_hooks(
         Aikido.Types.ActionResult.new(state: state),

@@ -70,7 +70,7 @@ defmodule Aikido.AiReact.Actions.HookCompleted do
       |> Map.put(:error, reason)
       |> Map.put(:hooks_pending, %{})
       |> Map.put(:hook_terminal, nil)
-      |> Aikido.AiReact.Run.clear_tools_and_handoff()
+      |> Aikido.AiReact.Completion.clear_tools_and_handoff()
 
     Aikido.Types.ActionResult.new(state: state)
   end

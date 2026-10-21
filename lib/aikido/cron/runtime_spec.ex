@@ -58,43 +58,36 @@ defmodule Aikido.Cron.RuntimeSpec do
   end
 
   @spec build_signal(t(), String.t(), term()) :: Aikido.Signal.t()
-  def build_signal(%__MODULE__{kind: :dynamic} = spec, agent_id, logical_id) do
-    signal = build_occurrence_signal(spec, agent_id, logical_id)
+  def build_signal(
+        %__MODULE__{kind: :dynamic, message: %Signal{} = signal} = spec,
+        _agent_id,
+        _logical_id
+      ) do
+    signal
+    |> Aikido.Directive.materialize_signal()
+    |> inherit_job_scope(spec)
+  end
 
+  def build_signal(%__MODULE__{kind: :dynamic, message: message} = spec, agent_id, logical_id) do
+    %{job_id: logical_id, message: message}
+    |> Aikido.Cron.Signals.Tick.new!(source: "/agent/#{agent_id}")
+    |> inherit_job_scope(spec)
+  end
+
+  def build_signal(
+        %__MODULE__{kind: :schedule, signal_type: signal_type, data: data},
+        agent_id,
+        _logical_id
+      ) do
+    Signal.new!(signal_type, data, source: "/agent/#{agent_id}/schedule")
+  end
+
+  defp inherit_job_scope(signal, spec) do
     Signal.inherit(signal, %Signal{
       type: signal.type,
       scope: spec.scope,
       tracer_context: spec.tracer_context
     })
-  end
-
-  def build_signal(%__MODULE__{} = spec, agent_id, logical_id),
-    do: build_occurrence_signal(spec, agent_id, logical_id)
-
-  defp build_occurrence_signal(
-         %__MODULE__{kind: :dynamic, message: %Signal{} = signal},
-         _agent_id,
-         _logical_id
-       ),
-       do: Aikido.Directive.materialize_signal(signal)
-
-  defp build_occurrence_signal(
-         %__MODULE__{kind: :dynamic, message: message},
-         agent_id,
-         logical_id
-       ) do
-    Aikido.Cron.Signals.Tick.new!(
-      %{job_id: logical_id, message: message},
-      source: "/agent/#{agent_id}"
-    )
-  end
-
-  defp build_occurrence_signal(
-         %__MODULE__{kind: :schedule, signal_type: signal_type, data: data},
-         agent_id,
-         _logical_id
-       ) do
-    Signal.new!(signal_type, data, source: "/agent/#{agent_id}/schedule")
   end
 
   defp normalize_timezone(nil), do: @default_timezone

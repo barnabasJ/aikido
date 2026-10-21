@@ -15,13 +15,13 @@ defmodule Aikido.AiReact.Completion do
     state =
       state
       |> resolve_todo_status(agent_state)
-      |> release_terminal_resources()
+      |> clear_tools_and_handoff()
 
     {:ok, %{result | state: state}}
   end
 
   def apply_completion_requirements({:ok, %{state: %{status: :failed} = state} = result}, _input) do
-    {:ok, %{result | state: release_terminal_resources(state)}}
+    {:ok, %{result | state: clear_tools_and_handoff(state)}}
   end
 
   def apply_completion_requirements(result, _input), do: result
@@ -41,10 +41,11 @@ defmodule Aikido.AiReact.Completion do
   end
 
   @doc "Discard prepared tools and pending handoff only after a run completes or fails."
-  def release_terminal_resources(%{status: status} = state) when status in [:completed, :failed],
-    do: Aikido.AiReact.Run.clear_tools_and_handoff(state)
+  def clear_tools_and_handoff(%{status: status} = state) when status in [:completed, :failed] do
+    Map.merge(state, %{prepared_tools: nil, handoff_pending: nil})
+  end
 
-  def release_terminal_resources(state), do: state
+  def clear_tools_and_handoff(state), do: state
 
   defp resolve_blocking_todos(state, items) do
     cond do

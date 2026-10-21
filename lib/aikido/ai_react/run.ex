@@ -1,5 +1,5 @@
 defmodule Aikido.AiReact.Run do
-  @moduledoc "Builds initial run state and releases tool/handoff state at terminal transitions."
+  @moduledoc "Builds initial conversation state and requests tool setup for a new run."
   alias Aikido.AiReact.Context
 
   @doc "Initialize conversation state and request tool setup before the first model call."
@@ -13,11 +13,6 @@ defmodule Aikido.AiReact.Run do
       |> reset_run(data, configuration)
       |> request_tool_setup()
     end
-  end
-
-  @doc "Discard the prepared callbacks and pending handoff when a run settles."
-  def clear_tools_and_handoff(state) do
-    Map.merge(state, %{prepared_tools: nil, handoff_pending: nil})
   end
 
   defp resolve_configuration(data, state) do
@@ -44,9 +39,11 @@ defmodule Aikido.AiReact.Run do
 
   defp refresh_conversation(state, system_prompt) do
     context =
-      state
-      |> Map.get(:context)
-      |> close_interrupted_tool_calls()
+      case Map.get(state, :context) do
+        %ReqLLM.Context{} = context -> context
+        _ -> ReqLLM.Context.new()
+      end
+      |> Context.append_interrupted_tool_results()
       |> replace_system_prompt(system_prompt)
 
     cached = Map.get(state, :estimated_tokens)
@@ -55,11 +52,6 @@ defmodule Aikido.AiReact.Run do
       do: state,
       else: Context.replace_context(state, context)
   end
-
-  defp close_interrupted_tool_calls(%ReqLLM.Context{} = context),
-    do: Context.append_interrupted_tool_results(context)
-
-  defp close_interrupted_tool_calls(_), do: ReqLLM.Context.new()
 
   defp replace_system_prompt(context, system_prompt) do
     messages = Enum.reject(context.messages, &(&1.role == :system))

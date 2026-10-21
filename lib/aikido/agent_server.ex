@@ -269,7 +269,7 @@ defmodule Aikido.AgentServer do
   def call(server, %Signal{} = signal, selector, opts \\ []) when is_function(selector, 1) do
     timeout = Keyword.get(opts, :timeout, Defaults.agent_server_call_timeout_ms())
 
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, pid} <- resolve(server) do
       GenServer.call(
         pid,
         {:signal_with_selector, Aikido.Signal.capture_tracing(signal), selector},
@@ -357,7 +357,7 @@ defmodule Aikido.AgentServer do
   end
 
   defp wait_for_command_result(server, command, pattern, selector, timeout) do
-    with {:ok, pid} <- resolve_server(server),
+    with {:ok, pid} <- resolve(server),
          {:ok, ref} <- subscribe(pid, pattern, selector, once: true) do
       monitor = Process.monitor(pid)
 
@@ -412,7 +412,7 @@ defmodule Aikido.AgentServer do
   """
   @spec cast(server(), Signal.t()) :: :ok | {:error, term()}
   def cast(server, %Signal{} = signal) do
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, pid} <- resolve(server) do
       GenServer.cast(pid, {:signal, Aikido.Signal.capture_tracing(signal)})
     end
   end
@@ -454,7 +454,7 @@ defmodule Aikido.AgentServer do
   def state(server, selector, opts \\ []) when is_function(selector, 1) and is_list(opts) do
     timeout = Keyword.get(opts, :timeout, Defaults.agent_server_call_timeout_ms())
 
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, pid} <- resolve(server) do
       GenServer.call(pid, {:read_state_with_selector, selector}, timeout)
     end
   end
@@ -498,7 +498,7 @@ defmodule Aikido.AgentServer do
              target: [type: :pid, default: self()],
              once: [type: :boolean, default: false]
            ),
-         {:ok, pid} <- resolve_server(server) do
+         {:ok, pid} <- resolve(server) do
       GenServer.call(
         pid,
         {:subscribe, pattern, selector, options[:target], self(), options[:once]}
@@ -513,7 +513,7 @@ defmodule Aikido.AgentServer do
   """
   @spec unsubscribe(server(), reference()) :: :ok | {:error, term()}
   def unsubscribe(server, sub_ref) when is_reference(sub_ref) do
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, pid} <- resolve(server) do
       GenServer.cast(pid, {:unsubscribe, sub_ref})
     end
   end
@@ -545,7 +545,7 @@ defmodule Aikido.AgentServer do
   def await_ready(server, opts \\ []) when is_list(opts) do
     timeout = Keyword.get(opts, :timeout, Defaults.agent_server_await_timeout_ms())
 
-    case resolve_server(server) do
+    case resolve(server) do
       {:ok, pid} ->
         ref = Process.monitor(pid)
         GenServer.cast(pid, {:register_ready_waiter, self(), ref})
@@ -592,7 +592,7 @@ defmodule Aikido.AgentServer do
   def await_child(server, child_tag, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, Defaults.agent_server_await_timeout_ms())
 
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, pid} <- resolve(server) do
       case GenServer.call(pid, {:get_child_pid, child_tag}) do
         {:ok, child_pid} -> {:ok, child_pid}
         :not_found -> subscribe_and_await_child(pid, child_tag, timeout)
@@ -655,7 +655,7 @@ defmodule Aikido.AgentServer do
   """
   @spec set_debug(server(), boolean()) :: :ok | {:error, term()}
   def set_debug(server, enabled) when is_boolean(enabled) do
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, pid} <- resolve(server) do
       GenServer.call(pid, {:set_debug, enabled})
     end
   end
@@ -680,7 +680,7 @@ defmodule Aikido.AgentServer do
   """
   @spec recent_events(server(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def recent_events(server, opts \\ []) do
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, pid} <- resolve(server) do
       GenServer.call(pid, {:recent_events, opts})
     end
   end
@@ -694,7 +694,7 @@ defmodule Aikido.AgentServer do
   end
 
   def alive?(server) do
-    case resolve_server(server) do
+    case resolve(server) do
       {:ok, pid} -> Process.alive?(pid)
       {:error, _} -> false
     end
@@ -714,7 +714,7 @@ defmodule Aikido.AgentServer do
           {:ok, %{id: String.t(), agent_module: module(), partition: term() | nil}}
           | {:error, term()}
   def adopt_parent(server, %ParentRef{} = parent_ref) do
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, pid} <- resolve(server) do
       try do
         GenServer.call(pid, {:adopt_parent, parent_ref})
       catch
@@ -740,7 +740,7 @@ defmodule Aikido.AgentServer do
   @spec adopt_child(server(), pid() | String.t(), term(), map()) ::
           {:ok, pid()} | {:error, term()}
   def adopt_child(server, child, tag, meta \\ %{}) do
-    with {:ok, parent_pid} <- resolve_server(server),
+    with {:ok, parent_pid} <- resolve(server),
          {:ok, runtime} <- state(parent_pid, &{:ok, &1}),
          :ok <- ensure_adopt_tag_available(runtime, tag),
          {:ok, child_pid} <- resolve_adopt_child(child, runtime),
@@ -767,7 +767,7 @@ defmodule Aikido.AgentServer do
   """
   @spec stop_child(server(), term(), term()) :: :ok | {:error, term()}
   def stop_child(server, tag, reason \\ :normal) do
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, pid} <- resolve(server) do
       try do
         GenServer.call(pid, {:stop_child, tag, reason})
       catch
@@ -2187,35 +2187,31 @@ defmodule Aikido.AgentServer do
   succeed).
   """
   @spec resolve(server()) :: {:ok, pid()} | {:error, term()}
-  def resolve(server) do
-    resolve_server(server)
-  end
-
-  defp resolve_server(pid) when is_pid(pid) do
+  def resolve(pid) when is_pid(pid) do
     {:ok, pid}
   end
 
-  defp resolve_server({:via, _, _} = via) do
+  def resolve({:via, _, _} = via) do
     case GenServer.whereis(via) do
       nil -> {:error, :not_found}
       pid -> {:ok, pid}
     end
   end
 
-  defp resolve_server(name) when is_atom(name) do
+  def resolve(name) when is_atom(name) do
     case GenServer.whereis(name) do
       nil -> {:error, :not_found}
       pid -> {:ok, pid}
     end
   end
 
-  defp resolve_server(id) when is_binary(id) do
+  def resolve(id) when is_binary(id) do
     {:error,
      {:invalid_server,
       "String IDs require an explicit Aikido instance lookup for #{inspect(id)}. Use the PID from the domain start action's reference, or pass an instance-scoped PID obtained from DurableServer lookup."}}
   end
 
-  defp resolve_server(_) do
+  def resolve(_) do
     {:error, :invalid_server}
   end
 

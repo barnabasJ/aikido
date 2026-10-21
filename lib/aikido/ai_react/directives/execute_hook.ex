@@ -57,7 +57,7 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
     |> AshLua.new()
     |> Lua.set!([:event], AshLua.Encoder.encode_result(event))
     |> expose_request_callback(hook, event, request_id)
-    |> maybe_install_async_signals(hook, pid, request_id, source_signal)
+    |> expose_async_signal_functions(hook, pid, request_id, source_signal)
     |> evaluate_script(hook.script)
     |> cast_hook_return(hook.mode)
   rescue
@@ -81,12 +81,6 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
       max_string_bytes: hook.max_string_bytes
     )
   end
-
-  # Async observers can send signals; sync gates return their decision through the action pipeline.
-  defp maybe_install_async_signals(lua, %{mode: :async} = hook, pid, request_id, signal),
-    do: expose_async_signal_functions(lua, pid, request_id, hook.name, signal)
-
-  defp maybe_install_async_signals(lua, _hook, _pid, _request_id, _signal), do: lua
 
   defp evaluate_script(lua, script) do
     {values, _lua} = Lua.eval!(lua, script)
@@ -130,7 +124,14 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
     end
   end
 
-  defp expose_async_signal_functions(lua, pid, request_id, name, source_signal) do
+  # Async observers can send signals; sync gates return their decision through the action pipeline.
+  defp expose_async_signal_functions(
+         lua,
+         %{mode: :async, name: name},
+         pid,
+         request_id,
+         source_signal
+       ) do
     lua
     |> Lua.set!([:aikido, :send_context], fn args, state ->
       [text] = Lua.decode_list!(state, args)
@@ -162,6 +163,8 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
       {[true], state}
     end)
   end
+
+  defp expose_async_signal_functions(lua, _hook, _pid, _request_id, _source_signal), do: lua
 
   defp expose_request_callback(lua, hook, event, request_id) do
     Lua.set!(lua, [:aikido, :request], fn args, vm ->

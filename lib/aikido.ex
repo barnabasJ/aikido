@@ -201,17 +201,11 @@ defmodule Aikido do
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
 
-    enable_configured_debugging(opts[:otp_app], name)
+    Aikido.Debug.configure_from_application(opts[:otp_app], name)
 
     opts
     |> runtime_children(name)
     |> Supervisor.init(strategy: :one_for_one)
-  end
-
-  defp enable_configured_debugging(nil, _name), do: :ok
-
-  defp enable_configured_debugging(otp_app, name) do
-    Aikido.Debug.maybe_enable_from_config(otp_app, name)
   end
 
   defp runtime_children(opts, name) do

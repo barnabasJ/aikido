@@ -101,11 +101,11 @@ defmodule AikidoTest.DebugTest do
     end
   end
 
-  describe "maybe_enable_from_config/2" do
+  describe "configure_from_application/2" do
     test "enables when config has debug: true" do
       Application.put_env(:aikido_test, @test_instance, debug: true)
 
-      Debug.maybe_enable_from_config(:aikido_test, @test_instance)
+      Debug.configure_from_application(:aikido_test, @test_instance)
       assert Debug.level(@test_instance) == :on
 
       Application.delete_env(:aikido_test, @test_instance)
@@ -114,7 +114,7 @@ defmodule AikidoTest.DebugTest do
     test "enables verbose when config has debug: :verbose" do
       Application.put_env(:aikido_test, @test_instance, debug: :verbose)
 
-      Debug.maybe_enable_from_config(:aikido_test, @test_instance)
+      Debug.configure_from_application(:aikido_test, @test_instance)
       assert Debug.level(@test_instance) == :verbose
 
       Application.delete_env(:aikido_test, @test_instance)
@@ -123,7 +123,7 @@ defmodule AikidoTest.DebugTest do
     test "does nothing when no debug config" do
       Application.put_env(:aikido_test, @test_instance, [])
 
-      Debug.maybe_enable_from_config(:aikido_test, @test_instance)
+      Debug.configure_from_application(:aikido_test, @test_instance)
       assert Debug.level(@test_instance) == :off
 
       Application.delete_env(:aikido_test, @test_instance)
@@ -133,7 +133,7 @@ defmodule AikidoTest.DebugTest do
       Debug.enable(@test_instance, :on)
       Application.put_env(:aikido_test, @test_instance, [])
 
-      Debug.maybe_enable_from_config(:aikido_test, @test_instance)
+      Debug.configure_from_application(:aikido_test, @test_instance)
       assert Debug.level(@test_instance) == :off
 
       Application.delete_env(:aikido_test, @test_instance)
