@@ -65,7 +65,9 @@ defmodule Aikido.Slice.Config do
                   value
 
                 :error ->
-                  Map.get_lazy(config, to_string(field.name), fn -> default(field.default) end)
+                  Map.get_lazy(config, to_string(field.name), fn ->
+                    resolve_default(field.default)
+                  end)
               end
 
             {field.name, value}
@@ -87,7 +89,7 @@ defmodule Aikido.Slice.Config do
     end
   end
 
-  defp default(fun) when is_function(fun, 0), do: fun.()
-  defp default({module, function, args}), do: apply(module, function, args)
-  defp default(value), do: value
+  defp resolve_default(fun) when is_function(fun, 0), do: fun.()
+  defp resolve_default({module, function, args}), do: apply(module, function, args)
+  defp resolve_default(value), do: value
 end

@@ -51,7 +51,7 @@ defmodule Aikido.MixProject do
             {:unsafe_input,
              {Aikido.Agent.Extension.Transformers.Build, :"-resolve_local_actions/3-fun-1-", 3}},
             {:unsafe_input,
-             {Aikido.Domain.Extension.Transformers.Build, :"-register/2-fun-1-", 2}},
+             {Aikido.Domain.Extension.Transformers.Build, :"-add_resource_interfaces/2-fun-1-", 2}},
             # Reads our trusted, compressed backend snapshots, including native callbacks.
             {:unsafe_input, {Aikido.Durable.AgentServer, :load_state, 2}},
             # Task-capacity fallback kills only the already retired scheduler PID.

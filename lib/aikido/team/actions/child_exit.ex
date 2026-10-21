@@ -8,10 +8,18 @@ defmodule Aikido.Team.Actions.ChildExit do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(Map.put(signal.data, :member, signal.data.tag), state, context, config))
+
+    Inputs.result(
+      record_member_exit_and_reconcile(
+        Map.put(signal.data, :member, signal.data.tag),
+        state,
+        context,
+        config
+      )
+    )
   end
 
-  defp reduce(%{member: name, pid: pid} = data, state, context, _config) do
+  defp record_member_exit_and_reconcile(%{member: name, pid: pid} = data, state, context, _config) do
     reason = Map.get(data, :result, Map.get(data, :reason))
 
     cond do

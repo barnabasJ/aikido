@@ -12,11 +12,11 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
   @impl true
   def transform(dsl) do
     with {:ok, dsl} <- Aikido.Signal.Routes.expand(dsl, :agent) do
-      build(dsl)
+      expand_agent_resource(dsl)
     end
   end
 
-  defp build(dsl) do
+  defp expand_agent_resource(dsl) do
     dsl = Transformer.eval(dsl, [], quote(do: @behaviour(Aikido.Agent)))
     resource = Transformer.get_persisted(dsl, :module)
     team_slice = Transformer.get_persisted(dsl, :aikido_team_slice)

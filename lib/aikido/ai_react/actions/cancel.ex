@@ -6,7 +6,7 @@ defmodule Aikido.AiReact.Actions.Cancel do
   @impl true
   def run(input, _opts, _context) do
     input
-    |> reduce()
+    |> cancel_matching_run()
     |> Completion.transition(
       input,
       :run_cancelled,
@@ -14,7 +14,7 @@ defmodule Aikido.AiReact.Actions.Cancel do
     )
   end
 
-  defp reduce(input) do
+  defp cancel_matching_run(input) do
     slice = input.arguments.state
     requested = Map.get(input.arguments, :request_id)
 

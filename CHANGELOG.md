@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Name reducer, queue, persistence and DSL expansion helpers for their concrete
+  operations, and remove unnecessary team acknowledgement/failure wrappers.
+
 - Separate ReAct tool setup, directive construction, terminal cleanup and
   model-boundary handoff planning. Remove the catch-all directive rewrite pass
   and hidden setup directive queue. Messages queued during before-model hooks

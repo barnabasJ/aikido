@@ -25,7 +25,7 @@ defmodule AgentExamples.Demo do
       worker_pid = worker.pid
 
       result =
-        after_signal(worker_pid, "worker.completed", fn ->
+        subscribe_and_run_command(worker_pid, "worker.completed", fn ->
           Agents.worker_run!(worker, %{text: "signals carry results"})
         end)
 
@@ -35,7 +35,7 @@ defmodule AgentExamples.Demo do
       team = Agents.team_inspect!(team)
       counter_pid = team.team.members.counter
 
-      after_signal(counter_pid, "counter.add", fn ->
+      subscribe_and_run_command(counter_pid, "counter.add", fn ->
         Agents.team_send!(team, %{
           member: :counter,
           type: "counter.add",
@@ -76,7 +76,7 @@ defmodule AgentExamples.Demo do
     end
   end
 
-  defp after_signal(pid, type, send) do
+  defp subscribe_and_run_command(pid, type, send) do
     {:ok, reference} =
       Aikido.AgentServer.subscribe(pid, type, &{:ok, &1.agent.state.state}, once: true)
 

@@ -6,16 +6,16 @@ defmodule Aikido.Team.Actions.RemoveMember do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal, state, context, config))
+    Inputs.result(remove_member_and_dependents(signal, state, context, config))
   end
 
-  defp reduce(signal, state, context, config) do
+  defp remove_member_and_dependents(signal, state, context, config) do
     Operation.start(signal, state, context, config, fn ->
-      plan(signal.data, state, config)
+      plan_member_removal(signal.data, state, config)
     end)
   end
 
-  defp plan(data, state, _config) do
+  defp plan_member_removal(data, state, _config) do
     with {:ok, next, removed} <-
            Topology.remove(state.topology, data.member, Map.get(data, :cascade?, false)) do
       {:ok, next, removed, [], Map.drop(state.paused, removed)}

@@ -6,11 +6,11 @@ defmodule Aikido.AiReact.Actions.HookContext do
   @impl true
   def run(input, _opts, _context) do
     input.arguments.state
-    |> reduce(Map.delete(input.arguments, :state))
+    |> queue_context_for_matching_run(Map.delete(input.arguments, :state))
   end
 
   @doc false
-  def reduce(state, data) do
+  def queue_context_for_matching_run(state, data) do
     state =
       if state.request_id == data.request_id && state.status in [:setup, :running],
         do: Hooks.enqueue_context(state, data[:name] || "async", data.text),

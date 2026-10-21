@@ -113,38 +113,40 @@ defmodule Aikido.Durable.AgentServer do
 
   @impl true
   def handle_call(request, from, state),
-    do: wrap(AgentServer.handle_call(request, from, state.runtime), state)
+    do: wrap_runtime_reply(AgentServer.handle_call(request, from, state.runtime), state)
 
   @impl true
   def handle_cast({:signal, %Aikido.Signal{type: "ai.react.stream"}} = request, state) do
     # Streaming text is transient; the completed turn commits canonical history.
-    wrap(AgentServer.handle_cast(request, state.runtime), state, false)
+    wrap_runtime_reply(AgentServer.handle_cast(request, state.runtime), state, false)
   end
 
   def handle_cast(request, state),
-    do: wrap(AgentServer.handle_cast(request, state.runtime), state)
+    do: wrap_runtime_reply(AgentServer.handle_cast(request, state.runtime), state)
 
   @impl true
   def handle_info({:aikido_durable_continue, continue, restored?}, state) do
     result = AgentServer.handle_continue(continue, state.runtime)
     if restored?, do: maybe_reconcile(state.runtime)
-    wrap(result, state)
+    wrap_runtime_reply(result, state)
   end
 
   def handle_info(message, state),
-    do: wrap(AgentServer.handle_info(message, state.runtime), state)
+    do: wrap_runtime_reply(AgentServer.handle_info(message, state.runtime), state)
 
   @impl true
   def handle_continue(continue, state),
-    do: wrap(AgentServer.handle_continue(continue, state.runtime), state)
+    do: wrap_runtime_reply(AgentServer.handle_continue(continue, state.runtime), state)
 
   @impl true
   def terminate(reason, state), do: AgentServer.terminate(reason, state.runtime)
 
-  defp wrap({:noreply, runtime}, state, false), do: {:noreply, %{state | runtime: runtime}}
-  defp wrap(result, state, false), do: wrap(result, state)
+  defp wrap_runtime_reply({:noreply, runtime}, state, false),
+    do: {:noreply, %{state | runtime: runtime}}
 
-  defp wrap({:reply, reply, runtime}, state) do
+  defp wrap_runtime_reply(result, state, false), do: wrap_runtime_reply(result, state)
+
+  defp wrap_runtime_reply({:reply, reply, runtime}, state) do
     next = %{state | runtime: runtime}
 
     if durable_changed?(state.runtime, runtime),
@@ -152,7 +154,7 @@ defmodule Aikido.Durable.AgentServer do
       else: {:reply, reply, next}
   end
 
-  defp wrap({:noreply, runtime}, state) do
+  defp wrap_runtime_reply({:noreply, runtime}, state) do
     next = %{state | runtime: runtime}
 
     if durable_changed?(state.runtime, runtime),
@@ -160,10 +162,10 @@ defmodule Aikido.Durable.AgentServer do
       else: {:noreply, next}
   end
 
-  defp wrap({:stop, reason, runtime}, state),
+  defp wrap_runtime_reply({:stop, reason, runtime}, state),
     do: {:stop, stop_reason(reason, runtime), %{state | runtime: runtime}}
 
-  defp wrap({:stop, reason, reply, runtime}, state),
+  defp wrap_runtime_reply({:stop, reason, reply, runtime}, state),
     do: {:stop, stop_reason(reason, runtime), reply, %{state | runtime: runtime}}
 
   # Runtime observations, subscriber bookkeeping and debug reads do not change

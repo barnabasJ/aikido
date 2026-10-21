@@ -8,10 +8,10 @@ defmodule Aikido.Team.Actions.TaskTimeout do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal.data, state, context, config))
+    Inputs.result(expire_task_and_request_cancellation(signal.data, state, context, config))
   end
 
-  defp reduce(data, state, context, _config) do
+  defp expire_task_and_request_cancellation(data, state, context, _config) do
     case Map.get(state.tasks, data.task_id) do
       %{status: :dispatched, attempt: attempt} = task when attempt == data.attempt ->
         task = %{task | status: :failed, result: :timeout}

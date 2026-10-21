@@ -10,10 +10,10 @@ defmodule Aikido.Domain.Extension.Transformers.Build do
   def transform(dsl) do
     entries = Transformer.get_entities(dsl, [:agents])
     # Preserve declarations for the verifier, but emit each interface name once.
-    register(dsl, Enum.uniq_by(entries, & &1.name))
+    add_resource_interfaces(dsl, Enum.uniq_by(entries, & &1.name))
   end
 
-  defp register(dsl, entries) do
+  defp add_resource_interfaces(dsl, entries) do
     dsl =
       Enum.reduce(entries, dsl, fn entry, dsl ->
         definitions =

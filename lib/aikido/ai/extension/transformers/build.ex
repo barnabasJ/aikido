@@ -8,10 +8,12 @@ defmodule Aikido.AI.Extension.Transformers.Build do
   def before?(_), do: false
 
   def transform(dsl) do
-    if Aikido.Agent.Extension in Spark.extensions(dsl), do: build(dsl), else: {:ok, dsl}
+    if Aikido.Agent.Extension in Spark.extensions(dsl),
+      do: add_ai_configuration_and_slice_mounts(dsl),
+      else: {:ok, dsl}
   end
 
-  defp build(dsl) do
+  defp add_ai_configuration_and_slice_mounts(dsl) do
     fields = [
       options: [Aikido.AiReact.Options, %{}, false],
       tools: [{:array, :atom}, [], false],

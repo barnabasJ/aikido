@@ -8,24 +8,24 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
   @impl true
   def run(input, _opts, _context) do
     input.arguments.state
-    |> reduce(Map.delete(input.arguments, :state))
+    |> adopt_handoff_and_resume(Map.delete(input.arguments, :state))
   end
 
   @doc false
-  def reduce(state, data) do
+  def adopt_handoff_and_resume(state, data) do
     if Handoff.active?(state, data) do
       response = data.turn
       turn = ReqLLM.Response.classify(response)
 
       cond do
         turn.type != :final_answer || String.trim(turn.text) == "" ->
-          Aikido.AiReact.Actions.HandoffFailed.reduce(
+          Aikido.AiReact.Actions.HandoffFailed.fail_pending_handoff(
             state,
             Map.put(data, :reason, :empty_or_invalid_document)
           )
 
         turn.finish_reason == :length ->
-          Aikido.AiReact.Actions.HandoffFailed.reduce(
+          Aikido.AiReact.Actions.HandoffFailed.fail_pending_handoff(
             state,
             Map.put(data, :reason, :truncated_document)
           )
@@ -57,7 +57,7 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
           options = state.options
 
           if tokens >= options.context_max_tokens do
-            Aikido.AiReact.Actions.HandoffFailed.reduce(
+            Aikido.AiReact.Actions.HandoffFailed.fail_pending_handoff(
               state,
               Map.put(data, :reason, :document_exceeds_context_limit)
             )

@@ -6,16 +6,16 @@ defmodule Aikido.Team.Actions.EnsureMember do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal, state, context, config))
+    Inputs.result(activate_member(signal, state, context, config))
   end
 
-  def reduce(signal, state, context, config) do
+  def activate_member(signal, state, context, config) do
     Operation.start(signal, state, context, config, fn ->
-      plan(signal.data, state, config)
+      plan_member_activation(signal.data, state, config)
     end)
   end
 
-  defp plan(data, state, _config) do
+  defp plan_member_activation(data, state, _config) do
     if Map.has_key?(state.topology.nodes, data.member),
       do: {:ok, state.topology, [], [data.member], Map.delete(state.paused, data.member)},
       else: {:error, {:unknown_member, data.member}}

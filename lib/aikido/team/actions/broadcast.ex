@@ -8,10 +8,10 @@ defmodule Aikido.Team.Actions.Broadcast do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal.data, state, context, config))
+    Inputs.result(build_member_deliveries(signal.data, state, context, config))
   end
 
-  defp reduce(data, state, _context, _config) do
+  defp build_member_deliveries(data, state, _context, _config) do
     targets = data[:members] || Map.keys(state.members)
 
     with {:ok, pids} <-

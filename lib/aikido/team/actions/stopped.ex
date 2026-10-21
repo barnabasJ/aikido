@@ -6,10 +6,10 @@ defmodule Aikido.Team.Actions.Stopped do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal.data, state, context, config))
+    Inputs.result(remove_stopped_member(signal.data, state, context, config))
   end
 
-  defp reduce(%{member: name, operation_id: id}, state, context, config) do
+  defp remove_stopped_member(%{member: name, operation_id: id}, state, context, config) do
     if Operation.awaited?(state, id, {:stop, name}) do
       state = %{
         state

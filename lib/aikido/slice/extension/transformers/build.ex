@@ -9,11 +9,11 @@ defmodule Aikido.Slice.Extension.Transformers.Build do
   @impl true
   def transform(dsl) do
     with {:ok, dsl} <- Aikido.Signal.Routes.expand(dsl, :slice) do
-      build(dsl)
+      add_state_attributes_and_default_actions(dsl)
     end
   end
 
-  defp build(dsl) do
+  defp add_state_attributes_and_default_actions(dsl) do
     declared = Transformer.get_entities(dsl, [:slice, :schema])
     dsl = Enum.reduce(declared, dsl, &Transformer.add_entity(&2, [:attributes], &1))
 

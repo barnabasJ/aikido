@@ -6,16 +6,16 @@ defmodule Aikido.Team.Actions.Start do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal, state, context, config))
+    Inputs.result(configure_topology_and_activate(signal, state, context, config))
   end
 
-  defp reduce(signal, state, context, config) do
+  defp configure_topology_and_activate(signal, state, context, config) do
     Operation.start(signal, state, context, config, fn ->
-      plan(signal.data, state, config)
+      plan_topology_replacement(signal.data, state, config)
     end)
   end
 
-  defp plan(data, state, config) do
+  defp plan_topology_replacement(data, state, config) do
     with {:ok, next} <-
            Topology.build(
              data[:topology] || state.topology.nodes,

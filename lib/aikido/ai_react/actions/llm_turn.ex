@@ -8,7 +8,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
   def run(input, _opts, _context) do
     if is_nil(Map.get(input.arguments.state, :hook_terminal)) do
       input
-      |> reduce()
+      |> adopt_model_response()
       |> Completion.transition(
         input,
         :after_model,
@@ -23,7 +23,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
     end
   end
 
-  defp reduce(input) do
+  defp adopt_model_response(input) do
     response = input.arguments[:turn]
     turn = ReqLLM.Response.classify(response)
     request_id = input.arguments[:request_id]
@@ -45,7 +45,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
             if is_number(old) && is_number(new), do: old + new, else: new
           end)
 
-        handle_turn(
+        continue_from_classified_response(
           response,
           turn,
           Map.merge(slice, %{
@@ -59,7 +59,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
     end
   end
 
-  defp handle_turn(response, %{type: :final_answer, text: text}, slice) do
+  defp continue_from_classified_response(response, %{type: :final_answer, text: text}, slice) do
     slice = Context.append_message(slice, response.message)
     new_context = slice.context
 
@@ -102,7 +102,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
     end
   end
 
-  defp handle_turn(
+  defp continue_from_classified_response(
          response,
          %{type: :tool_calls, tool_calls: tool_calls, text: text},
          slice
@@ -112,20 +112,20 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
     msg_calls = Enum.reject(tool_calls, &ReqLLM.ToolCall.flagged_builtin?/1)
 
     if msg_calls == [] do
-      handle_turn(response, %{type: :final_answer, text: text}, slice)
+      continue_from_classified_response(response, %{type: :final_answer, text: text}, slice)
     else
       slice = Context.append_message(slice, response.message)
       new_context = slice.context
 
       if iteration >= slice.max_iterations do
-        truncate(slice, new_context, iteration)
+        complete_at_iteration_limit(slice, new_context, iteration)
       else
-        dispatch_tools(slice, new_context, iteration, msg_calls)
+        record_batch_and_request_tools(slice, new_context, iteration, msg_calls)
       end
     end
   end
 
-  defp truncate(slice, new_context, iteration) do
+  defp complete_at_iteration_limit(slice, new_context, iteration) do
     new_slice = %{
       slice
       | iteration: iteration,
@@ -137,7 +137,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
     Aikido.Types.ActionResult.new(state: new_slice, directives: [])
   end
 
-  defp dispatch_tools(slice, new_context, iteration, msg_calls) do
+  defp record_batch_and_request_tools(slice, new_context, iteration, msg_calls) do
     {_tools, registry} = slice.prepared_tools
 
     new_slice = %{

@@ -7,10 +7,15 @@ defmodule Aikido.Team.Actions.Started do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal.data, state, context, config))
+    Inputs.result(adopt_started_member(signal.data, state, context, config))
   end
 
-  defp reduce(%{member: name, operation_id: id, result: pid}, state, context, config) do
+  defp adopt_started_member(
+         %{member: name, operation_id: id, result: pid},
+         state,
+         context,
+         config
+       ) do
     if Operation.awaited?(state, id, {:start, name}) do
       state = %{
         state

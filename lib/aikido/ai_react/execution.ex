@@ -26,7 +26,7 @@ defmodule Aikido.AiReact.Execution do
       try do
         case Aikido.AgentServer.state(owner, &{:ok, selector.(&1)}) do
           {:ok, :skip} ->
-            attempt(owner, supervisor, work, opts, subscription, monitor, deadline, 0)
+            execute_attempt(owner, supervisor, work, opts, subscription, monitor, deadline, 0)
 
           _ ->
             {:error, :cancelled}
@@ -38,7 +38,7 @@ defmodule Aikido.AiReact.Execution do
     end
   end
 
-  defp attempt(owner, supervisor, work, opts, sub, monitor, deadline, number) do
+  defp execute_attempt(owner, supervisor, work, opts, sub, monitor, deadline, number) do
     parent = self()
     key = make_ref()
 
@@ -47,7 +47,7 @@ defmodule Aikido.AiReact.Execution do
     result =
       case start_attempt(supervisor, work, opts, transfer, parent, key, number) do
         {:ok, task} ->
-          wait(
+          await_attempt_result(
             task,
             key,
             sub,
@@ -76,7 +76,8 @@ defmodule Aikido.AiReact.Execution do
       after
         delay ->
           if now() < deadline,
-            do: attempt(owner, supervisor, work, opts, sub, monitor, deadline, number + 1),
+            do:
+              execute_attempt(owner, supervisor, work, opts, sub, monitor, deadline, number + 1),
             else: {:error, :timeout}
       end
     else
@@ -108,7 +109,16 @@ defmodule Aikido.AiReact.Execution do
     :exit, reason -> {:error, reason}
   end
 
-  defp wait(%Task{ref: task_ref} = task, key, sub, monitor, deadline, progress, opts, cleanups) do
+  defp await_attempt_result(
+         %Task{ref: task_ref} = task,
+         key,
+         sub,
+         monitor,
+         deadline,
+         progress,
+         opts,
+         cleanups
+       ) do
     result =
       receive do
         {^task_ref, value} ->
@@ -134,7 +144,7 @@ defmodule Aikido.AiReact.Execution do
 
     case result do
       {:continue, progress, cleanups} ->
-        wait(task, key, sub, monitor, deadline, progress, opts, cleanups)
+        await_attempt_result(task, key, sub, monitor, deadline, progress, opts, cleanups)
 
       result ->
         Task.shutdown(task, :brutal_kill)

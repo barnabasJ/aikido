@@ -6,11 +6,11 @@ defmodule Aikido.AiReact.Actions.Message do
   @impl true
   def run(input, _opts, _context) do
     with :ok <- Scope.validate(input.arguments.state, input) do
-      reduce(input)
+      queue_message_or_resume_run(input)
     end
   end
 
-  defp reduce(input) do
+  defp queue_message_or_resume_run(input) do
     state = input.arguments.state
 
     if state.status == :waiting do

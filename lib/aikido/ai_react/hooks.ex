@@ -22,7 +22,8 @@ defmodule Aikido.AiReact.Hooks do
         if(state.status in [:completed, :failed], do: state.status)
       )
 
-    queue = [{:event, event, payload}] ++ Enum.flat_map(result.directives, &steps/1)
+    queue =
+      [{:event, event, payload}] ++ Enum.flat_map(result.directives, &hook_steps_for_effect/1)
 
     queue =
       if state.status == :completed,
@@ -54,16 +55,16 @@ defmodule Aikido.AiReact.Hooks do
 
   @doc "Run before-model hooks, then release this model request with their accumulated context."
   def before_model(state, %LLMCall{} = directive) do
-    advance(state, steps(directive), state.status, [])
+    advance(state, hook_steps_for_effect(directive), state.status, [])
   end
 
-  defp steps(%LLMCall{} = effect),
+  defp hook_steps_for_effect(%LLMCall{} = effect),
     do: [{:event, :before_model, %{}}, {:effect, effect}]
 
-  defp steps(%ToolExec{} = effect),
+  defp hook_steps_for_effect(%ToolExec{} = effect),
     do: [{:event, :before_tool, %{tool_call: effect.tool_call}}, {:effect, effect}]
 
-  defp steps(effect), do: [{:effect, effect}]
+  defp hook_steps_for_effect(effect), do: [{:effect, effect}]
 
   @doc false
   def advance(state, [], status, directives) do

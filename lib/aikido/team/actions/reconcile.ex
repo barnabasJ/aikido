@@ -6,16 +6,16 @@ defmodule Aikido.Team.Actions.Reconcile do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal, state, context, config))
+    Inputs.result(reconcile_member_activation(signal, state, context, config))
   end
 
-  defp reduce(signal, state, context, config) do
+  defp reconcile_member_activation(signal, state, context, config) do
     Operation.start(signal, state, context, config, fn ->
-      plan(signal.data, state, config)
+      plan_reconciliation(signal.data, state, config)
     end)
   end
 
-  defp plan(data, state, _config) do
+  defp plan_reconciliation(data, state, _config) do
     requested = Enum.uniq(Topology.eager(state.topology) ++ Map.get(data, :members, []))
 
     {:ok, state.topology, Map.get(data, :replace, []),

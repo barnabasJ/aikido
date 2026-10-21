@@ -6,7 +6,7 @@ defmodule Aikido.AiReact.Actions.Ask do
   @impl true
   def run(input, _opts, _context) do
     input
-    |> reduce()
+    |> start_run()
     |> Scope.bind(input)
     |> Completion.transition(
       input,
@@ -15,7 +15,7 @@ defmodule Aikido.AiReact.Actions.Ask do
     )
   end
 
-  defp reduce(input) do
+  defp start_run(input) do
     data = Map.delete(input.arguments, :state)
     slice = input.arguments.state
 

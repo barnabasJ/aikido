@@ -37,14 +37,14 @@ defmodule Aikido.Agent.Runtime do
   def snapshot(resource, pid) do
     AgentServer.state(pid, fn state ->
       if state.agent.agent_module == resource do
-        {:ok, record(resource, state.agent)}
+        {:ok, resource_record_from_agent(resource, state.agent)}
       else
         {:error, :different_resource}
       end
     end)
   end
 
-  defp record(resource, agent) do
+  defp resource_record_from_agent(resource, agent) do
     attributes =
       Map.new(Ash.Resource.Info.attributes(resource), fn attr ->
         value =

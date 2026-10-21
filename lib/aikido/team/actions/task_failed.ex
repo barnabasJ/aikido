@@ -6,10 +6,10 @@ defmodule Aikido.Team.Actions.TaskFailed do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal, state, context, config))
+    Inputs.result(record_task_failure(signal, state, context, config))
   end
 
-  defp reduce(signal, state, context, _config) do
+  defp record_task_failure(signal, state, context, _config) do
     data = signal.data
 
     case Map.get(state.tasks, data.task_id) do

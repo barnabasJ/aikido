@@ -53,7 +53,7 @@ defmodule AgentExamplesWeb.ExamplePage do
 
   defp handle_event("stop", _, socket) do
     result = Playground.stop(socket.assigns.owner, socket.assigns.example.slug)
-    {:halt, socket |> assign(error: error(result)) |> reload()}
+    {:halt, socket |> assign(error: command_error(result)) |> reload_run()}
   end
 
   defp handle_event(_, _, socket), do: {:cont, socket}
@@ -72,7 +72,7 @@ defmodule AgentExamplesWeb.ExamplePage do
   defp handle_info({:run_updated, owner, slug}, socket) do
     socket =
       if owner == socket.assigns.owner && slug == socket.assigns.example.slug,
-        do: reload(socket),
+        do: reload_run(socket),
         else: socket
 
     {:halt, socket}
@@ -82,10 +82,10 @@ defmodule AgentExamplesWeb.ExamplePage do
 
   def command(socket, action, input) do
     result = Playground.command(socket.assigns.owner, socket.assigns.example.slug, action, input)
-    {:noreply, socket |> assign(error: error(result)) |> reload()}
+    {:noreply, socket |> assign(error: command_error(result)) |> reload_run()}
   end
 
-  defp reload(socket),
+  defp reload_run(socket),
     do: assign(socket, :run, Playground.get(socket.assigns.owner, socket.assigns.example.slug))
 
   defp ai_default(example, key, fallback) do
@@ -95,6 +95,6 @@ defmodule AgentExamplesWeb.ExamplePage do
     end
   end
 
-  defp error(:ok), do: nil
-  defp error({:error, reason}), do: reason
+  defp command_error(:ok), do: nil
+  defp command_error({:error, reason}), do: reason
 end

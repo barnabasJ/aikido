@@ -16,7 +16,7 @@ defmodule Aikido.AiReact.Run do
     if is_nil(model) do
       {:error, :no_model}
     else
-      build(
+      initialize_run_and_request_tools(
         Map.put(data, :hooks, data[:hooks] || Map.get(slice, :hooks) || []),
         slice,
         system_prompt,
@@ -35,7 +35,7 @@ defmodule Aikido.AiReact.Run do
     Map.merge(state, %{prepared_tools: nil, handoff_pending: nil})
   end
 
-  defp build(
+  defp initialize_run_and_request_tools(
          data,
          slice,
          system_prompt,

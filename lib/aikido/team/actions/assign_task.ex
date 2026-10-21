@@ -8,10 +8,10 @@ defmodule Aikido.Team.Actions.AssignTask do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal, state, context, config))
+    Inputs.result(assign_or_activate_member(signal, state, context, config))
   end
 
-  defp reduce(signal, state, context, config) do
+  defp assign_or_activate_member(signal, state, context, config) do
     id = signal.data[:task_id] || signal.id
 
     cond do
@@ -29,7 +29,7 @@ defmodule Aikido.Team.Actions.AssignTask do
         state =
           Map.update(state, :pending_tasks, %{id => signal.data}, &Map.put(&1, id, signal.data))
 
-        Aikido.Team.Actions.EnsureMember.reduce(
+        Aikido.Team.Actions.EnsureMember.activate_member(
           %{signal | data: %{member: signal.data.member}},
           state,
           context,

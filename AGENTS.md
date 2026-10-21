@@ -74,6 +74,7 @@ does not permit other runtime effects inside reducers.
 - Place example resources beside their own implementation and signal files. Keep source-viewer paths and categories aligned with the declared native contracts when files move.
 
 ## Standards
+- Name ordinary helpers for the operation they perform, such as `record_tool_result` or `plan_member_removal`; avoid vague `reduce`, `finish` and `next` wrappers. Keep required behaviour callback names.
 - Keep Ash reducer actions pure: the same input returns the same state and directives
 - Directives mutate **no** state — neither `agent.state` (domain) nor `%AgentServer.State{}` (runtime). State changes flow through the action's return value; runtime bookkeeping flows through GenServer callbacks and `process_signal/2` cascade callbacks
 - Use **Ash types** for data contracts and **Spark.Options** for DSL/configuration validation

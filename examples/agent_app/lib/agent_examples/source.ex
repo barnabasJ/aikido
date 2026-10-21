@@ -111,7 +111,7 @@ defmodule AgentExamples.Source do
 
   def for_example(example) do
     modules =
-      modules(example.slug) ++
+      supporting_modules(example.slug) ++
         [
           example.resource,
           AgentExamples.Agents
@@ -126,7 +126,8 @@ defmodule AgentExamples.Source do
            end))
     end)
     |> Enum.sort_by(fn entry ->
-      {if(entry.module == example.resource, do: 0, else: rank(entry.category)), entry.name}
+      {if(entry.module == example.resource, do: 0, else: source_kind_rank(entry.category)),
+       entry.name}
     end)
     |> Enum.map(
       &Map.merge(&1, %{
@@ -136,16 +137,16 @@ defmodule AgentExamples.Source do
     )
   end
 
-  defp modules("hook-requests"), do: [AgentExamples.Playground]
+  defp supporting_modules("hook-requests"), do: [AgentExamples.Playground]
 
-  defp modules("conversation"), do: [Aikido.Todo]
+  defp supporting_modules("conversation"), do: [Aikido.Todo]
 
-  defp modules("counter"), do: []
-  defp modules("checklist"), do: []
-  defp modules("notebook"), do: [AgentExamples.Journal]
-  defp modules("worker"), do: []
+  defp supporting_modules("counter"), do: []
+  defp supporting_modules("checklist"), do: []
+  defp supporting_modules("notebook"), do: [AgentExamples.Journal]
+  defp supporting_modules("worker"), do: []
 
-  defp modules("team"),
+  defp supporting_modules("team"),
     do: [
       Aikido.Team,
       AgentExamples.Counter,
@@ -154,7 +155,7 @@ defmodule AgentExamples.Source do
       AgentExamples.Journal
     ]
 
-  defp modules("research-team"),
+  defp supporting_modules("research-team"),
     do: [
       AgentExamples.Researcher,
       AgentExamples.Reviewer,
@@ -162,15 +163,15 @@ defmodule AgentExamples.Source do
       Aikido.Team
     ]
 
-  defp modules("nested-teams"),
-    do: [AgentExamples.Team | modules("team")]
+  defp supporting_modules("nested-teams"),
+    do: [AgentExamples.Team | supporting_modules("team")]
 
-  defp modules(_), do: []
-  defp rank(:agent), do: 1
-  defp rank(:slice), do: 2
-  defp rank(:signal), do: 3
-  defp rank(:action), do: 4
-  defp rank(:directive), do: 5
-  defp rank(:domain), do: 6
-  defp rank(_), do: 7
+  defp supporting_modules(_), do: []
+  defp source_kind_rank(:agent), do: 1
+  defp source_kind_rank(:slice), do: 2
+  defp source_kind_rank(:signal), do: 3
+  defp source_kind_rank(:action), do: 4
+  defp source_kind_rank(:directive), do: 5
+  defp source_kind_rank(:domain), do: 6
+  defp source_kind_rank(_), do: 7
 end

@@ -19,10 +19,12 @@ defmodule Aikido.Team.Extension.Transformers.Build do
   def before?(_), do: false
 
   def transform(dsl) do
-    if Aikido.Agent.Extension in Spark.extensions(dsl), do: expand(dsl), else: {:ok, dsl}
+    if Aikido.Agent.Extension in Spark.extensions(dsl),
+      do: resolve_team_configuration(dsl),
+      else: {:ok, dsl}
   end
 
-  defp expand(dsl) do
+  defp resolve_team_configuration(dsl) do
     entities = Transformer.get_entities(dsl, [:team])
     members = Enum.filter(entities, &match?(%Aikido.Team.Member{}, &1))
     workers = Enum.filter(entities, &match?(%Aikido.Team.Worker{}, &1))
@@ -42,10 +44,10 @@ defmodule Aikido.Team.Extension.Transformers.Build do
       workers: Map.new(workers, &{&1.name, Map.from_struct(&1)})
     }
 
-    build(dsl, config)
+    add_team_slice_and_commands(dsl, config)
   end
 
-  defp build(dsl, config) do
+  defp add_team_slice_and_commands(dsl, config) do
     slice = Aikido.Team.Slice
     Code.ensure_compiled!(slice)
 

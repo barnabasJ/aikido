@@ -7,7 +7,7 @@ defmodule Aikido.AiReact.Actions.Failed do
   def run(input, _opts, _context) do
     if is_nil(Map.get(input.arguments.state, :hook_terminal)) do
       input
-      |> reduce()
+      |> record_execution_failure()
       |> Completion.transition(
         input,
         :run_failed,
@@ -18,7 +18,7 @@ defmodule Aikido.AiReact.Actions.Failed do
     end
   end
 
-  defp reduce(input) do
+  defp record_execution_failure(input) do
     reason = input.arguments[:reason]
     id = input.arguments[:request_id]
     slice = input.arguments.state

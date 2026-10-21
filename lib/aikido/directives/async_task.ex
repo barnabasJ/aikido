@@ -123,7 +123,7 @@ defmodule Aikido.Directives.AsyncTask do
     signals =
       directive
       |> run_work(input_signal, state)
-      |> normalize_result(directive, state)
+      |> result_signals(directive, state)
 
     dispatch_signals(signals, input_signal, reply_target(directive, agent_pid), state)
   end
@@ -160,21 +160,21 @@ defmodule Aikido.Directives.AsyncTask do
     }
   end
 
-  @spec normalize_result(result :: term(), directive :: AsyncTask.t(), state :: State.t()) :: [
+  @spec result_signals(result :: term(), directive :: AsyncTask.t(), state :: State.t()) :: [
           Signal.t()
         ]
-  defp normalize_result(%Signal{} = signal, _directive, _state), do: [signal]
-  defp normalize_result({:ok, %Signal{} = signal}, _directive, _state), do: [signal]
-  defp normalize_result({:signals, signals}, _directive, _state), do: valid_signals(signals)
+  defp result_signals(%Signal{} = signal, _directive, _state), do: [signal]
+  defp result_signals({:ok, %Signal{} = signal}, _directive, _state), do: [signal]
+  defp result_signals({:signals, signals}, _directive, _state), do: valid_signals(signals)
 
-  defp normalize_result({:ok, {:signals, signals}}, _directive, _state),
+  defp result_signals({:ok, {:signals, signals}}, _directive, _state),
     do: valid_signals(signals)
 
-  defp normalize_result({:ok, result}, %AsyncTask{} = directive, %State{} = state) do
+  defp result_signals({:ok, result}, %AsyncTask{} = directive, %State{} = state) do
     [success_signal(directive, result, state)]
   end
 
-  defp normalize_result(
+  defp result_signals(
          {:error, %{kind: kind, reason: reason}},
          %AsyncTask{} = directive,
          %State{} = state
@@ -182,11 +182,11 @@ defmodule Aikido.Directives.AsyncTask do
     [error_signal(directive, reason, state, %{kind: kind})]
   end
 
-  defp normalize_result({:error, reason}, %AsyncTask{} = directive, %State{} = state) do
+  defp result_signals({:error, reason}, %AsyncTask{} = directive, %State{} = state) do
     [error_signal(directive, reason, state)]
   end
 
-  defp normalize_result(result, %AsyncTask{} = directive, %State{} = state) do
+  defp result_signals(result, %AsyncTask{} = directive, %State{} = state) do
     [success_signal(directive, result, state)]
   end
 

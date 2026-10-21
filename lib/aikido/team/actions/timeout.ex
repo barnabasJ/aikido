@@ -5,15 +5,10 @@ defmodule Aikido.Team.Actions.Timeout do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reduce(signal, state, context, config))
-  end
+    {signal, state, context, _config} = Inputs.read(input)
 
-  defp reduce(signal, state, context, _config),
-    do:
-      Operation.failed(
-        %{operation_id: signal.data.operation_id, reason: :timeout},
-        state,
-        context
-      )
+    %{operation_id: signal.data.operation_id, reason: :timeout}
+    |> Operation.failed(state, context)
+    |> Inputs.result()
+  end
 end

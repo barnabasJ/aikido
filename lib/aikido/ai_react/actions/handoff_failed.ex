@@ -6,11 +6,11 @@ defmodule Aikido.AiReact.Actions.HandoffFailed do
   @impl true
   def run(input, _opts, _context) do
     input.arguments.state
-    |> reduce(Map.delete(input.arguments, :state))
+    |> fail_pending_handoff(Map.delete(input.arguments, :state))
   end
 
   @doc false
-  def reduce(state, data) do
+  def fail_pending_handoff(state, data) do
     if Handoff.active?(state, data) do
       state =
         Map.merge(state, %{

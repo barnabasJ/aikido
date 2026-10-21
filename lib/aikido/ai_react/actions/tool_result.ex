@@ -10,7 +10,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
   def run(input, _opts, _context) do
     if is_nil(Map.get(input.arguments.state, :hook_terminal)) do
       input
-      |> reduce()
+      |> record_tool_result()
       |> Completion.transition(
         input,
         :after_tool,
@@ -21,7 +21,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
     end
   end
 
-  defp reduce(input) do
+  defp record_tool_result(input) do
     data = Map.delete(input.arguments, :state)
     slice = input.arguments.state
 
@@ -37,11 +37,11 @@ defmodule Aikido.AiReact.Actions.ToolResult do
         Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       true ->
-        append_and_maybe_dispatch(data, slice)
+        append_result_and_resume_when_complete(data, slice)
     end
   end
 
-  defp append_and_maybe_dispatch(data, slice) do
+  defp append_result_and_resume_when_complete(data, slice) do
     msg = ReqLLM.Context.tool_result(data.tool_call_id, data.name, data.content)
     slice = Context.append_message(slice, msg)
     new_context = slice.context
@@ -51,7 +51,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
         [%{tool_call_id: data.tool_call_id, name: data.name, content: data.content}]
 
     if length(received) == length(slice.pending_tool_calls) do
-      finalize_batch(slice)
+      complete_batch_and_request_model(slice)
     else
       Aikido.Types.ActionResult.new(
         state: %{slice | context: new_context, tool_results_received: received},
@@ -60,7 +60,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
     end
   end
 
-  defp finalize_batch(slice) do
+  defp complete_batch_and_request_model(slice) do
     current_signature = tool_call_signature(slice.pending_tool_calls)
 
     slice =

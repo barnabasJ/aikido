@@ -21,7 +21,7 @@ defmodule Aikido.AiWorker.Actions.Settle do
       complete_task(state, pending, ai.status, result, context)
     else
       if is_nil(pending) && ai.status in [:completed, :failed, :idle],
-        do: next(state, context, []),
+        do: start_next_queued_task(state, context, []),
         else: Aikido.Types.ActionResult.new(state: state)
     end
   end
@@ -42,12 +42,12 @@ defmodule Aikido.AiWorker.Actions.Settle do
       }
       |> Aikido.Signal.put_ctx(Map.get(task, :signal_context, %{}))
 
-    next(%{state | pending: nil, completed: state.completed + 1}, context, [
+    start_next_queued_task(%{state | pending: nil, completed: state.completed + 1}, context, [
       Aikido.Directives.emit_to_pid(reply, task.reply_to)
     ])
   end
 
-  defp next(state, context, effects) do
+  defp start_next_queued_task(state, context, effects) do
     case Map.get(state, :queue, []) do
       [data | rest] ->
         {:ok, result} =

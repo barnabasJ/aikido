@@ -6,11 +6,11 @@ defmodule Aikido.AiReact.Actions.Deliver do
   @impl true
   def run(input, _opts, _context) do
     with :ok <- Scope.validate(input.arguments.state, input) do
-      reduce(input)
+      queue_delivery_or_start_run(input)
     end
   end
 
-  defp reduce(input) do
+  defp queue_delivery_or_start_run(input) do
     if input.arguments.state.status in [:setup, :running] do
       state =
         input.arguments.state
