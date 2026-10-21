@@ -4,6 +4,12 @@ defmodule Aikido.Signal.Routes do
   alias Spark.Dsl.Transformer
 
   def expand(dsl, section) do
+    with {:ok, dsl, expanded} <- expand_declared_routes(dsl, section) do
+      {:ok, replace_declared_routes(dsl, section, expanded)}
+    end
+  end
+
+  defp expand_declared_routes(dsl, section) do
     entities = Transformer.get_entities(dsl, [section])
 
     Enum.reduce_while(entities, {:ok, dsl, []}, fn entity, {:ok, dsl, expanded} ->
@@ -12,16 +18,11 @@ defmodule Aikido.Signal.Routes do
         {:error, _} = error -> {:halt, error}
       end
     end)
-    |> case do
-      {:ok, dsl, expanded} ->
-        dsl = Transformer.remove_entity(dsl, [section], fn _ -> true end)
+  end
 
-        {:ok,
-         Enum.reduce(expanded, dsl, &Transformer.add_entity(&2, [section], &1, type: :append))}
-
-      error ->
-        error
-    end
+  defp replace_declared_routes(dsl, section, expanded) do
+    dsl = Transformer.remove_entity(dsl, [section], fn _ -> true end)
+    Enum.reduce(expanded, dsl, &Transformer.add_entity(&2, [section], &1, type: :append))
   end
 
   def arguments(module) do
@@ -209,41 +210,31 @@ defmodule Aikido.Signal.Routes do
       with {:ok, generated} <- Builder.build_action(:action, name, options),
            {:ok, dsl} <- add_handler(dsl, section, generated) do
         dsl =
-          Transformer.persist(
-            dsl,
-            :aikido_generated_handlers,
-            Map.put(
-              Transformer.get_persisted(dsl, :aikido_generated_handlers, %{}),
-              name,
-              implementation
-            )
-          )
-
-        dsl =
-          if is_list(definition) do
-            variants =
-              Map.new(definition, &{Aikido.Signal.Info.signal_type!(&1), handler_name(&1)})
-
-            Transformer.persist(
-              dsl,
-              :aikido_union_reducers,
-              Map.put(Transformer.get_persisted(dsl, :aikido_union_reducers, %{}), name, variants)
-            )
-          else
-            if definition do
-              Transformer.persist(
-                dsl,
-                :aikido_flat_reducers,
-                Enum.uniq([name | Transformer.get_persisted(dsl, :aikido_flat_reducers, [])])
-              )
-            else
-              dsl
-            end
-          end
+          dsl
+          |> persist_generated_handler(name, implementation)
+          |> persist_payload_shape(name, definition)
 
         {:ok, dsl, name}
       end
     end
+  end
+
+  defp persist_generated_handler(dsl, name, implementation) do
+    handlers = Transformer.get_persisted(dsl, :aikido_generated_handlers, %{})
+    Transformer.persist(dsl, :aikido_generated_handlers, Map.put(handlers, name, implementation))
+  end
+
+  defp persist_payload_shape(dsl, name, definitions) when is_list(definitions) do
+    variants = Map.new(definitions, &{Aikido.Signal.Info.signal_type!(&1), handler_name(&1)})
+    reducers = Transformer.get_persisted(dsl, :aikido_union_reducers, %{})
+    Transformer.persist(dsl, :aikido_union_reducers, Map.put(reducers, name, variants))
+  end
+
+  defp persist_payload_shape(dsl, _name, nil), do: dsl
+
+  defp persist_payload_shape(dsl, name, _definition) do
+    reducers = Transformer.get_persisted(dsl, :aikido_flat_reducers, [])
+    Transformer.persist(dsl, :aikido_flat_reducers, Enum.uniq([name | reducers]))
   end
 
   defp add_handler(dsl, section, generated) do

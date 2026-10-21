@@ -62,13 +62,8 @@ defmodule Aikido.AiReact.Execution do
           {:error, reason}
       end
 
-    if number < Keyword.get(opts, :retries, 0) && Aikido.Error.retryable?(result) &&
-         match?({:error, _}, result) && now() < deadline && result != {:error, :cancelled} do
-      delay =
-        min(
-          min(round(Keyword.get(opts, :backoff, 200) * :math.pow(2, number)), 30_000),
-          max(deadline - now(), 0)
-        )
+    if retry_allowed?(result, number, deadline, opts) do
+      delay = retry_delay(number, deadline, opts)
 
       receive do
         {:aikido_subscription, ^sub, _} -> {:error, :cancelled}
@@ -83,6 +78,16 @@ defmodule Aikido.AiReact.Execution do
     else
       result
     end
+  end
+
+  defp retry_allowed?(result, number, deadline, opts) do
+    number < Keyword.get(opts, :retries, 0) && Aikido.Error.retryable?(result) &&
+      match?({:error, _}, result) && now() < deadline && result != {:error, :cancelled}
+  end
+
+  defp retry_delay(number, deadline, opts) do
+    backoff = round(Keyword.get(opts, :backoff, 200) * :math.pow(2, number))
+    min(min(backoff, 30_000), max(deadline - now(), 0))
   end
 
   defp start_attempt(supervisor, work, opts, transfer, parent, key, number) do
@@ -147,26 +152,28 @@ defmodule Aikido.AiReact.Execution do
         await_attempt_result(task, key, sub, monitor, deadline, progress, opts, cleanups)
 
       result ->
-        Task.shutdown(task, :brutal_kill)
-
-        Enum.each(drain_cleanups(key, cleanups), fn cleanup ->
-          try do
-            cleanup.()
-          rescue
-            error ->
-              Logger.warning(
-                "AI cleanup callback raised: #{Aikido.Telemetry.Formatter.safe_inspect(error)}"
-              )
-          catch
-            kind, reason ->
-              Logger.warning(
-                "AI cleanup callback #{kind}: #{Aikido.Telemetry.Formatter.safe_inspect(reason)}"
-              )
-          end
-        end)
-
+        release_attempt_resources(task, key, cleanups)
         result
     end
+  end
+
+  defp release_attempt_resources(task, key, cleanups) do
+    Task.shutdown(task, :brutal_kill)
+    key |> drain_cleanups(cleanups) |> Enum.each(&run_cleanup/1)
+  end
+
+  defp run_cleanup(cleanup) do
+    cleanup.()
+  rescue
+    error ->
+      Logger.warning(
+        "AI cleanup callback raised: #{Aikido.Telemetry.Formatter.safe_inspect(error)}"
+      )
+  catch
+    kind, reason ->
+      Logger.warning(
+        "AI cleanup callback #{kind}: #{Aikido.Telemetry.Formatter.safe_inspect(reason)}"
+      )
   end
 
   defp drain_cleanups(key, cleanups) do

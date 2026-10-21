@@ -58,19 +58,23 @@ defmodule Aikido.Signal.Definition do
   @doc false
   def payload_defaults(module, value) do
     case Ash.Type.cast_input(:map, value, []) do
-      {:ok, value} when is_map(value) ->
-        {:ok,
-         Enum.reduce(Aikido.Signal.Info.schema(module), value, fn attribute, values ->
-           if !is_nil(attribute.default) && !Map.has_key?(values, attribute.name) &&
-                !Map.has_key?(values, Atom.to_string(attribute.name)) do
-             Map.put(values, attribute.name, Ash.Helpers.resolve_default(attribute.default))
-           else
-             values
-           end
-         end)}
+      {:ok, values} when is_map(values) -> {:ok, apply_payload_defaults(values, module)}
+      _ -> {:error, "Signal definition data must be a map"}
+    end
+  end
 
-      _ ->
-        {:error, "Signal definition data must be a map"}
+  defp apply_payload_defaults(values, module) do
+    module
+    |> Aikido.Signal.Info.schema()
+    |> Enum.reduce(values, &apply_attribute_default/2)
+  end
+
+  defp apply_attribute_default(attribute, values) do
+    if !is_nil(attribute.default) && !Map.has_key?(values, attribute.name) &&
+         !Map.has_key?(values, Atom.to_string(attribute.name)) do
+      Map.put(values, attribute.name, Ash.Helpers.resolve_default(attribute.default))
+    else
+      values
     end
   end
 end

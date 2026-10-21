@@ -53,7 +53,7 @@ defmodule Aikido.Cron.Job do
   def next_scheduled_at(cron, timezone, from)
       when is_struct(cron, Crontab.CronExpression) and is_binary(timezone) and
              is_struct(from, DateTime) do
-    do_next_scheduled_at(cron, timezone, from, @max_schedule_attempts)
+    search_next_occurrence(cron, timezone, from, @max_schedule_attempts)
   end
 
   @spec start((-> term()), schedule(), pid() | nil) :: GenServer.on_start()
@@ -74,23 +74,21 @@ defmodule Aikido.Cron.Job do
     owner_pid = Map.get(init_state, :owner_pid)
     owner_ref = if is_pid(owner_pid), do: Process.monitor(owner_pid), else: nil
 
-    case schedule_next_tick(cron, timezone) do
-      {:ok, timer_ref} ->
-        {:ok,
-         %{
-           fun: fun,
-           cron_expr: cron_expr,
-           cron: cron,
-           timezone: timezone,
-           timer_ref: timer_ref,
-           retrying?: false,
-           callback_workers: %{},
-           owner_pid: owner_pid,
-           owner_ref: owner_ref
-         }}
-
-      {:error, reason} ->
-        {:stop, reason}
+    with {:ok, timer_ref} <- schedule_next_tick(cron, timezone) do
+      {:ok,
+       %{
+         fun: fun,
+         cron_expr: cron_expr,
+         cron: cron,
+         timezone: timezone,
+         timer_ref: timer_ref,
+         retrying?: false,
+         callback_workers: %{},
+         owner_pid: owner_pid,
+         owner_ref: owner_ref
+       }}
+    else
+      {:error, reason} -> {:stop, reason}
     end
   end
 
@@ -112,16 +110,7 @@ defmodule Aikido.Cron.Job do
 
   def handle_info({:DOWN, ref, :process, pid, _reason}, state) do
     if state.callback_workers[ref] == pid do
-      # Unlink suppresses in-flight exit signals; flush an EXIT already queued
-      # before forgetting this worker's identity.
-      Process.unlink(pid)
-
-      receive do
-        {:EXIT, ^pid, _reason} -> :ok
-      after
-        0 -> :ok
-      end
-
+      unlink_finished_worker(pid)
       {:noreply, %{state | callback_workers: Map.delete(state.callback_workers, ref)}}
     else
       {:noreply, state}
@@ -150,6 +139,19 @@ defmodule Aikido.Cron.Job do
     Enum.each(callback_workers, fn {_ref, pid} ->
       if Process.alive?(pid), do: Process.exit(pid, :kill)
     end)
+
+    :ok
+  end
+
+  defp unlink_finished_worker(pid) do
+    # Flush an EXIT already queued before forgetting this worker's identity.
+    Process.unlink(pid)
+
+    receive do
+      {:EXIT, ^pid, _reason} -> :ok
+    after
+      0 -> :ok
+    end
 
     :ok
   end
@@ -270,16 +272,17 @@ defmodule Aikido.Cron.Job do
     end
   end
 
-  @spec do_next_scheduled_at(
+  @spec search_next_occurrence(
           Crontab.CronExpression.t(),
           String.t(),
           DateTime.t(),
           non_neg_integer()
         ) ::
           {:ok, DateTime.t()} | {:error, term()}
-  defp do_next_scheduled_at(_cron, _timezone, _from, 0), do: {:error, :schedule_resolution_limit}
+  defp search_next_occurrence(_cron, _timezone, _from, 0),
+    do: {:error, :schedule_resolution_limit}
 
-  defp do_next_scheduled_at(cron, timezone, from, attempts_left) do
+  defp search_next_occurrence(cron, timezone, from, attempts_left) do
     with {:ok, next_naive} <- next_run_date(cron, from) do
       case DateTime.from_naive(next_naive, timezone, time_zone_database()) do
         {:ok, next_at} ->
@@ -289,7 +292,7 @@ defmodule Aikido.Cron.Job do
           ensure_future_schedule(cron, timezone, second, from, attempts_left)
 
         {:gap, _before, after_dt} ->
-          do_next_scheduled_at(cron, timezone, after_dt, attempts_left - 1)
+          search_next_occurrence(cron, timezone, after_dt, attempts_left - 1)
 
         {:error, reason} ->
           {:error, {:invalid_timezone, reason}}
@@ -311,7 +314,7 @@ defmodule Aikido.Cron.Job do
 
       _other ->
         with {:ok, next_from} <- advance_search_start(from, timezone) do
-          do_next_scheduled_at(cron, timezone, next_from, attempts_left - 1)
+          search_next_occurrence(cron, timezone, next_from, attempts_left - 1)
         end
     end
   end

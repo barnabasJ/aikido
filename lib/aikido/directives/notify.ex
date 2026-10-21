@@ -23,30 +23,10 @@ defmodule Aikido.Directives.Notify do
   @impl true
   def exec(%{notification: notification}, signal, runtime) do
     notification =
-      case notification.resource do
-        nil -> %{notification | resource: runtime.agent_module}
-        _ -> notification
-      end
-
-    notification =
-      case notification.actor do
-        nil -> %{notification | actor: Aikido.Signal.get(signal, :actor)}
-        _ -> notification
-      end
-
-    notification =
-      case notification.data do
-        %Aikido.Signal{} = data ->
-          data =
-            data
-            |> Aikido.Directive.materialize_signal()
-            |> Aikido.Signal.inherit(signal)
-
-          %{notification | data: data}
-
-        _ ->
-          notification
-      end
+      notification
+      |> default_resource(runtime.agent_module)
+      |> default_actor(Aikido.Signal.get(signal, :actor))
+      |> materialize_notification_signal(signal)
 
     task = %Aikido.Directives.AsyncTask{
       work: fn ->
@@ -59,11 +39,30 @@ defmodule Aikido.Directives.Notify do
       end
     }
 
-    case Aikido.Directives.AsyncTask.start(task, signal, runtime) do
-      {:ok, _pid} -> :ok
-      {:error, reason} -> Logger.error("Could not start notification: #{inspect(reason)}")
-    end
+    task
+    |> Aikido.Directives.AsyncTask.start(signal, runtime)
+    |> report_start_result()
 
     :ok
   end
+
+  defp default_resource(%{resource: nil} = notification, resource),
+    do: %{notification | resource: resource}
+
+  defp default_resource(notification, _resource), do: notification
+
+  defp default_actor(%{actor: nil} = notification, actor), do: %{notification | actor: actor}
+  defp default_actor(notification, _actor), do: notification
+
+  defp materialize_notification_signal(%{data: %Aikido.Signal{} = data} = notification, signal) do
+    data = data |> Aikido.Directive.materialize_signal() |> Aikido.Signal.inherit(signal)
+    %{notification | data: data}
+  end
+
+  defp materialize_notification_signal(notification, _signal), do: notification
+
+  defp report_start_result({:ok, _pid}), do: :ok
+
+  defp report_start_result({:error, reason}),
+    do: Logger.error("Could not start notification: #{inspect(reason)}")
 end

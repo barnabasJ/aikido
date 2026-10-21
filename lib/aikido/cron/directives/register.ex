@@ -126,19 +126,7 @@ defmodule Aikido.Cron.Directives.Register do
            origin
          ) do
       {:ok, io_result} ->
-        signal =
-          Aikido.Cron.Signals.Registered.new!(
-            %{
-              job_id: io_result.job_id,
-              pid: io_result.pid,
-              monitor_ref: io_result.monitor_ref,
-              cron_spec: io_result.cron_spec,
-              runtime_spec: io_result.runtime_spec
-            },
-            source: "/agent/#{state.id}"
-          )
-
-        _ = AgentServer.cast(self(), Aikido.Signal.inherit(signal, input_signal))
+        publish_registration(io_result, input_signal, state)
 
         Logger.debug(
           "AgentServer #{state.id} registered cron job #{inspect(io_result.job_id)}: #{cron_expr}"
@@ -158,5 +146,15 @@ defmodule Aikido.Cron.Directives.Register do
 
         :ok
     end
+  end
+
+  defp publish_registration(result, input_signal, state) do
+    signal =
+      result
+      |> Map.take([:job_id, :pid, :monitor_ref, :cron_spec, :runtime_spec])
+      |> Aikido.Cron.Signals.Registered.new!(source: "/agent/#{state.id}")
+      |> Aikido.Signal.inherit(input_signal)
+
+    AgentServer.cast(self(), signal)
   end
 end

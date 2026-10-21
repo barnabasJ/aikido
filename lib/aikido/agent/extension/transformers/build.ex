@@ -31,44 +31,58 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
     signals = declared_signals ++ inherited
     dsl = Enum.reduce(inherited, dsl, &Transformer.add_entity(&2, [:agent], &1))
 
-    declared = Transformer.get_entities(dsl, [:agent, :schema])
-    dsl = Enum.reduce(declared, dsl, &Transformer.add_entity(&2, [:attributes], &1))
+    dsl = add_state_attributes(dsl)
     attributes = Ash.Resource.Info.attributes(dsl)
 
-    state_fields = for attribute <- attributes, attribute.name != :id, do: attribute.name
-
     with :ok <- ensure_embedded_mounts(mounts),
-         {:ok, dsl} <-
-           Builder.add_new_attribute(dsl, :id, :string,
-             primary_key?: true,
-             allow_nil?: false,
-             public?: true,
-             default: &Ash.UUIDv7.generate/0
-           ),
+         {:ok, dsl} <- add_identity_attribute(dsl),
          {:ok, dsl} <- add_mounts(dsl, mounts, team_slice),
          {:ok, dsl} <- add_lifecycle_actions(dsl),
-         {:ok, dsl} <- add_signals(dsl, signals) do
-      declared_routes =
-        for route <- entities, match?(%Aikido.Agent.Route{}, route) do
-          %{route | action: resolve_local_target(route.action, aliases, resource)}
-        end
-
-      routes = Enum.reject(declared_routes, &mounted_signal?(&1, mounts))
-
-      accepted = for attribute <- attributes, attribute.writable?, do: attribute.name
-
-      with {:ok, dsl} <-
-             Builder.add_new_action(dsl, :create, :__aikido_initialize_state__,
-               accept: Enum.uniq([:id | accepted]),
-               manual: Aikido.Agent.Actions.Initialize,
-               public?: false
-             ) do
-        {:ok,
-         dsl
-         |> Transformer.persist(:aikido_agent_routes, routes)
-         |> Transformer.persist(:aikido_state_fields, state_fields)}
-      end
+         {:ok, dsl} <- add_signals(dsl, signals),
+         {:ok, dsl} <- add_initialization_action(dsl, attributes) do
+      {:ok, persist_state_and_routes(dsl, attributes, entities, mounts, aliases)}
     end
+  end
+
+  defp add_state_attributes(dsl) do
+    dsl
+    |> Transformer.get_entities([:agent, :schema])
+    |> Enum.reduce(dsl, &Transformer.add_entity(&2, [:attributes], &1))
+  end
+
+  defp add_identity_attribute(dsl) do
+    Builder.add_new_attribute(dsl, :id, :string,
+      primary_key?: true,
+      allow_nil?: false,
+      public?: true,
+      default: &Ash.UUIDv7.generate/0
+    )
+  end
+
+  defp add_initialization_action(dsl, attributes) do
+    accepted = for attribute <- attributes, attribute.writable?, do: attribute.name
+
+    Builder.add_new_action(dsl, :create, :__aikido_initialize_state__,
+      accept: Enum.uniq([:id | accepted]),
+      manual: Aikido.Agent.Actions.Initialize,
+      public?: false
+    )
+  end
+
+  defp persist_state_and_routes(dsl, attributes, entities, mounts, aliases) do
+    resource = Transformer.get_persisted(dsl, :module)
+
+    routes =
+      entities
+      |> Enum.filter(&match?(%Aikido.Agent.Route{}, &1))
+      |> Enum.map(&%{&1 | action: resolve_local_target(&1.action, aliases, resource)})
+      |> Enum.reject(&mounted_signal?(&1, mounts))
+
+    fields = for attribute <- attributes, attribute.name != :id, do: attribute.name
+
+    dsl
+    |> Transformer.persist(:aikido_agent_routes, routes)
+    |> Transformer.persist(:aikido_state_fields, fields)
   end
 
   # Mount types and their schemas are inputs to attribute/action generation.
@@ -84,12 +98,7 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
   defp resolve_local_actions(dsl, signals, resource) do
     {dsl, aliases} =
       Enum.reduce(signals, {dsl, %{}}, fn signal, {dsl, aliases} ->
-        local =
-          case signal.action do
-            name when is_atom(name) -> name
-            {^resource, name} -> name
-            _ -> nil
-          end
+        local = local_action_name(signal.action, resource)
 
         if local == signal.name && !Map.has_key?(aliases, local) do
           case Ash.Resource.Info.action(dsl, local) do
@@ -118,6 +127,14 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
         {resolved, Transformer.replace_entity(dsl, [:agent], resolved, &(&1 == signal))}
       end)
 
+    {persist_reducer_aliases(dsl, aliases), signals, aliases}
+  end
+
+  defp local_action_name(name, _resource) when is_atom(name), do: name
+  defp local_action_name({resource, name}, resource), do: name
+  defp local_action_name(_target, _resource), do: nil
+
+  defp persist_reducer_aliases(dsl, aliases) do
     flat_reducers =
       Enum.map(
         Transformer.get_persisted(dsl, :aikido_flat_reducers, []),
@@ -129,9 +146,9 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
         {Map.get(aliases, name, name), variants}
       end)
 
-    {dsl
-     |> Transformer.persist(:aikido_flat_reducers, flat_reducers)
-     |> Transformer.persist(:aikido_union_reducers, union_reducers), signals, aliases}
+    dsl
+    |> Transformer.persist(:aikido_flat_reducers, flat_reducers)
+    |> Transformer.persist(:aikido_union_reducers, union_reducers)
   end
 
   defp resolve_local_target(name, aliases, resource) when is_atom(name),
@@ -282,7 +299,7 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
     )
   end
 
-  defp add_lifecycle_actions(dsl) do
+  defp startup_arguments(dsl) do
     arguments =
       dsl
       |> Ash.Resource.Info.attributes()
@@ -315,6 +332,12 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
       else
         arguments
       end
+
+    arguments
+  end
+
+  defp add_lifecycle_actions(dsl) do
+    arguments = startup_arguments(dsl)
 
     Enum.reduce_while(
       [

@@ -9,6 +9,14 @@ defmodule Aikido.Agent.Extension.Transformers.WalkExtensions do
 
   @impl true
   def transform(dsl) do
+    {:ok,
+     dsl
+     |> persist_slice_instances()
+     |> persist_middleware()
+     |> persist_action_paths()}
+  end
+
+  defp persist_slice_instances(dsl) do
     instances =
       dsl
       |> Transformer.get_entities([:agent])
@@ -18,6 +26,12 @@ defmodule Aikido.Agent.Extension.Transformers.WalkExtensions do
         Aikido.Slice.Instance.new({mount.module, mount.options}, mount.path)
       end)
 
+    dsl
+    |> Transformer.persist(:slice_instances, instances)
+    |> Transformer.persist(:slice_paths, Enum.map(instances, & &1.path))
+  end
+
+  defp persist_middleware(dsl) do
     middleware =
       dsl
       |> Transformer.get_option([:agent], :middleware, [])
@@ -25,6 +39,12 @@ defmodule Aikido.Agent.Extension.Transformers.WalkExtensions do
         module when is_atom(module) -> {module, %{}}
         {module, options} -> {module, Map.new(options)}
       end)
+
+    Transformer.persist(dsl, :middleware_list, middleware)
+  end
+
+  defp persist_action_paths(dsl) do
+    instances = Transformer.get_persisted(dsl, :slice_instances, [])
 
     pairs =
       Enum.flat_map(instances, fn instance ->
@@ -41,11 +61,6 @@ defmodule Aikido.Agent.Extension.Transformers.WalkExtensions do
       Enum.group_by(pairs ++ own, &elem(&1, 0), &elem(&1, 1))
       |> Map.new(fn {action, paths} -> {action, Enum.uniq(paths)} end)
 
-    {:ok,
-     dsl
-     |> Transformer.persist(:slice_instances, instances)
-     |> Transformer.persist(:middleware_list, middleware)
-     |> Transformer.persist(:slice_paths, Enum.map(instances, & &1.path))
-     |> Transformer.persist(:slice_paths_for_action, paths)}
+    Transformer.persist(dsl, :slice_paths_for_action, paths)
   end
 end

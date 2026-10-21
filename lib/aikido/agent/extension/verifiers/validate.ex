@@ -15,25 +15,33 @@ defmodule Aikido.Agent.Extension.Verifiers.Validate do
 
   @impl true
   def verify(dsl) do
-    path = Verifier.get_option(dsl, [:agent], :path)
-    entities = Verifier.get_entities(dsl, [:agent])
-    mounts = Enum.filter(entities, &match?(%Aikido.Agent.SliceMount{}, &1))
-    signals = Enum.filter(entities, &(match?(%Aikido.Agent.Route{}, &1) && &1.public?))
-    routes = Verifier.get_persisted(dsl, :aikido_agent_routes, [])
-    reserved = [path | Enum.map(mounts, & &1.path)]
-    fields = Verifier.get_persisted(dsl, :aikido_state_fields, [])
+    with :ok <- validate_public_names(dsl),
+         :ok <- validate_signal_definitions(dsl),
+         :ok <- validate_schedule_ids(dsl),
+         :ok <- validate_codec_pairs(dsl),
+         :ok <- validate_route_actions(dsl) do
+      validate_state_paths(dsl)
+    end
+  end
 
+  defp public_signals(dsl) do
+    dsl
+    |> Verifier.get_entities([:agent])
+    |> Enum.filter(&(match?(%Aikido.Agent.Route{}, &1) && &1.public?))
+  end
+
+  defp validate_public_names(dsl) do
+    signals = public_signals(dsl)
     resource = Verifier.get_persisted(dsl, :module)
-    schedules = Verifier.get_persisted(dsl, :expanded_agent_schedules, [])
-    job_ids = Enum.map(schedules, & &1.job_id)
     generated = Verifier.get_persisted(dsl, :aikido_generated_handlers, %{})
-    reserved_handler = Enum.find(@reserved_handlers, &Map.has_key?(generated, &1))
 
     duplicate =
       signals |> Enum.frequencies_by(& &1.name) |> Enum.find(fn {_, count} -> count > 1 end)
 
     reserved_signal =
       Enum.find(signals, &(!is_nil(&1.implementation) && &1.name in @reserved_handlers))
+
+    reserved_handler = Enum.find(@reserved_handlers, &Map.has_key?(generated, &1))
 
     cond do
       duplicate ->
@@ -51,33 +59,77 @@ defmodule Aikido.Agent.Extension.Verifiers.Validate do
           resource
         )
 
-      Enum.any?(signals ++ routes, &invalid_signal_reference?/1) ->
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_signal_definitions(dsl) do
+    routes = public_signals(dsl) ++ Verifier.get_persisted(dsl, :aikido_agent_routes, [])
+
+    if Enum.any?(routes, &invalid_signal_reference?/1),
+      do:
         error(
           "Typed routes require Aikido.Signal definitions and native Ash action implementations"
-        )
+        ),
+      else: :ok
+  end
 
-      length(job_ids) != length(Enum.uniq(job_ids)) ->
+  defp validate_schedule_ids(dsl) do
+    ids = dsl |> Verifier.get_persisted(:expanded_agent_schedules, []) |> Enum.map(& &1.job_id)
+
+    if length(ids) != length(Enum.uniq(ids)),
+      do:
         error(
           "Agent schedules require unique job IDs; use distinct job_id options for schedules sharing a signal",
-          resource
-        )
+          Verifier.get_persisted(dsl, :module)
+        ),
+      else: :ok
+  end
 
+  defp validate_codec_pairs(dsl) do
+    resource = Verifier.get_persisted(dsl, :module)
+
+    cond do
       function_exported?(resource, :externalize, 1) != function_exported?(resource, :reinstate, 1) ->
         error("Agent externalize/1 and reinstate/1 must be implemented together", resource)
 
       function_exported?(resource, :checkpoint, 2) != function_exported?(resource, :restore, 2) ->
         error("Agent checkpoint/2 and restore/2 must be implemented together", resource)
 
-      Enum.any?(routes, &invalid_action?(dsl, &1.action)) ->
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_route_actions(dsl) do
+    routes = Verifier.get_persisted(dsl, :aikido_agent_routes, [])
+
+    if Enum.any?(routes, &invalid_action?(dsl, &1.action)),
+      do:
         error(
           "Agent routes require generic Ash actions with a :state argument and Aikido.Types.ActionResult return type",
-          resource
-        )
+          Verifier.get_persisted(dsl, :module)
+        ),
+      else: :ok
+  end
 
+  defp validate_state_paths(dsl) do
+    path = Verifier.get_option(dsl, [:agent], :path)
+
+    mounts =
+      dsl
+      |> Verifier.get_entities([:agent])
+      |> Enum.filter(&match?(%Aikido.Agent.SliceMount{}, &1))
+
+    reserved = [path | Enum.map(mounts, & &1.path)]
+    fields = Verifier.get_persisted(dsl, :aikido_state_fields, [])
+
+    cond do
       :id in reserved ->
         error("The :id attribute is reserved for the agent identity")
 
-      Enum.any?(signals, &String.contains?(&1.type, "*")) ->
+      Enum.any?(public_signals(dsl), &String.contains?(&1.type, "*")) ->
         error("Public routes require a concrete type; mark wildcard routes public? false")
 
       Enum.any?(fields, &(&1 in reserved)) ->

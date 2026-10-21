@@ -8,7 +8,14 @@ defmodule Aikido.Slice.Extension.Verifiers.Validate do
     routes = Verifier.get_entities(dsl, [:slice])
     schedules = Verifier.get_entities(dsl, [:schedules])
 
-    resource = Verifier.get_persisted(dsl, :module)
+    with :ok <- validate_route_declarations(dsl, routes),
+         :ok <- validate_snapshot_callbacks(dsl),
+         :ok <- validate_embedded_resource(dsl) do
+      validate_routed_actions(dsl, routes ++ schedules)
+    end
+  end
+
+  defp validate_route_declarations(dsl, routes) do
     generated = Verifier.get_persisted(dsl, :aikido_generated_handlers, %{})
     reserved_handler = Enum.find([:create, :update], &Map.has_key?(generated, &1))
 
@@ -26,19 +33,33 @@ defmodule Aikido.Slice.Extension.Verifiers.Validate do
           "Typed routes require Aikido.Signal definitions and native Ash action implementations"
         )
 
-      function_exported?(resource, :externalize, 1) != function_exported?(resource, :reinstate, 1) ->
-        error("Slice externalize/1 and reinstate/1 must be implemented together")
-
-      !Ash.Resource.Info.embedded?(dsl) ->
-        error("Aikido.Slice.Extension requires data_layer: :embedded")
-
-      Enum.any?(routes ++ schedules, &invalid_action?(dsl, &1.action)) ->
-        error(
-          "Slice routes require generic Ash actions with a :state argument and Aikido.Types.ActionResult return type"
-        )
-
       true ->
         :ok
+    end
+  end
+
+  defp validate_snapshot_callbacks(dsl) do
+    resource = Verifier.get_persisted(dsl, :module)
+
+    if function_exported?(resource, :externalize, 1) ==
+         function_exported?(resource, :reinstate, 1),
+       do: :ok,
+       else: error("Slice externalize/1 and reinstate/1 must be implemented together")
+  end
+
+  defp validate_embedded_resource(dsl) do
+    if Ash.Resource.Info.embedded?(dsl),
+      do: :ok,
+      else: error("Aikido.Slice.Extension requires data_layer: :embedded")
+  end
+
+  defp validate_routed_actions(dsl, routes) do
+    if Enum.any?(routes, &invalid_action?(dsl, &1.action)) do
+      error(
+        "Slice routes require generic Ash actions with a :state argument and Aikido.Types.ActionResult return type"
+      )
+    else
+      :ok
     end
   end
 

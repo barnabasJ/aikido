@@ -116,106 +116,110 @@ defmodule Aikido.AiReact.Directives.LLMCall do
   end
 
   defp run_and_dispatch(%LLMCall{} = d, agent_pid, source, scope, supervisor) do
-    options = d.options
-
-    llm_opts = Keyword.put(d.llm_opts, :tools, d.tools)
-    llm_opts = if d.mode == :handoff, do: Keyword.delete(llm_opts, :tool_choice), else: llm_opts
-    messages = Context.to_list(d.context)
-
-    result =
-      Aikido.AiReact.Execution.run(
-        agent_pid,
-        d.request_id,
-        supervisor,
-        fn notify, attempt ->
-          if options.streaming && d.mode != :handoff do
-            Aikido.AiReact.Streaming.call(
-              d.client,
-              d.model,
-              messages,
-              llm_opts,
-              fn text, thinking ->
-                signal =
-                  Signal.new!(
-                    "ai.react.stream",
-                    %{
-                      request_id: d.request_id,
-                      iteration: d.iteration,
-                      attempt: attempt,
-                      text: text,
-                      thinking: thinking
-                    },
-                    source: source
-                  )
-                  |> Aikido.Signal.put_ctx(scope)
-
-                AgentServer.cast(agent_pid, signal)
-              end,
-              notify,
-              options.stream_batch_bytes,
-              options.stream_batch_ms
-            )
-          else
-            d.client.generate_text(d.model, messages, llm_opts)
-          end
-        end,
-        tracer: scope[:tracer],
-        timeout: options.model_timeout_ms,
-        progress_timeout:
-          if(options.streaming && d.mode != :handoff,
-            do: options.progress_timeout_ms,
-            else: options.model_timeout_ms
-          ),
-        retries: options.model_max_retries,
-        backoff: options.retry_backoff_ms
-      )
-
-    signal =
-      case result do
-        {:ok, response} ->
-          data =
-            handoff_data(
-              %{
-                turn: response,
-                request_id: d.request_id,
-                iteration: d.iteration
-              },
-              d
-            )
-
-          Signal.new!(
-            if(d.mode == :handoff,
-              do: "ai.react.context_handoff.completed",
-              else: "ai.react.llm.completed"
-            ),
-            data,
-            source: source
-          )
-
-        {:error, reason} ->
-          Signal.new!(
-            failure_type(d),
-            handoff_data(%{reason: reason, request_id: d.request_id}, d),
-            source: source
-          )
-      end
-
-    AgentServer.cast(agent_pid, Aikido.Signal.put_ctx(signal, scope))
+    d
+    |> generate_response(agent_pid, source, scope, supervisor)
+    |> dispatch_response(d, agent_pid, source, scope)
   rescue
     exception -> dispatch_failure(d, exception, agent_pid, source, scope)
   end
 
-  defp dispatch_failure(d, reason, agent_pid, source, scope) do
-    AgentServer.cast(
+  defp generate_response(d, agent_pid, source, scope, supervisor) do
+    messages = Context.to_list(d.context)
+    llm_opts = model_options(d)
+
+    Aikido.AiReact.Execution.run(
       agent_pid,
+      d.request_id,
+      supervisor,
+      fn notify, attempt ->
+        emit = fn text, thinking ->
+          dispatch_stream_delta(d, text, thinking, attempt, agent_pid, source, scope)
+        end
+
+        call_model(d, messages, llm_opts, notify, emit)
+      end,
+      execution_options(d, scope)
+    )
+  end
+
+  defp model_options(d) do
+    options = Keyword.put(d.llm_opts, :tools, d.tools)
+    if d.mode == :handoff, do: Keyword.delete(options, :tool_choice), else: options
+  end
+
+  defp execution_options(d, scope) do
+    [
+      tracer: scope[:tracer],
+      timeout: d.options.model_timeout_ms,
+      progress_timeout:
+        if(streaming?(d), do: d.options.progress_timeout_ms, else: d.options.model_timeout_ms),
+      retries: d.options.model_max_retries,
+      backoff: d.options.retry_backoff_ms
+    ]
+  end
+
+  defp streaming?(d), do: d.options.streaming && d.mode != :handoff
+
+  defp call_model(d, messages, options, notify, emit) do
+    if streaming?(d) do
+      Aikido.AiReact.Streaming.call(
+        d.client,
+        d.model,
+        messages,
+        options,
+        emit,
+        notify,
+        d.options.stream_batch_bytes,
+        d.options.stream_batch_ms
+      )
+    else
+      d.client.generate_text(d.model, messages, options)
+    end
+  end
+
+  defp dispatch_stream_delta(d, text, thinking, attempt, pid, source, scope) do
+    signal =
       Signal.new!(
-        failure_type(d),
-        handoff_data(%{reason: reason, request_id: d.request_id}, d),
+        "ai.react.stream",
+        %{
+          request_id: d.request_id,
+          iteration: d.iteration,
+          attempt: attempt,
+          text: text,
+          thinking: thinking
+        },
         source: source
       )
       |> Aikido.Signal.put_ctx(scope)
-    )
+
+    AgentServer.cast(pid, signal)
   end
+
+  defp dispatch_response(result, d, pid, source, scope) do
+    signal = result |> response_signal(d, source) |> Aikido.Signal.put_ctx(scope)
+    AgentServer.cast(pid, signal)
+  end
+
+  defp response_signal({:ok, response}, d, source) do
+    type =
+      if d.mode == :handoff,
+        do: "ai.react.context_handoff.completed",
+        else: "ai.react.llm.completed"
+
+    data =
+      %{turn: response, request_id: d.request_id, iteration: d.iteration}
+      |> handoff_data(d)
+
+    Signal.new!(type, data, source: source)
+  end
+
+  defp response_signal({:error, reason}, d, source) do
+    data = %{reason: reason, request_id: d.request_id} |> handoff_data(d)
+    Signal.new!(failure_type(d), data, source: source)
+  end
+
+  defp dispatch_failure(d, reason, pid, source, scope),
+    do: dispatch_response({:error, reason}, d, pid, source, scope)
 
   defp failure_type(%{mode: :handoff}), do: "ai.react.context_handoff.failed"
   defp failure_type(_), do: "ai.react.failed"

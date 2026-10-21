@@ -305,15 +305,7 @@ defmodule Aikido.AgentServer do
     caller = self()
     request = make_ref()
 
-    tracers =
-      if is_struct(command, Signal),
-        do: Aikido.Signal.tracers(command),
-        else:
-          Enum.uniq(
-            List.wrap(Keyword.get(opts, :tracer)) ++
-              List.wrap(Application.get_env(:ash, :tracer)) ++
-              List.wrap(Aikido.Telemetry.Config.tracer())
-          )
+    tracers = command_tracers(command, opts)
 
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
 
@@ -324,6 +316,21 @@ defmodule Aikido.AgentServer do
         send(caller, {request, result})
       end)
 
+    await_command_waiter(waiter, monitor, request, timeout)
+  end
+
+  defp command_tracers(command, opts) do
+    if is_struct(command, Signal),
+      do: Aikido.Signal.tracers(command),
+      else:
+        Enum.uniq(
+          List.wrap(Keyword.get(opts, :tracer)) ++
+            List.wrap(Application.get_env(:ash, :tracer)) ++
+            List.wrap(Aikido.Telemetry.Config.tracer())
+        )
+  end
+
+  defp await_command_waiter(waiter, monitor, request, timeout) do
     receive do
       {^request, result} ->
         Process.demonitor(monitor, [:flush])
@@ -833,93 +840,113 @@ defmodule Aikido.AgentServer do
     previous_pid = Map.get(state.cron_jobs, logical_id)
     monitor_ref = Keyword.get(opts, :monitor_ref) || Process.monitor(pid)
 
-    state =
-      if previous_pid == pid && state.cron_monitors[logical_id] == monitor_ref do
-        state
-      else
-        {_old_pid, cleaned} =
-          untrack_cron_job(state, logical_id,
-            cancel?: previous_pid != pid,
-            input_signal: opts[:input_signal]
-          )
+    state
+    |> retire_previous_cron_registration(logical_id, previous_pid, pid, monitor_ref, opts)
+    |> retain_cron_runtime_spec(logical_id, runtime_spec)
+    |> install_cron_registration(logical_id, pid, monitor_ref)
+  end
 
-        cleaned
-      end
+  defp retire_previous_cron_registration(state, id, previous_pid, pid, monitor_ref, opts) do
+    if previous_pid == pid && state.cron_monitors[id] == monitor_ref do
+      state
+    else
+      {_old_pid, cleaned} =
+        untrack_cron_job(state, id,
+          cancel?: previous_pid != pid,
+          input_signal: opts[:input_signal]
+        )
 
-    state =
-      if is_struct(runtime_spec, Aikido.Cron.RuntimeSpec) do
-        %{state | cron_runtime_specs: Map.put(state.cron_runtime_specs, logical_id, runtime_spec)}
-      else
-        state
-      end
+      cleaned
+    end
+  end
 
+  defp retain_cron_runtime_spec(state, id, %Aikido.Cron.RuntimeSpec{} = spec) do
+    %{state | cron_runtime_specs: Map.put(state.cron_runtime_specs, id, spec)}
+  end
+
+  defp retain_cron_runtime_spec(state, _id, _spec), do: state
+
+  defp install_cron_registration(state, id, pid, monitor_ref) do
     %{
       state
-      | cron_jobs: Map.put(state.cron_jobs, logical_id, pid),
-        cron_monitors: Map.put(state.cron_monitors, logical_id, monitor_ref),
-        cron_monitor_refs: Map.put(state.cron_monitor_refs, monitor_ref, logical_id),
-        cron_restart_attempts: Map.delete(state.cron_restart_attempts, logical_id)
+      | cron_jobs: Map.put(state.cron_jobs, id, pid),
+        cron_monitors: Map.put(state.cron_monitors, id, monitor_ref),
+        cron_monitor_refs: Map.put(state.cron_monitor_refs, monitor_ref, id),
+        cron_restart_attempts: Map.delete(state.cron_restart_attempts, id)
     }
   end
 
   @doc false
   @spec untrack_cron_job(State.t(), term(), keyword()) :: {pid() | nil, State.t()}
   def untrack_cron_job(%State{} = state, logical_id, opts \\ []) do
-    cancel? = Keyword.get(opts, :cancel?, false)
-    drop_runtime_spec? = Keyword.get(opts, :drop_runtime_spec?, false)
     pid = Map.get(state.cron_jobs, logical_id)
-    monitor_ref = Map.get(state.cron_monitors, logical_id)
-    timer_ref = Map.get(state.cron_restart_timers, logical_id)
 
-    if is_reference(monitor_ref) do
-      Process.demonitor(monitor_ref, [:flush])
-    end
-
-    if is_reference(timer_ref) do
-      :erlang.cancel_timer(timer_ref)
-    end
-
-    new_state = %{
+    new_state =
       state
-      | cron_jobs: Map.delete(state.cron_jobs, logical_id),
-        cron_monitors: Map.delete(state.cron_monitors, logical_id),
+      |> remove_cron_monitor(logical_id)
+      |> remove_cron_restart_timer(logical_id)
+      |> remove_cron_job_entry(logical_id)
+      |> maybe_drop_cron_specifications(logical_id, Keyword.get(opts, :drop_runtime_spec?, false))
+
+    maybe_cancel_tracked_cron(state, logical_id, pid, opts)
+    {pid, new_state}
+  end
+
+  defp remove_cron_monitor(state, id) do
+    ref = Map.get(state.cron_monitors, id)
+    if is_reference(ref), do: Process.demonitor(ref, [:flush])
+
+    %{
+      state
+      | cron_monitors: Map.delete(state.cron_monitors, id),
         cron_monitor_refs:
-          if is_reference(monitor_ref) do
-            Map.delete(state.cron_monitor_refs, monitor_ref)
-          else
-            state.cron_monitor_refs
-          end,
-        cron_restart_attempts: Map.delete(state.cron_restart_attempts, logical_id),
-        cron_restart_timers: Map.delete(state.cron_restart_timers, logical_id),
-        cron_restart_timer_refs:
-          if is_reference(timer_ref) do
-            Map.delete(state.cron_restart_timer_refs, timer_ref)
-          else
-            state.cron_restart_timer_refs
-          end,
-        cron_runtime_specs:
-          if drop_runtime_spec? do
-            Map.delete(state.cron_runtime_specs, logical_id)
-          else
-            state.cron_runtime_specs
-          end,
-        cron_specs:
-          if(drop_runtime_spec?,
-            do: Map.delete(state.cron_specs, logical_id),
-            else: state.cron_specs
+          if(is_reference(ref),
+            do: Map.delete(state.cron_monitor_refs, ref),
+            else: state.cron_monitor_refs
           )
     }
+  end
 
-    if cancel? and is_pid(pid) and Process.alive?(pid) do
-      Aikido.Cron.Directives.Cancel.shutdown_io(
-        logical_id,
-        opts[:input_signal] ||
-          Aikido.Signal.new!("aikido.agent.cron.cancel", %{job_id: logical_id}),
-        state
-      )
+  defp remove_cron_restart_timer(state, id) do
+    ref = Map.get(state.cron_restart_timers, id)
+    if is_reference(ref), do: :erlang.cancel_timer(ref)
+
+    %{
+      state
+      | cron_restart_timers: Map.delete(state.cron_restart_timers, id),
+        cron_restart_timer_refs:
+          if(is_reference(ref),
+            do: Map.delete(state.cron_restart_timer_refs, ref),
+            else: state.cron_restart_timer_refs
+          )
+    }
+  end
+
+  defp remove_cron_job_entry(state, id) do
+    %{
+      state
+      | cron_jobs: Map.delete(state.cron_jobs, id),
+        cron_restart_attempts: Map.delete(state.cron_restart_attempts, id)
+    }
+  end
+
+  defp maybe_drop_cron_specifications(state, id, true) do
+    %{
+      state
+      | cron_runtime_specs: Map.delete(state.cron_runtime_specs, id),
+        cron_specs: Map.delete(state.cron_specs, id)
+    }
+  end
+
+  defp maybe_drop_cron_specifications(state, _id, false), do: state
+
+  defp maybe_cancel_tracked_cron(state, id, pid, opts) do
+    if Keyword.get(opts, :cancel?, false) and is_pid(pid) and Process.alive?(pid) do
+      signal =
+        opts[:input_signal] || Aikido.Signal.new!("aikido.agent.cron.cancel", %{job_id: id})
+
+      Aikido.Cron.Directives.Cancel.shutdown_io(id, signal, state)
     end
-
-    {pid, new_state}
   end
 
   @doc false
@@ -1388,30 +1415,7 @@ defmodule Aikido.AgentServer do
         Map.merge(metadata, signal_stop_metadata_for(result))
       )
 
-      case result do
-        {:ok, new_state, directives} ->
-          case execute_directives(directives, signal, new_state) do
-            {:ok, executed_state} ->
-              executed_state = fire_subscribers(executed_state, signal)
-              {:ok, executed_state, directives}
-
-            {:stop, reason, executed_state} ->
-              # Subscribers are intentionally not fired on the stop branch
-              # — the agent is going down; observers see the :DOWN monitor.
-              {:stop, reason, executed_state}
-
-            {:error, executed_state, reason} ->
-              executed_state = fire_subscribers(executed_state, signal)
-              {:error, executed_state, reason}
-          end
-
-        {:error, new_state, reason} ->
-          # Chain returned an error. `new_state` already has any
-          # middleware-staged mutations committed; no directives to run on
-          # this branch. Subscribers still observe the resulting state.
-          new_state = fire_subscribers(new_state, signal)
-          {:error, new_state, reason}
-      end
+      execute_signal_effects(result, signal)
     catch
       kind, reason ->
         emit_telemetry(
@@ -1423,6 +1427,26 @@ defmodule Aikido.AgentServer do
         :erlang.raise(kind, reason, __STACKTRACE__)
     end
   end
+
+  defp execute_signal_effects({:ok, state, directives}, signal) do
+    directives
+    |> execute_directives(signal, state)
+    |> notify_after_effects(signal, directives)
+  end
+
+  defp execute_signal_effects({:error, state, reason}, signal) do
+    {:error, fire_subscribers(state, signal), reason}
+  end
+
+  defp notify_after_effects({:ok, state}, signal, directives),
+    do: {:ok, fire_subscribers(state, signal), directives}
+
+  # Shutdown is observed through the process monitor, not a terminal state snapshot.
+  defp notify_after_effects({:stop, reason, state}, _signal, _directives),
+    do: {:stop, reason, state}
+
+  defp notify_after_effects({:error, state, reason}, signal, _directives),
+    do: {:error, fire_subscribers(state, signal), reason}
 
   # Invokes a call, state or subscription selector in a try/rescue so a raising
   # selector doesn't crash the agent. Returns the selector's tagged tuple
@@ -1821,42 +1845,58 @@ defmodule Aikido.AgentServer do
 
   @doc false
   def apply_actions(%Signal{} = signal, ctx, targets) do
-    Enum.reduce_while(targets, {:ok, ctx, []}, fn {reference, params}, {:ok, current, effects} ->
-      paths =
-        current.agent_module
-        |> Aikido.Agent.Info.slice_paths_for_action()
-        |> Map.get(reference, [Spark.Dsl.Extension.get_opt(current.agent_module, [:agent], :path)])
-
-      Enum.reduce_while(paths, {:ok, current, effects}, fn path, {:ok, current, effects} ->
-        case run_action(reference, params, signal, current, path) do
-          {:ok, result} ->
-            state =
-              case result.state do
-                %Aikido.Types.SliceUpdate{slices: slices} ->
-                  Map.merge(current.agent.state, slices)
-
-                slice ->
-                  Map.put(current.agent.state, path, slice)
-              end
-
-            current = Map.put(current, :agent, %{current.agent | state: state})
-            {:cont, {:ok, current, effects ++ result.directives}}
-
-          {:error, reason} ->
-            {:halt, {:error, ctx, reason}}
-        end
-      end)
-      |> case do
+    Enum.reduce_while(targets, {:ok, ctx, []}, fn target, accumulated ->
+      case apply_action_at_mounted_paths(target, signal, accumulated) do
         {:ok, _, _} = result -> {:cont, result}
-        {:error, _, _} = error -> {:halt, error}
+        {:error, reason} -> {:halt, {:error, ctx, reason}}
       end
     end)
   rescue
     error -> {:error, ctx, Ash.Error.to_error_class(error)}
   end
 
-  defp run_action(reference, params, signal, ctx, path) do
-    {resource, name} = reference
+  defp apply_action_at_mounted_paths({reference, params}, signal, {:ok, ctx, effects}) do
+    ctx.agent_module
+    |> action_mount_paths(reference)
+    |> Enum.reduce_while({:ok, ctx, effects}, fn path, {:ok, current, effects} ->
+      with {:ok, result} <- run_action(reference, params, signal, current, path) do
+        {:cont,
+         {:ok, adopt_action_state(current, result.state, path), effects ++ result.directives}}
+      else
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp action_mount_paths(agent_module, reference) do
+    agent_module
+    |> Aikido.Agent.Info.slice_paths_for_action()
+    |> Map.get(reference, [Spark.Dsl.Extension.get_opt(agent_module, [:agent], :path)])
+  end
+
+  defp adopt_action_state(ctx, %Aikido.Types.SliceUpdate{slices: slices}, _path) do
+    put_in(ctx.agent.state, Map.merge(ctx.agent.state, slices))
+  end
+
+  defp adopt_action_state(ctx, slice, path) do
+    put_in(ctx.agent.state, Map.put(ctx.agent.state, path, slice))
+  end
+
+  defp run_action({resource, name} = reference, params, signal, ctx, path) do
+    arguments = reducer_arguments(reference, params, signal, ctx, path)
+    options = reducer_scope_options(params, signal, ctx, path)
+
+    resource
+    |> Ash.ActionInput.for_action(
+      name,
+      arguments,
+      Keyword.put(options, :skip_unknown_inputs, [:*])
+    )
+    |> Ash.run_action(options)
+    |> cast_reducer_result()
+  end
+
+  defp reducer_arguments({resource, name}, params, signal, ctx, path) do
     definition = Ash.Resource.Info.action(resource, name)
     state = Map.get(ctx.agent.state, path, %{})
 
@@ -1869,12 +1909,13 @@ defmodule Aikido.AgentServer do
         variant -> %Ash.Union{type: variant, value: params}
       end
 
-    arguments =
-      if Enum.any?(definition.arguments, &(&1.name == :data)) &&
-           name not in Spark.Dsl.Extension.get_persisted(resource, :aikido_flat_reducers, []),
-         do: %{data: payload, state: state},
-         else: Map.put(params || %{}, :state, state)
+    if Enum.any?(definition.arguments, &(&1.name == :data)) &&
+         name not in Spark.Dsl.Extension.get_persisted(resource, :aikido_flat_reducers, []),
+       do: %{data: payload, state: state},
+       else: Map.put(params || %{}, :state, state)
+  end
 
+  defp reducer_scope_options(params, signal, ctx, path) do
     runtime =
       Map.merge(ctx, %{
         signal: %{signal | data: params},
@@ -1882,27 +1923,14 @@ defmodule Aikido.AgentServer do
         slice_config: Map.get(Aikido.Agent.Info.mount_config_map(ctx.agent_module), path, %{})
       })
 
-    options =
-      Ash.Scope.to_opts(ctx, context: Map.put(Map.get(ctx, :context) || %{}, :aikido, runtime))
-
-    resource
-    |> Ash.ActionInput.for_action(
-      name,
-      arguments,
-      Keyword.put(options, :skip_unknown_inputs, [:*])
-    )
-    |> Ash.run_action(options)
-    |> case do
-      {:ok, %Aikido.Types.ActionResult{} = result} ->
-        Aikido.Types.ActionResult.new(Map.from_struct(result))
-
-      {:ok, result} ->
-        Aikido.Types.ActionResult.new(result)
-
-      error ->
-        error
-    end
+    Ash.Scope.to_opts(ctx, context: Map.put(Map.get(ctx, :context) || %{}, :aikido, runtime))
   end
+
+  defp cast_reducer_result({:ok, %Aikido.Types.ActionResult{} = result}),
+    do: result |> Map.from_struct() |> Aikido.Types.ActionResult.new()
+
+  defp cast_reducer_result({:ok, result}), do: Aikido.Types.ActionResult.new(result)
+  defp cast_reducer_result(error), do: error
 
   # Routing failures short-circuit the chain before directives run.
   # Log them here so operators can identify signals without a valid route.
@@ -2414,19 +2442,7 @@ defmodule Aikido.AgentServer do
 
   defp exec_directive_with_telemetry(directive, signal, state) do
     start_time = System.monotonic_time()
-    directive_type = directive.__struct__ |> Module.split() |> List.last()
-
-    metadata =
-      %{
-        agent_id: state.id,
-        agent_module: state.agent_module,
-        directive_type: directive_type,
-        directive: directive,
-        signal_id: signal.id,
-        signal_type: signal.type,
-        aikido_instance: state.aikido,
-        aikido_partition: state.partition
-      }
+    metadata = directive_metadata(directive, signal, state)
 
     emit_telemetry(
       [:aikido, :agent_server, :directive, :start],
@@ -2454,6 +2470,21 @@ defmodule Aikido.AgentServer do
 
         :erlang.raise(kind, reason, __STACKTRACE__)
     end
+  end
+
+  defp directive_metadata(directive, signal, state) do
+    directive_type = directive.__struct__ |> Module.split() |> List.last()
+
+    %{
+      agent_id: state.id,
+      agent_module: state.agent_module,
+      directive_type: directive_type,
+      directive: directive,
+      signal_id: signal.id,
+      signal_type: signal.type,
+      aikido_instance: state.aikido,
+      aikido_partition: state.partition
+    }
   end
 
   defp result_type(:ok) do

@@ -79,23 +79,25 @@ defmodule Aikido.Signal do
     do: signal |> Map.from_struct() |> materialize()
 
   def materialize(attrs) do
-    attrs = Map.new(attrs)
+    attrs
+    |> Map.new()
+    |> supply_missing_identity()
+    |> supply_missing_timestamp()
+    |> new()
+  end
 
-    attrs =
-      Enum.reduce([:id, :time], attrs, fn key, attrs ->
-        if is_nil(Map.get(attrs, key, Map.get(attrs, Atom.to_string(key)))) do
-          value =
-            if key == :id,
-              do: Ash.UUIDv7.generate(),
-              else: DateTime.to_iso8601(DateTime.utc_now())
+  defp supply_missing_identity(attrs) do
+    put_missing_runtime_value(attrs, :id, &Ash.UUIDv7.generate/0)
+  end
 
-          Map.put(attrs, key, value)
-        else
-          attrs
-        end
-      end)
+  defp supply_missing_timestamp(attrs) do
+    put_missing_runtime_value(attrs, :time, fn -> DateTime.to_iso8601(DateTime.utc_now()) end)
+  end
 
-    new(attrs)
+  defp put_missing_runtime_value(attrs, key, generate) do
+    if is_nil(Map.get(attrs, key, Map.get(attrs, Atom.to_string(key)))),
+      do: Map.put(attrs, key, generate.()),
+      else: attrs
   end
 
   @doc "Construct and materialize an internal signal with arbitrary data at an I/O boundary."

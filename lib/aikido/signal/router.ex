@@ -43,15 +43,8 @@ defmodule Aikido.Signal.Router do
   @doc "Constructs a router from existing route tuples without executing predicates."
   @spec new(list()) :: {:ok, t()} | {:error, Exception.t()}
   def new(routes) when is_list(routes) do
-    Enum.reduce_while(routes, {:ok, []}, fn route, {:ok, normalized} ->
-      case normalize(route) do
-        {:ok, entry} -> {:cont, {:ok, [entry | normalized]}}
-        {:error, error} -> {:halt, {:error, error}}
-      end
-    end)
-    |> case do
-      {:ok, normalized} -> {:ok, Index.new(Enum.reverse(normalized))}
-      error -> error
+    with {:ok, normalized} <- normalize_routes(routes) do
+      {:ok, Index.new(normalized)}
     end
   end
 
@@ -109,6 +102,20 @@ defmodule Aikido.Signal.Router do
   @doc "Matches a signal type against a previously validated, compiled pattern."
   @spec matches_compiled?(String.t(), compiled_pattern()) :: boolean()
   defdelegate matches_compiled?(type, pattern), to: Index
+
+  defp normalize_routes(routes) do
+    routes
+    |> Enum.reduce_while({:ok, []}, fn route, {:ok, normalized} ->
+      case normalize(route) do
+        {:ok, entry} -> {:cont, {:ok, [entry | normalized]}}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+    |> case do
+      {:ok, normalized} -> {:ok, Enum.reverse(normalized)}
+      error -> error
+    end
+  end
 
   defp normalize({path, target}), do: validate_route(path: path, target: target)
 

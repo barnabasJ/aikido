@@ -14,6 +14,36 @@ defmodule Aikido.AI.Extension.Transformers.Build do
   end
 
   defp add_ai_configuration_and_slice_mounts(dsl) do
+    with {:ok, dsl} <- add_ai_attributes(dsl),
+         {:ok, dsl} <- add_ask_command(dsl),
+         {:ok, dsl} <- add_action(dsl, :cancel, [arg(:request_id, :string)]) do
+      {:ok,
+       dsl
+       |> mount_ai_slices()
+       |> Transformer.persist(:aikido_ai?, true)}
+    end
+  end
+
+  defp add_ask_command(dsl) do
+    add_action(dsl, :ask, [
+      arg(:query, :string, allow_nil?: false),
+      arg(:metadata, :map, default: %{}),
+      arg(:request_id, :string, allow_nil?: false, default: &Ash.UUIDv7.generate/0)
+    ])
+  end
+
+  defp mount_ai_slices(dsl) do
+    Enum.reduce([ai: Aikido.AiReact.Slice, work: Aikido.AiWorker.Slice], dsl, fn {path, module},
+                                                                                 dsl ->
+      Transformer.add_entity(dsl, [:agent], %Aikido.Agent.SliceMount{
+        path: path,
+        module: module,
+        options: []
+      })
+    end)
+  end
+
+  defp add_ai_attributes(dsl) do
     fields = [
       options: [Aikido.AiReact.Options, %{}, false],
       tools: [{:array, :atom}, [], false],
@@ -27,62 +57,36 @@ defmodule Aikido.AI.Extension.Transformers.Build do
       max_iterations: [:integer, 10, false]
     ]
 
-    with {:ok, dsl} <-
-           Enum.reduce_while(fields, {:ok, dsl}, fn {name, [type, default, nullable]},
-                                                    {:ok, dsl} ->
-             options = [
-               default:
-                 if(name in [:tools, :tool_context],
-                   do: default,
-                   else: Transformer.get_option(dsl, [:ai], name, default)
-                 ),
-               allow_nil?: nullable,
-               public?: true
-             ]
+    Enum.reduce_while(fields, {:ok, dsl}, fn {name, [type, default, nullable]}, {:ok, dsl} ->
+      options = attribute_options(dsl, name, default, nullable)
 
-             options =
-               case name do
-                 :max_iterations ->
-                   Keyword.put(options, :constraints, min: 1)
-
-                 name when name in [:llm_opts, :tool_options] ->
-                   Keyword.put(options, :constraints,
-                     items: [fields: [key: [type: :atom], value: [type: :term]]]
-                   )
-
-                 _ ->
-                   options
-               end
-
-             case Builder.add_new_attribute(dsl, name, type, options) do
-               {:ok, dsl} -> {:cont, {:ok, dsl}}
-               error -> {:halt, error}
-             end
-           end),
-         {:ok, dsl} <-
-           add_action(dsl, :ask, [
-             arg(:query, :string, allow_nil?: false),
-             arg(:metadata, :map, default: %{}),
-             arg(:request_id, :string, allow_nil?: false, default: &Ash.UUIDv7.generate/0)
-           ]),
-         {:ok, dsl} <- add_action(dsl, :cancel, [arg(:request_id, :string)]) do
-      dsl =
-        Transformer.add_entity(dsl, [:agent], %Aikido.Agent.SliceMount{
-          path: :ai,
-          module: Aikido.AiReact.Slice,
-          options: []
-        })
-
-      dsl =
-        Transformer.add_entity(dsl, [:agent], %Aikido.Agent.SliceMount{
-          path: :work,
-          module: Aikido.AiWorker.Slice,
-          options: []
-        })
-
-      {:ok, Transformer.persist(dsl, :aikido_ai?, true)}
-    end
+      case Builder.add_new_attribute(dsl, name, type, options) do
+        {:ok, dsl} -> {:cont, {:ok, dsl}}
+        error -> {:halt, error}
+      end
+    end)
   end
+
+  defp attribute_options(dsl, name, default, nullable) do
+    default =
+      if name in [:tools, :tool_context],
+        do: default,
+        else: Transformer.get_option(dsl, [:ai], name, default)
+
+    [default: default, allow_nil?: nullable, public?: true]
+    |> add_attribute_constraints(name)
+  end
+
+  defp add_attribute_constraints(options, :max_iterations),
+    do: Keyword.put(options, :constraints, min: 1)
+
+  defp add_attribute_constraints(options, name) when name in [:llm_opts, :tool_options],
+    do:
+      Keyword.put(options, :constraints,
+        items: [fields: [key: [type: :atom], value: [type: :term]]]
+      )
+
+  defp add_attribute_constraints(options, _name), do: options
 
   defp add_action(dsl, name, arguments) do
     dsl =

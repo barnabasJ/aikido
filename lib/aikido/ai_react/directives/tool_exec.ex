@@ -55,6 +55,26 @@ defmodule Aikido.AiReact.Directives.ToolExec do
     agent_pid = self()
     task_sup = Aikido.task_supervisor_name(state.aikido)
     source = "/agent/#{state.id}"
+    context = tool_context(directive, input_signal, state)
+
+    tracers = Aikido.Signal.tracers(input_signal, state.aikido)
+    transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
+
+    case Task.Supervisor.start_child(task_sup, fn ->
+           Ash.ProcessHelpers.transfer_context(transfer)
+
+           Ash.Tracer.span {:custom, :aikido_tool_call}, "aikido_tool_call", tracers do
+             run_and_dispatch(directive, agent_pid, source, context, task_sup)
+           end
+         end) do
+      {:ok, _pid} -> :ok
+      {:error, reason} -> dispatch_result(directive, {:error, reason}, agent_pid, source, context)
+    end
+
+    :ok
+  end
+
+  defp tool_context(directive, input_signal, state) do
     agent_module = Map.get(state, :agent_module)
 
     inherited =
@@ -76,28 +96,11 @@ defmodule Aikido.AiReact.Directives.ToolExec do
         parent: Map.get(state, :parent)
       })
 
-    context =
-      Map.put(
-        context,
-        :context,
-        DeepMerge.deep_merge(directive.tool_context[:context] || %{}, inherited[:context] || %{})
-      )
-
-    tracers = Aikido.Signal.tracers(input_signal, state.aikido)
-    transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
-
-    case Task.Supervisor.start_child(task_sup, fn ->
-           Ash.ProcessHelpers.transfer_context(transfer)
-
-           Ash.Tracer.span {:custom, :aikido_tool_call}, "aikido_tool_call", tracers do
-             run_and_dispatch(directive, agent_pid, source, context, task_sup)
-           end
-         end) do
-      {:ok, _pid} -> :ok
-      {:error, reason} -> dispatch_result(directive, {:error, reason}, agent_pid, source, context)
-    end
-
-    :ok
+    Map.put(
+      context,
+      :context,
+      DeepMerge.deep_merge(directive.tool_context[:context] || %{}, inherited[:context] || %{})
+    )
   end
 
   defp run_and_dispatch(%ToolExec{} = d, agent_pid, source, context, supervisor) do

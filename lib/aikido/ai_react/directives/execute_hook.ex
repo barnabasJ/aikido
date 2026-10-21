@@ -52,56 +52,55 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
 
   @doc false
   def evaluate(hook, event, pid, request_id, source_signal \\ nil) do
-    scope =
-      if source_signal,
-        do: source_signal |> Ash.Scope.to_opts() |> Keyword.take([:actor, :tenant, :context]),
-        else: []
-
-    lua =
-      hook.lua_options
-      |> surface_options()
-      |> Keyword.merge(scope)
-      |> Keyword.put(:lua_options,
-        max_instructions: hook.max_instructions,
-        max_call_depth: hook.max_call_depth,
-        max_string_bytes: hook.max_string_bytes
-      )
-      |> AshLua.new()
-      |> Lua.set!([:event], AshLua.Encoder.encode_result(event))
-      |> install_request(hook, event, request_id)
-
-    # Only async hooks get fire-and-forget signal helpers. Both modes can
-    # request a response; the owning action still applies the final decision.
-    lua =
-      if hook.mode == :async,
-        do: install_signals(lua, pid, request_id, hook.name, source_signal),
-        else: lua
-
-    {values, _lua} = Lua.eval!(lua, hook.script)
-    values = Enum.map(values, &AshLua.Encoder.decode_input/1)
-
-    if hook.mode == :sync do
-      case values do
-        [] ->
-          Ash.Type.cast_input(Aikido.AiReact.Hooks.Decision, %{})
-
-        [nil] ->
-          Ash.Type.cast_input(Aikido.AiReact.Hooks.Decision, %{})
-
-        [value] when is_map(value) ->
-          Ash.Type.cast_input(Aikido.AiReact.Hooks.Decision, value)
-
-        _ ->
-          {:error, "hook must return nil or a decision table"}
-      end
-    else
-      {:ok, nil}
-    end
+    hook
+    |> hook_vm_options(source_signal)
+    |> AshLua.new()
+    |> Lua.set!([:event], AshLua.Encoder.encode_result(event))
+    |> install_request(hook, event, request_id)
+    |> maybe_install_async_signals(hook, pid, request_id, source_signal)
+    |> evaluate_script(hook.script)
+    |> cast_hook_return(hook.mode)
   rescue
     error -> {:error, Exception.message(error)}
   catch
     kind, reason -> {:error, "#{kind}: #{inspect(reason)}"}
   end
+
+  defp hook_vm_options(hook, source_signal) do
+    scope =
+      if source_signal,
+        do: source_signal |> Ash.Scope.to_opts() |> Keyword.take([:actor, :tenant, :context]),
+        else: []
+
+    hook.lua_options
+    |> surface_options()
+    |> Keyword.merge(scope)
+    |> Keyword.put(:lua_options,
+      max_instructions: hook.max_instructions,
+      max_call_depth: hook.max_call_depth,
+      max_string_bytes: hook.max_string_bytes
+    )
+  end
+
+  # Async observers can send signals; sync gates return their decision through the action pipeline.
+  defp maybe_install_async_signals(lua, %{mode: :async} = hook, pid, request_id, signal),
+    do: install_signals(lua, pid, request_id, hook.name, signal)
+
+  defp maybe_install_async_signals(lua, _hook, _pid, _request_id, _signal), do: lua
+
+  defp evaluate_script(lua, script) do
+    {values, _lua} = Lua.eval!(lua, script)
+    Enum.map(values, &AshLua.Encoder.decode_input/1)
+  end
+
+  defp cast_hook_return(values, :sync) when values in [[], [nil]],
+    do: Ash.Type.cast_input(Aikido.AiReact.Hooks.Decision, %{})
+
+  defp cast_hook_return([value], :sync) when is_map(value),
+    do: Ash.Type.cast_input(Aikido.AiReact.Hooks.Decision, value)
+
+  defp cast_hook_return(_values, :sync), do: {:error, "hook must return nil or a decision table"}
+  defp cast_hook_return(_values, _mode), do: {:ok, nil}
 
   defp surface_options(options) do
     case Keyword.pop(options, :eval_resource) do

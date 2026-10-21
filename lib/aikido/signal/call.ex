@@ -79,24 +79,26 @@ defmodule Aikido.Signal.Call do
           {:ok, Signal.t()} | {:error, term()}
   def call(server, %Signal{} = signal, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, default_timeout())
-    signal = Aikido.Directive.materialize_signal(signal)
-    correlation_id = signal.id
-
-    query =
-      case signal.reply_to do
-        nil -> %{signal | reply_to: self()}
-        _existing -> signal
-      end
+    query = signal |> Aikido.Directive.materialize_signal() |> attach_reply_destination()
 
     with {:ok, pid} <- AgentServer.resolve(server) do
-      ref = Process.monitor(pid)
-      :ok = AgentServer.cast(pid, query)
+      send_query_and_await_reply(pid, query, timeout)
+    end
+  end
 
-      try do
-        await_reply(correlation_id, ref, timeout)
-      after
-        Process.demonitor(ref, [:flush])
-      end
+  defp attach_reply_destination(%Signal{reply_to: nil} = signal),
+    do: %{signal | reply_to: self()}
+
+  defp attach_reply_destination(signal), do: signal
+
+  defp send_query_and_await_reply(pid, query, timeout) do
+    ref = Process.monitor(pid)
+    :ok = AgentServer.cast(pid, query)
+
+    try do
+      await_reply(query.id, ref, timeout)
+    after
+      Process.demonitor(ref, [:flush])
     end
   end
 

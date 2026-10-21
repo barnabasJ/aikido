@@ -143,15 +143,7 @@ defmodule Aikido.Directives.SpawnAgent do
       meta: meta
     }
 
-    child_opts =
-      opts
-      |> Map.drop(@reserved_child_opts)
-      |> Map.put(:agent_module, agent)
-      |> Map.put(:id, child_id)
-      |> Map.put(:partition, child_partition)
-      |> Map.put(:parent, parent_ref)
-      |> Map.put(:aikido, state.aikido)
-      |> Map.to_list()
+    child_opts = child_options(opts, state, parent_ref, agent, child_id, child_partition)
 
     case Aikido.Durable.start(
            Aikido.durable_supervisor_name(state.aikido),
@@ -179,6 +171,17 @@ defmodule Aikido.Directives.SpawnAgent do
 
         :ok
     end
+  end
+
+  defp child_options(opts, state, parent_ref, agent, child_id, child_partition) do
+    opts
+    |> Map.drop(@reserved_child_opts)
+    |> Map.put(:agent_module, agent)
+    |> Map.put(:id, child_id)
+    |> Map.put(:partition, child_partition)
+    |> Map.put(:parent, parent_ref)
+    |> Map.put(:aikido, state.aikido)
+    |> Map.to_list()
   end
 
   defp tag_component(tag) do

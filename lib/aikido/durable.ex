@@ -39,6 +39,19 @@ defmodule Aikido.Durable do
   @impl true
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
+    {stores, backend} = storage_children(opts, name)
+    durable_opts = durable_supervisor_options(opts, name, backend)
+    Supervisor.init(stores ++ [{DurableServer.Supervisor, durable_opts}], strategy: :rest_for_one)
+  end
+
+  defp storage_children(opts, name) do
+    case Keyword.fetch(opts, :backend) do
+      {:ok, backend} -> {[], backend}
+      :error -> local_ekv_storage(opts, name)
+    end
+  end
+
+  defp local_ekv_storage(opts, name) do
     ekv = Module.concat(name, Store)
 
     directory =
@@ -46,17 +59,24 @@ defmodule Aikido.Durable do
         Path.join([File.cwd!(), "_build", "aikido_durable", Atom.to_string(name)])
       end)
 
-    {stores, backend} =
-      case Keyword.fetch(opts, :backend) do
-        {:ok, backend} ->
-          {[], backend}
+    {[{EKV, name: ekv, data_dir: directory, cluster_size: 1, node_id: "local", shards: 1}],
+     {DurableServer.Backends.EKVStore, name: ekv}}
+  end
 
-        :error ->
-          {[{EKV, name: ekv, data_dir: directory, cluster_size: 1, node_id: "local", shards: 1}],
-           {DurableServer.Backends.EKVStore, name: ekv}}
-      end
+  defp durable_supervisor_options(opts, name, backend) do
+    durable = Keyword.get(opts, :durable_options, [])
+    info = Map.put(durable[:init_info] || %{}, :aikido_config, activation_defaults(opts))
 
-    config = %{
+    Keyword.merge(durable,
+      name: name,
+      prefix: Keyword.get(opts, :prefix, "aikido/#{name}/"),
+      backend: backend,
+      init_info: info
+    )
+  end
+
+  defp activation_defaults(opts) do
+    %{
       agent: opts[:agent],
       agent_opts: Keyword.get(opts, :agent_opts, []),
       aikido:
@@ -68,22 +88,6 @@ defmodule Aikido.Durable do
       partition: opts[:partition],
       permanent: Keyword.get(opts, :permanent, true)
     }
-
-    durable_opts =
-      Keyword.get(opts, :durable_options, [])
-      |> Keyword.merge(
-        name: name,
-        prefix: Keyword.get(opts, :prefix, "aikido/#{name}/"),
-        backend: backend,
-        init_info:
-          Map.put(
-            Keyword.get(opts, :durable_options, [])[:init_info] || %{},
-            :aikido_config,
-            config
-          )
-      )
-
-    Supervisor.init(stores ++ [{DurableServer.Supervisor, durable_opts}], strategy: :rest_for_one)
   end
 
   def start(name, key, opts \\ []), do: activate(name, key, opts, :start_child)

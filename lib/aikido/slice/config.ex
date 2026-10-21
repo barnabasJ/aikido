@@ -13,10 +13,10 @@ defmodule Aikido.Slice.Config do
   """
   @spec resolve_config(module(), map()) :: {:ok, map()} | {:error, term()}
   def resolve_config(slice_module, overrides \\ %{}) do
-    base_config = get_app_env_config(slice_module)
-    merged_config = Map.merge(base_config, overrides)
-
-    validate_config(slice_module, merged_config)
+    slice_module
+    |> get_app_env_config()
+    |> Map.merge(overrides)
+    |> cast_config(slice_module)
   end
 
   @doc """
@@ -51,32 +51,15 @@ defmodule Aikido.Slice.Config do
   defp normalize_to_map(config) when is_map(config), do: config
   defp normalize_to_map(_), do: %{}
 
-  defp validate_config(slice_module, config) do
+  @doc "Cast supplied configuration with native Ash types and defaults, without reading application config."
+  def cast_config(config, slice_module) do
     case Aikido.Slice.Info.config_schema(slice_module) do
       [] ->
         {:ok, config}
 
       fields ->
-        values =
-          Map.new(fields, fn field ->
-            value =
-              case Map.fetch(config, field.name) do
-                {:ok, value} ->
-                  value
-
-                :error ->
-                  Map.get_lazy(config, to_string(field.name), fn ->
-                    resolve_default(field.default)
-                  end)
-              end
-
-            {field.name, value}
-          end)
-
-        constraints =
-          Enum.map(fields, fn field ->
-            {field.name, Map.to_list(Map.take(field, [:type, :constraints, :allow_nil?]))}
-          end)
+        values = apply_field_defaults(config, fields)
+        constraints = config_field_constraints(fields)
 
         with {:ok, constraints} <- Ash.Type.init(:map, fields: constraints),
              {:ok, values} <- Ash.Type.cast_input(:map, values, constraints),
@@ -87,6 +70,27 @@ defmodule Aikido.Slice.Config do
             Ash.Type.CompositeTypeHelpers.convert_errors_to_invalid_attributes(errors)
         end
     end
+  end
+
+  defp apply_field_defaults(config, fields) do
+    Map.new(fields, fn field ->
+      value =
+        case Map.fetch(config, field.name) do
+          {:ok, value} ->
+            value
+
+          :error ->
+            Map.get_lazy(config, to_string(field.name), fn -> resolve_default(field.default) end)
+        end
+
+      {field.name, value}
+    end)
+  end
+
+  defp config_field_constraints(fields) do
+    Enum.map(fields, fn field ->
+      {field.name, Map.to_list(Map.take(field, [:type, :constraints, :allow_nil?]))}
+    end)
   end
 
   defp resolve_default(fun) when is_function(fun, 0), do: fun.()

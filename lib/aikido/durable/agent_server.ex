@@ -195,41 +195,35 @@ defmodule Aikido.Durable.AgentServer do
   defp restore_parent(options) do
     case options[:parent] do
       %{id: id} = parent ->
-        pid =
-          case Aikido.Durable.lookup(Aikido.durable_supervisor_name(options[:aikido]), id,
-                 partition: Map.get(parent, :partition)
-               ) do
-            {:ok, pid} -> pid
-            :error -> nil
-          end
+        case lookup_saved_process(options[:aikido], id, parent[:partition]) do
+          nil ->
+            Keyword.delete(options, :parent)
 
-        if pid do
-          meta = Map.get(parent, :meta, %{})
-
-          meta =
-            if meta[:team_id],
-              do:
-                Map.put(
-                  meta,
-                  :team_pid,
-                  case Aikido.Durable.lookup(
-                         Aikido.durable_supervisor_name(options[:aikido]),
-                         meta.team_id,
-                         partition: Map.get(parent, :partition)
-                       ) do
-                    {:ok, pid} -> pid
-                    :error -> nil
-                  end
-                ),
-              else: meta
-
-          Keyword.put(options, :parent, parent |> Map.put(:pid, pid) |> Map.put(:meta, meta))
-        else
-          Keyword.delete(options, :parent)
+          pid ->
+            parent = parent |> Map.put(:pid, pid) |> restore_team_reference(options[:aikido])
+            Keyword.put(options, :parent, parent)
         end
 
       _ ->
         options
+    end
+  end
+
+  defp restore_team_reference(parent, instance) do
+    meta = Map.get(parent, :meta, %{})
+
+    if meta[:team_id] do
+      pid = lookup_saved_process(instance, meta.team_id, parent[:partition])
+      Map.put(parent, :meta, Map.put(meta, :team_pid, pid))
+    else
+      Map.put(parent, :meta, meta)
+    end
+  end
+
+  defp lookup_saved_process(instance, id, partition) do
+    case Aikido.Durable.lookup(Aikido.durable_supervisor_name(instance), id, partition: partition) do
+      {:ok, pid} -> pid
+      :error -> nil
     end
   end
 
