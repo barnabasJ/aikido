@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.LlmTurn do
   @moduledoc "Adopts model responses, accumulates usage and continues with tools or queued messages."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Completion, Handoff, Preparation}
+  alias Aikido.AiReact.{Completion, Handoff, DirectivePlan}
   alias Aikido.AiReact.Context
 
   @impl true
@@ -18,7 +18,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
           Map.from_struct(input.arguments.turn)
         )
       )
-      |> Preparation.finish(input)
+      |> DirectivePlan.prepare_tools_and_handoff(input)
     else
       Aikido.Types.ActionResult.new(state: input.arguments.state)
     end

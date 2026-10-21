@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.ToolResult do
   @moduledoc "Adopts each pending tool result once and resumes the model after the complete batch."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Completion, Preparation}
+  alias Aikido.AiReact.{Completion, DirectivePlan}
   alias Aikido.AiReact.Context
 
   @impl true
@@ -14,7 +14,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
         :after_tool,
         Map.take(input.arguments, [:query, :tool_call_id, :name, :content, :reason, :metadata])
       )
-      |> Preparation.finish(input)
+      |> DirectivePlan.prepare_tools_and_handoff(input)
     else
       Aikido.Types.ActionResult.new(state: input.arguments.state)
     end

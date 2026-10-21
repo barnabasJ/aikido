@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.Cancel do
   @moduledoc "Fails a matching active run and clears its pending hooks."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Completion, Preparation}
+  alias Aikido.AiReact.{Completion, DirectivePlan}
 
   @impl true
   def run(input, _opts, _context) do
@@ -12,7 +12,7 @@ defmodule Aikido.AiReact.Actions.Cancel do
       :run_cancelled,
       Map.take(input.arguments, [:query, :tool_call_id, :name, :content, :reason, :metadata])
     )
-    |> Preparation.finish(input)
+    |> DirectivePlan.prepare_tools_and_handoff(input)
   end
 
   defp reduce(input) do

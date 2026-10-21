@@ -1,13 +1,13 @@
 defmodule Aikido.AiReact.Actions.HandoffFailed do
   @moduledoc "Fails a matching pending context handoff and plans failure hooks."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Handoff, Hooks, Preparation}
+  alias Aikido.AiReact.{Handoff, Hooks, DirectivePlan}
 
   @impl true
   def run(input, _opts, _context) do
     input.arguments.state
     |> reduce(Map.delete(input.arguments, :state))
-    |> Preparation.finish(input)
+    |> DirectivePlan.prepare_tools_and_handoff(input)
   end
 
   @doc false

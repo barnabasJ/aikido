@@ -1,18 +1,31 @@
-defmodule Aikido.AiReact.Preparation do
-  @moduledoc "Pure tool preparation and handoff planning shared by ReAct actions."
+defmodule Aikido.AiReact.DirectivePlan do
+  @moduledoc """
+  Prepares returned ReAct directives without executing them.
+
+  Supplies model tool descriptions and execution registries when available.
+  Otherwise queues model/tool work behind tool setup. Terminal states discard
+  transient tool setup data; model requests may be replaced by a context handoff
+  when the configured token threshold is reached.
+  """
 
   alias Aikido.AiReact.Directives.{LLMCall, PrepareTools, ToolExec}
 
-  @doc false
-  def finish({:ok, %{state: state, directives: []}} = unchanged, input)
+  @doc """
+  Prepare tools for the action result, then plan a context handoff if needed.
+
+  Unchanged state with no directives passes through without starting work.
+  Errors also pass through unchanged. All returned effects remain descriptors
+  for the runtime to execute after adopting the state.
+  """
+  def prepare_tools_and_handoff({:ok, %{state: state, directives: []}} = unchanged, input)
       when state == input.arguments.state,
       do: unchanged
 
-  def finish(result, _input) do
-    result |> prepare_tools() |> Aikido.AiReact.Handoff.plan()
+  def prepare_tools_and_handoff(result, _input) do
+    result |> prepare_tool_directives() |> Aikido.AiReact.Handoff.plan()
   end
 
-  defp prepare_tools({:ok, result}) do
+  defp prepare_tool_directives({:ok, result}) do
     state = result.state
 
     cond do
@@ -69,5 +82,5 @@ defmodule Aikido.AiReact.Preparation do
     end
   end
 
-  defp prepare_tools(error), do: error
+  defp prepare_tool_directives(error), do: error
 end

@@ -1,11 +1,11 @@
 defmodule Aikido.AiReact.Actions.Stream do
   @moduledoc "Accumulates streaming text and thinking while rejecting obsolete turns and attempts."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.Preparation
+  alias Aikido.AiReact.DirectivePlan
 
   @impl true
   def run(input, _opts, _context) do
-    input |> reduce() |> Preparation.finish(input)
+    input |> reduce() |> DirectivePlan.prepare_tools_and_handoff(input)
   end
 
   defp reduce(input) do

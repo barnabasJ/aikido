@@ -1,13 +1,13 @@
 defmodule Aikido.AiReact.Actions.HookCompleted do
   @moduledoc "Applies correlated hook decisions and resumes serialized synchronous continuations."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Hooks, Preparation}
+  alias Aikido.AiReact.{Hooks, DirectivePlan}
 
   @impl true
   def run(input, _opts, _context) do
     input.arguments.state
     |> reduce(Map.delete(input.arguments, :state))
-    |> Preparation.finish(input)
+    |> DirectivePlan.prepare_tools_and_handoff(input)
   end
 
   @doc false

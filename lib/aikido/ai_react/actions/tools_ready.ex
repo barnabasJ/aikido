@@ -1,13 +1,13 @@
 defmodule Aikido.AiReact.Actions.ToolsReady do
   @moduledoc "Installs prepared tools and releases queued work for the matching setup run."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{Hooks, Preparation}
+  alias Aikido.AiReact.{Hooks, DirectivePlan}
   alias Aikido.AiReact.Directives.LLMCall
   alias Aikido.AiReact.Context
 
   @impl true
   def run(input, _opts, _context) do
-    input |> reduce() |> Preparation.finish(input)
+    input |> reduce() |> DirectivePlan.prepare_tools_and_handoff(input)
   end
 
   defp reduce(input) do
