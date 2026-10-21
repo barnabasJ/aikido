@@ -47,55 +47,64 @@ defmodule Aikido.Team.Actions.AssignTask do
 
     with true <- !Map.has_key?(state.tasks, id) || {:error, {:task_exists, id}},
          {:ok, pid} <- Tasks.fetch_member(state, data.member) do
-      outgoing =
-        %Signal{
-          id: nil,
-          type: Map.get(data, :type, "harness.task"),
-          data:
-            Map.merge(Map.get(data, :payload, %{}), %{
-              metadata: data[:metadata] || %{},
-              task_id: id,
-              member: data.member,
-              reply_to: context.agent_pid,
-              attempt: state.incarnations[data.member]
-            }),
-          source: "/ash/team"
-        }
+      task = dispatched_task(id, data, state.incarnations[data.member])
 
-      task = %{
-        id: id,
-        member: data.member,
-        status: :dispatched,
-        result: nil,
-        notify: data[:notify],
-        metadata: data[:metadata] || %{},
-        attempt: state.incarnations[data.member]
-      }
-
-      effects = [Directives.emit_to_pid(outgoing, pid)]
-      timeout = Map.get(data, :timeout_ms, 30_000)
-
-      effects =
-        if is_integer(timeout) && timeout > 0,
-          do:
-            effects ++
-              [
-                Directives.schedule(
-                  timeout,
-                  %Signal{
-                    id: nil,
-                    type: "aikido.ash.team.task.timeout",
-                    data: %{
-                      task_id: id,
-                      attempt: task.attempt
-                    },
-                    source: "/aikido"
-                  }
-                )
-              ],
-          else: effects
-
-      {:ok, put_in(state.tasks[id], task), effects}
+      state
+      |> Map.update!(:tasks, &Map.put(&1, id, task))
+      |> request_task_execution(task, data, pid, context)
     end
   end
+
+  defp dispatched_task(id, data, attempt) do
+    %{
+      id: id,
+      member: data.member,
+      status: :dispatched,
+      result: nil,
+      notify: data[:notify],
+      metadata: data[:metadata] || %{},
+      attempt: attempt
+    }
+  end
+
+  defp request_task_execution(state, task, data, pid, context) do
+    directives =
+      task
+      |> task_signal(data, context.agent_pid)
+      |> Directives.emit_to_pid(pid)
+      |> List.wrap()
+      |> append_task_deadline(task, Map.get(data, :timeout_ms, 30_000))
+
+    {:ok, state, directives}
+  end
+
+  defp task_signal(task, data, reply_to) do
+    %Signal{
+      id: nil,
+      type: Map.get(data, :type, "harness.task"),
+      data:
+        Map.merge(Map.get(data, :payload, %{}), %{
+          metadata: task.metadata,
+          task_id: task.id,
+          member: task.member,
+          reply_to: reply_to,
+          attempt: task.attempt
+        }),
+      source: "/ash/team"
+    }
+  end
+
+  defp append_task_deadline(directives, task, timeout) when is_integer(timeout) and timeout > 0 do
+    deadline =
+      Directives.schedule(timeout, %Signal{
+        id: nil,
+        type: "aikido.ash.team.task.timeout",
+        data: %{task_id: task.id, attempt: task.attempt},
+        source: "/aikido"
+      })
+
+    directives ++ [deadline]
+  end
+
+  defp append_task_deadline(directives, _task, _timeout), do: directives
 end

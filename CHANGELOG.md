@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Split ReAct run setup, model/tool result handling, handoff adoption and team
+  member recovery into named transformation steps. Handoff validation uses an
+  explicit error chain before replacing conversation state.
+
 - Name reducer, queue, persistence and DSL expansion helpers for their concrete
   operations, and remove unnecessary team acknowledgement/failure wrappers.
 

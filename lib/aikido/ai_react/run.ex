@@ -3,30 +3,15 @@ defmodule Aikido.AiReact.Run do
   alias Aikido.AiReact.Context
 
   @doc false
-  def open(data, slice) do
-    slice = slice || %{}
-    model = data[:model] || Map.get(slice, :model)
-    tools = data[:tools] || Map.get(slice, :tools) || []
+  def open(data, state) do
+    state = state || %{}
 
-    system_prompt = data[:system_prompt] || Map.get(slice, :system_prompt)
-    max_iter = data[:max_iterations] || Map.get(slice, :max_iterations) || 10
-    llm_opts = Keyword.merge(Map.get(slice, :llm_opts) || [], data[:llm_opts] || [])
-    client = Map.get(data, :client) || Map.get(slice, :client) || ReqLLM.Generation
-
-    if is_nil(model) do
-      {:error, :no_model}
-    else
-      initialize_run_and_request_tools(
-        Map.put(data, :hooks, data[:hooks] || Map.get(slice, :hooks) || []),
-        slice,
-        system_prompt,
-        model,
-        tools,
-        max_iter,
-        llm_opts,
-        client,
-        Map.merge(Map.get(slice, :tool_context) || %{}, data[:tool_context] || %{})
-      )
+    with {:ok, configuration} <- resolve_configuration(data, state) do
+      state
+      |> refresh_conversation(configuration.system_prompt)
+      |> append_opening_messages(data.query)
+      |> reset_run(data, configuration)
+      |> request_tool_setup()
     end
   end
 
@@ -35,98 +20,102 @@ defmodule Aikido.AiReact.Run do
     Map.merge(state, %{prepared_tools: nil, handoff_pending: nil})
   end
 
-  defp initialize_run_and_request_tools(
-         data,
-         slice,
-         system_prompt,
-         model,
-         tools,
-         max_iter,
-         llm_opts,
-         client,
-         tool_context
-       ) do
+  defp resolve_configuration(data, state) do
+    model = data[:model] || Map.get(state, :model)
+
+    if is_nil(model) do
+      {:error, :no_model}
+    else
+      {:ok,
+       %{
+         model: model,
+         tools: data[:tools] || Map.get(state, :tools) || [],
+         system_prompt: data[:system_prompt] || Map.get(state, :system_prompt),
+         max_iterations: data[:max_iterations] || Map.get(state, :max_iterations) || 10,
+         llm_opts: Keyword.merge(Map.get(state, :llm_opts) || [], data[:llm_opts] || []),
+         client: data[:client] || Map.get(state, :client) || ReqLLM.Generation,
+         hooks: data[:hooks] || Map.get(state, :hooks) || [],
+         options: data[:options] || Map.get(state, :options) || %Aikido.AiReact.Options{},
+         tool_options: data[:tool_options] || Map.get(state, :tool_options, otp_app: :aikido),
+         tool_context: Map.merge(Map.get(state, :tool_context) || %{}, data[:tool_context] || %{})
+       }}
+    end
+  end
+
+  defp refresh_conversation(state, system_prompt) do
     context =
-      case Map.get(slice, :context) do
-        %ReqLLM.Context{} = context ->
-          context = Context.close_tool_calls(context)
-          messages = Enum.reject(context.messages, &(&1.role == :system))
-          system = if system_prompt, do: [ReqLLM.Context.system(system_prompt)], else: []
-          %{context | messages: system ++ messages}
+      state
+      |> Map.get(:context)
+      |> close_interrupted_tool_calls()
+      |> replace_system_prompt(system_prompt)
 
-        _ ->
-          ReqLLM.Context.new(
-            if(system_prompt, do: [ReqLLM.Context.system(system_prompt)], else: [])
-          )
-      end
+    cached = Map.get(state, :estimated_tokens)
 
-    base = slice
-    cached = Map.get(base, :estimated_tokens)
+    if Map.get(state, :context) == context && is_integer(cached) && cached > 0,
+      do: state,
+      else: Context.replace_context(state, context)
+  end
 
-    base =
-      if Map.get(base, :context) == context && is_integer(cached) && cached > 0,
-        do: base,
-        else: Context.replace_context(base, context)
+  defp close_interrupted_tool_calls(%ReqLLM.Context{} = context),
+    do: Context.close_tool_calls(context)
 
-    base =
-      Context.append_messages(
-        base,
-        Enum.map(Map.get(base, :queued_messages, []) ++ [data.query], &ReqLLM.Context.user/1)
-      )
+  defp close_interrupted_tool_calls(_), do: ReqLLM.Context.new()
 
-    context = base.context
+  defp replace_system_prompt(context, system_prompt) do
+    messages = Enum.reject(context.messages, &(&1.role == :system))
+    system = if system_prompt, do: [ReqLLM.Context.system(system_prompt)], else: []
+    %{context | messages: system ++ messages}
+  end
 
-    options = data[:options] || Map.get(slice, :options) || %Aikido.AiReact.Options{}
+  defp append_opening_messages(state, query) do
+    messages =
+      state
+      |> Map.get(:queued_messages, [])
+      |> Enum.concat([query])
+      |> Enum.map(&ReqLLM.Context.user/1)
 
-    new_slice = %{
+    Context.append_messages(state, messages)
+  end
+
+  defp reset_run(state, data, configuration) do
+    state
+    |> Map.merge(configuration)
+    |> Map.merge(%{
       status: :setup,
+      request_id: data.request_id,
+      run_metadata: data[:metadata] || %{},
       prepared_tools: nil,
       handoff_pending: nil,
       handoff_count: 0,
       last_handoff: nil,
       last_input_tokens: nil,
-      options: options,
-      run_metadata: data[:metadata] || %{},
       queued_messages: [],
       streaming_text: "",
       streaming_thinking: "",
       stream_attempt: 0,
       usage: %{},
-      request_id: data.request_id,
-      context: context,
-      estimated_tokens: base.estimated_tokens,
       iteration: 0,
-      max_iterations: max_iter,
       result: nil,
       error: nil,
       pending_tool_calls: [],
       tool_results_received: [],
       previous_tool_signature: nil,
-      model: model,
-      hooks: data[:hooks] || [],
       hooks_pending: %{},
       hook_sequence: 0,
       hook_context: [],
       hook_errors: [],
-      hook_terminal: nil,
-      client: client,
-      tools: tools,
-      tool_options: data[:tool_options] || Map.get(slice, :tool_options, otp_app: :aikido),
-      tool_context: tool_context,
-      system_prompt: system_prompt,
-      llm_opts: llm_opts
-    }
+      hook_terminal: nil
+    })
+  end
 
+  defp request_tool_setup(state) do
     directive = %Aikido.AiReact.Directives.PrepareTools{
-      options: options,
-      tools: tools,
-      tool_options: new_slice.tool_options,
-      request_id: data.request_id
+      options: state.options,
+      tools: state.tools,
+      tool_options: state.tool_options,
+      request_id: state.request_id
     }
 
-    Aikido.Types.ActionResult.new(
-      state: Map.merge(slice, new_slice),
-      directives: [directive]
-    )
+    Aikido.Types.ActionResult.new(state: state, directives: [directive])
   end
 end
