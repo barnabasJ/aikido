@@ -27,7 +27,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
     end
 
     test "evolves identity by years" do
-      identity = State.new()
+      identity = Ash.create!(State, %{})
 
       assert {:ok, %Aikido.Types.ActionResult{state: %State{} = evolved, directives: []}} =
                then(sig(%{days: 0, years: 5}), fn signal ->
@@ -45,7 +45,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
     end
 
     test "evolves identity by days" do
-      identity = State.new()
+      identity = Ash.create!(State, %{})
 
       assert {:ok, %Aikido.Types.ActionResult{state: %State{} = evolved, directives: []}} =
                then(sig(%{days: 730, years: 0}), fn signal ->
@@ -63,7 +63,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
     end
 
     test "evolves identity by combined years and days" do
-      identity = State.new()
+      identity = Ash.create!(State, %{})
 
       assert {:ok, %Aikido.Types.ActionResult{state: %State{} = evolved, directives: []}} =
                then(sig(%{days: 365, years: 3}), fn signal ->
@@ -81,7 +81,7 @@ defmodule AikidoTest.Identity.Actions.EvolveTest do
     end
 
     test "bumps rev on evolve" do
-      identity = State.new()
+      identity = Ash.create!(State, %{})
       assert identity.rev == 0
 
       assert {:ok, %Aikido.Types.ActionResult{state: %State{} = evolved, directives: []}} =

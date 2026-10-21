@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Remove the identity slice’s parallel constructor/mutation API and timestamp
+  option wrapper. Evolution and profile changes run directly in native Ash actions.
+
 - Remove the thread slice’s parallel constructor, mutation and read helper API.
   Native Ash actions own append/clear transitions; their entry payload type lives
   at `Aikido.Thread.Types.Entry`. Explicit nil entry fields follow native type
