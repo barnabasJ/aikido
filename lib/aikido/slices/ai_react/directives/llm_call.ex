@@ -23,11 +23,10 @@ defmodule Aikido.Slices.AiReact.Directives.LLMCall do
   require Ash.Tracer
 
   typed_struct do
-    field :mode, :atom do
+    field :mode, Aikido.Slices.AiReact.Types.RequestMode do
       description "Whether this request performs a normal turn, a handoff summary or a resumed turn."
       default :normal
       allow_nil? false
-      constraints one_of: [:normal, :handoff, :resume]
     end
 
     field :handoff_id, :integer do

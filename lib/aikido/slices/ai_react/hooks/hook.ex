@@ -33,26 +33,14 @@ defmodule Aikido.Slices.AiReact.Hooks.Hook do
       public? true
     end
 
-    attribute :event, :atom do
+    attribute :event, Aikido.Slices.AiReact.Hooks.Types.Event do
       description "AI lifecycle event that triggers this hook."
       allow_nil? false
       public? true
-
-      constraints one_of: [
-                    :run_started,
-                    :before_model,
-                    :after_model,
-                    :before_tool,
-                    :after_tool,
-                    :run_completed,
-                    :run_failed,
-                    :run_cancelled
-                  ]
     end
 
-    attribute :mode, :atom do
+    attribute :mode, Aikido.Slices.AiReact.Hooks.Types.Mode do
       description "Whether the hook gates the lifecycle step or observes it asynchronously."
-      constraints one_of: [:sync, :async]
       allow_nil? false
       default :sync
       public? true
@@ -85,7 +73,9 @@ defmodule Aikido.Slices.AiReact.Hooks.Hook do
                         ]
                       ]
                     ],
-                    forbidden_fields: [type: :atom, constraints: [one_of: [:hide, :display]]]
+                    forbidden_fields: [
+                      type: Aikido.Slices.AiReact.Hooks.Types.ForbiddenFieldPolicy
+                    ]
                   ]
     end
 

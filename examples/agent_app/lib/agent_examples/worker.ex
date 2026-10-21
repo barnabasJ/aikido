@@ -7,11 +7,10 @@ defmodule AgentExamples.Worker do
     persistence :temporary
 
     schema do
-      attribute :status, :atom do
+      attribute :status, AgentExamples.Worker.Types.Status do
         description "Current stage of background work."
         allow_nil? false
         default :idle
-        constraints one_of: [:idle, :working, :completed, :failed]
         public? true
       end
 

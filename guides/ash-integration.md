@@ -56,6 +56,11 @@ Shared reusable implementations such as `Aikido.Actions.Broadcast` and
 Result contracts live under `Aikido.Types`, including `ActionResult`,
 `SliceUpdate` and `Directive`.
 
+Finite states and modes use feature-owned `Ash.Type.Enum` modules. For example,
+`Aikido.Slices.AiReact.Types.Status` defines `idle`, `setup`, `running`, `waiting`,
+`completed` and `failed`. The same type flows into resource attributes, generated
+reducer arguments and native storage casting. Open-ended names and paths remain atoms.
+
 Place each resource beside its owned `actions/`, `signals/` and `directives/` folders.
 Their modules use matching `Actions`, `Signals` and `Directives` namespaces;
 ordinary shared helpers stay directly under the feature.

@@ -14,7 +14,8 @@ defmodule AgentExamples.Source do
              "lib/aikido/ash/ai.ex",
              "lib/aikido/ash/team.ex",
              "lib/aikido/ash/team/*.ex",
-             "lib/aikido/ash/team/actions/*.ex"
+             "lib/aikido/ash/team/actions/*.ex",
+             "lib/aikido/ash/team/types/*.ex"
            ],
            &Path.wildcard(Path.join(@root, &1))
          )

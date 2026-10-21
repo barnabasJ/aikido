@@ -3,9 +3,8 @@ defmodule Aikido.Slices.AiReact.Hooks.Decision do
   use Ash.TypedStruct
 
   typed_struct do
-    field :decision, :atom do
+    field :decision, Aikido.Slices.AiReact.Hooks.Types.DecisionKind do
       description "Whether the synchronous hook allows the lifecycle step to continue or denies it."
-      constraints one_of: [:continue, :deny]
       allow_nil? false
       default :continue
     end

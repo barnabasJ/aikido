@@ -58,7 +58,7 @@ defmodule Aikido.Ash.Team do
       name: [type: :atom, required: true],
       resource: [type: :module, required: true],
       initial_state: [type: :map, default: %{}],
-      activation: [type: {:in, [:eager, :lazy]}, default: :eager],
+      activation: [type: {:in, Aikido.Ash.Team.Types.Activation.values()}, default: :eager],
       owner: [type: :atom],
       depends_on: [type: {:list, :atom}, default: []]
     ]

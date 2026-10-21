@@ -25,11 +25,10 @@ defmodule Aikido.Slices.Todo.Item do
       allow_nil? false
     end
 
-    field :status, :atom do
+    field :status, Aikido.Slices.Todo.Types.Status do
       description "Current work state: pending, active, completed or blocked."
       default :pending
       allow_nil? false
-      constraints one_of: [:pending, :active, :completed, :blocked]
     end
 
     field :result, :term do

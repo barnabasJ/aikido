@@ -122,7 +122,7 @@ defmodule Aikido.Ash.Team.State do
       argument :initial_state, :map, default: %{}
       argument :owner, :term
       argument :depends_on, {:array, :term}, default: []
-      argument :activation, :atom, default: :eager, constraints: [one_of: [:eager, :lazy]]
+      argument :activation, Aikido.Ash.Team.Types.Activation, default: :eager
       run Aikido.Ash.Team.Actions.AddMember
     end
 

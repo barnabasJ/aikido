@@ -21,10 +21,9 @@ defmodule Aikido.Slices.AiReact.Signals.HookCompleted do
         allow_nil? false
       end
 
-      attribute :mode, :atom do
+      attribute :mode, Aikido.Slices.AiReact.Hooks.Types.Mode do
         description "Hook execution mode determining whether completion gates the run."
         allow_nil? false
-        constraints one_of: [:sync, :async]
       end
 
       attribute :result, :term do

@@ -12,7 +12,7 @@ defmodule Aikido.AgentServer.Options do
 
   alias Aikido.AgentServer.ParentRef
 
-  @type on_parent_death :: :stop | :continue | :emit_orphan
+  @type on_parent_death :: Aikido.AgentServer.Types.ParentDeathPolicy.t()
 
   use Ash.TypedStruct
 
@@ -58,11 +58,10 @@ defmodule Aikido.AgentServer.Options do
       description "Parent reference for hierarchy"
     end
 
-    field :on_parent_death, :atom do
+    field :on_parent_death, Aikido.AgentServer.Types.ParentDeathPolicy do
       allow_nil? false
       default :stop
       description "Behavior when parent dies"
-      constraints one_of: [:stop, :continue, :emit_orphan]
     end
 
     field :skip_schedules, :boolean do

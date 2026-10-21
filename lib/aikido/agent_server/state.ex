@@ -16,7 +16,7 @@ defmodule Aikido.AgentServer.State do
 
   alias Aikido.AgentServer.{ChildInfo, Options, ParentRef}
 
-  @type status :: :initializing | :idle | :stopping
+  @type status :: Aikido.AgentServer.Types.Status.t()
 
   use Ash.TypedStruct
 
@@ -37,7 +37,7 @@ defmodule Aikido.AgentServer.State do
       description "Currently adopted immutable agent identity and domain state."
     end
 
-    field :status, :atom do
+    field :status, Aikido.AgentServer.Types.Status do
       allow_nil? false
       default :initializing
       description "Current server status"
@@ -59,10 +59,9 @@ defmodule Aikido.AgentServer.State do
       description "Map of tag => ChildInfo"
     end
 
-    field :on_parent_death, :atom do
+    field :on_parent_death, Aikido.AgentServer.Types.ParentDeathPolicy do
       allow_nil? false
       default :stop
-      constraints one_of: [:stop, :continue, :emit_orphan]
       description "Behavior on parent death"
     end
 

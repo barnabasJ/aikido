@@ -3,11 +3,10 @@ defmodule Aikido.Slices.AiReact.Options do
   use Ash.TypedStruct
 
   typed_struct do
-    field :completion, :atom do
+    field :completion, Aikido.Slices.AiReact.Types.CompletionMode do
       description "Whether the run completes from the model response or from the tracked todo state."
       default :model
       allow_nil? false
-      constraints one_of: [:model, :todos]
     end
 
     field :todo_path, :atom do

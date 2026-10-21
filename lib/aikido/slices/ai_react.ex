@@ -116,7 +116,7 @@ defmodule Aikido.Slices.AiReact do
         default %{}
       end
 
-      attribute :status, :atom do
+      attribute :status, Aikido.Slices.AiReact.Types.Status do
         description "Current ReAct lifecycle stage from idle through setup, execution and completion."
         public? true
         allow_nil? false
@@ -272,7 +272,7 @@ defmodule Aikido.Slices.AiReact do
         default []
       end
 
-      attribute :hook_terminal, :atom do
+      attribute :hook_terminal, Aikido.Slices.AiReact.Types.TerminalStatus do
         description "Terminal status awaiting completion of synchronous lifecycle hooks."
         public? true
       end

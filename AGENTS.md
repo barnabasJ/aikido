@@ -75,6 +75,7 @@ does not permit other runtime effects inside reducers.
 - Keep Ash reducer actions pure: the same input returns the same state and directives
 - Directives mutate **no** state — neither `agent.state` (domain) nor `%AgentServer.State{}` (runtime). State changes flow through the action's return value; runtime bookkeeping flows through GenServer callbacks and `process_signal/2` cascade callbacks
 - Use **Ash types** for data contracts and **Spark.Options** for DSL/configuration validation
+- Define fixed statuses, modes and policies with feature-owned `Ash.Type.Enum` modules and reuse them across contracts. Keep extensible names, paths and tags as atoms.
 - Preserve tagged tuple and structured error contracts at public boundaries
 - Keep cross-agent communication on signals/directives, not ad-hoc process messages
 - Use the Spark formatter's DSL rules and omit parentheses on DSL keys. Declare every `field` and `attribute` with `do … end`, including a description explaining its purpose. Keep examples and test fixtures consistent. Use multiline heredocs for multiline documentation and scripts.

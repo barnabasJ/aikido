@@ -74,6 +74,14 @@ defmodule AgentExamplesWeb.LiveViewTest do
           assert definition.category == category
           assert definition.open? == open?
         end
+
+        activation = Enum.find(definitions, &(&1.module == Aikido.Ash.Team.Types.Activation))
+        assert activation
+        refute activation.open?
+      end
+
+      if Catalog.ai?(example) do
+        assert Enum.any?(definitions, &(&1.module == Aikido.Slices.AiReact.Types.Status))
       end
 
       for definition <- definitions do
@@ -85,6 +93,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     end
 
     worker = Catalog.find("worker") |> AgentExamples.Source.for_example()
+    assert Enum.any?(worker, &(&1.module == AgentExamples.Worker.Types.Status))
     definition = Enum.find(worker, &(&1.module == AgentExamples.Worker))
     assert definition.code =~ "route AgentExamples.Worker.Signals.Run"
 

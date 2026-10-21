@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Use feature-owned native Ash enum types for lifecycle states, hook events and
+  decisions, model/completion modes, parent-death and retention policies, and team activation.
+
 - Separate external Ash command implementations into `Aikido.Ash.Commands` and
   `ash/commands/`, making their runtime I/O boundary explicit.
 

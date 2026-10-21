@@ -74,7 +74,7 @@ defmodule Aikido.Ash.Agent do
       ],
       middleware: [type: {:list, :any}, default: []],
       persistence: [
-        type: {:in, [:permanent, :temporary]},
+        type: {:in, Aikido.Ash.Agent.Types.PersistenceMode.values()},
         default: :permanent,
         doc:
           "Snapshot retention after stop. :permanent retains saved state; :temporary deletes it. Both checkpoint while running."
