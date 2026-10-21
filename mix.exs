@@ -1,7 +1,7 @@
 defmodule Aikido.MixProject do
   use Mix.Project
 
-  @version "2.2.0"
+  @version "0.1.0"
 
   def vsn do
     @version
