@@ -48,30 +48,33 @@ defmodule Aikido.Team.Extension.Transformers.Build do
   end
 
   defp add_team_slice_and_commands(dsl, config) do
-    slice = Aikido.Team.Slice
-    Code.ensure_compiled!(slice)
+    Code.ensure_compiled!(Aikido.Team.Slice)
 
-    dsl =
-      dsl
-      |> Transformer.persist(:aikido_team_slice, slice)
-      |> Transformer.add_entity([:agent], %Aikido.Agent.SliceMount{
-        path: :team,
-        module: slice,
-        options: []
+    dsl
+    |> mount_team_slice()
+    |> Transformer.persist(:aikido_team_config, config)
+    |> add_team_commands()
+    |> then(&{:ok, &1})
+  end
+
+  defp mount_team_slice(dsl) do
+    dsl
+    |> Transformer.persist(:aikido_team_slice, Aikido.Team.Slice)
+    |> Transformer.add_entity([:agent], %Aikido.Agent.SliceMount{
+      path: :team,
+      module: Aikido.Team.Slice,
+      options: []
+    })
+  end
+
+  defp add_team_commands(dsl) do
+    Enum.reduce(@commands, dsl, fn command, dsl ->
+      Transformer.add_entity(dsl, [:agent], %Aikido.Agent.Route{
+        name: if(command == :start, do: :configure_topology, else: command),
+        public?: true,
+        type: "aikido.ash.team.#{command}",
+        action: {Aikido.Team.Slice, command}
       })
-
-    dsl = Transformer.persist(dsl, :aikido_team_config, config)
-
-    dsl =
-      Enum.reduce(@commands, dsl, fn command, dsl ->
-        Transformer.add_entity(dsl, [:agent], %Aikido.Agent.Route{
-          name: if(command == :start, do: :configure_topology, else: command),
-          public?: true,
-          type: "aikido.ash.team.#{command}",
-          action: {slice, command}
-        })
-      end)
-
-    {:ok, dsl}
+    end)
   end
 end

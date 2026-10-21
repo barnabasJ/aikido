@@ -75,7 +75,7 @@ defmodule Aikido.Team.Actions.ChildExit do
   defp failed_task_notifications(state, previous, context) do
     for {id, task} <- state.tasks,
         task.status == :failed and previous.tasks[id].status == :dispatched,
-        directive <- Tasks.notify(task, state, context),
+        directive <- Tasks.notification_directives(task, state, context),
         do: directive
   end
 

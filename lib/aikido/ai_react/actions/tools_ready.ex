@@ -28,7 +28,7 @@ defmodule Aikido.AiReact.Actions.ToolsReady do
         tools: tools
       }
 
-      Hooks.before_model(state, directive)
+      Hooks.queue_before_model_hooks(state, directive)
     else
       Aikido.Types.ActionResult.new(state: state)
     end

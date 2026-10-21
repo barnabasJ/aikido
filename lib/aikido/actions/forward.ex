@@ -8,26 +8,25 @@ defmodule Aikido.Actions.Forward do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    pid = input.arguments[:target_pid]
-    type = input.arguments[:signal_type]
-    payload = input.arguments[:payload]
-    source = input.arguments[:source]
-    original = input.context.aikido.signal
-    final_type = resolve_type(type, original)
-    final_payload = resolve_payload(payload, original)
-    final_source = resolve_source(source, original)
+    directive =
+      input.context.aikido.signal
+      |> apply_forwarding_overrides(input.arguments)
+      |> Aikido.Directives.emit_to_pid(input.arguments.target_pid)
 
-    out_signal =
-      case original do
-        %Aikido.Signal{} ->
-          %{original | type: final_type, data: final_payload, source: final_source}
-
-        _ ->
-          %Aikido.Signal{type: final_type, data: final_payload, source: final_source}
-      end
-
-    directive = Aikido.Directives.emit_to_pid(out_signal, pid)
     Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [directive])
+  end
+
+  defp apply_forwarding_overrides(original, arguments) do
+    changes = %{
+      type: resolve_type(arguments[:signal_type], original),
+      data: resolve_payload(arguments[:payload], original),
+      source: resolve_source(arguments[:source], original)
+    }
+
+    case original do
+      %Aikido.Signal{} -> Map.merge(original, changes)
+      _ -> %Aikido.Signal{type: changes.type, data: changes.data, source: changes.source}
+    end
   end
 
   defp resolve_type(type, _original) when is_binary(type) do

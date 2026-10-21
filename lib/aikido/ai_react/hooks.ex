@@ -11,51 +11,65 @@ defmodule Aikido.AiReact.Hooks do
   alias Aikido.AiReact.Directives.ExecuteHook
   alias Aikido.AiReact.Directives.{LLMCall, ToolExec}
 
-  @doc false
-  def transition({:ok, result}, event, payload) do
-    state = result.state
+  @doc "Queue lifecycle hooks only when an action changed its state; preserve errors and no-ops."
+  def queue_event_hooks_if_changed({:ok, %{state: state}} = result, input, event, payload)
+      when state != input.arguments.state,
+      do: queue_event_hooks(result, event, payload)
 
-    state =
-      Map.put(
-        state,
-        :hook_terminal,
-        if(state.status in [:completed, :failed], do: state.status)
-      )
+  def queue_event_hooks_if_changed(result, _input, _event, _payload), do: result
 
-    queue =
-      [{:event, event, payload}] ++ Enum.flat_map(result.directives, &hook_steps_for_effect/1)
+  @doc "Queue an event, its directive hooks and any terminal event in declaration order."
+  def queue_event_hooks({:ok, result}, event, payload) do
+    queue = event_steps(result, event, payload)
 
-    queue =
-      if state.status == :completed,
-        do: queue ++ [{:event, :run_completed, %{result: state.result}}],
-        else: queue
+    result.state
+    |> mark_terminal_transition()
+    |> enqueue_event_steps(queue)
+  end
 
-    queue =
-      if state.status == :failed && event not in [:run_failed, :run_cancelled],
-        do: queue ++ [{:event, :run_failed, %{reason: state.error}}],
-        else: queue
+  def queue_event_hooks(error, _event, _payload), do: error
 
+  defp event_steps(result, event, payload) do
+    [{:event, event, payload}] ++
+      Enum.flat_map(result.directives, &hook_steps_for_effect/1) ++
+      terminal_event_steps(result.state, event)
+  end
+
+  defp terminal_event_steps(%{status: :completed} = state, _event),
+    do: [{:event, :run_completed, %{result: state.result}}]
+
+  defp terminal_event_steps(%{status: :failed} = state, event)
+       when event not in [:run_failed, :run_cancelled],
+       do: [{:event, :run_failed, %{reason: state.error}}]
+
+  defp terminal_event_steps(_state, _event), do: []
+
+  defp mark_terminal_transition(state) do
+    Map.put(state, :hook_terminal, if(state.status in [:completed, :failed], do: state.status))
+  end
+
+  defp enqueue_event_steps(state, queue) do
     case {state.status, Map.to_list(state.hooks_pending)} do
       {status, [{token, continuation}]} when status != :failed ->
         continuation = %{continuation | queue: continuation.queue ++ queue, status: status}
 
-        Aikido.Types.ActionResult.new(
-          state:
-            state
-            |> Map.put(:hooks_pending, %{token => continuation})
-            |> Map.put(:status, if(status == :setup, do: :setup, else: :running))
-        )
+        state =
+          state
+          |> Map.put(:hooks_pending, %{token => continuation})
+          |> Map.put(:status, if(status == :setup, do: :setup, else: :running))
+
+        Aikido.Types.ActionResult.new(state: state)
 
       _ ->
-        advance(Map.put(state, :hooks_pending, %{}), queue, state.status, [])
+        state
+        |> Map.put(:hooks_pending, %{})
+        |> release_queued_steps(queue, state.status, [])
     end
   end
 
-  def transition(error, _event, _payload), do: error
-
   @doc "Run before-model hooks, then release this model request with their accumulated context."
-  def before_model(state, %LLMCall{} = directive) do
-    advance(state, hook_steps_for_effect(directive), state.status, [])
+  def queue_before_model_hooks(state, %LLMCall{} = directive) do
+    release_queued_steps(state, hook_steps_for_effect(directive), state.status, [])
   end
 
   defp hook_steps_for_effect(%LLMCall{} = effect),
@@ -66,13 +80,13 @@ defmodule Aikido.AiReact.Hooks do
 
   defp hook_steps_for_effect(effect), do: [{:effect, effect}]
 
-  @doc false
-  def advance(state, [], status, directives) do
+  @doc "Release queued effects until a synchronous hook needs to return its decision."
+  def release_queued_steps(state, [], status, directives) do
     state = state |> Map.put(:status, status) |> Map.put(:hook_terminal, nil)
     Aikido.Types.ActionResult.new(state: state, directives: directives)
   end
 
-  def advance(state, [{:event, event, payload} | rest], status, directives) do
+  def release_queued_steps(state, [{:event, event, payload} | rest], status, directives) do
     hooks = Enum.filter(state.hooks, &(&1.event == event))
 
     event =
@@ -84,16 +98,16 @@ defmodule Aikido.AiReact.Hooks do
       })
 
     queue = Enum.map(hooks, &{:hook, &1, event}) ++ rest
-    advance(state, queue, status, directives)
+    release_queued_steps(state, queue, status, directives)
   end
 
-  def advance(state, [{:hook, hook, event} | rest], status, directives) do
+  def release_queued_steps(state, [{:hook, hook, event} | rest], status, directives) do
     token = Map.get(state, :hook_sequence, 0) + 1
     state = Map.put(state, :hook_sequence, token)
     effect = %ExecuteHook{hook: hook, event: event, token: token, request_id: state.request_id}
 
     if hook.mode == :async do
-      advance(state, rest, status, directives ++ [effect])
+      release_queued_steps(state, rest, status, directives ++ [effect])
     else
       pending = Map.get(state, :hooks_pending, %{})
 
@@ -106,36 +120,46 @@ defmodule Aikido.AiReact.Hooks do
     end
   end
 
-  def advance(state, [{:effect, %LLMCall{} = effect} | rest], status, directives) do
-    state =
-      Aikido.AiReact.Context.append_messages(
-        state,
-        Enum.map(state.queued_messages, &ReqLLM.Context.user/1)
-      )
+  def release_queued_steps(state, [{:effect, %LLMCall{} = effect} | rest], status, directives) do
+    state = state |> append_queued_messages() |> append_hook_context()
+    effect = %{effect | context: state.context}
 
-    state = %{state | queued_messages: []}
-    {state, effect} = apply_hook_context(state, effect)
-    {state, effect} = Aikido.AiReact.Handoff.before_model(state, effect)
-    advance(state, rest, status, directives ++ [effect])
+    {state, effect} =
+      if Aikido.AiReact.Handoff.required?(state, effect),
+        do: Aikido.AiReact.Handoff.prepare_request(state, effect),
+        else: {state, effect}
+
+    release_queued_steps(state, rest, status, directives ++ [effect])
   end
 
-  def advance(state, [{:effect, effect} | rest], status, directives),
-    do: advance(state, rest, status, directives ++ [effect])
+  def release_queued_steps(state, [{:effect, effect} | rest], status, directives),
+    do: release_queued_steps(state, rest, status, directives ++ [effect])
 
-  defp apply_hook_context(state, effect) do
-    state =
-      Enum.reduce(Map.get(state, :hook_context, []), state, fn entry, state ->
-        Aikido.AiReact.Context.append_message(
-          state,
-          ReqLLM.Context.user("""
-          [Hook context: #{entry.name}]
-          #{entry.text}\
-          """)
-        )
-      end)
+  @doc "Append queued user messages to the conversation and empty their queue."
+  def append_queued_messages(state) do
+    messages = Enum.map(state.queued_messages, &ReqLLM.Context.user/1)
 
-    state = Map.put(state, :hook_context, [])
-    {state, %{effect | context: state.context}}
+    state
+    |> Aikido.AiReact.Context.append_messages(messages)
+    |> Map.put(:queued_messages, [])
+  end
+
+  @doc "Append hook-supplied context to the conversation and empty its queue."
+  def append_hook_context(state) do
+    state
+    |> Map.get(:hook_context, [])
+    |> Enum.reduce(state, &append_hook_message/2)
+    |> Map.put(:hook_context, [])
+  end
+
+  defp append_hook_message(entry, state) do
+    Aikido.AiReact.Context.append_message(
+      state,
+      ReqLLM.Context.user("""
+      [Hook context: #{entry.name}]
+      #{entry.text}\
+      """)
+    )
   end
 
   @doc false

@@ -9,51 +9,61 @@ defmodule Aikido.Team.Operation do
 
   def start(signal, state, context, config, plan) do
     with {:ok, topology, stop, requested, paused} <- plan.(),
-         :ok <- validate_limits(topology, config),
-         {:ok, stops} <- Topology.order(state.topology.nodes, stop),
-         {:ok, starts} <- Topology.order(topology.nodes, Topology.targets(topology, requested)) do
-      steps = Enum.map(Enum.reverse(stops), &{:stop, &1}) ++ Enum.map(starts, &{:start, &1})
-
-      version =
-        if topology.nodes == state.topology.nodes,
-          do: state.topology.version,
-          else: state.topology.version + 1
-
-      operation = %{
-        id: signal.id,
-        status: :running,
-        remaining: steps,
-        awaiting: nil,
-        started: [],
-        stopped: [],
-        error: nil
-      }
-
-      state = %{
-        state
-        | topology: %{topology | version: version},
-          paused: paused,
-          operation: operation
-      }
-
-      {:ok, state, directives} = advance(state, context, config)
-
-      timer =
-        Directives.schedule(
-          config.timeout,
-          %Signal{
-            id: nil,
-            type: "aikido.ash.team.timeout",
-            data: %{operation_id: signal.id},
-            source: "/aikido"
-          }
-        )
-
-      {:ok, state, directives ++ [timer]}
+         :ok <- validate_worker_limits(topology, config),
+         {:ok, steps} <- order_member_steps(state.topology, topology, stop, requested) do
+      state
+      |> adopt_topology(topology, paused)
+      |> begin_operation(signal.id, steps)
+      |> advance(context, config)
+      |> append_operation_deadline(signal.id, config.timeout)
     end
   end
 
-  defp validate_limits(topology, config) do
+  @doc "Order dependent member stops before starts for a proposed topology."
+  def order_member_steps(current, desired, stop, requested) do
+    with {:ok, stops} <- Topology.order(current.nodes, stop),
+         {:ok, starts} <- Topology.order(desired.nodes, Topology.targets(desired, requested)) do
+      {:ok, Enum.map(Enum.reverse(stops), &{:stop, &1}) ++ Enum.map(starts, &{:start, &1})}
+    end
+  end
+
+  defp adopt_topology(state, topology, paused) do
+    version =
+      if topology.nodes == state.topology.nodes,
+        do: state.topology.version,
+        else: state.topology.version + 1
+
+    %{state | topology: %{topology | version: version}, paused: paused}
+  end
+
+  defp begin_operation(state, id, steps) do
+    operation = %{
+      id: id,
+      status: :running,
+      remaining: steps,
+      awaiting: nil,
+      started: [],
+      stopped: [],
+      error: nil
+    }
+
+    %{state | operation: operation}
+  end
+
+  defp append_operation_deadline({:ok, state, directives}, id, timeout) do
+    timer =
+      Directives.schedule(timeout, %Signal{
+        id: nil,
+        type: "aikido.ash.team.timeout",
+        data: %{operation_id: id},
+        source: "/aikido"
+      })
+
+    {:ok, state, directives ++ [timer]}
+  end
+
+  @doc "Check worker template counts and resource identities in a proposed topology."
+  def validate_worker_limits(topology, config) do
     counts = Enum.frequencies_by(Map.values(topology.nodes), & &1.template)
 
     Enum.reduce_while(counts, :ok, fn
@@ -90,25 +100,11 @@ defmodule Aikido.Team.Operation do
         source: "/aikido"
       }
 
-    pending = Map.get(state, :pending_tasks, %{})
+    directives =
+      [Directives.emit_to_pid(completed, context.agent_pid)] ++
+        pending_task_assignments(state) ++ recovered_task_notifications(state, context)
 
-    dispatch =
-      Enum.map(pending, fn {id, data} ->
-        Directives.emit(%Signal{
-          id: nil,
-          type: "aikido.ash.team.assign_task",
-          data: Map.put(data, :task_id, id),
-          source: "/aikido"
-        })
-      end)
-
-    recovered =
-      Enum.flat_map(Map.get(state, :recovered_tasks, []), fn id ->
-        Tasks.notify(state.tasks[id], state, context)
-      end)
-
-    state = Map.put(state, :recovered_tasks, [])
-    {:ok, state, [Directives.emit_to_pid(completed, context.agent_pid)] ++ dispatch ++ recovered}
+    {:ok, Map.put(state, :recovered_tasks, []), directives}
   end
 
   def advance(%{operation: %{remaining: [{kind, name} | rest]}} = state, context, config) do
@@ -122,88 +118,120 @@ defmodule Aikido.Team.Operation do
         advance(state, context, config)
 
       {:stop, pid} ->
-        payload = %{member: name, operation_id: state.operation.id, pid: pid}
-
-        effect =
-          Directives.async_task({Aikido.Team.Runtime, :stop_member, [config.instance, pid]},
-            success_type: "aikido.ash.team.stopped",
-            error_type: "aikido.ash.team.failed",
-            payload: payload
-          )
-
-        {:ok, put_in(state.operation.awaiting, {:stop, name}), [effect]}
+        request_member_stop(state, name, pid, config)
 
       {:start, nil} ->
-        spec = state.topology.nodes[name]
-        parent_pid = if spec.owner, do: state.members[spec.owner], else: context.agent_pid
-
-        parent_id =
-          if spec.owner, do: member_id(context.agent_id, spec.owner), else: context.agent_id
-
-        parent = %{
-          pid: parent_pid,
-          id: parent_id,
-          tag: name,
-          partition: context.partition,
-          meta: %{
-            team_id: context.agent_id,
-            team_resource: config.resource,
-            team_pid: context.agent_pid,
-            member: name
-          }
-        }
-
-        payload = %{member: name, operation_id: state.operation.id}
-
-        effect =
-          Directives.async_task(
-            {Aikido.Team.Runtime, :start_member,
-             [
-               spec.resource,
-               member_id(context.agent_id, name),
-               Map.merge(
-                 Map.take(Map.get(context.agent.state, config.state_path, %{}), config.inherit),
-                 spec.initial_state
-               ),
-               parent,
-               context
-             ]},
-            success_type: "aikido.ash.team.started",
-            error_type: "aikido.ash.team.failed",
-            payload: payload
-          )
-
-        {:ok, put_in(state.operation.awaiting, {:start, name}), [effect]}
+        request_member_start(state, name, context, config)
     end
+  end
+
+  defp pending_task_assignments(state) do
+    Enum.map(Map.get(state, :pending_tasks, %{}), fn {id, data} ->
+      Directives.emit(%Signal{
+        id: nil,
+        type: "aikido.ash.team.assign_task",
+        data: Map.put(data, :task_id, id),
+        source: "/aikido"
+      })
+    end)
+  end
+
+  defp recovered_task_notifications(state, context) do
+    Enum.flat_map(Map.get(state, :recovered_tasks, []), fn id ->
+      Tasks.notification_directives(state.tasks[id], state, context)
+    end)
+  end
+
+  defp request_member_stop(state, name, pid, config) do
+    effect =
+      Directives.async_task({Aikido.Team.Runtime, :stop_member, [config.instance, pid]},
+        success_type: "aikido.ash.team.stopped",
+        error_type: "aikido.ash.team.failed",
+        payload: %{member: name, operation_id: state.operation.id, pid: pid}
+      )
+
+    {:ok, put_in(state.operation.awaiting, {:stop, name}), [effect]}
+  end
+
+  defp request_member_start(state, name, context, config) do
+    spec = state.topology.nodes[name]
+    parent = member_parent(state, name, spec.owner, context, config)
+    initial = inherited_member_state(spec, context, config)
+
+    effect =
+      Directives.async_task(
+        {Aikido.Team.Runtime, :start_member,
+         [spec.resource, member_id(context.agent_id, name), initial, parent, context]},
+        success_type: "aikido.ash.team.started",
+        error_type: "aikido.ash.team.failed",
+        payload: %{member: name, operation_id: state.operation.id}
+      )
+
+    {:ok, put_in(state.operation.awaiting, {:start, name}), [effect]}
+  end
+
+  defp member_parent(state, name, owner, context, config) do
+    %{
+      pid: if(owner, do: state.members[owner], else: context.agent_pid),
+      id: if(owner, do: member_id(context.agent_id, owner), else: context.agent_id),
+      tag: name,
+      partition: context.partition,
+      meta: %{
+        team_id: context.agent_id,
+        team_resource: config.resource,
+        team_pid: context.agent_pid,
+        member: name
+      }
+    }
+  end
+
+  defp inherited_member_state(spec, context, config) do
+    context.agent.state
+    |> Map.get(config.state_path, %{})
+    |> Map.take(config.inherit)
+    |> Map.merge(spec.initial_state)
   end
 
   def failed(%{operation_id: id, reason: reason}, state, context) do
     if state.operation.id == id && state.operation.status == :running do
-      tasks =
-        Map.new(Map.get(state, :pending_tasks, %{}), fn {id, data} ->
-          {id,
-           %{
-             id: id,
-             member: data.member,
-             status: :failed,
-             result: reason,
-             attempt: nil,
-             notify: data[:notify],
-             metadata: data[:metadata] || %{}
-           }}
-        end)
+      pending = Map.keys(Map.get(state, :pending_tasks, %{}))
 
-      state =
-        Map.merge(state, %{
-          operation: %{state.operation | status: :failed, error: reason},
-          pending_tasks: %{},
-          tasks: Map.merge(state.tasks, tasks)
-        })
-
-      {:ok, state, Enum.flat_map(Map.values(tasks), &Tasks.notify(&1, state, context))}
+      state
+      |> mark_operation_failed(reason)
+      |> record_pending_task_failures(reason)
+      |> result_with_task_notifications(pending, context)
     else
       {:ok, state, []}
     end
+  end
+
+  defp mark_operation_failed(state, reason) do
+    %{state | operation: %{state.operation | status: :failed, error: reason}}
+  end
+
+  defp record_pending_task_failures(state, reason) do
+    tasks =
+      Map.new(Map.get(state, :pending_tasks, %{}), fn {id, data} ->
+        {id,
+         %{
+           id: id,
+           member: data.member,
+           status: :failed,
+           result: reason,
+           attempt: nil,
+           notify: data[:notify],
+           metadata: data[:metadata] || %{}
+         }}
+      end)
+
+    Map.merge(state, %{pending_tasks: %{}, tasks: Map.merge(state.tasks, tasks)})
+  end
+
+  defp result_with_task_notifications(state, ids, context) do
+    directives =
+      Enum.flat_map(ids, &Tasks.notification_directives(state.tasks[&1], state, context))
+
+    {:ok, state, directives}
   end
 
   def awaited?(state, id, step),

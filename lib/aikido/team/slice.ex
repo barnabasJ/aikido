@@ -261,27 +261,37 @@ defmodule Aikido.Team.Slice do
   def externalize(state), do: state
   @doc false
   def reinstate(state) do
-    tasks =
-      Map.merge(
-        state.tasks,
-        Map.new(Map.get(state, :pending_tasks, %{}), fn {id, data} ->
-          {id,
-           %{
-             id: id,
-             member: data.member,
-             status: :dispatched,
-             result: nil,
-             attempt: nil,
-             notify: data[:notify],
-             metadata: data[:metadata] || %{}
-           }}
-        end)
-      )
+    state
+    |> restore_pending_tasks()
+    |> fail_interrupted_tasks()
+  end
 
-    interrupted = for {id, task} <- tasks, task.status == :dispatched, do: id
+  defp restore_pending_tasks(state) do
+    tasks =
+      state
+      |> Map.get(:pending_tasks, %{})
+      |> Map.new(fn {id, data} -> {id, pending_task_record(id, data)} end)
+
+    %{state | tasks: Map.merge(state.tasks, tasks)}
+  end
+
+  defp pending_task_record(id, data) do
+    %{
+      id: id,
+      member: data.member,
+      status: :dispatched,
+      result: nil,
+      attempt: nil,
+      notify: data[:notify],
+      metadata: data[:metadata] || %{}
+    }
+  end
+
+  defp fail_interrupted_tasks(state) do
+    interrupted = for {id, task} <- state.tasks, task.status == :dispatched, do: id
 
     tasks =
-      Map.new(tasks, fn {id, task} ->
+      Map.new(state.tasks, fn {id, task} ->
         {id,
          if(id in interrupted, do: %{task | status: :failed, result: :interrupted}, else: task)}
       end)

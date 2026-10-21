@@ -1,5 +1,5 @@
 defmodule Aikido.AiReact.Signals.Deliver do
-  @moduledoc "Typed payload for `ai.react.deliver`."
+  @moduledoc "Text and task metadata to add to the receiving AI agent’s conversation."
   use Aikido.Signal
 
   signal do

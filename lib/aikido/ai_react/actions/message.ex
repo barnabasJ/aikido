@@ -14,25 +14,18 @@ defmodule Aikido.AiReact.Actions.Message do
     state = input.arguments.state
 
     if state.status == :waiting do
-      case Run.open(
-             %{
-               query: input.arguments.text,
-               request_id: state.request_id,
-               metadata: Map.get(state, :run_metadata, %{})
-             },
-             state
-           ) do
-        {:ok, result} ->
-          Hooks.transition(
-            Scope.bind({:ok, result}, input),
-            :run_started,
-            %{
-              query: input.arguments.text
-            }
-          )
-
-        error ->
-          error
+      with {:ok, result} <-
+             Run.open(
+               %{
+                 query: input.arguments.text,
+                 request_id: state.request_id,
+                 metadata: Map.get(state, :run_metadata, %{})
+               },
+               state
+             ) do
+        {:ok, result}
+        |> Scope.bind(input)
+        |> Hooks.queue_event_hooks(:run_started, %{query: input.arguments.text})
       end
     else
       state =

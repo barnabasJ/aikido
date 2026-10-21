@@ -73,23 +73,7 @@ defmodule AikidoTest.FSMTest do
       agent = AikidoTest.FSMTest.DefaultFSMAgent.initialize!()
 
       {:ok, %{agent: agent}, _} =
-        Aikido.AgentServer.apply_actions(
-          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
-          Map.merge(
-            Aikido.Signal.ctx(%Aikido.Signal{
-              id: nil,
-              type: "test.action",
-              data: %{},
-              source: "/test"
-            }),
-            Map.merge(%{}, %{
-              agent_module: AikidoTest.FSMTest.DefaultFSMAgent,
-              agent: agent,
-              agent_id: agent.id
-            })
-          ),
-          [{{Aikido.FSM.Slice, :transition}, %{to: "processing"}}]
-        )
+        apply_transition(agent, "processing")
 
       assert agent.state.fsm.state == "processing"
       assert [%{from: "idle", to: "processing"}] = agent.state.fsm.history
@@ -99,42 +83,10 @@ defmodule AikidoTest.FSMTest do
       agent = AikidoTest.FSMTest.DefaultFSMAgent.initialize!()
 
       {:ok, %{agent: agent}, _} =
-        Aikido.AgentServer.apply_actions(
-          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
-          Map.merge(
-            Aikido.Signal.ctx(%Aikido.Signal{
-              id: nil,
-              type: "test.action",
-              data: %{},
-              source: "/test"
-            }),
-            Map.merge(%{}, %{
-              agent_module: AikidoTest.FSMTest.DefaultFSMAgent,
-              agent: agent,
-              agent_id: agent.id
-            })
-          ),
-          [{{Aikido.FSM.Slice, :transition}, %{to: "processing"}}]
-        )
+        apply_transition(agent, "processing")
 
       {:ok, %{agent: agent}, _} =
-        Aikido.AgentServer.apply_actions(
-          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
-          Map.merge(
-            Aikido.Signal.ctx(%Aikido.Signal{
-              id: nil,
-              type: "test.action",
-              data: %{},
-              source: "/test"
-            }),
-            Map.merge(%{}, %{
-              agent_module: AikidoTest.FSMTest.DefaultFSMAgent,
-              agent: agent,
-              agent_id: agent.id
-            })
-          ),
-          [{{Aikido.FSM.Slice, :transition}, %{to: "completed"}}]
-        )
+        apply_transition(agent, "completed")
 
       assert agent.state.fsm.state == "completed"
       assert agent.state.fsm.terminal? == true
@@ -198,44 +150,12 @@ defmodule AikidoTest.FSMTest do
       agent = AikidoTest.FSMTest.ConfiguredFSMAgent.initialize!()
 
       {:ok, %{agent: agent}, _} =
-        Aikido.AgentServer.apply_actions(
-          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
-          Map.merge(
-            Aikido.Signal.ctx(%Aikido.Signal{
-              id: nil,
-              type: "test.action",
-              data: %{},
-              source: "/test"
-            }),
-            Map.merge(%{}, %{
-              agent_module: AikidoTest.FSMTest.ConfiguredFSMAgent,
-              agent: agent,
-              agent_id: agent.id
-            })
-          ),
-          [{{Aikido.FSM.Slice, :transition}, %{to: "working"}}]
-        )
+        apply_transition(agent, "working")
 
       assert agent.state.fsm.state == "working"
 
       {:ok, %{agent: agent}, _} =
-        Aikido.AgentServer.apply_actions(
-          %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
-          Map.merge(
-            Aikido.Signal.ctx(%Aikido.Signal{
-              id: nil,
-              type: "test.action",
-              data: %{},
-              source: "/test"
-            }),
-            Map.merge(%{}, %{
-              agent_module: AikidoTest.FSMTest.ConfiguredFSMAgent,
-              agent: agent,
-              agent_id: agent.id
-            })
-          ),
-          [{{Aikido.FSM.Slice, :transition}, %{to: "errored"}}]
-        )
+        apply_transition(agent, "errored")
 
       assert agent.state.fsm.state == "errored"
       assert agent.state.fsm.terminal? == true
@@ -245,23 +165,16 @@ defmodule AikidoTest.FSMTest do
       agent = AikidoTest.FSMTest.ConfiguredFSMAgent.initialize!()
 
       assert {:error, _, _reason} =
-               Aikido.AgentServer.apply_actions(
-                 %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"},
-                 Map.merge(
-                   Aikido.Signal.ctx(%Aikido.Signal{
-                     id: nil,
-                     type: "test.action",
-                     data: %{},
-                     source: "/test"
-                   }),
-                   Map.merge(%{}, %{
-                     agent_module: AikidoTest.FSMTest.ConfiguredFSMAgent,
-                     agent: agent,
-                     agent_id: agent.id
-                   })
-                 ),
-                 [{{Aikido.FSM.Slice, :transition}, %{to: "unknown"}}]
-               )
+               apply_transition(agent, "unknown")
     end
+  end
+
+  defp apply_transition(agent, destination) do
+    signal = %Aikido.Signal{id: nil, type: "test.action", data: %{}, source: "/test"}
+    context = %{agent_module: agent.agent_module, agent: agent, agent_id: agent.id}
+
+    Aikido.AgentServer.apply_actions(signal, context, [
+      {{Aikido.FSM.Slice, :transition}, %{to: destination}}
+    ])
   end
 end

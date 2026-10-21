@@ -22,7 +22,7 @@ defmodule Aikido.Team.Actions.TaskCompleted do
         }
 
         state = put_in(state.tasks[data.task_id], task)
-        {:ok, state, Tasks.notify(task, state, context)}
+        {:ok, state, Tasks.notification_directives(task, state, context)}
 
       _ ->
         {:ok, state, []}

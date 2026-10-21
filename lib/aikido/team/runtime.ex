@@ -3,18 +3,10 @@ defmodule Aikido.Team.Runtime do
 
   # Each function is one AsyncTask unit. No function changes agent state.
   def start_member(resource, id, initial_state, parent, scope) do
-    options = Ash.Scope.to_opts(scope, context: Map.get(scope, :context) || %{})
-    context = Keyword.get(options, :context, %{})
-
-    context =
-      Map.put(context, :aikido_runtime_options,
-        parent: parent,
-        partition: parent.partition,
-        on_parent_death: :stop,
-        restart?: false
-      )
-
-    options = Keyword.put(options, :context, context)
+    options =
+      scope
+      |> Ash.Scope.to_opts(context: Map.get(scope, :context) || %{})
+      |> attach_parent_options(parent)
 
     with {:ok, %{pid: pid}} <-
            resource
@@ -27,6 +19,20 @@ defmodule Aikido.Team.Runtime do
       {:ok, _different_pid} -> {:error, :member_not_attached}
       error -> error
     end
+  end
+
+  defp attach_parent_options(options, parent) do
+    context =
+      options
+      |> Keyword.get(:context, %{})
+      |> Map.put(:aikido_runtime_options,
+        parent: parent,
+        partition: parent.partition,
+        on_parent_death: :stop,
+        restart?: false
+      )
+
+    Keyword.put(options, :context, context)
   end
 
   def stop_member(instance, pid) do

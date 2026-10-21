@@ -1,74 +1,61 @@
 defmodule Aikido.AiReact.Completion do
-  @moduledoc "Pure todo completion gating and lifecycle hook transitions."
+  @moduledoc "Pure todo completion requirements and terminal run resource release."
 
-  @doc false
-  def transition({:ok, %{state: state, directives: []}} = unchanged, input, _event, _payload)
+  @doc "Resolve completion requirements and release terminal resources in an action result."
+  def settle_result({:ok, %{state: state, directives: []}} = unchanged, input)
       when state == input.arguments.state,
       do: unchanged
 
-  def transition(result, input, event, payload) do
-    result =
-      case result do
-        {:ok, %{state: %{status: :completed} = state} = result} ->
-          {:ok,
-           %{
-             result
-             | state:
-                 gate(
-                   state,
-                   (input.context.aikido[:agent] && input.context.aikido.agent.state) || %{}
-                 )
-           }}
+  def settle_result({:ok, %{state: %{status: :completed} = state} = result}, input) do
+    agent_state = (input.context.aikido[:agent] && input.context.aikido.agent.state) || %{}
 
-        {:ok, %{state: %{status: :failed} = state} = result} ->
-          {:ok, %{result | state: Aikido.AiReact.Run.clear_tools_and_handoff(state)}}
+    state =
+      state
+      |> resolve_todo_status(agent_state)
+      |> release_terminal_resources()
 
-        other ->
-          other
+    {:ok, %{result | state: state}}
+  end
+
+  def settle_result({:ok, %{state: %{status: :failed} = state} = result}, _input) do
+    {:ok, %{result | state: release_terminal_resources(state)}}
+  end
+
+  def settle_result(result, _input), do: result
+
+  @doc "Resolve completed, waiting or failed status from the configured blocking todos."
+  def resolve_todo_status(state, agent_state) do
+    options = Map.get(state, :options) || %Aikido.AiReact.Options{}
+
+    if options.completion == :todos do
+      case Map.get(agent_state, options.todo_path) do
+        %{items: items} -> resolve_blocking_todos(state, Enum.filter(items, & &1.blocking?))
+        _ -> Map.merge(state, %{status: :failed, error: :todo_slice_not_mounted})
       end
-
-    case result do
-      {:ok, %{state: state}} when state != input.arguments.state ->
-        Aikido.AiReact.Hooks.transition(result, event, payload)
-
-      _ ->
-        result
+    else
+      state
     end
   end
 
-  @doc false
-  def gate(state, agent_state) do
-    options = Map.get(state, :options) || %Aikido.AiReact.Options{}
+  @doc "Discard prepared tools and pending handoff only after a run completes or fails."
+  def release_terminal_resources(%{status: status} = state) when status in [:completed, :failed],
+    do: Aikido.AiReact.Run.clear_tools_and_handoff(state)
 
-    state =
-      if options.completion == :todos do
-        case Map.get(agent_state, options.todo_path) do
-          %{items: items} ->
-            blocking = Enum.filter(items, & &1.blocking?)
+  def release_terminal_resources(state), do: state
 
-            cond do
-              blocked = Enum.find(blocking, &(&1.status == :blocked)) ->
-                Map.merge(state, %{
-                  status: :failed,
-                  error: {:todo_blocked, blocked.id, blocked.reason}
-                })
+  defp resolve_blocking_todos(state, items) do
+    cond do
+      blocked = Enum.find(items, &(&1.status == :blocked)) ->
+        Map.merge(state, %{
+          status: :failed,
+          error: {:todo_blocked, blocked.id, blocked.reason}
+        })
 
-              Enum.any?(blocking, &(&1.status != :completed)) ->
-                Map.put(state, :status, :waiting)
+      Enum.any?(items, &(&1.status != :completed)) ->
+        Map.put(state, :status, :waiting)
 
-              true ->
-                Map.put(state, :status, :completed)
-            end
-
-          _ ->
-            Map.merge(state, %{status: :failed, error: :todo_slice_not_mounted})
-        end
-      else
-        state
-      end
-
-    if state.status in [:completed, :failed],
-      do: Aikido.AiReact.Run.clear_tools_and_handoff(state),
-      else: state
+      true ->
+        Map.put(state, :status, :completed)
+    end
   end
 end

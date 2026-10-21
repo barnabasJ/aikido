@@ -21,7 +21,7 @@ defmodule Aikido.AiReact.Actions.HandoffFailed do
         })
         |> Aikido.AiReact.Run.clear_tools_and_handoff()
 
-      Hooks.transition(
+      Hooks.queue_event_hooks(
         Aikido.Types.ActionResult.new(state: state),
         :run_failed,
         %{

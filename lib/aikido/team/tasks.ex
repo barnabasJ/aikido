@@ -3,35 +3,39 @@ defmodule Aikido.Team.Tasks do
   alias Aikido.Directives
   alias Aikido.Signal
 
-  def notify(task, state, context) do
-    pid =
-      case Map.get(task, :notify) do
-        :self -> context.agent_pid
-        nil -> nil
-        member -> state.members[member]
-      end
-
-    if pid do
-      text =
-        "Task #{task.id} from #{task.member} #{task.status}: " <>
-          inspect(task.result, limit: 100, printable_limit: 4_000)
-
-      signal =
-        %Signal{
-          id: nil,
-          type: "ai.react.deliver",
-          data: %{
-            text: text,
-            request_id: "task-result/" <> task.id,
-            metadata: %{task: Map.take(task, [:id, :member, :status, :result, :metadata])}
-          },
-          source: "/aikido"
-        }
-
-      [Directives.emit_to_pid(signal, pid)]
-    else
-      []
+  @doc "Build delivery directives for the task's configured notification recipient."
+  def notification_directives(task, state, context) do
+    case notification_target(task, state, context) do
+      nil -> []
+      pid -> [Directives.emit_to_pid(result_signal(task), pid)]
     end
+  end
+
+  @doc "Resolve the current recipient PID, or nil when the task has no live recipient."
+  def notification_target(task, state, context) do
+    case Map.get(task, :notify) do
+      :self -> context.agent_pid
+      nil -> nil
+      member -> state.members[member]
+    end
+  end
+
+  @doc "Describe a task result as an AI delivery payload without delivering it."
+  def result_signal(task) do
+    text =
+      "Task #{task.id} from #{task.member} #{task.status}: " <>
+        inspect(task.result, limit: 100, printable_limit: 4_000)
+
+    %Signal{
+      id: nil,
+      type: "ai.react.deliver",
+      data: %{
+        text: text,
+        request_id: "task-result/" <> task.id,
+        metadata: %{task: Map.take(task, [:id, :member, :status, :result, :metadata])}
+      },
+      source: "/aikido"
+    }
   end
 
   def fetch_member(state, name) do

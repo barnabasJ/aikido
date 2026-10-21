@@ -17,7 +17,12 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
       |> record_response_content(turn)
       |> append_model_message(response)
       |> continue_from_classified_response(turn)
-      |> Completion.transition(input, :after_model, model_hook_payload(input.arguments))
+      |> Completion.settle_result(input)
+      |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(
+        input,
+        :after_model,
+        model_hook_payload(input.arguments)
+      )
     else
       Aikido.Types.ActionResult.new(state: state)
     end

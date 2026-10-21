@@ -21,7 +21,7 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
         |> record_handoff(state, data.handoff_id, document)
         |> accumulate_usage(data.turn)
         |> request_resumed_model_turn()
-        |> Hooks.transition(:after_model, %{handoff: true})
+        |> Hooks.queue_event_hooks(:after_model, %{handoff: true})
       else
         {:error, reason} ->
           Aikido.AiReact.Actions.HandoffFailed.fail_pending_handoff(

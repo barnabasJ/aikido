@@ -8,9 +8,12 @@ defmodule Aikido.AiReact.Actions.TodoChanged do
     state = input.arguments.state
 
     if state.status == :waiting do
-      state = Completion.gate(state, input.context.aikido.agent.state)
+      state =
+        state
+        |> Completion.resolve_todo_status(input.context.aikido.agent.state)
+        |> Completion.release_terminal_resources()
 
-      Hooks.transition(
+      Hooks.queue_event_hooks(
         Aikido.Types.ActionResult.new(state: state),
         :after_model,
         %{

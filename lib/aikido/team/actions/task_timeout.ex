@@ -36,7 +36,7 @@ defmodule Aikido.Team.Actions.TaskTimeout do
               ]
           end
 
-        {:ok, state, cancel ++ Tasks.notify(task, state, context)}
+        {:ok, state, cancel ++ Tasks.notification_directives(task, state, context)}
 
       _ ->
         {:ok, state, []}

@@ -21,31 +21,30 @@ defmodule Aikido.AiReact.Handoff do
     """
   end
 
-  @doc "Replace a ready normal model request with a handoff when the context budget is reached."
-  def before_model(state, %LLMCall{mode: :normal} = directive) do
+  @doc "Whether a ready normal model request has reached the configured handoff budget."
+  def required?(state, %LLMCall{mode: :normal}) do
     options = Map.get(state, :options) || %Aikido.AiReact.Options{}
 
-    if state.status == :running && is_nil(state.handoff_pending) &&
-         state.pending_tool_calls == [] && options.handoff &&
-         is_integer(options.context_max_tokens) &&
-         current_tokens(state) >=
-           max(options.context_max_tokens - options.handoff_buffer_tokens, 0) do
-      count = state.handoff_count + 1
-
-      context =
-        Context.append(
-          directive.context,
-          Context.user(options.handoff_prompt || instructions())
-        )
-
-      directive = %{directive | mode: :handoff, handoff_id: count, context: context, tools: []}
-      {%{state | handoff_count: count, handoff_pending: count}, directive}
-    else
-      {state, directive}
-    end
+    state.status == :running && is_nil(state.handoff_pending) &&
+      state.pending_tool_calls == [] && options.handoff &&
+      is_integer(options.context_max_tokens) &&
+      current_tokens(state) >= max(options.context_max_tokens - options.handoff_buffer_tokens, 0)
   end
 
-  def before_model(state, directive), do: {state, directive}
+  def required?(_state, _directive), do: false
+
+  @doc "Mark a handoff pending and replace a model request with the handoff instructions."
+  def prepare_request(state, %LLMCall{} = directive) do
+    options = Map.get(state, :options) || %Aikido.AiReact.Options{}
+    count = state.handoff_count + 1
+
+    context =
+      directive.context
+      |> Context.append(Context.user(options.handoff_prompt || instructions()))
+
+    directive = %{directive | mode: :handoff, handoff_id: count, context: context, tools: []}
+    {%{state | handoff_count: count, handoff_pending: count}, directive}
+  end
 
   @doc false
   def active?(state, data),

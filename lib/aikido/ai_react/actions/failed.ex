@@ -8,7 +8,8 @@ defmodule Aikido.AiReact.Actions.Failed do
     if is_nil(Map.get(input.arguments.state, :hook_terminal)) do
       input
       |> record_execution_failure()
-      |> Completion.transition(
+      |> Completion.settle_result(input)
+      |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(
         input,
         :run_failed,
         Map.take(input.arguments, [:query, :tool_call_id, :name, :content, :reason, :metadata])

@@ -9,26 +9,33 @@ defmodule Aikido.AiWorker.Actions.Accept do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    data = Map.delete(input.arguments, :state)
     state = input.arguments.state
     context = input.context.aikido
-    scope = Map.merge(%{actor: nil, tenant: nil}, Aikido.Signal.ctx(context.signal))
-    data = Map.put(data, :signal_context, scope)
-
-    duplicate? =
-      (state.pending && state.pending.task_id == data.task_id) ||
-        Enum.any?(Map.get(state, :queue, []), &(&1.task_id == data.task_id))
+    task = task_with_scope(input)
 
     cond do
-      duplicate? ->
+      duplicate_task?(state, task.task_id) ->
         Aikido.Types.ActionResult.new(state: state)
 
       state.pending || context.agent.state.ai.status in [:setup, :running, :waiting] ->
-        Aikido.Types.ActionResult.new(state: Map.update(state, :queue, [data], &(&1 ++ [data])))
+        Aikido.Types.ActionResult.new(state: Map.update(state, :queue, [task], &(&1 ++ [task])))
 
       true ->
-        start_task(state, data, context)
+        start_task(state, task, context)
     end
+  end
+
+  defp task_with_scope(input) do
+    scope = Map.merge(%{actor: nil, tenant: nil}, Aikido.Signal.ctx(input.context.aikido.signal))
+
+    input.arguments
+    |> Map.delete(:state)
+    |> Map.put(:signal_context, scope)
+  end
+
+  defp duplicate_task?(state, id) do
+    (state.pending && state.pending.task_id == id) ||
+      Enum.any?(Map.get(state, :queue, []), &(&1.task_id == id))
   end
 
   @doc false
@@ -49,6 +56,15 @@ defmodule Aikido.AiWorker.Actions.Accept do
   defp launch_task(state, data, context) do
     pending = Map.take(data, [:task_id, :member, :attempt, :reply_to])
 
+    ask = task_request_signal(data)
+
+    Aikido.Types.ActionResult.new(
+      state: %{state | pending: pending},
+      directives: [Aikido.Directives.emit_to_pid(ask, context.agent_pid)]
+    )
+  end
+
+  defp task_request_signal(data) do
     payload =
       data
       |> Map.take([
@@ -64,13 +80,7 @@ defmodule Aikido.AiWorker.Actions.Accept do
       ])
       |> Map.merge(%{query: data.text, request_id: data.task_id})
 
-    ask =
-      %Aikido.Signal{id: nil, type: "ai.react.ask", data: payload, source: "/aikido"}
-      |> Aikido.Signal.put_ctx(Map.get(data, :signal_context, %{}))
-
-    Aikido.Types.ActionResult.new(
-      state: %{state | pending: pending},
-      directives: [Aikido.Directives.emit_to_pid(ask, context.agent_pid)]
-    )
+    %Aikido.Signal{id: nil, type: "ai.react.ask", data: payload, source: "/aikido"}
+    |> Aikido.Signal.put_ctx(Map.get(data, :signal_context, %{}))
   end
 end

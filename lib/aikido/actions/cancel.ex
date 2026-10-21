@@ -11,18 +11,24 @@ defmodule Aikido.Actions.Cancel do
   def run(input, _opts, _context) do
     changes = %{status: :failed, error: {:cancelled, input.arguments.reason}}
 
-    case input.arguments.state do
-      %_{} = state ->
-        changeset = state |> Ash.Changeset.new() |> Ash.Changeset.change_attributes(changes)
-
-        if changeset.valid? do
-          Aikido.Types.ActionResult.new(state: Map.merge(state, changeset.attributes))
-        else
-          {:error, Ash.Error.to_error_class(changeset.errors)}
-        end
-
-      state when is_map(state) ->
-        Aikido.Types.ActionResult.new(state: Map.merge(state, changes))
+    with {:ok, state} <- apply_cancellation_changes(input.arguments.state, changes) do
+      Aikido.Types.ActionResult.new(state: state)
     end
   end
+
+  defp apply_cancellation_changes(%_{} = state, changes) do
+    state
+    |> Ash.Changeset.new()
+    |> Ash.Changeset.change_attributes(changes)
+    |> adopt_validated_changes(state)
+  end
+
+  defp apply_cancellation_changes(state, changes) when is_map(state),
+    do: {:ok, Map.merge(state, changes)}
+
+  defp adopt_validated_changes(%{valid?: true, attributes: attributes}, state),
+    do: {:ok, Map.merge(state, attributes)}
+
+  defp adopt_validated_changes(%{errors: errors}, _state),
+    do: {:error, Ash.Error.to_error_class(errors)}
 end
