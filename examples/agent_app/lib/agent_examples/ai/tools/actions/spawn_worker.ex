@@ -1,13 +1,13 @@
 defmodule AgentExamples.AI.Tools.Actions.SpawnWorker do
   @moduledoc "Starts an owned worker from a team template with the caller's model and tool configuration."
   use Ash.Resource.Actions.Implementation
-  alias AgentExamples.AI.Tools.Context
+  alias AgentExamples.AI.Tools.TeamAccess
 
   @impl true
   def run(input, _opts, context) do
     ash_opts = Ash.Scope.to_opts(context, context: input.context)
 
-    with {:ok, team, owner, caller} <- Context.resolve_caller_team(input, context),
+    with {:ok, team, owner, caller} <- TeamAccess.resolve_caller_team(input, context),
          {:ok, template, resource} <- resolve_template(team, input.arguments.template),
          {:ok, _started} <-
            team.__struct__

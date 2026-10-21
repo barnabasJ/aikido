@@ -150,7 +150,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     for {module, category} <- [
           {Aikido.AI, :support},
           {Aikido.AiReact.Options, :support},
-          {Aikido.AiReact.Hooks, :support},
+          {Aikido.AiReact.HookQueue, :support},
           {Aikido.AiReact.Hooks.Hook, :support},
           {Aikido.AiReact.Directives.ExecuteHook, :directive},
           {Aikido.AiWorker.Signals.Accept, :signal},

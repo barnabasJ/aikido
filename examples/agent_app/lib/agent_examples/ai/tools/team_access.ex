@@ -1,5 +1,10 @@
-defmodule AgentExamples.AI.Tools.Context do
-  @moduledoc false
+defmodule AgentExamples.AI.Tools.TeamAccess do
+  @moduledoc """
+  Resolves the calling agent’s team and checks member ownership for management tools.
+
+  Team inspection uses scoped public actions. Ownership checks traverse supplied
+  topology data and do not start, stop or modify members.
+  """
 
   def resolve_topology_member(team, name) do
     case Enum.find(Map.keys(team.team.topology.nodes), &(to_string(&1) == name)) do

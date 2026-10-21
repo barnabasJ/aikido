@@ -1,16 +1,16 @@
 defmodule AgentExamples.AI.Tools.Actions.RemoveWorker do
   @moduledoc "Removes an owned descendant and its descendants from the team's topology."
   use Ash.Resource.Actions.Implementation
-  alias AgentExamples.AI.Tools.Context
+  alias AgentExamples.AI.Tools.TeamAccess
 
   @impl true
   def run(input, _opts, context) do
     ash_opts = Ash.Scope.to_opts(context, context: input.context)
 
-    with {:ok, team, caller, _record} <- Context.resolve_caller_team(input, context),
-         {:ok, member} <- Context.resolve_topology_member(team, input.arguments.member),
+    with {:ok, team, caller, _record} <- TeamAccess.resolve_caller_team(input, context),
+         {:ok, member} <- TeamAccess.resolve_topology_member(team, input.arguments.member),
          true <-
-           Context.owned_by?(team.team.topology.nodes, member, caller) ||
+           TeamAccess.owned_by?(team.team.topology.nodes, member, caller) ||
              {:error, "You may only manage your own descendants"},
          {:ok, _} <-
            team.__struct__
