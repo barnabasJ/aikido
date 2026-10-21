@@ -32,7 +32,7 @@ Provide stable, reusable testing patterns for pure agents, AgentServer runtime b
 - AgentServer signal routing and runtime directive execution
 - DurableServer activation, snapshot retention, codec round trips and recovery
 - Parent-child lifecycle (`SpawnAgent`, `StopChild`) and state synchronization
-- Action result shapes — state for the resolved mount path, multiple slices via `%Aikido.Agent.SliceUpdate{}`
+- Action result shapes — state for the resolved mount path, multiple slices via `%Aikido.Types.SliceUpdate{}`
 
 ## Release Hygiene
 - Keep test fixtures aligned with current directive/slice-return/tool contracts

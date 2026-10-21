@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Place the typed multi-slice result descriptor at `Aikido.Types.SliceUpdate`,
+  alongside `ActionResult` and `Directive`.
+
 - Flatten the shared `Broadcast`, `Cancel`, `Forward`, `Noop` and `Reply`
   implementations into `Aikido.Actions`.
 

@@ -76,7 +76,7 @@ defmodule AikidoTest.TestActions.Actions.UpdateDomainAndAudit do
   @impl true
   def run(_input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: %Aikido.Agent.SliceUpdate{
+      state: %Aikido.Types.SliceUpdate{
         slices: %{domain: %{primary: "result"}, audit: %{last_event: :touched}}
       },
       directives: []

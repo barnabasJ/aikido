@@ -54,7 +54,7 @@ defmodule Aikido.AICapacityTest.Launch do
       |> Aikido.Slices.AiReact.Context.replace_context(context)
 
     Aikido.Types.ActionResult.new(
-      state: %Aikido.Agent.SliceUpdate{slices: %{ai: ai}},
+      state: %Aikido.Types.SliceUpdate{slices: %{ai: ai}},
       directives: [effect]
     )
   end

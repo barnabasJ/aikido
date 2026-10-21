@@ -1835,7 +1835,7 @@ defmodule Aikido.AgentServer do
           {:ok, result} ->
             state =
               case result.state do
-                %Aikido.Agent.SliceUpdate{slices: slices} ->
+                %Aikido.Types.SliceUpdate{slices: slices} ->
                   Map.merge(current.agent.state, slices)
 
                 slice ->

@@ -1,4 +1,4 @@
-defmodule Aikido.Agent.SliceUpdate do
+defmodule Aikido.Types.SliceUpdate do
   @moduledoc """
   Multi-slice action return value used when one action transactionally
   mutates multiple slices on the agent.
@@ -11,7 +11,7 @@ defmodule Aikido.Agent.SliceUpdate do
 
       def run(input, _opts, _context) do
         Aikido.Types.ActionResult.new(
-          state: %Aikido.Agent.SliceUpdate{
+          state: %Aikido.Types.SliceUpdate{
             slices: %{
               team: input.arguments.team,
               audit: %{last_event: "topology.updated"}
@@ -24,8 +24,12 @@ defmodule Aikido.Agent.SliceUpdate do
   All side effects belong in directives, which must not mutate state.
   """
 
-  @enforce_keys [:slices]
-  defstruct [:slices]
+  use Ash.TypedStruct
 
-  @type t :: %__MODULE__{slices: %{atom() => map()}}
+  typed_struct do
+    field :slices, :map do
+      description "Replacement slice values keyed by their mounted paths on the agent."
+      allow_nil? false
+    end
+  end
 end

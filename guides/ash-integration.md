@@ -53,6 +53,9 @@ the implementation modules provide their callbacks without creating resources.
 Shared reusable implementations such as `Aikido.Actions.Broadcast` and
 `Aikido.Actions.Forward` live directly under `Aikido.Actions`.
 
+Result contracts live under `Aikido.Types`, including `ActionResult`,
+`SliceUpdate` and `Directive`.
+
 Place each resource beside its owned `actions/`, `signals/` and `directives/` folders.
 Their modules use matching `Actions`, `Signals` and `Directives` namespaces;
 ordinary shared helpers stay directly under the feature.

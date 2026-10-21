@@ -21,7 +21,7 @@ defmodule Aikido.AgentServer.Actions.QueryChildren do
       )
 
     Aikido.Types.ActionResult.new(
-      state: %Aikido.Agent.SliceUpdate{slices: %{}},
+      state: %Aikido.Types.SliceUpdate{slices: %{}},
       directives: List.wrap(directive)
     )
   end

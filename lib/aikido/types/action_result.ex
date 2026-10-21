@@ -7,7 +7,7 @@ defmodule Aikido.Types.ActionResult do
 
   Construct results with `new/1` or `new!/1`. The execution boundary also validates
   returned maps and structs before applying state or executing any directives.
-  State may be a slice map, a typed state struct, or a multi-slice update.
+  State may be a slice map, a typed state struct, or an `Aikido.Types.SliceUpdate`.
   """
   use Ash.TypedStruct
 
