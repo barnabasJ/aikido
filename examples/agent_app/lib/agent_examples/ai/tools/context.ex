@@ -24,7 +24,7 @@ defmodule AgentExamples.AI.Tools.Context do
     end
   end
 
-  def scope(input, context) do
+  def resolve_caller_team(input, context) do
     caller = input.context[:aikido]
     resource = caller && caller[:agent_resource]
     opts = Ash.Scope.to_opts(context, context: input.context)

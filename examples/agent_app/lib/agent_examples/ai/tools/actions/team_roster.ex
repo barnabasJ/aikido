@@ -5,7 +5,7 @@ defmodule AgentExamples.AI.Tools.Actions.TeamRoster do
 
   @impl true
   def run(input, _opts, context) do
-    with {:ok, team, _member, _caller} <- Context.scope(input, context) do
+    with {:ok, team, _member, _caller} <- Context.resolve_caller_team(input, context) do
       members = team.team.members |> Map.keys() |> Enum.map(&to_string/1) |> Enum.sort()
 
       templates =

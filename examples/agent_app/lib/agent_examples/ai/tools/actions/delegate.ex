@@ -5,7 +5,7 @@ defmodule AgentExamples.AI.Tools.Actions.Delegate do
 
   @impl true
   def run(input, _opts, context) do
-    with {:ok, team, caller, _record} <- Context.scope(input, context),
+    with {:ok, team, caller, _record} <- Context.resolve_caller_team(input, context),
          {:ok, member} <- resolve_member(team, input.arguments.member),
          true <- member != caller || {:error, "Cannot delegate to yourself"},
          {:ok, result} <-

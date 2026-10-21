@@ -7,7 +7,7 @@ defmodule AgentExamples.AI.Tools.Actions.SpawnWorker do
   def run(input, _opts, context) do
     ash_opts = Ash.Scope.to_opts(context, context: input.context)
 
-    with {:ok, team, owner, caller} <- Context.scope(input, context),
+    with {:ok, team, owner, caller} <- Context.resolve_caller_team(input, context),
          {:ok, template, resource} <- resolve_template(team, input.arguments.template),
          {:ok, _started} <-
            team.__struct__

@@ -7,7 +7,7 @@ defmodule AgentExamples.AI.Tools.Actions.RemoveWorker do
   def run(input, _opts, context) do
     ash_opts = Ash.Scope.to_opts(context, context: input.context)
 
-    with {:ok, team, caller, _record} <- Context.scope(input, context),
+    with {:ok, team, caller, _record} <- Context.resolve_caller_team(input, context),
          {:ok, member} <- Context.resolve_topology_member(team, input.arguments.member),
          true <-
            Context.owned_by?(team.team.topology.nodes, member, caller) ||

@@ -53,7 +53,8 @@ defmodule AgentExamples.Playground do
           }
 
           state =
-            %{state | tasks: Map.put(state.tasks, task.ref, {key, task})} |> put_run(key, run)
+            %{state | tasks: Map.put(state.tasks, task.ref, {key, task})}
+            |> broadcast_and_store_run(key, run)
 
           {:reply, :ok, state}
         end
@@ -64,7 +65,10 @@ defmodule AgentExamples.Playground do
              |> Ash.run_action() do
           {:ok, _} ->
             {:reply, :ok,
-             put_run(state, key, %{run | messages: run.messages ++ [%{role: :user, text: query}]})}
+             broadcast_and_store_run(state, key, %{
+               run
+               | messages: run.messages ++ [%{role: :user, text: query}]
+             })}
 
           {:error, error} ->
             {:reply, {:error, error_text(error)}, state}
@@ -96,7 +100,7 @@ defmodule AgentExamples.Playground do
         }
 
         state = put_in(state.requests[id], waiter)
-        {:noreply, put_run(state, key, %{run | requests: run.requests ++ [card]})}
+        {:noreply, broadcast_and_store_run(state, key, %{run | requests: run.requests ++ [card]})}
 
       _ ->
         {:reply, {:error, :run_not_active}, state}
@@ -109,10 +113,11 @@ defmodule AgentExamples.Playground do
     case state.requests[input.interaction_id] do
       %{key: ^key, deadline: deadline} ->
         if System.monotonic_time(:millisecond) < deadline do
-          {:reply, :ok, finish_request(state, input.interaction_id, {:ok, input.response})}
+          {:reply, :ok,
+           reply_and_remove_request(state, input.interaction_id, {:ok, input.response})}
         else
           {:reply, {:error, :request_expired},
-           finish_request(state, input.interaction_id, {:error, :timeout})}
+           reply_and_remove_request(state, input.interaction_id, {:error, :timeout})}
         end
 
       _ ->
@@ -159,8 +164,11 @@ defmodule AgentExamples.Playground do
       end
 
     case result do
-      {:ok, _} -> {:reply, :ok, put_run(state, {owner, slug}, %{run | error: nil})}
-      {:error, reason} -> {:reply, {:error, error_text(reason)}, state}
+      {:ok, _} ->
+        {:reply, :ok, broadcast_and_store_run(state, {owner, slug}, %{run | error: nil})}
+
+      {:error, reason} ->
+        {:reply, {:error, error_text(reason)}, state}
     end
   end
 
@@ -177,11 +185,11 @@ defmodule AgentExamples.Playground do
 
             state =
               if action == :cancel,
-                do: finish_requests(state, key, {:error, :cancelled}),
+                do: reply_to_run_requests(state, key, {:error, :cancelled}),
                 else: state
 
             run = %{run | requests: state.runs[key].requests}
-            {:reply, :ok, put_run(state, key, run)}
+            {:reply, :ok, broadcast_and_store_run(state, key, run)}
 
           {:error, reason} ->
             {:reply, {:error, Exception.message(Ash.Error.to_ash_error(reason))}, state}
@@ -201,7 +209,7 @@ defmodule AgentExamples.Playground do
              |> Ash.ActionInput.for_action(:stop, %{agent: run.record})
              |> Ash.run_action() do
           {:ok, _receipt} ->
-            state = finish_requests(state, key, {:error, :stopped})
+            state = reply_to_run_requests(state, key, {:error, :stopped})
             for {_ref, {^key, task}} <- state.tasks, do: Task.shutdown(task, :brutal_kill)
             tasks = Map.reject(state.tasks, fn {_, {task_key, _}} -> task_key == key end)
 
@@ -211,7 +219,11 @@ defmodule AgentExamples.Playground do
             run = %{run | status: :stopped, requests: []}
 
             {:reply, :ok,
-             put_run(%{state | tasks: tasks, subscriptions: subscriptions}, key, run)}
+             broadcast_and_store_run(
+               %{state | tasks: tasks, subscriptions: subscriptions},
+               key,
+               run
+             )}
 
           {:error, reason} ->
             {:reply, {:error, inspect(reason)}, state}
@@ -225,13 +237,13 @@ defmodule AgentExamples.Playground do
   @impl true
   def handle_info({ref, result}, state) when is_reference(ref) do
     Process.demonitor(ref, [:flush])
-    finish_task(ref, result, state)
+    apply_prompt_task_result(ref, result, state)
   end
 
   def handle_info({:DOWN, ref, :process, _, reason}, state) do
     case Enum.find(state.requests, fn {_, waiter} -> waiter.monitor == ref end) do
-      {id, _} -> {:noreply, finish_request(state, id, {:error, :caller_stopped})}
-      nil -> finish_task(ref, {:error, "Run failed: #{inspect(reason)}"}, state)
+      {id, _} -> {:noreply, reply_and_remove_request(state, id, {:error, :caller_stopped})}
+      nil -> apply_prompt_task_result(ref, {:error, "Run failed: #{inspect(reason)}"}, state)
     end
   end
 
@@ -266,13 +278,13 @@ defmodule AgentExamples.Playground do
               events: Enum.take([event | run.events], 80)
           }
 
-          {:noreply, put_run(state, key, run)}
+          {:noreply, broadcast_and_store_run(state, key, run)}
         end
     end
   end
 
   def handle_info({:request_expired, id}, state),
-    do: {:noreply, finish_request(state, id, {:error, :timeout})}
+    do: {:noreply, reply_and_remove_request(state, id, {:error, :timeout})}
 
   def handle_info(_, state), do: {:noreply, state}
 
@@ -338,7 +350,7 @@ defmodule AgentExamples.Playground do
         error: nil
       }
 
-      {:reply, {:ok, run}, put_run(state, key, run)}
+      {:reply, {:ok, run}, broadcast_and_store_run(state, key, run)}
     else
       {:error, reason} -> {:reply, {:error, error_text(reason)}, state}
     end
@@ -561,7 +573,7 @@ defmodule AgentExamples.Playground do
            :streaming_thinking,
            :usage
          ])
-         |> Map.put(:hook_messages, hook_messages(ai)),
+         |> Map.put(:hook_messages, hook_injected_context_messages(ai)),
        todos: Map.get(Map.get(state.agent.state, :todos, %{}), :items, []),
        members: member_snapshots(team, resource),
        tasks: task_snapshots(team)
@@ -600,7 +612,7 @@ defmodule AgentExamples.Playground do
     |> Enum.map(&Map.take(&1, [:id, :member, :status, :result]))
   end
 
-  defp hook_messages(%{context: %ReqLLM.Context{} = context}) do
+  defp hook_injected_context_messages(%{context: %ReqLLM.Context{} = context}) do
     context
     |> ReqLLM.Context.to_list()
     |> Enum.filter(&(&1.role == :user))
@@ -609,7 +621,7 @@ defmodule AgentExamples.Playground do
     |> Enum.filter(&(is_binary(&1) && String.starts_with?(&1, "[Hook context:")))
   end
 
-  defp hook_messages(_), do: []
+  defp hook_injected_context_messages(_), do: []
 
   defp subtree(nil, _), do: nil
   defp subtree(snapshot, []), do: snapshot
@@ -654,13 +666,13 @@ defmodule AgentExamples.Playground do
     end
   end
 
-  defp finish_task(ref, result, state) do
+  defp apply_prompt_task_result(ref, result, state) do
     case Map.pop(state.tasks, ref) do
       {nil, _} ->
         {:noreply, state}
 
       {{key, _task}, tasks} ->
-        state = finish_requests(state, key, {:error, :run_finished})
+        state = reply_to_run_requests(state, key, {:error, :run_finished})
         run = state.runs[key]
 
         run =
@@ -676,17 +688,17 @@ defmodule AgentExamples.Playground do
               %{run | status: :failed, error: error_text(error)}
           end
 
-        {:noreply, put_run(%{state | tasks: tasks}, key, run)}
+        {:noreply, broadcast_and_store_run(%{state | tasks: tasks}, key, run)}
     end
   end
 
-  defp finish_requests(state, key, result) do
+  defp reply_to_run_requests(state, key, result) do
     Enum.reduce(state.requests, state, fn {id, waiter}, state ->
-      if waiter.key == key, do: finish_request(state, id, result), else: state
+      if waiter.key == key, do: reply_and_remove_request(state, id, result), else: state
     end)
   end
 
-  defp finish_request(state, id, result) do
+  defp reply_and_remove_request(state, id, result) do
     case Map.pop(state.requests, id) do
       {nil, _} ->
         state
@@ -697,11 +709,15 @@ defmodule AgentExamples.Playground do
         GenServer.reply(waiter.from, result)
         state = %{state | requests: requests}
         run = state.runs[waiter.key]
-        put_run(state, waiter.key, %{run | requests: Enum.reject(run.requests, &(&1.id == id))})
+
+        broadcast_and_store_run(state, waiter.key, %{
+          run
+          | requests: Enum.reject(run.requests, &(&1.id == id))
+        })
     end
   end
 
-  defp put_run(state, key, run) do
+  defp broadcast_and_store_run(state, key, run) do
     Phoenix.PubSub.broadcast(
       AgentExamples.PubSub,
       @topic,
