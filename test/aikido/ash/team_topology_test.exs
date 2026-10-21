@@ -17,7 +17,7 @@ defmodule AikidoTest.AshTeamTopologyTest do
     assert {:ok, [:lead, "child", :reviewer]} =
              Topology.order(topology.nodes, Map.keys(topology.nodes))
 
-    assert MapSet.new(Topology.targets(topology, [:reviewer])) ==
+    assert MapSet.new(Topology.members_with_prerequisites(topology, [:reviewer])) ==
              MapSet.new([:lead, "child", :reviewer])
 
     assert {:error, {:required_by, [:reviewer]}} = Topology.remove(topology, :lead, false)
@@ -43,7 +43,7 @@ defmodule AikidoTest.AshTeamTopologyTest do
     assert MapSet.new(Topology.owned_members(topology, [:root])) ==
              MapSet.new([:root, :child, :grandchild])
 
-    assert :dependent in Topology.affected(topology, [:root])
+    assert :dependent in Topology.members_with_dependents(topology, [:root])
   end
 
   test "ordering a selected subset ignores prerequisites outside that subset" do

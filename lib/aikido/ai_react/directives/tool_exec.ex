@@ -55,7 +55,7 @@ defmodule Aikido.AiReact.Directives.ToolExec do
     agent_pid = self()
     task_sup = Aikido.task_supervisor_name(state.aikido)
     source = "/agent/#{state.id}"
-    context = tool_context(directive, input_signal, state)
+    context = tool_execution_context(directive, input_signal, state)
 
     tracers = Aikido.Signal.tracers(input_signal, state.aikido)
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
@@ -64,17 +64,26 @@ defmodule Aikido.AiReact.Directives.ToolExec do
            Ash.ProcessHelpers.transfer_context(transfer)
 
            Ash.Tracer.span {:custom, :aikido_tool_call}, "aikido_tool_call", tracers do
-             run_and_dispatch(directive, agent_pid, source, context, task_sup)
+             execute_tool_and_send_result_to_agent(
+               directive,
+               agent_pid,
+               source,
+               context,
+               task_sup
+             )
            end
          end) do
-      {:ok, _pid} -> :ok
-      {:error, reason} -> dispatch_result(directive, {:error, reason}, agent_pid, source, context)
+      {:ok, _pid} ->
+        :ok
+
+      {:error, reason} ->
+        send_tool_result_to_agent(directive, {:error, reason}, agent_pid, source, context)
     end
 
     :ok
   end
 
-  defp tool_context(directive, input_signal, state) do
+  defp tool_execution_context(directive, input_signal, state) do
     agent_module = Map.get(state, :agent_module)
 
     inherited =
@@ -103,25 +112,33 @@ defmodule Aikido.AiReact.Directives.ToolExec do
     )
   end
 
-  defp run_and_dispatch(%ToolExec{} = d, agent_pid, source, context, supervisor) do
+  defp execute_tool_and_send_result_to_agent(
+         %ToolExec{} = d,
+         agent_pid,
+         source,
+         context,
+         supervisor
+       ) do
     options = d.options
 
     result =
-      Aikido.AiReact.Execution.run(
+      Aikido.AiReact.Execution.run_cancellable_attempts(
         agent_pid,
         d.request_id,
         supervisor,
-        fn _notify, _attempt -> run_tool(d.tool_call, d.registry, context) end,
+        fn _notify, _attempt ->
+          execute_registered_tool_call(d.tool_call, d.registry, context)
+        end,
         tracer: context[:tracer],
         timeout: options.tool_timeout_ms,
         retries: options.tool_max_retries,
         backoff: options.retry_backoff_ms
       )
 
-    dispatch_result(d, result, agent_pid, source, context)
+    send_tool_result_to_agent(d, result, agent_pid, source, context)
   end
 
-  defp dispatch_result(d, result, agent_pid, source, context) do
+  defp send_tool_result_to_agent(d, result, agent_pid, source, context) do
     content =
       case result do
         {:ok, content} -> content
@@ -149,7 +166,7 @@ defmodule Aikido.AiReact.Directives.ToolExec do
       )
   end
 
-  defp run_tool(%{name: name, arguments: args}, registry, context) do
+  defp execute_registered_tool_call(%{name: name, arguments: args}, registry, context) do
     ash_context =
       Map.put(Map.get(context, :context) || %{}, :aikido, Map.delete(context, :context))
 

@@ -21,7 +21,7 @@ defmodule Aikido.AiWorker.Actions.Accept do
         Aikido.Types.ActionResult.new(state: Map.update(state, :queue, [task], &(&1 ++ [task])))
 
       true ->
-        start_task(state, task, context)
+        start_ai_run_for_task(state, task, context)
     end
   end
 
@@ -39,9 +39,9 @@ defmodule Aikido.AiWorker.Actions.Accept do
   end
 
   @doc false
-  def start_task(state, data, context) do
+  def start_ai_run_for_task(state, data, context) do
     if is_nil(data[:model] || context.agent.state.ai.model) do
-      Aikido.AiWorker.Actions.Settle.complete_task(
+      Aikido.AiWorker.Actions.Settle.report_task_outcome_and_start_next(
         state,
         data,
         :failed,
@@ -49,11 +49,11 @@ defmodule Aikido.AiWorker.Actions.Accept do
         context
       )
     else
-      launch_task(state, data, context)
+      record_pending_task_and_request_ai_run(state, data, context)
     end
   end
 
-  defp launch_task(state, data, context) do
+  defp record_pending_task_and_request_ai_run(state, data, context) do
     pending = Map.take(data, [:task_id, :member, :attempt, :reply_to])
 
     ask = task_request_signal(data)

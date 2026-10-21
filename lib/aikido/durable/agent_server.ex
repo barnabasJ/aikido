@@ -5,7 +5,7 @@ defmodule Aikido.Durable.AgentServer do
 
   @impl true
   def dump_state(%{runtime: runtime} = state) do
-    agent = %{runtime.agent | state: durable_domain_state(runtime.agent.state)}
+    agent = %{runtime.agent | state: clear_transient_team_membership(runtime.agent.state)}
     agent = Aikido.Durable.Codec.transform_agent(agent, runtime.agent_module, :externalize)
 
     encode(%{
@@ -127,7 +127,7 @@ defmodule Aikido.Durable.AgentServer do
   @impl true
   def handle_info({:aikido_durable_continue, continue, restored?}, state) do
     result = AgentServer.handle_continue(continue, state.runtime)
-    if restored?, do: maybe_reconcile(state.runtime)
+    if restored?, do: enqueue_team_reconciliation(state.runtime)
     wrap_runtime_reply(result, state)
   end
 
@@ -256,7 +256,7 @@ defmodule Aikido.Durable.AgentServer do
   defp restore_agent({:agent, agent}, agent_module),
     do: Aikido.Durable.Codec.transform_agent(agent, agent_module, :reinstate)
 
-  defp durable_domain_state(state) do
+  defp clear_transient_team_membership(state) do
     case state[:team] do
       %Aikido.Team.Slice{} = team ->
         Map.put(state, :team, %{
@@ -271,7 +271,7 @@ defmodule Aikido.Durable.AgentServer do
     end
   end
 
-  defp maybe_reconcile(runtime) do
+  defp enqueue_team_reconciliation(runtime) do
     resource = runtime.agent_module
 
     if Aikido.Agent.Info.team_config(resource) do

@@ -16,7 +16,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
       |> append_tool_message(data)
       |> record_received_result(data)
       |> resume_when_batch_complete()
-      |> Completion.settle_result(input)
+      |> Completion.apply_completion_requirements(input)
       |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(
         input,
         :after_tool,

@@ -5,8 +5,8 @@ defmodule Aikido.Team.Actions.Stopped do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(remove_stopped_member(signal.data, state, context, config))
+    {signal, state, context, config} = Inputs.unpack_team_action(input)
+    Inputs.to_action_result(remove_stopped_member(signal.data, state, context, config))
   end
 
   defp remove_stopped_member(%{member: name, operation_id: id}, state, context, config) do
@@ -18,7 +18,7 @@ defmodule Aikido.Team.Actions.Stopped do
       }
 
       state = update_in(state.operation.stopped, &(&1 ++ [name]))
-      Operation.advance(state, context, config)
+      Operation.advance_member_lifecycle(state, context, config)
     else
       {:ok, state, []}
     end

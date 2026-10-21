@@ -7,9 +7,15 @@ defmodule Aikido.Memory.Actions.DeleteSpace do
     name = input.arguments.space
 
     if name in [:world, :tasks] do
-      Aikido.Memory.Spaces.error(input, "cannot delete reserved space #{inspect(name)}")
+      Aikido.Memory.Spaces.invalid_space_argument(
+        input,
+        "cannot delete reserved space #{inspect(name)}"
+      )
     else
-      Aikido.Memory.Spaces.commit(input, Map.delete(input.arguments.state.spaces, name))
+      Aikido.Memory.Spaces.replace_spaces_and_advance_revision(
+        input,
+        Map.delete(input.arguments.state.spaces, name)
+      )
     end
   end
 end

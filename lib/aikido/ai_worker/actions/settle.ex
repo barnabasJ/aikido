@@ -16,7 +16,7 @@ defmodule Aikido.AiWorker.Actions.Settle do
     cond do
       pending_run_finished?(state.pending, context.signal.data, ai) ->
         result = if ai.status == :completed, do: ai.result, else: ai.error
-        complete_task(state, state.pending, ai.status, result, context)
+        report_task_outcome_and_start_next(state, state.pending, ai.status, result, context)
 
       is_nil(state.pending) && ai.status in [:completed, :failed, :idle] ->
         start_next_queued_task(state, context, [])
@@ -34,7 +34,7 @@ defmodule Aikido.AiWorker.Actions.Settle do
   end
 
   @doc false
-  def complete_task(state, task, status, result, context) do
+  def report_task_outcome_and_start_next(state, task, status, result, context) do
     reply = task_result_signal(task, status, result)
 
     state
@@ -62,7 +62,11 @@ defmodule Aikido.AiWorker.Actions.Settle do
     case Map.get(state, :queue, []) do
       [data | rest] ->
         with {:ok, result} <-
-               Aikido.AiWorker.Actions.Accept.start_task(%{state | queue: rest}, data, context) do
+               Aikido.AiWorker.Actions.Accept.start_ai_run_for_task(
+                 %{state | queue: rest},
+                 data,
+                 context
+               ) do
           Aikido.Types.ActionResult.new(
             state: result.state,
             directives: effects ++ result.directives

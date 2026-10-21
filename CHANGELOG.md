@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Name internal operations for their state changes, message content and recipients,
+  failure handling and return values across features, runtime, DSLs and examples.
+  Replace ambiguous helpers such as `commit`, `safe` and `scope` with explicit names.
+
 - Separate completion requirements, resource release and hook queueing into
   composable operations. Expose handoff decisions and request construction,
   task notification descriptions, and pure slice configuration casting. Name

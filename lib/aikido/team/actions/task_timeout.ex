@@ -7,8 +7,11 @@ defmodule Aikido.Team.Actions.TaskTimeout do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(expire_task_and_request_cancellation(signal.data, state, context, config))
+    {signal, state, context, config} = Inputs.unpack_team_action(input)
+
+    Inputs.to_action_result(
+      expire_task_and_request_cancellation(signal.data, state, context, config)
+    )
   end
 
   defp expire_task_and_request_cancellation(data, state, context, _config) do
@@ -36,7 +39,7 @@ defmodule Aikido.Team.Actions.TaskTimeout do
               ]
           end
 
-        {:ok, state, cancel ++ Tasks.notification_directives(task, state, context)}
+        {:ok, state, cancel ++ Tasks.task_result_delivery_directives(task, state, context)}
 
       _ ->
         {:ok, state, []}

@@ -167,7 +167,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: id)
 
-      restarted_pid = AikidoTest.LifecycleWait.restart(pid)
+      restarted_pid = AikidoTest.LifecycleWait.crash_and_await_replacement(pid)
       assert is_pid(restarted_pid)
       refute restarted_pid == pid
       Aikido.Durable.stop(Aikido.durable_supervisor_name(aikido), restarted_pid)

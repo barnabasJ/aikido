@@ -9,7 +9,7 @@ defmodule Aikido.Agent.Commands.List do
     arguments = input.arguments
     options = Ash.Scope.to_opts(context, context: input.context)
 
-    Runtime.safe(fn ->
+    Runtime.catch_runtime_exit(fn ->
       with {:ok, records} <- collect_live_snapshots(resource),
            {:ok, records} <- filter_snapshots(records, resource, arguments[:filter], options) do
         {:ok, sort_and_paginate(records, arguments)}

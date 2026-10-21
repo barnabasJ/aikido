@@ -154,7 +154,7 @@ defmodule AikidoTest.DurableTest do
                &{:ok, &1.agent.state.domain.counter}
              )
 
-    second = AikidoTest.LifecycleWait.restart(first)
+    second = AikidoTest.LifecycleWait.crash_and_await_replacement(first)
 
     assert {:ok, 9} = Aikido.AgentServer.state(second, &{:ok, &1.agent.state.domain.counter})
   end
@@ -421,7 +421,7 @@ defmodule AikidoTest.DurableTest do
       )
 
     first = AikidoTest.Case.agent_pid(instance, team.id)
-    second = AikidoTest.LifecycleWait.restart(first)
+    second = AikidoTest.LifecycleWait.crash_and_await_replacement(first)
 
     member =
       AikidoTest.AgentWait.await_state_value(

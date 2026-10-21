@@ -96,18 +96,23 @@ defmodule Aikido.HooksTest do
     h = hook(~s(return {context = event.request_id, decision = "continue"}))
 
     assert {:ok, %Decision{context: "run", decision: :continue}} =
-             ExecuteHook.evaluate(h, %{request_id: "run"}, self(), "run")
+             ExecuteHook.evaluate_lua_hook(h, %{request_id: "run"}, self(), "run")
 
     assert {:ok, %Decision{decision: :continue}} =
-             ExecuteHook.evaluate(hook("return nil"), %{}, self(), "run")
+             ExecuteHook.evaluate_lua_hook(hook("return nil"), %{}, self(), "run")
 
     assert {:error, _} =
-             ExecuteHook.evaluate(hook(~s(return {decision = "whatever"})), %{}, self(), "run")
+             ExecuteHook.evaluate_lua_hook(
+               hook(~s(return {decision = "whatever"})),
+               %{},
+               self(),
+               "run"
+             )
   end
 
   test "runaway scripts stop at native instruction limits and sync hooks cannot emit" do
     assert {:error, _} =
-             ExecuteHook.evaluate(
+             ExecuteHook.evaluate_lua_hook(
                hook("while true do end", max_instructions: 100),
                %{},
                self(),
@@ -115,10 +120,15 @@ defmodule Aikido.HooksTest do
              )
 
     assert {:error, _} =
-             ExecuteHook.evaluate(hook(~s|aikido.send_context("no")|), %{}, self(), "run")
+             ExecuteHook.evaluate_lua_hook(
+               hook(~s|aikido.send_context("no")|),
+               %{},
+               self(),
+               "run"
+             )
 
     assert {:error, _} =
-             ExecuteHook.evaluate(hook(~s|os.execute("anything")|), %{}, self(), "run")
+             ExecuteHook.evaluate_lua_hook(hook(~s|os.execute("anything")|), %{}, self(), "run")
   end
 
   test "sync gates release the model only after ordered decisions, with updated context" do
@@ -137,12 +147,16 @@ defmodule Aikido.HooksTest do
     assert %ExecuteHook{} = gate
 
     {:ok, %{state: waiting, directives: [second]}} =
-      complete(waiting, gate, ExecuteHook.evaluate(gate.hook, gate.event, self(), "run"))
+      complete(waiting, gate, ExecuteHook.evaluate_lua_hook(gate.hook, gate.event, self(), "run"))
 
     assert %ExecuteHook{} = second
 
     {:ok, %{state: ready, directives: [%LLMCall{} = released]}} =
-      complete(waiting, second, ExecuteHook.evaluate(second.hook, second.event, self(), "run"))
+      complete(
+        waiting,
+        second,
+        ExecuteHook.evaluate_lua_hook(second.hook, second.event, self(), "run")
+      )
 
     assert ready.hooks_pending == %{}
     assert ready.hook_context == []
@@ -188,7 +202,7 @@ defmodule Aikido.HooksTest do
         mode: :async
       )
 
-    assert {:ok, nil} = ExecuteHook.evaluate(h, %{}, self(), "run")
+    assert {:ok, nil} = ExecuteHook.evaluate_lua_hook(h, %{}, self(), "run")
 
     assert_receive {:"$gen_cast",
                     {:signal,
@@ -201,7 +215,7 @@ defmodule Aikido.HooksTest do
                     {:signal, %{type: "example.notice", data: %{"value" => 1, request_id: "run"}}}}
 
     assert {:error, _} =
-             ExecuteHook.evaluate(
+             ExecuteHook.evaluate_lua_hook(
                hook(~s|aikido.send_signal("ai.react.llm.completed", {})|, mode: :async),
                %{},
                self(),

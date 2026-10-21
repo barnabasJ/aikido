@@ -121,7 +121,7 @@ defmodule Aikido.AiReact.Hooks do
   end
 
   def release_queued_steps(state, [{:effect, %LLMCall{} = effect} | rest], status, directives) do
-    state = state |> append_queued_messages() |> append_hook_context()
+    state = state |> append_queued_text_to_conversation() |> append_hook_text_to_conversation()
     effect = %{effect | context: state.context}
 
     {state, effect} =
@@ -136,7 +136,7 @@ defmodule Aikido.AiReact.Hooks do
     do: release_queued_steps(state, rest, status, directives ++ [effect])
 
   @doc "Append queued user messages to the conversation and empty their queue."
-  def append_queued_messages(state) do
+  def append_queued_text_to_conversation(state) do
     messages = Enum.map(state.queued_messages, &ReqLLM.Context.user/1)
 
     state
@@ -145,7 +145,7 @@ defmodule Aikido.AiReact.Hooks do
   end
 
   @doc "Append hook-supplied context to the conversation and empty its queue."
-  def append_hook_context(state) do
+  def append_hook_text_to_conversation(state) do
     state
     |> Map.get(:hook_context, [])
     |> Enum.reduce(state, &append_hook_message/2)
@@ -163,7 +163,7 @@ defmodule Aikido.AiReact.Hooks do
   end
 
   @doc false
-  def enqueue_context(state, name, text),
+  def queue_hook_text_for_next_model_request(state, name, text),
     do:
       Map.put(
         state,

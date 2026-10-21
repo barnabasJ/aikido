@@ -105,7 +105,7 @@ defmodule AikidoTest.DirectiveFailureTest do
       assert_receive {:aikido_subscription, ^ref, %{result: {:ok, 1}}}
       refute_received {:signal, %{type: "test.effect", data: %{label: :after}}}
 
-      replacement = AikidoTest.LifecycleWait.restart(pid)
+      replacement = AikidoTest.LifecycleWait.crash_and_await_replacement(pid)
       assert {:ok, 1} = Aikido.AgentServer.state(replacement, &{:ok, &1.agent.state.state.count})
 
       assert :ok =

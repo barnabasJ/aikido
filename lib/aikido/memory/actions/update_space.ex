@@ -7,7 +7,7 @@ defmodule Aikido.Memory.Actions.UpdateSpace do
     with {:ok, existing} <- Aikido.Memory.Spaces.fetch(input) do
       replacement = %{input.arguments.value | rev: existing.rev + 1}
 
-      Aikido.Memory.Spaces.commit(
+      Aikido.Memory.Spaces.replace_spaces_and_advance_revision(
         input,
         Map.put(input.arguments.state.spaces, input.arguments.space, replacement)
       )

@@ -5,7 +5,7 @@ defmodule Aikido.Agent.Commands.Inspect do
 
   @impl true
   def run(input, _opts, _context) do
-    Runtime.safe(fn ->
+    Runtime.catch_runtime_exit(fn ->
       with {:ok, {_id, pid}} <- Runtime.resolve(input.resource, input.arguments.agent),
            {:ok, record} <- Runtime.snapshot(input.resource, pid) do
         {:ok,

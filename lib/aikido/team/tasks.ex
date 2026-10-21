@@ -4,15 +4,15 @@ defmodule Aikido.Team.Tasks do
   alias Aikido.Signal
 
   @doc "Build delivery directives for the task's configured notification recipient."
-  def notification_directives(task, state, context) do
-    case notification_target(task, state, context) do
+  def task_result_delivery_directives(task, state, context) do
+    case task_result_recipient_pid(task, state, context) do
       nil -> []
       pid -> [Directives.emit_to_pid(conversation_message_for_task_result(task), pid)]
     end
   end
 
   @doc "Resolve the current recipient PID, or nil when the task has no live recipient."
-  def notification_target(task, state, context) do
+  def task_result_recipient_pid(task, state, context) do
     case Map.get(task, :notify) do
       :self -> context.agent_pid
       nil -> nil
@@ -38,7 +38,7 @@ defmodule Aikido.Team.Tasks do
     }
   end
 
-  def fetch_member(state, name) do
+  def fetch_running_member_pid(state, name) do
     case Map.fetch(state.members, name) do
       {:ok, pid} -> {:ok, pid}
       :error -> {:error, {:member_not_running, name}}

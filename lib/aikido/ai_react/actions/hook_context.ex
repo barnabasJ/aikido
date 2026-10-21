@@ -13,7 +13,8 @@ defmodule Aikido.AiReact.Actions.HookContext do
   def queue_context_for_matching_run(state, data) do
     state =
       if state.request_id == data.request_id && state.status in [:setup, :running],
-        do: Hooks.enqueue_context(state, data[:name] || "async", data.text),
+        do:
+          Hooks.queue_hook_text_for_next_model_request(state, data[:name] || "async", data.text),
         else: state
 
     Aikido.Types.ActionResult.new(state: state)

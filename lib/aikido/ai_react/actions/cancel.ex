@@ -7,7 +7,7 @@ defmodule Aikido.AiReact.Actions.Cancel do
   def run(input, _opts, _context) do
     input
     |> cancel_matching_run()
-    |> Completion.settle_result(input)
+    |> Completion.apply_completion_requirements(input)
     |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(
       input,
       :run_cancelled,

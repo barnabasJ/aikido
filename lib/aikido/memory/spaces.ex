@@ -11,14 +11,15 @@ defmodule Aikido.Memory.Spaces do
         {:ok, space}
 
       nil ->
-        error(input, "space #{inspect(name)} does not exist")
+        invalid_space_argument(input, "space #{inspect(name)} does not exist")
 
       _ ->
-        error(input, "space #{inspect(name)} is not a #{kind || :valid} space")
+        invalid_space_argument(input, "space #{inspect(name)} is not a #{kind || :valid} space")
     end
   end
 
-  def commit(input, spaces) do
+  @doc "Return updated spaces with the next revision and the input signal’s timestamp."
+  def replace_spaces_and_advance_revision(input, spaces) do
     state = input.arguments.state
 
     Aikido.Types.ActionResult.new(
@@ -31,7 +32,7 @@ defmodule Aikido.Memory.Spaces do
     )
   end
 
-  def error(input, message) do
+  def invalid_space_argument(input, message) do
     {:error,
      Ash.Error.Action.InvalidArgument.exception(
        field: :space,

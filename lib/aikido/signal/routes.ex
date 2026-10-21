@@ -25,7 +25,7 @@ defmodule Aikido.Signal.Routes do
     Enum.reduce(expanded, dsl, &Transformer.add_entity(&2, [section], &1, type: :append))
   end
 
-  def arguments(module) do
+  def payload_action_arguments(module) do
     Enum.map(Aikido.Signal.Info.schema(module), fn attribute ->
       options =
         attribute
@@ -65,9 +65,15 @@ defmodule Aikido.Signal.Routes do
         error(section, "Signal lists require a native Ash action implementation module")
 
       true ->
-        with {:ok, definitions} <- definitions(types, section),
+        with {:ok, definitions} <- resolve_union_signal_definitions(types, section),
              {:ok, dsl, target, implementation} <-
-               handler(dsl, section, definitions, entity.action, public?(entity)) do
+               resolve_or_generate_action_reference(
+                 dsl,
+                 section,
+                 definitions,
+                 entity.action,
+                 public?(entity)
+               ) do
           entries =
             Enum.map(definitions, fn module ->
               Map.merge(entity, %{
@@ -88,9 +94,15 @@ defmodule Aikido.Signal.Routes do
   defp expand_entity(dsl, section, %{type: type} = entity)
        when is_struct(entity, Aikido.Agent.Route) or
               is_struct(entity, Aikido.Slice.Route) do
-    with {:ok, definition, type} <- definition(type, section),
+    with {:ok, definition, type} <- resolve_signal_definition(type, section),
          {:ok, dsl, target, implementation} <-
-           handler(dsl, section, definition, entity.action, public?(entity)) do
+           resolve_or_generate_action_reference(
+             dsl,
+             section,
+             definition,
+             entity.action,
+             public?(entity)
+           ) do
       name = entity.name || route_name(definition, target)
 
       entity = %{
@@ -117,9 +129,9 @@ defmodule Aikido.Signal.Routes do
   defp route_name(_, {_, action}), do: action
   defp route_name(_, action), do: action
 
-  defp definitions(types, section) do
+  defp resolve_union_signal_definitions(types, section) do
     Enum.reduce_while(types, {:ok, []}, fn type, {:ok, modules} ->
-      case definition(type, section) do
+      case resolve_signal_definition(type, section) do
         {:ok, module, _type} when not is_nil(module) -> {:cont, {:ok, modules ++ [module]}}
         {:error, _} = error -> {:halt, error}
         _ -> {:halt, error(section, "Signal lists require signal definition modules")}
@@ -127,9 +139,9 @@ defmodule Aikido.Signal.Routes do
     end)
   end
 
-  defp definition(type, _section) when is_binary(type), do: {:ok, nil, type}
+  defp resolve_signal_definition(type, _section) when is_binary(type), do: {:ok, nil, type}
 
-  defp definition(module, section) when is_atom(module) do
+  defp resolve_signal_definition(module, section) when is_atom(module) do
     with {:module, _} <- Code.ensure_compiled(module),
          true <- valid_definition?(module) do
       {:ok, module, Aikido.Signal.Info.signal_type!(module)}
@@ -138,14 +150,14 @@ defmodule Aikido.Signal.Routes do
     end
   end
 
-  defp definition(value, section),
+  defp resolve_signal_definition(value, section),
     do:
       error(
         section,
         "Expected a signal definition module or string pattern, got #{inspect(value)}"
       )
 
-  defp handler(dsl, section, definition, target, public?) do
+  defp resolve_or_generate_action_reference(dsl, section, definition, target, public?) do
     if implementation_reference?(target) do
       with {:ok, dsl, action} <- generate(dsl, section, definition, target, public?) do
         {:ok, dsl, {Transformer.get_persisted(dsl, :module), action}, target}
@@ -184,7 +196,7 @@ defmodule Aikido.Signal.Routes do
   end
 
   defp payload_arguments(nil, _section), do: {:ok, [argument!(:data, :term, [])]}
-  defp payload_arguments(definition, _section), do: {:ok, arguments(definition)}
+  defp payload_arguments(definition, _section), do: {:ok, payload_action_arguments(definition)}
 
   defp generate_action(dsl, section, definition, implementation, name, payload, public?) do
     if Enum.any?(payload, &(&1.name == :state)) do
@@ -208,7 +220,7 @@ defmodule Aikido.Signal.Routes do
       options = if description, do: Keyword.put(options, :description, description), else: options
 
       with {:ok, generated} <- Builder.build_action(:action, name, options),
-           {:ok, dsl} <- add_handler(dsl, section, generated) do
+           {:ok, dsl} <- add_or_reuse_compatible_action(dsl, section, generated) do
         dsl =
           dsl
           |> persist_generated_handler(name, implementation)
@@ -237,7 +249,7 @@ defmodule Aikido.Signal.Routes do
     Transformer.persist(dsl, :aikido_flat_reducers, Enum.uniq([name | reducers]))
   end
 
-  defp add_handler(dsl, section, generated) do
+  defp add_or_reuse_compatible_action(dsl, section, generated) do
     case Ash.Resource.Info.action(dsl, generated.name) do
       nil ->
         {:ok, Transformer.add_entity(dsl, [:actions], generated)}

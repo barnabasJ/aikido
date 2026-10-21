@@ -91,7 +91,7 @@ defmodule Aikido.HooksVmTest do
         }
 
         assert {:ok, %{context: context}} =
-                 Aikido.AiReact.Directives.ExecuteHook.evaluate(
+                 Aikido.AiReact.Directives.ExecuteHook.evaluate_lua_hook(
                    hook,
                    %{},
                    self(),
@@ -111,7 +111,7 @@ defmodule Aikido.HooksVmTest do
           [otp_app: :aikido_hook_vm_test, action_entrypoints: []]
         ] do
       assert {:ok, %{decision: :continue}} =
-               Aikido.AiReact.Directives.ExecuteHook.evaluate(
+               Aikido.AiReact.Directives.ExecuteHook.evaluate_lua_hook(
                  hook("assert(hooks == nil); return nil", options),
                  %{},
                  self(),
@@ -125,7 +125,7 @@ defmodule Aikido.HooksVmTest do
 
     for _ <- 1..2 do
       assert {:ok, %{decision: :continue}} =
-               Aikido.AiReact.Directives.ExecuteHook.evaluate(hook, %{}, self(), "run")
+               Aikido.AiReact.Directives.ExecuteHook.evaluate_lua_hook(hook, %{}, self(), "run")
     end
   end
 

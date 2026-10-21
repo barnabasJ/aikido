@@ -5,10 +5,10 @@ defmodule Aikido.Team.Actions.Failed do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, _config} = Inputs.read(input)
+    {signal, state, context, _config} = Inputs.unpack_team_action(input)
 
     signal.data
-    |> Operation.failed(state, context)
-    |> Inputs.result()
+    |> Operation.fail_operation_and_pending_tasks(state, context)
+    |> Inputs.to_action_result()
   end
 end

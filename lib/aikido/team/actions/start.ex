@@ -5,12 +5,12 @@ defmodule Aikido.Team.Actions.Start do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(configure_topology_and_activate(signal, state, context, config))
+    {signal, state, context, config} = Inputs.unpack_team_action(input)
+    Inputs.to_action_result(configure_topology_and_activate(signal, state, context, config))
   end
 
   defp configure_topology_and_activate(signal, state, context, config) do
-    Operation.start(signal, state, context, config, fn ->
+    Operation.begin_topology_change(signal, state, context, config, fn ->
       plan_topology_replacement(signal.data, state, config)
     end)
   end
@@ -25,7 +25,7 @@ defmodule Aikido.Team.Actions.Start do
       changed =
         for {name, spec} <- state.topology.nodes, Map.get(next.nodes, name) != spec, do: name
 
-      affected = Topology.affected(state.topology, changed)
+      affected = Topology.members_with_dependents(state.topology, changed)
 
       retained =
         Enum.filter(

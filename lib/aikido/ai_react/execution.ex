@@ -6,7 +6,8 @@ defmodule Aikido.AiReact.Execution do
   require Ash.Tracer
   require Logger
 
-  def run(owner, request_id, supervisor, work, opts) do
+  @doc "Run bounded I/O attempts, retry eligible failures, and cancel when the owning run ends."
+  def run_cancellable_attempts(owner, request_id, supervisor, work, opts) do
     selector = fn runtime ->
       if Enum.any?(runtime.agent.state, fn
            {_, %{request_id: ^request_id, status: status} = slice}

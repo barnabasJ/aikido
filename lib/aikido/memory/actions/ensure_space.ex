@@ -17,7 +17,10 @@ defmodule Aikido.Memory.Actions.EnsureSpace do
         end
 
       with {:ok, space} <- Aikido.Memory.Types.Space.new(data: data) do
-        Aikido.Memory.Spaces.commit(input, Map.put(state.spaces, name, space))
+        Aikido.Memory.Spaces.replace_spaces_and_advance_revision(
+          input,
+          Map.put(state.spaces, name, space)
+        )
       end
     end
   end

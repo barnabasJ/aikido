@@ -5,7 +5,7 @@ defmodule Aikido.AiReact.Actions.Message do
 
   @impl true
   def run(input, _opts, _context) do
-    with :ok <- Scope.validate(input.arguments.state, input) do
+    with :ok <- Scope.validate_run_caller(input.arguments.state, input) do
       queue_message_or_resume_run(input)
     end
   end
@@ -15,7 +15,7 @@ defmodule Aikido.AiReact.Actions.Message do
 
     if state.status == :waiting do
       with {:ok, result} <-
-             Run.open(
+             Run.begin_run(
                %{
                  query: input.arguments.text,
                  request_id: state.request_id,
@@ -24,7 +24,7 @@ defmodule Aikido.AiReact.Actions.Message do
                state
              ) do
         {:ok, result}
-        |> Scope.bind(input)
+        |> Scope.bind_run_caller(input)
         |> Hooks.queue_event_hooks(:run_started, %{query: input.arguments.text})
       end
     else

@@ -2,8 +2,8 @@ defmodule Aikido.AiReact.Run do
   @moduledoc "Builds initial run state and releases tool/handoff state at terminal transitions."
   alias Aikido.AiReact.Context
 
-  @doc false
-  def open(data, state) do
+  @doc "Initialize conversation state and request tool setup before the first model call."
+  def begin_run(data, state) do
     state = state || %{}
 
     with {:ok, configuration} <- resolve_configuration(data, state) do
@@ -57,7 +57,7 @@ defmodule Aikido.AiReact.Run do
   end
 
   defp close_interrupted_tool_calls(%ReqLLM.Context{} = context),
-    do: Context.close_tool_calls(context)
+    do: Context.append_interrupted_tool_results(context)
 
   defp close_interrupted_tool_calls(_), do: ReqLLM.Context.new()
 

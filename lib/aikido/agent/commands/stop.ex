@@ -8,7 +8,7 @@ defmodule Aikido.Agent.Commands.Stop do
     resource = input.resource
     agent = input.arguments.agent
 
-    Runtime.safe(fn ->
+    Runtime.catch_runtime_exit(fn ->
       with {:ok, {id, pid}} <- Runtime.resolve(resource, agent),
            :ok <-
              Aikido.Durable.stop(

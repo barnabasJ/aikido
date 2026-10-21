@@ -34,9 +34,9 @@ defmodule Aikido.Agent.Commands.Start do
 
     options = activation_options(resource, input, context, runtime_options)
 
-    Runtime.safe(fn ->
+    Runtime.catch_runtime_exit(fn ->
       with {:ok, pid} <- Aikido.Durable.start(pool, input.arguments.id, options) do
-        finish_startup(resource, input, context, topology, pid, runtime_options)
+        configure_topology_or_stop_agent(resource, input, context, topology, pid, runtime_options)
       end
     end)
   end
@@ -53,7 +53,7 @@ defmodule Aikido.Agent.Commands.Start do
     ]
   end
 
-  defp finish_startup(resource, input, context, topology, pid, runtime_options) do
+  defp configure_topology_or_stop_agent(resource, input, context, topology, pid, runtime_options) do
     pool = Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource))
 
     with {:ok, _} <-

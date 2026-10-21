@@ -10,15 +10,15 @@ defmodule Aikido.AI.ContextRepairTest do
   test "builtin-only history retains native content and has no fabricated wire output" do
     context = history([ToolCall.new_builtin("builtin", "web_search", "{}")])
 
-    assert Conversation.close_tool_calls(context) == context
+    assert Conversation.append_interrupted_tool_results(context) == context
     assert wire_outputs(context) == []
 
-    assert Conversation.close_tool_calls(Context.new()) == Context.new()
+    assert Conversation.append_interrupted_tool_results(Context.new()) == Context.new()
 
     for calls <- [nil, []] do
       no_calls = %{List.last(context.messages) | tool_calls: calls}
       context = %{context | messages: [no_calls]}
-      assert Conversation.close_tool_calls(context) == context
+      assert Conversation.append_interrupted_tool_results(context) == context
     end
   end
 
@@ -36,7 +36,7 @@ defmodule Aikido.AI.ContextRepairTest do
         ])
         |> Context.append(Context.tool_result("answered", "lookup", "recorded"))
 
-      repaired = Conversation.close_tool_calls(context)
+      repaired = Conversation.append_interrupted_tool_results(context)
       assert Enum.take(repaired.messages, length(context.messages)) == context.messages
       assert List.last(repaired.messages).tool_call_id == "pending"
       assert List.last(repaired.messages).name == "lookup"
@@ -45,7 +45,7 @@ defmodule Aikido.AI.ContextRepairTest do
                "error" => "interrupted before a result was recorded"
              }
 
-      assert Conversation.close_tool_calls(repaired) == repaired
+      assert Conversation.append_interrupted_tool_results(repaired) == repaired
       assert Enum.map(wire_outputs(repaired), & &1["call_id"]) == ["answered", "pending"]
     end
   end

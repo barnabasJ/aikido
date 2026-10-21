@@ -52,7 +52,7 @@ defmodule Aikido.Team.Topology do
     end
   end
 
-  def targets(%__MODULE__{nodes: nodes}, requested) do
+  def members_with_prerequisites(%__MODULE__{nodes: nodes}, requested) do
     expand_prerequisites(nodes, requested, %{}) |> Map.keys()
   end
 
@@ -60,7 +60,8 @@ defmodule Aikido.Team.Topology do
     for {name, %{activation: :eager}} <- nodes, do: name
   end
 
-  def affected(%__MODULE__{nodes: nodes}, names), do: expand_dependents(nodes, names, :all)
+  def members_with_dependents(%__MODULE__{nodes: nodes}, names),
+    do: expand_dependents(nodes, names, :all)
 
   @doc "Returns the supplied members and their ownership descendants, excluding dependents."
   def owned_members(%__MODULE__{nodes: nodes}, names), do: expand_dependents(nodes, names, :owner)

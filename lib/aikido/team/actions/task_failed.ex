@@ -5,8 +5,8 @@ defmodule Aikido.Team.Actions.TaskFailed do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(record_task_failure(signal, state, context, config))
+    {signal, state, context, config} = Inputs.unpack_team_action(input)
+    Inputs.to_action_result(record_task_failure(signal, state, context, config))
   end
 
   defp record_task_failure(signal, state, context, _config) do
@@ -17,7 +17,7 @@ defmodule Aikido.Team.Actions.TaskFailed do
       when attempt == data.attempt and member == data.member ->
         task = %{task | status: :failed, result: Map.get(data, :result, Map.get(data, :reason))}
         state = put_in(state.tasks[data.task_id], task)
-        {:ok, state, Tasks.notification_directives(task, state, context)}
+        {:ok, state, Tasks.task_result_delivery_directives(task, state, context)}
 
       _ ->
         {:ok, state, []}

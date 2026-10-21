@@ -1,11 +1,17 @@
 defmodule Aikido.Todo.Items do
-  @moduledoc false
+  @moduledoc "Pure todo collection changes and change-notification descriptors."
 
   def find(input), do: Enum.find(input.arguments.state.items, &(&1.id == input.arguments.id))
 
   def append(input, item, effects) do
     item = cast_item(item)
-    commit(input, input.arguments.state.items ++ [item], %{id: item.id, item: item}, effects)
+
+    replace_items_with_change_notification(
+      input,
+      input.arguments.state.items ++ [item],
+      %{id: item.id, item: item},
+      effects
+    )
   end
 
   def replace(input, item) do
@@ -16,10 +22,11 @@ defmodule Aikido.Todo.Items do
         if existing.id == item.id, do: item, else: existing
       end)
 
-    commit(input, items, %{id: item.id, item: item})
+    replace_items_with_change_notification(input, items, %{id: item.id, item: item})
   end
 
-  def commit(input, items, changed, effects \\ []) do
+  @doc "Return revised items and a change signal directed to the owning agent."
+  def replace_items_with_change_notification(input, items, changed, effects \\ []) do
     state = input.arguments.state
 
     signal = %Aikido.Signal{

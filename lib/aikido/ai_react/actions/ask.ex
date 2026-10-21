@@ -7,8 +7,8 @@ defmodule Aikido.AiReact.Actions.Ask do
   def run(input, _opts, _context) do
     input
     |> start_run()
-    |> Scope.bind(input)
-    |> Completion.settle_result(input)
+    |> Scope.bind_run_caller(input)
+    |> Completion.apply_completion_requirements(input)
     |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(
       input,
       :run_started,
@@ -23,7 +23,7 @@ defmodule Aikido.AiReact.Actions.Ask do
     if slice.status in [:setup, :running] do
       {:error, :busy}
     else
-      Run.open(data, slice)
+      Run.begin_run(data, slice)
     end
   end
 end

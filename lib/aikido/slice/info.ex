@@ -9,7 +9,7 @@ defmodule Aikido.Slice.Info do
     resource
     |> Extension.get_entities([:slice])
     |> Enum.map(fn route ->
-      target = target(resource, route.action)
+      target = action_reference(resource, route.action)
 
       cond do
         is_function(route.match, 1) ->
@@ -35,19 +35,24 @@ defmodule Aikido.Slice.Info do
       options =
         if schedule.signal, do: Keyword.put(options, :signal, schedule.signal), else: options
 
-      {schedule.cron, target(resource, schedule.action), options}
+      {schedule.cron, action_reference(resource, schedule.action), options}
     end)
   end
 
   def actions(resource) do
-    routes = Enum.map(Extension.get_entities(resource, [:slice]), &target(resource, &1.action))
+    routes =
+      Enum.map(Extension.get_entities(resource, [:slice]), &action_reference(resource, &1.action))
 
     schedules =
-      Enum.map(Extension.get_entities(resource, [:schedules]), &target(resource, &1.action))
+      Enum.map(
+        Extension.get_entities(resource, [:schedules]),
+        &action_reference(resource, &1.action)
+      )
 
     Enum.uniq(routes ++ schedules)
   end
 
-  def target(resource, action) when is_atom(action), do: {resource, action}
-  def target(_resource, {resource, action}), do: {resource, action}
+  @doc "Qualify a local action name with its resource, preserving explicit action references."
+  def action_reference(resource, action) when is_atom(action), do: {resource, action}
+  def action_reference(_resource, {resource, action}), do: {resource, action}
 end

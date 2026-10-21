@@ -89,7 +89,7 @@ defmodule Aikido.HookRequestsTest do
 
     # No AgentServer or transport exists at this PID: the binding only calls our function.
     assert {:ok, %Aikido.AiReact.Hooks.Decision{context: "same Lua stack: blue"}} =
-             Aikido.AiReact.Directives.ExecuteHook.evaluate(
+             Aikido.AiReact.Directives.ExecuteHook.evaluate_lua_hook(
                hook(callback, script),
                %{type: :before_model},
                self(),
@@ -101,7 +101,7 @@ defmodule Aikido.HookRequestsTest do
     # Compile the Lua request path before the timed mailbox assertions. In the
     # full suite, concurrent fixture compilation can delay BEAM module loading.
     assert {:ok, _} =
-             Aikido.AiReact.Directives.ExecuteHook.evaluate(
+             Aikido.AiReact.Directives.ExecuteHook.evaluate_lua_hook(
                hook(&Callbacks.blue/2),
                %{type: :before_model},
                self(),
@@ -159,7 +159,7 @@ defmodule Aikido.HookRequestsTest do
     """
 
     assert {:ok, %Aikido.AiReact.Hooks.Decision{context: "handled :timeout"}} =
-             Aikido.AiReact.Directives.ExecuteHook.evaluate(
+             Aikido.AiReact.Directives.ExecuteHook.evaluate_lua_hook(
                hook(&Callbacks.timeout/2, script),
                %{},
                self(),
@@ -170,7 +170,7 @@ defmodule Aikido.HookRequestsTest do
             %Aikido.AiReact.Hooks.Decision{
               context: "handled :request_callback_not_configured"
             }} =
-             Aikido.AiReact.Directives.ExecuteHook.evaluate(
+             Aikido.AiReact.Directives.ExecuteHook.evaluate_lua_hook(
                hook(nil, script),
                %{},
                self(),
@@ -199,7 +199,7 @@ defmodule Aikido.HookRequestsTest do
     """
 
     assert {:ok, %Aikido.AiReact.Hooks.Decision{decision: :deny, message: message}} =
-             Aikido.AiReact.Directives.ExecuteHook.evaluate(
+             Aikido.AiReact.Directives.ExecuteHook.evaluate_lua_hook(
                hook(&Callbacks.unexpected/2, script),
                %{},
                self(),
@@ -211,7 +211,7 @@ defmodule Aikido.HookRequestsTest do
 
   test "callback exceptions become hook failures" do
     assert {:error, message} =
-             Aikido.AiReact.Directives.ExecuteHook.evaluate(
+             Aikido.AiReact.Directives.ExecuteHook.evaluate_lua_hook(
                hook(&Callbacks.fail/2),
                %{},
                self(),
@@ -227,7 +227,7 @@ defmodule Aikido.HookRequestsTest do
     callback = &Callbacks.observe/2
 
     assert {:ok, nil} =
-             Aikido.AiReact.Directives.ExecuteHook.evaluate(
+             Aikido.AiReact.Directives.ExecuteHook.evaluate_lua_hook(
                hook(callback, @script, :async),
                %{metadata: %{observer: observer}},
                self(),

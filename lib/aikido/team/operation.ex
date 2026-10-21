@@ -4,17 +4,17 @@ defmodule Aikido.Team.Operation do
   alias Aikido.Directives
   alias Aikido.Signal
 
-  def start(_signal, %{operation: %{status: :running}}, _context, _config, _plan),
+  def begin_topology_change(_signal, %{operation: %{status: :running}}, _context, _config, _plan),
     do: {:error, :operation_in_progress}
 
-  def start(signal, state, context, config, plan) do
+  def begin_topology_change(signal, state, context, config, plan) do
     with {:ok, topology, stop, requested, paused} <- plan.(),
          :ok <- validate_worker_limits(topology, config),
          {:ok, steps} <- order_member_steps(state.topology, topology, stop, requested) do
       state
       |> adopt_topology(topology, paused)
       |> begin_operation(signal.id, steps)
-      |> advance(context, config)
+      |> advance_member_lifecycle(context, config)
       |> append_operation_deadline(signal.id, config.timeout)
     end
   end
@@ -22,7 +22,8 @@ defmodule Aikido.Team.Operation do
   @doc "Order dependent member stops before starts for a proposed topology."
   def order_member_steps(current, desired, stop, requested) do
     with {:ok, stops} <- Topology.order(current.nodes, stop),
-         {:ok, starts} <- Topology.order(desired.nodes, Topology.targets(desired, requested)) do
+         {:ok, starts} <-
+           Topology.order(desired.nodes, Topology.members_with_prerequisites(desired, requested)) do
       {:ok, Enum.map(Enum.reverse(stops), &{:stop, &1}) ++ Enum.map(starts, &{:start, &1})}
     end
   end
@@ -89,7 +90,7 @@ defmodule Aikido.Team.Operation do
     end)
   end
 
-  def advance(%{operation: %{remaining: []}} = state, context, _config) do
+  def advance_member_lifecycle(%{operation: %{remaining: []}} = state, context, _config) do
     state = put_in(state.operation.status, :completed)
 
     completed =
@@ -107,15 +108,19 @@ defmodule Aikido.Team.Operation do
     {:ok, Map.put(state, :recovered_tasks, []), directives}
   end
 
-  def advance(%{operation: %{remaining: [{kind, name} | rest]}} = state, context, config) do
+  def advance_member_lifecycle(
+        %{operation: %{remaining: [{kind, name} | rest]}} = state,
+        context,
+        config
+      ) do
     state = put_in(state.operation.remaining, rest)
 
     case {kind, Map.get(state.members, name)} do
       {:stop, nil} ->
-        advance(state, context, config)
+        advance_member_lifecycle(state, context, config)
 
       {:start, pid} when is_pid(pid) ->
-        advance(state, context, config)
+        advance_member_lifecycle(state, context, config)
 
       {:stop, pid} ->
         request_member_stop(state, name, pid, config)
@@ -138,7 +143,7 @@ defmodule Aikido.Team.Operation do
 
   defp recovered_task_notifications(state, context) do
     Enum.flat_map(Map.get(state, :recovered_tasks, []), fn id ->
-      Tasks.notification_directives(state.tasks[id], state, context)
+      Tasks.task_result_delivery_directives(state.tasks[id], state, context)
     end)
   end
 
@@ -192,7 +197,7 @@ defmodule Aikido.Team.Operation do
     |> Map.merge(spec.initial_state)
   end
 
-  def failed(%{operation_id: id, reason: reason}, state, context) do
+  def fail_operation_and_pending_tasks(%{operation_id: id, reason: reason}, state, context) do
     if state.operation.id == id && state.operation.status == :running do
       pending = Map.keys(Map.get(state, :pending_tasks, %{}))
 
@@ -229,7 +234,7 @@ defmodule Aikido.Team.Operation do
 
   defp result_with_task_notifications(state, ids, context) do
     directives =
-      Enum.flat_map(ids, &Tasks.notification_directives(state.tasks[&1], state, context))
+      Enum.flat_map(ids, &Tasks.task_result_delivery_directives(state.tasks[&1], state, context))
 
     {:ok, state, directives}
   end

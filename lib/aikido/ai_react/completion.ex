@@ -2,11 +2,14 @@ defmodule Aikido.AiReact.Completion do
   @moduledoc "Pure todo completion requirements and terminal run resource release."
 
   @doc "Resolve completion requirements and release terminal resources in an action result."
-  def settle_result({:ok, %{state: state, directives: []}} = unchanged, input)
+  def apply_completion_requirements({:ok, %{state: state, directives: []}} = unchanged, input)
       when state == input.arguments.state,
       do: unchanged
 
-  def settle_result({:ok, %{state: %{status: :completed} = state} = result}, input) do
+  def apply_completion_requirements(
+        {:ok, %{state: %{status: :completed} = state} = result},
+        input
+      ) do
     agent_state = (input.context.aikido[:agent] && input.context.aikido.agent.state) || %{}
 
     state =
@@ -17,11 +20,11 @@ defmodule Aikido.AiReact.Completion do
     {:ok, %{result | state: state}}
   end
 
-  def settle_result({:ok, %{state: %{status: :failed} = state} = result}, _input) do
+  def apply_completion_requirements({:ok, %{state: %{status: :failed} = state} = result}, _input) do
     {:ok, %{result | state: release_terminal_resources(state)}}
   end
 
-  def settle_result(result, _input), do: result
+  def apply_completion_requirements(result, _input), do: result
 
   @doc "Resolve completed, waiting or failed status from the configured blocking todos."
   def resolve_todo_status(state, agent_state) do

@@ -39,7 +39,7 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
     task = %Aikido.Directives.AsyncTask{
       work: fn ->
         result =
-          evaluate(directive.hook, directive.event, pid, directive.request_id, signal)
+          evaluate_lua_hook(directive.hook, directive.event, pid, directive.request_id, signal)
 
         Aikido.Signal.new!("ai.react.hook.completed", Map.put(payload, :result, result))
       end,
@@ -51,12 +51,12 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
   end
 
   @doc false
-  def evaluate(hook, event, pid, request_id, source_signal \\ nil) do
+  def evaluate_lua_hook(hook, event, pid, request_id, source_signal \\ nil) do
     hook
     |> hook_vm_options(source_signal)
     |> AshLua.new()
     |> Lua.set!([:event], AshLua.Encoder.encode_result(event))
-    |> install_request(hook, event, request_id)
+    |> expose_request_callback(hook, event, request_id)
     |> maybe_install_async_signals(hook, pid, request_id, source_signal)
     |> evaluate_script(hook.script)
     |> cast_hook_return(hook.mode)
@@ -73,7 +73,7 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
         else: []
 
     hook.lua_options
-    |> surface_options()
+    |> add_lua_action_manifest()
     |> Keyword.merge(scope)
     |> Keyword.put(:lua_options,
       max_instructions: hook.max_instructions,
@@ -84,7 +84,7 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
 
   # Async observers can send signals; sync gates return their decision through the action pipeline.
   defp maybe_install_async_signals(lua, %{mode: :async} = hook, pid, request_id, signal),
-    do: install_signals(lua, pid, request_id, hook.name, signal)
+    do: expose_async_signal_functions(lua, pid, request_id, hook.name, signal)
 
   defp maybe_install_async_signals(lua, _hook, _pid, _request_id, _signal), do: lua
 
@@ -102,7 +102,7 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
   defp cast_hook_return(_values, :sync), do: {:error, "hook must return nil or a decision table"}
   defp cast_hook_return(_values, _mode), do: {:ok, nil}
 
-  defp surface_options(options) do
+  defp add_lua_action_manifest(options) do
     case Keyword.pop(options, :eval_resource) do
       {nil, options} ->
         {surface, options} = Keyword.split(options, [:otp_app, :labels, :action_entrypoints])
@@ -130,7 +130,7 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
     end
   end
 
-  defp install_signals(lua, pid, request_id, name, source_signal) do
+  defp expose_async_signal_functions(lua, pid, request_id, name, source_signal) do
     lua
     |> Lua.set!([:aikido, :send_context], fn args, state ->
       [text] = Lua.decode_list!(state, args)
@@ -163,7 +163,7 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
     end)
   end
 
-  defp install_request(lua, hook, event, request_id) do
+  defp expose_request_callback(lua, hook, event, request_id) do
     Lua.set!(lua, [:aikido, :request], fn args, vm ->
       [type, payload] = Lua.decode_list!(vm, args)
       payload = AshLua.Encoder.decode_input(payload)

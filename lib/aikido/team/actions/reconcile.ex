@@ -5,12 +5,12 @@ defmodule Aikido.Team.Actions.Reconcile do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(reconcile_member_activation(signal, state, context, config))
+    {signal, state, context, config} = Inputs.unpack_team_action(input)
+    Inputs.to_action_result(reconcile_member_activation(signal, state, context, config))
   end
 
   defp reconcile_member_activation(signal, state, context, config) do
-    Operation.start(signal, state, context, config, fn ->
+    Operation.begin_topology_change(signal, state, context, config, fn ->
       plan_reconciliation(signal.data, state, config)
     end)
   end

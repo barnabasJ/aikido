@@ -96,7 +96,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
            Ash.ProcessHelpers.transfer_context(transfer)
 
            Ash.Tracer.span {:custom, :aikido_model_call}, "aikido_model_call", tracers do
-             run_and_dispatch(
+             generate_response_and_send_to_agent(
                directive,
                agent_pid,
                source,
@@ -109,25 +109,31 @@ defmodule Aikido.AiReact.Directives.LLMCall do
         :ok
 
       {:error, reason} ->
-        dispatch_failure(directive, reason, agent_pid, source, Aikido.Signal.ctx(input_signal))
+        send_model_failure_to_agent(
+          directive,
+          reason,
+          agent_pid,
+          source,
+          Aikido.Signal.ctx(input_signal)
+        )
     end
 
     :ok
   end
 
-  defp run_and_dispatch(%LLMCall{} = d, agent_pid, source, scope, supervisor) do
+  defp generate_response_and_send_to_agent(%LLMCall{} = d, agent_pid, source, scope, supervisor) do
     d
     |> generate_response(agent_pid, source, scope, supervisor)
-    |> dispatch_response(d, agent_pid, source, scope)
+    |> send_model_result_to_agent(d, agent_pid, source, scope)
   rescue
-    exception -> dispatch_failure(d, exception, agent_pid, source, scope)
+    exception -> send_model_failure_to_agent(d, exception, agent_pid, source, scope)
   end
 
   defp generate_response(d, agent_pid, source, scope, supervisor) do
     messages = Context.to_list(d.context)
     llm_opts = model_options(d)
 
-    Aikido.AiReact.Execution.run(
+    Aikido.AiReact.Execution.run_cancellable_attempts(
       agent_pid,
       d.request_id,
       supervisor,
@@ -136,7 +142,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
           dispatch_stream_delta(d, text, thinking, attempt, agent_pid, source, scope)
         end
 
-        call_model(d, messages, llm_opts, notify, emit)
+        request_model_response(d, messages, llm_opts, notify, emit)
       end,
       execution_options(d, scope)
     )
@@ -160,7 +166,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
 
   defp streaming?(d), do: d.options.streaming && d.mode != :handoff
 
-  defp call_model(d, messages, options, notify, emit) do
+  defp request_model_response(d, messages, options, notify, emit) do
     if streaming?(d) do
       Aikido.AiReact.Streaming.call(
         d.client,
@@ -195,12 +201,12 @@ defmodule Aikido.AiReact.Directives.LLMCall do
     AgentServer.cast(pid, signal)
   end
 
-  defp dispatch_response(result, d, pid, source, scope) do
-    signal = result |> response_signal(d, source) |> Aikido.Signal.put_ctx(scope)
+  defp send_model_result_to_agent(result, d, pid, source, scope) do
+    signal = result |> model_result_signal(d, source) |> Aikido.Signal.put_ctx(scope)
     AgentServer.cast(pid, signal)
   end
 
-  defp response_signal({:ok, response}, d, source) do
+  defp model_result_signal({:ok, response}, d, source) do
     type =
       if d.mode == :handoff,
         do: "ai.react.context_handoff.completed",
@@ -208,21 +214,24 @@ defmodule Aikido.AiReact.Directives.LLMCall do
 
     data =
       %{turn: response, request_id: d.request_id, iteration: d.iteration}
-      |> handoff_data(d)
+      |> include_handoff_id(d)
 
     Signal.new!(type, data, source: source)
   end
 
-  defp response_signal({:error, reason}, d, source) do
-    data = %{reason: reason, request_id: d.request_id} |> handoff_data(d)
-    Signal.new!(failure_type(d), data, source: source)
+  defp model_result_signal({:error, reason}, d, source) do
+    data = %{reason: reason, request_id: d.request_id} |> include_handoff_id(d)
+    Signal.new!(model_failure_signal_type(d), data, source: source)
   end
 
-  defp dispatch_failure(d, reason, pid, source, scope),
-    do: dispatch_response({:error, reason}, d, pid, source, scope)
+  defp send_model_failure_to_agent(d, reason, pid, source, scope),
+    do: send_model_result_to_agent({:error, reason}, d, pid, source, scope)
 
-  defp failure_type(%{mode: :handoff}), do: "ai.react.context_handoff.failed"
-  defp failure_type(_), do: "ai.react.failed"
-  defp handoff_data(data, %{mode: :handoff, handoff_id: id}), do: Map.put(data, :handoff_id, id)
-  defp handoff_data(data, _), do: data
+  defp model_failure_signal_type(%{mode: :handoff}), do: "ai.react.context_handoff.failed"
+  defp model_failure_signal_type(_), do: "ai.react.failed"
+
+  defp include_handoff_id(data, %{mode: :handoff, handoff_id: id}),
+    do: Map.put(data, :handoff_id, id)
+
+  defp include_handoff_id(data, _), do: data
 end

@@ -133,7 +133,7 @@ defmodule AikidoTest.AshPersistenceTest do
 
   test "temporary agents retain crash recovery until explicitly stopped" do
     ref = Domain.temporary_start!(%{id: "recoverable", value: 7})
-    recovered = AikidoTest.LifecycleWait.restart(ref.pid)
+    recovered = AikidoTest.LifecycleWait.crash_and_await_replacement(ref.pid)
 
     assert %{value: 7} = Domain.temporary_inspect!(recovered)
   end

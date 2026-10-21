@@ -8,23 +8,25 @@ defmodule Aikido.Agent.Commands.Delete do
     resource = input.resource
     agent = input.arguments.agent
 
-    Runtime.safe(fn ->
-      with {:ok, {id, target}} <- deletion_id(resource, agent),
-           :ok <- delete_process(resource, target) do
+    Runtime.catch_runtime_exit(fn ->
+      with {:ok, {id, target}} <- resolve_deletion_target(resource, agent),
+           :ok <- delete_durable_identity(resource, target) do
         {:ok, %{id: id, resource: resource, status: :deleted}}
       end
     end)
   end
 
-  defp deletion_id(resource, pid) when is_pid(pid) do
+  defp resolve_deletion_target(resource, pid) when is_pid(pid) do
     with {:ok, {id, _pid}} <- Runtime.resolve(resource, pid), do: {:ok, {id, pid}}
   end
 
-  defp deletion_id(resource, %{id: id}), do: deletion_id(resource, id)
-  defp deletion_id(_resource, id) when is_binary(id), do: {:ok, {id, id}}
-  defp deletion_id(_resource, _), do: {:error, "Expected an agent ID, PID, or reference"}
+  defp resolve_deletion_target(resource, %{id: id}), do: resolve_deletion_target(resource, id)
+  defp resolve_deletion_target(_resource, id) when is_binary(id), do: {:ok, {id, id}}
 
-  defp delete_process(resource, pid) when is_pid(pid) do
+  defp resolve_deletion_target(_resource, _),
+    do: {:error, "Expected an agent ID, PID, or reference"}
+
+  defp delete_durable_identity(resource, pid) when is_pid(pid) do
     with {:ok, {pool, key, partition}} <-
            Aikido.AgentServer.state(pid, fn runtime ->
              {:ok, {runtime.durable_server, runtime.durable_key, runtime.partition}}
@@ -36,7 +38,7 @@ defmodule Aikido.Agent.Commands.Delete do
     end
   end
 
-  defp delete_process(resource, id) do
+  defp delete_durable_identity(resource, id) do
     instance = Aikido.Agent.Info.agent_instance!(resource)
     pool = Aikido.durable_supervisor_name(instance)
 

@@ -186,9 +186,9 @@ defmodule Aikido.AI.ContextTest do
     calls = [make_tool_call("first", "lookup"), make_tool_call("second", "lookup")]
     completed = tool_msg("first", "lookup", "known result")
     original = Context.new([assistant_msg("Checking", tool_calls: calls), completed])
-    repaired = Conversation.close_tool_calls(original)
+    repaired = Conversation.append_interrupted_tool_results(original)
     assert Enum.take(repaired.messages, 2) == original.messages
     assert List.last(repaired.messages).tool_call_id == "second"
-    assert Conversation.close_tool_calls(repaired) == repaired
+    assert Conversation.append_interrupted_tool_results(repaired) == repaired
   end
 end

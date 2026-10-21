@@ -35,7 +35,7 @@ defmodule Aikido.AiReact.Directives.PrepareTools do
     supervisor = Aikido.task_supervisor_name(runtime.aikido)
 
     task = %Aikido.Directives.AsyncTask{
-      work: fn -> prepare_and_signal(directive, scope, owner, supervisor) end,
+      work: fn -> prepare_tools_and_build_ready_signal(directive, scope, owner, supervisor) end,
       payload: %{request_id: directive.request_id},
       error_type: "ai.react.failed"
     }
@@ -43,13 +43,13 @@ defmodule Aikido.AiReact.Directives.PrepareTools do
     Aikido.Directives.AsyncTask.exec(task, signal, runtime)
   end
 
-  defp prepare_and_signal(directive, scope, owner, supervisor) do
+  defp prepare_tools_and_build_ready_signal(directive, scope, owner, supervisor) do
     with {:ok, prepared} <-
-           Aikido.AiReact.Execution.run(
+           Aikido.AiReact.Execution.run_cancellable_attempts(
              owner,
              directive.request_id,
              supervisor,
-             fn _, _ -> {:ok, prepare_registry(directive, scope)} end,
+             fn _, _ -> {:ok, build_native_tools_and_registry(directive, scope)} end,
              tracer: scope[:tracer],
              timeout: directive.options.model_timeout_ms
            ) do
@@ -60,7 +60,7 @@ defmodule Aikido.AiReact.Directives.PrepareTools do
     end
   end
 
-  defp prepare_registry(directive, scope) do
+  defp build_native_tools_and_registry(directive, scope) do
     directive.tool_options
     |> Keyword.merge(Ash.Scope.to_opts(scope, context: scope[:context] || %{}))
     |> Keyword.put(:tools, directive.tools)

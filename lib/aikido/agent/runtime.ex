@@ -72,7 +72,8 @@ defmodule Aikido.Agent.Runtime do
     struct(resource, attributes)
   end
 
-  def safe(fun) do
+  @doc "Translate runtime process exits into the public tagged error contract."
+  def catch_runtime_exit(fun) do
     fun.()
   catch
     :exit, reason -> {:error, "Agent runtime unavailable: #{inspect(reason)}"}

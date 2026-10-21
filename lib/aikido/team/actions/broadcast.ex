@@ -7,8 +7,8 @@ defmodule Aikido.Team.Actions.Broadcast do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(build_member_deliveries(signal.data, state, context, config))
+    {signal, state, context, config} = Inputs.unpack_team_action(input)
+    Inputs.to_action_result(build_member_deliveries(signal.data, state, context, config))
   end
 
   defp build_member_deliveries(data, state, _context, _config) do
@@ -16,7 +16,7 @@ defmodule Aikido.Team.Actions.Broadcast do
 
     with {:ok, pids} <-
            Enum.reduce_while(targets, {:ok, []}, fn name, {:ok, pids} ->
-             case Tasks.fetch_member(state, name) do
+             case Tasks.fetch_running_member_pid(state, name) do
                {:ok, pid} -> {:cont, {:ok, [pid | pids]}}
                error -> {:halt, error}
              end

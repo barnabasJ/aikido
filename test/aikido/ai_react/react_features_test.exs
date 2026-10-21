@@ -316,7 +316,7 @@ defmodule Aikido.ReactFeaturesTest do
         ReqLLM.Context.assistant("call", tool_calls: [%{id: "one", name: "tool", arguments: %{}}])
       ])
 
-    repaired = Aikido.AiReact.Context.close_tool_calls(context)
+    repaired = Aikido.AiReact.Context.append_interrupted_tool_results(context)
     assert List.last(repaired.messages).role == :tool
 
     assert hd(repaired.messages).role == :system

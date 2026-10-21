@@ -6,8 +6,8 @@ defmodule Aikido.Team.Actions.Started do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(adopt_started_member(signal.data, state, context, config))
+    {signal, state, context, config} = Inputs.unpack_team_action(input)
+    Inputs.to_action_result(adopt_started_member(signal.data, state, context, config))
   end
 
   defp adopt_started_member(
@@ -49,14 +49,14 @@ defmodule Aikido.Team.Actions.Started do
             incarnations: Map.delete(state.incarnations, name)
         }
 
-        Operation.failed(
+        Operation.fail_operation_and_pending_tasks(
           %{operation_id: id, reason: {:member_exited, name, reason}},
           state,
           context
         )
 
       _ ->
-        Operation.advance(state, context, config)
+        Operation.advance_member_lifecycle(state, context, config)
     end
   end
 

@@ -9,7 +9,11 @@ defmodule Aikido.Todo.Actions.Remove do
     id = input.arguments.id
 
     if Items.find(input) do
-      Items.commit(input, Enum.reject(state.items, &(&1.id == id)), %{id: id, removed: true})
+      Items.replace_items_with_change_notification(
+        input,
+        Enum.reject(state.items, &(&1.id == id)),
+        %{id: id, removed: true}
+      )
     else
       {:error, "Unknown todo ID"}
     end

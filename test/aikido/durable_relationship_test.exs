@@ -116,7 +116,7 @@ defmodule AikidoTest.DurableRelationshipTest do
     assert :ok = Aikido.Directive.exec(directive, signal, runtime)
     assert {:ok, child} = AgentServer.await_child(parent, :worker)
     assert {:ok, ^child} = Aikido.Durable.lookup(durable, "child")
-    restored = AikidoTest.LifecycleWait.restart(child)
+    restored = AikidoTest.LifecycleWait.crash_and_await_replacement(child)
 
     assert {:ok, %{id: "parent", pid: ^parent}} = AgentServer.state(restored, &{:ok, &1.parent})
 

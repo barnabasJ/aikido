@@ -36,7 +36,11 @@ defmodule Aikido.AiReact.Actions.HookCompleted do
 
         case data.result do
           {:ok, %Hooks.Decision{decision: :continue, context: context}} ->
-            state = if context, do: Hooks.enqueue_context(state, data.name, context), else: state
+            state =
+              if context,
+                do: Hooks.queue_hook_text_for_next_model_request(state, data.name, context),
+                else: state
+
             Hooks.release_queued_steps(state, continuation.queue, continuation.status, [])
 
           {:ok, %Hooks.Decision{decision: :deny, message: message}} ->

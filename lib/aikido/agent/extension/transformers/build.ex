@@ -165,7 +165,7 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
         Aikido.Slice.Extension in Spark.extensions(mount.module),
         route <- Spark.Dsl.Extension.get_entities(mount.module, [:slice]),
         route.public?,
-        {resource, name} = Aikido.Slice.Info.target(mount.module, route.action),
+        {resource, name} = Aikido.Slice.Info.action_reference(mount.module, route.action),
         action = Ash.Resource.Info.action(resource, name),
         match?(%{public?: true}, action),
         command_name = route.name || inherited_name(route, resource, action.name),
@@ -201,7 +201,7 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
       |> Spark.Dsl.Extension.get_entities([:slice])
       |> Enum.any?(fn route ->
         route.type == signal.type &&
-          Aikido.Slice.Info.target(mount.module, route.action) == signal.action
+          Aikido.Slice.Info.action_reference(mount.module, route.action) == signal.action
       end)
     end)
   end
@@ -369,7 +369,7 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
   end
 
   defp signal_arguments(_dsl, %{signal_module: module}) when not is_nil(module),
-    do: {Aikido.Signal.Routes.arguments(module), :flat}
+    do: {Aikido.Signal.Routes.payload_action_arguments(module), :flat}
 
   defp signal_arguments(dsl, %{action: {resource, name}}) do
     action =

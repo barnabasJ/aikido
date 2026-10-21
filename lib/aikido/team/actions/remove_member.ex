@@ -5,12 +5,12 @@ defmodule Aikido.Team.Actions.RemoveMember do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(remove_member_and_dependents(signal, state, context, config))
+    {signal, state, context, config} = Inputs.unpack_team_action(input)
+    Inputs.to_action_result(remove_member_and_dependents(signal, state, context, config))
   end
 
   defp remove_member_and_dependents(signal, state, context, config) do
-    Operation.start(signal, state, context, config, fn ->
+    Operation.begin_topology_change(signal, state, context, config, fn ->
       plan_member_removal(signal.data, state, config)
     end)
   end

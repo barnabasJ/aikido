@@ -59,7 +59,7 @@ defmodule Aikido.Cron.RuntimeSpec do
 
   @spec build_signal(t(), String.t(), term()) :: Aikido.Signal.t()
   def build_signal(%__MODULE__{kind: :dynamic} = spec, agent_id, logical_id) do
-    signal = occurrence(spec, agent_id, logical_id)
+    signal = build_occurrence_signal(spec, agent_id, logical_id)
 
     Signal.inherit(signal, %Signal{
       type: signal.type,
@@ -69,23 +69,27 @@ defmodule Aikido.Cron.RuntimeSpec do
   end
 
   def build_signal(%__MODULE__{} = spec, agent_id, logical_id),
-    do: occurrence(spec, agent_id, logical_id)
+    do: build_occurrence_signal(spec, agent_id, logical_id)
 
-  defp occurrence(
+  defp build_occurrence_signal(
          %__MODULE__{kind: :dynamic, message: %Signal{} = signal},
          _agent_id,
          _logical_id
        ),
        do: Aikido.Directive.materialize_signal(signal)
 
-  defp occurrence(%__MODULE__{kind: :dynamic, message: message}, agent_id, logical_id) do
+  defp build_occurrence_signal(
+         %__MODULE__{kind: :dynamic, message: message},
+         agent_id,
+         logical_id
+       ) do
     Aikido.Cron.Signals.Tick.new!(
       %{job_id: logical_id, message: message},
       source: "/agent/#{agent_id}"
     )
   end
 
-  defp occurrence(
+  defp build_occurrence_signal(
          %__MODULE__{kind: :schedule, signal_type: signal_type, data: data},
          agent_id,
          _logical_id

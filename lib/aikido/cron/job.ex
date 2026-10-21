@@ -209,8 +209,8 @@ defmodule Aikido.Cron.Job do
     end
   end
 
-  @spec safe_execute((-> term())) :: :ok
-  defp safe_execute(fun) do
+  @spec invoke_callback_and_log_failure((-> term())) :: :ok
+  defp invoke_callback_and_log_failure(fun) do
     _ = fun.()
     :ok
   rescue
@@ -257,7 +257,9 @@ defmodule Aikido.Cron.Job do
 
   @spec spawn_callback_worker(state()) :: state()
   defp spawn_callback_worker(%{fun: fun, callback_workers: callback_workers} = state) do
-    {pid, ref} = :erlang.spawn_opt(fn -> safe_execute(fun) end, [:link, :monitor])
+    {pid, ref} =
+      :erlang.spawn_opt(fn -> invoke_callback_and_log_failure(fun) end, [:link, :monitor])
+
     %{state | callback_workers: Map.put(callback_workers, ref, pid)}
   end
 

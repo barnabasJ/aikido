@@ -54,7 +54,7 @@ reducer rather than calling a helper that combines both:
 
 ```elixir
 result
-|> Aikido.AiReact.Completion.settle_result(input)
+|> Aikido.AiReact.Completion.apply_completion_requirements(input)
 |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(input, :after_tool, payload)
 ```
 

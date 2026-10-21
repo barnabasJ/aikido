@@ -120,7 +120,7 @@ defmodule Aikido.AiReact.Context do
   defp args_to_json(args), do: Jason.encode!(args)
 
   @doc "Close an interrupted final tool batch so the next user turn has valid history."
-  def close_tool_calls(context) do
+  def append_interrupted_tool_results(context) do
     # Builtins are provider observations; exclude them only from pending-call detection.
     context.messages
     |> Enum.map(fn

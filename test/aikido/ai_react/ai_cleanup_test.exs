@@ -37,7 +37,13 @@ defmodule Aikido.AICleanupTest do
     log =
       ExUnit.CaptureLog.capture_log(fn ->
         assert {:ok, :primary_result} =
-                 Aikido.AiReact.Execution.run(owner, request_id, supervisor, work, timeout: 5_000)
+                 Aikido.AiReact.Execution.run_cancellable_attempts(
+                   owner,
+                   request_id,
+                   supervisor,
+                   work,
+                   timeout: 5_000
+                 )
       end)
 
     assert log =~ "AI cleanup callback raised:"

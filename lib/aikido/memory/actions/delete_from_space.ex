@@ -7,7 +7,7 @@ defmodule Aikido.Memory.Actions.DeleteFromSpace do
     with {:ok, space} <- Aikido.Memory.Spaces.fetch(input, :map) do
       space = %{space | data: Map.delete(space.data, input.arguments.key), rev: space.rev + 1}
 
-      Aikido.Memory.Spaces.commit(
+      Aikido.Memory.Spaces.replace_spaces_and_advance_revision(
         input,
         Map.put(input.arguments.state.spaces, input.arguments.space, space)
       )

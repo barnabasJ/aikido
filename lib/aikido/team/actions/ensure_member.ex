@@ -5,12 +5,12 @@ defmodule Aikido.Team.Actions.EnsureMember do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, config} = Inputs.read(input)
-    Inputs.result(activate_member(signal, state, context, config))
+    {signal, state, context, config} = Inputs.unpack_team_action(input)
+    Inputs.to_action_result(activate_member(signal, state, context, config))
   end
 
   def activate_member(signal, state, context, config) do
-    Operation.start(signal, state, context, config, fn ->
+    Operation.begin_topology_change(signal, state, context, config, fn ->
       plan_member_activation(signal.data, state, config)
     end)
   end

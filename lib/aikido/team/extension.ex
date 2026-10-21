@@ -76,11 +76,11 @@ defmodule Aikido.Team.Extension do
       Aikido.Signal.new!("aikido.ash.team.start", %{topology: topology})
       |> Aikido.Signal.put_ctx(context)
 
-    call(resource, pid, signal)
+    dispatch_and_await_operation(resource, pid, signal)
   end
 
   @doc false
-  def call(resource, pid, signal) do
+  def dispatch_and_await_operation(resource, pid, signal) do
     selector = fn runtime ->
       operation = runtime.agent.state.team.operation
 

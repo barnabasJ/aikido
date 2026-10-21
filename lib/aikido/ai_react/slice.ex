@@ -400,7 +400,9 @@ defmodule Aikido.AiReact.Slice do
         do: Map.merge(state, %{status: :failed, error: :interrupted}),
         else: state
 
-    context = if(state.context, do: Aikido.AiReact.Context.close_tool_calls(state.context))
+    context =
+      if(state.context, do: Aikido.AiReact.Context.append_interrupted_tool_results(state.context))
+
     state = Aikido.AiReact.Context.replace_context(state, context)
 
     Map.merge(state, %{

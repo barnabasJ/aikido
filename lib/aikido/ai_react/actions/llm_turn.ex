@@ -17,7 +17,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
       |> record_response_content(turn)
       |> append_model_message(response)
       |> continue_from_classified_response(turn)
-      |> Completion.settle_result(input)
+      |> Completion.apply_completion_requirements(input)
       |> Aikido.AiReact.Hooks.queue_event_hooks_if_changed(
         input,
         :after_model,

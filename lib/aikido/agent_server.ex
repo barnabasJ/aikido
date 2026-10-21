@@ -1407,7 +1407,7 @@ defmodule Aikido.AgentServer do
     )
 
     try do
-      result = run_chain(signal, state)
+      result = run_middleware_and_adopt_agent(signal, state)
 
       emit_telemetry(
         [:aikido, :agent_server, :signal, :stop],
@@ -1469,7 +1469,7 @@ defmodule Aikido.AgentServer do
   # the action errored downstream. Action-level rollback already happened
   # before accepting the action results.
   #
-  defp run_chain(%Signal{} = signal, %State{middleware_chain: chain} = state)
+  defp run_middleware_and_adopt_agent(%Signal{} = signal, %State{middleware_chain: chain} = state)
        when is_function(chain, 2) do
     ctx = build_signal_ctx(signal, state)
 
@@ -1485,14 +1485,14 @@ defmodule Aikido.AgentServer do
   end
 
   # Routes a lifecycle / identity signal through the middleware chain.
-  # Mirrors the agent-state sync in `run_chain/2` and runs any returned
-  # directives inline so emitted signals reach observers.
+  # Mirrors agent-state adoption in `run_middleware_and_adopt_agent/2` and
+  # runs returned directives inline so emitted signals reach observers.
   #
   # Like the user-signal path, subscribers fire after the outermost
   # middleware unwinds and directives have executed.
   defp emit_through_chain(%State{} = state, %Signal{} = signal) do
     with_signal_span(state, signal, fn signal ->
-      case run_chain(signal, state) do
+      case run_middleware_and_adopt_agent(signal, state) do
         {:ok, next, directives} ->
           executed =
             case execute_directives(directives, signal, next) do
@@ -1717,14 +1717,14 @@ defmodule Aikido.AgentServer do
         acc_state
 
       {:ok, _value} = fire ->
-        dispatch_and_maybe_remove(acc_state, sub_ref, entry, signal, fire)
+        deliver_subscription_result(acc_state, sub_ref, entry, signal, fire)
 
       {:error, _reason} = fire ->
-        dispatch_and_maybe_remove(acc_state, sub_ref, entry, signal, fire)
+        deliver_subscription_result(acc_state, sub_ref, entry, signal, fire)
     end
   end
 
-  defp dispatch_and_maybe_remove(acc_state, sub_ref, entry, signal, fire) do
+  defp deliver_subscription_result(acc_state, sub_ref, entry, signal, fire) do
     send(entry.target, {:aikido_subscription, sub_ref, %{signal_type: signal.type, result: fire}})
 
     if entry.once do
@@ -1797,7 +1797,7 @@ defmodule Aikido.AgentServer do
   defp build_middleware_chain(agent_module, %Options{middleware: runtime_mw}) do
     compile_mw = Aikido.Agent.Info.middleware(agent_module)
     all_entries = compile_mw ++ runtime_mw
-    compose_chain(all_entries, &core_next/2)
+    compose_chain(all_entries, &route_and_apply_reducers/2)
   end
 
   defp normalize_entry({mod, opts}) when is_atom(mod) and is_map(opts) do
@@ -1808,8 +1808,8 @@ defmodule Aikido.AgentServer do
     {mod, %{}}
   end
 
-  defp compose_chain(entries, core_next) do
-    Enum.reduce(Enum.reverse(entries), core_next, fn entry, acc_next ->
+  defp compose_chain(entries, reducer_step) do
+    Enum.reduce(Enum.reverse(entries), reducer_step, fn entry, acc_next ->
       {mod, opts} = normalize_entry(entry)
       Code.ensure_loaded(mod)
 
@@ -1826,7 +1826,7 @@ defmodule Aikido.AgentServer do
 
   # Route directly to native Ash actions. The original context is retained on
   # any failure so partial slice updates and directives cannot escape the turn.
-  defp core_next(%Signal{} = signal, ctx) do
+  defp route_and_apply_reducers(%Signal{} = signal, ctx) do
     case route_to_actions(ctx.__signal_router__, signal) do
       {:ok, targets} ->
         apply_actions(signal, ctx, targets)
