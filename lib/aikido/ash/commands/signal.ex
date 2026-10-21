@@ -1,5 +1,5 @@
-defmodule Aikido.Ash.Actions.Signal do
-  @moduledoc "Delivers a public command with native caller scope and returns a compact signal-processing receipt."
+defmodule Aikido.Ash.Commands.Signal do
+  @moduledoc "External Ash command boundary. Delivers a public command with native caller scope and returns a compact signal-processing receipt."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Ash.Runtime
 

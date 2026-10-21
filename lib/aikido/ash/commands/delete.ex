@@ -1,5 +1,5 @@
-defmodule Aikido.Ash.Actions.Delete do
-  @moduledoc "Deletes a live or stopped durable identity while preserving native resource and partition checks."
+defmodule Aikido.Ash.Commands.Delete do
+  @moduledoc "External Ash command boundary. Deletes a live or stopped durable identity while preserving native resource and partition checks."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Ash.Runtime
 

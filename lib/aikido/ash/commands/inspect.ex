@@ -1,5 +1,5 @@
-defmodule Aikido.Ash.Actions.Inspect do
-  @moduledoc "Reads a live native resource snapshot and optionally selects its requested fields."
+defmodule Aikido.Ash.Commands.Inspect do
+  @moduledoc "External Ash command boundary. Reads a live native resource snapshot and optionally selects its requested fields."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Ash.Runtime
 

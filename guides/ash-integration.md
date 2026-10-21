@@ -143,8 +143,10 @@ command. Attributes carry Ash types, constraints, defaults, visibility and nil
 validation. Mounted slices become additional attributes. Internally the runtime
 groups the agent's own fields under `:state`; `path :other_name` changes that path.
 
-Each public command uses its own native implementation under `Aikido.Ash.Actions`.
-The transformer attaches that implementation directly. Shared reference resolution,
+Each public command uses its own native implementation under `Aikido.Ash.Commands`.
+These implementations live in `lib/aikido/ash/commands/` and perform I/O at the
+external domain boundary. Agent/slice `actions/` contain pure reducer implementations.
+The transformer attaches each command implementation directly. Shared reference resolution,
 snapshot projection and caller-scope helpers live in `lib/aikido/ash/runtime.ex`.
 
 The generated public actions are all generic Ash actions: `start`, `stop`,

@@ -1,5 +1,5 @@
-defmodule Aikido.Ash.Actions.List do
-  @moduledoc "Reads live agent snapshots with native filtering, sorting and pagination under the caller scope."
+defmodule Aikido.Ash.Commands.List do
+  @moduledoc "External Ash command boundary. Reads live agent snapshots with native filtering, sorting and pagination under the caller scope."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Ash.Runtime
 

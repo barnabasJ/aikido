@@ -22,6 +22,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Use AgentServer/runtime modules for process concerns, not agent module internals.
 
 ## Public API and Persistence
+- External domain command implementations live under `Aikido.Ash.Commands` in `ash/commands/` and perform runtime I/O. Agent/slice `actions/` contain pure state reducers returning `Aikido.Types.ActionResult`.
 - Declare agents as `Ash.Resource`s with `Aikido.Ash.Agent`, and register them in an `Ash.Domain` with `Aikido.Ash.Domain`. `use Aikido.Agent` forwards native resource options and supplies `Aikido.RuntimeDomain` only when no domain is provided.
 - Declare `route SignalDefinition, Implementation` with a native `Ash.Resource.Actions.Implementation` module. Aikido generates native reducers with state typed from the owning resource and payload arguments from the signal. Signal lists receive a native `Ash.Union`; wildcard observers receive generic `data`. Explicit native action references remain available for application-owned contracts.
 - Use generated `<agent>_<action>` domain interfaces. `start` returns a reference; signal commands return processing receipts. Read live state explicitly with `inspect` or `list`; observe asynchronous completion with subscriptions or `Aikido.AgentServer.call_until/5` from an external caller.

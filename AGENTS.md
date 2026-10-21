@@ -38,7 +38,7 @@ does not permit other runtime effects inside reducers.
 - `Aikido.Agent`: immutable identity/state struct and a convenience macro over `Ash.Resource` with `Aikido.Ash.Agent`
 - `Aikido.Ash.Agent`: resource extension that compiles state declarations into attributes and exposes generic lifecycle/signal actions
 - `Aikido.Ash.Domain`: domain interfaces named `<agent>_<action>`; start returns a reference, signal commands return processing receipts, and inspect/list explicitly read live state
-- `Aikido.Ash.Actions`: dedicated native I/O implementations for public lifecycle, inspection, list and signal commands; `Aikido.Ash.Runtime` contains only shared helpers
+- `Aikido.Ash.Commands`: dedicated native I/O implementations for public lifecycle, inspection, list and signal commands; `Aikido.Ash.Runtime` contains only shared helpers
 - `Aikido.Ash.Slice`: embedded resource extension; slices own their attributes, native reducer actions and routes
 - `Aikido.Ash.Team`: topology and coordination on an agent resource, including nested teams and dynamic workers
 - `Aikido.AgentServer`: signal routing, native Ash reducer execution, directive execution and runtime bookkeeping, hosted by DurableServer
@@ -56,6 +56,7 @@ does not permit other runtime effects inside reducers.
 - Supply AI tools as Ash AI tool names plus native `tool_options`. Tool setup builds descriptions and registry once per run. Prepared callbacks are transient and are rebuilt for a new run.
 - Internal messages use `Aikido.Signal`; define typed payloads with its Spark `signal`/`schema` DSL. Scope and native tracer context travel directly on the envelope. Pure reducers return literals; constructors that generate IDs or timestamps belong at I/O boundaries. Deliver to agents directly; publish native Ash notifications through directives after state adoption.
 - The purity rules apply to agent/slice state reducers. Public lifecycle/signal adapters and tool implementations are I/O boundaries, not reducers; invoke tools through directives or supervised work rather than from a reducer.
+- Put external domain command implementations in `Aikido.Ash.Commands` and `ash/commands/`. Their runtime I/O stays outside the reducer pipeline; agent/slice `Actions` and `actions/` contain reducers. Tool implementations remain separate I/O boundaries.
 
 ## Persistence and Completion
 - DurableServer is the sole persistence/activation path. Do not introduce parallel storage adapters or an instance manager.

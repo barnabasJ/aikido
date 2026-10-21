@@ -247,7 +247,7 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
 
         options = [
           returns: :map,
-          run: {Aikido.Ash.Actions.Signal, []},
+          run: {Aikido.Ash.Commands.Signal, []},
           arguments: [reference_argument() | arguments]
         ]
 
@@ -259,7 +259,7 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
       %{type: :action, run: nil} = action ->
         updated = %{
           action
-          | run: {Aikido.Ash.Actions.Signal, []},
+          | run: {Aikido.Ash.Commands.Signal, []},
             arguments: [reference_argument() | action.arguments]
         }
 
@@ -318,12 +318,12 @@ defmodule Aikido.Ash.Agent.Transformers.Build do
 
     Enum.reduce_while(
       [
-        {:start, Aikido.Ash.Actions.Start, :map, arguments},
-        {:inspect, Aikido.Ash.Actions.Inspect, :term,
+        {:start, Aikido.Ash.Commands.Start, :map, arguments},
+        {:inspect, Aikido.Ash.Commands.Inspect, :term,
          [reference_argument(), build_argument!(:fields, {:array, :atom}, [])]},
-        {:stop, Aikido.Ash.Actions.Stop, :map, [reference_argument()]},
-        {:delete, Aikido.Ash.Actions.Delete, :map, [reference_argument()]},
-        {:list, Aikido.Ash.Actions.List, {:array, :term},
+        {:stop, Aikido.Ash.Commands.Stop, :map, [reference_argument()]},
+        {:delete, Aikido.Ash.Commands.Delete, :map, [reference_argument()]},
+        {:list, Aikido.Ash.Commands.List, {:array, :term},
          [
            build_argument!(:filter, :term, []),
            build_argument!(:sort, :term, default: []),

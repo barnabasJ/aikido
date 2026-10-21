@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Separate external Ash command implementations into `Aikido.Ash.Commands` and
+  `ash/commands/`, making their runtime I/O boundary explicit.
+
 - Place the typed multi-slice result descriptor at `Aikido.Types.SliceUpdate`,
   alongside `ActionResult` and `Directive`.
 

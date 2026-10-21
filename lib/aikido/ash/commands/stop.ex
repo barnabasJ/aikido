@@ -1,5 +1,5 @@
-defmodule Aikido.Ash.Actions.Stop do
-  @moduledoc "Stops a live durable agent and returns its identity and stopped status."
+defmodule Aikido.Ash.Commands.Stop do
+  @moduledoc "External Ash command boundary. Stops a live durable agent and returns its identity and stopped status."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Ash.Runtime
 

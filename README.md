@@ -166,7 +166,11 @@ not automatically persist live agent state or make process effects transactional
 
 ## State and effects
 
-Actions are pure: they return the next state and directives and never perform
+External domain commands run through `Aikido.Ash.Commands` in `ash/commands/`.
+They perform runtime I/O such as starting agents and delivering signals. Inside
+the agent pipeline, reducer implementations live in their owning `actions/` folders.
+
+Reducer actions are pure: they return the next state and directives and never perform
 side effects. Their return values are the sole channel for domain state changes.
 All side effects belong in directives: message delivery, network and database I/O,
 process creation and timers. Directives perform I/O

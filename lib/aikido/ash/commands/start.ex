@@ -1,5 +1,5 @@
-defmodule Aikido.Ash.Actions.Start do
-  @moduledoc "Starts a durable agent through native scoped initialization and completes its initial team topology."
+defmodule Aikido.Ash.Commands.Start do
+  @moduledoc "External Ash command boundary. Starts a durable agent through native scoped initialization and completes its initial team topology."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Ash.Runtime
 
