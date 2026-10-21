@@ -11,8 +11,8 @@ defmodule Aikido.Memory.Signals.PutSpace do
         allow_nil? false
       end
 
-      attribute :value, Aikido.Memory.Space do
-        description "%Aikido.Memory.Space{} to install at the named key."
+      attribute :value, Aikido.Memory.Types.Space do
+        description "%Aikido.Memory.Types.Space{} to install at the named key."
         allow_nil? false
       end
     end

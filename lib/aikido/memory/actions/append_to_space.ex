@@ -1,18 +1,16 @@
 defmodule Aikido.Memory.Actions.AppendToSpace do
   @moduledoc "Appends an item to a named list memory space."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Memory.ActionOptions
 
   @impl true
   def run(input, _opts, _context) do
-    name = input.arguments[:space]
-    item = input.arguments[:item]
-    memory = input.arguments.state
+    with {:ok, space} <- Aikido.Memory.Spaces.fetch(input, :list) do
+      space = %{space | data: space.data ++ [input.arguments.item], rev: space.rev + 1}
 
-    Aikido.Types.ActionResult.new(
-      state:
-        Aikido.Memory.Slice.append_to_space(memory, name, item, ActionOptions.from_input(input)),
-      directives: []
-    )
+      Aikido.Memory.Spaces.commit(
+        input,
+        Map.put(input.arguments.state.spaces, input.arguments.space, space)
+      )
+    end
   end
 end

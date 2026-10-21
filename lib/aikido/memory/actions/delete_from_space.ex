@@ -1,18 +1,16 @@
 defmodule Aikido.Memory.Actions.DeleteFromSpace do
   @moduledoc "Removes a key from a named memory space."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Memory.ActionOptions
 
   @impl true
   def run(input, _opts, _context) do
-    name = input.arguments[:space]
-    key = input.arguments[:key]
-    memory = input.arguments.state
+    with {:ok, space} <- Aikido.Memory.Spaces.fetch(input, :map) do
+      space = %{space | data: Map.delete(space.data, input.arguments.key), rev: space.rev + 1}
 
-    Aikido.Types.ActionResult.new(
-      state:
-        Aikido.Memory.Slice.delete_from_space(memory, name, key, ActionOptions.from_input(input)),
-      directives: []
-    )
+      Aikido.Memory.Spaces.commit(
+        input,
+        Map.put(input.arguments.state.spaces, input.arguments.space, space)
+      )
+    end
   end
 end

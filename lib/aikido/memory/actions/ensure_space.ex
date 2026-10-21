@@ -1,24 +1,24 @@
 defmodule Aikido.Memory.Actions.EnsureSpace do
   @moduledoc "Creates a missing memory space from its native default while preserving an existing space."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Memory.ActionOptions
 
   @impl true
   def run(input, _opts, _context) do
-    name = input.arguments[:space]
+    state = input.arguments.state
+    name = input.arguments.space
 
-    default =
-      case input.arguments.default do
-        %Ash.Union{value: value} -> value
-        nil -> nil
+    if Map.get(state.spaces, name) do
+      Aikido.Types.ActionResult.new(state: state)
+    else
+      data =
+        case input.arguments.default do
+          %Ash.Union{value: value} -> value
+          nil -> nil
+        end
+
+      with {:ok, space} <- Aikido.Memory.Types.Space.new(data: data) do
+        Aikido.Memory.Spaces.commit(input, Map.put(state.spaces, name, space))
       end
-
-    memory = input.arguments.state
-
-    Aikido.Types.ActionResult.new(
-      state:
-        Aikido.Memory.Slice.ensure_space(memory, name, default, ActionOptions.from_input(input)),
-      directives: []
-    )
+    end
   end
 end

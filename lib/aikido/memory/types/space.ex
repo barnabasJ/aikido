@@ -1,4 +1,4 @@
-defmodule Aikido.Memory.Space do
+defmodule Aikido.Memory.Types.Space do
   @moduledoc """
   The unit of memory — a named container with typed data and revision tracking.
 

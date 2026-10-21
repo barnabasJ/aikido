@@ -11,8 +11,8 @@ defmodule Aikido.Memory.Signals.UpdateSpace do
         allow_nil? false
       end
 
-      attribute :value, Aikido.Memory.Space do
-        description "Replacement %Aikido.Memory.Space{} value."
+      attribute :value, Aikido.Memory.Types.Space do
+        description "Replacement %Aikido.Memory.Types.Space{} value."
         allow_nil? false
       end
     end

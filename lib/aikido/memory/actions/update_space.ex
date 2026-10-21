@@ -1,23 +1,16 @@
 defmodule Aikido.Memory.Actions.UpdateSpace do
   @moduledoc "Updates an existing memory space using the supplied replacement value."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Memory.ActionOptions
 
   @impl true
   def run(input, _opts, _context) do
-    name = input.arguments[:space]
-    new_space = input.arguments.value
-    memory = input.arguments.state
+    with {:ok, existing} <- Aikido.Memory.Spaces.fetch(input) do
+      replacement = %{input.arguments.value | rev: existing.rev + 1}
 
-    Aikido.Types.ActionResult.new(
-      state:
-        Aikido.Memory.Slice.update_space(
-          memory,
-          name,
-          fn _existing -> new_space end,
-          ActionOptions.from_input(input)
-        ),
-      directives: []
-    )
+      Aikido.Memory.Spaces.commit(
+        input,
+        Map.put(input.arguments.state.spaces, input.arguments.space, replacement)
+      )
+    end
   end
 end

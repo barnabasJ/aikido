@@ -5,12 +5,15 @@ defmodule Aikido.Bench.Actions do
     inputs =
       Map.new([1, 100, 10_000], fn size ->
         entries = Map.new(1..size, &{"key_#{&1}", &1})
-        memory = Aikido.Memory.Slice.new(id: "benchmark-memory", now: 0)
 
         memory =
-          Aikido.Memory.Slice.put_space(memory, :world, Aikido.Memory.Space.new!(data: entries),
-            now: 0
-          )
+          Ash.create!(Aikido.Memory.Slice, %{
+            id: "benchmark-memory",
+            spaces: %{
+              world: Aikido.Memory.Types.Space.new!(data: entries),
+              tasks: Aikido.Memory.Types.Space.new!(data: [])
+            }
+          })
 
         params = %{state: memory, space: :world, key: "benchmark", value: 1}
         input = Ash.ActionInput.for_action(Aikido.Memory.Slice, :put_in_space, params)
@@ -34,7 +37,7 @@ defmodule Aikido.Bench.Actions do
       results = Enum.map(jobs, fn {_name, job} -> job.(input) end)
       [result | _] = results
       true = Enum.all?(results, &(&1 == result))
-      1 = Aikido.Memory.Slice.get_in_space(result.state, :world, "benchmark")
+      1 = result.state.spaces.world.data["benchmark"]
       [] = result.directives
     end
 

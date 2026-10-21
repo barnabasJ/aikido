@@ -1,25 +1,20 @@
 defmodule Aikido.Memory.Actions.PutInSpace do
   @moduledoc "Stores a key and value in a named memory space."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.Memory.ActionOptions
 
   @impl true
   def run(input, _opts, _context) do
-    name = input.arguments[:space]
-    key = input.arguments[:key]
-    value = input.arguments[:value]
-    memory = input.arguments.state
+    with {:ok, space} <- Aikido.Memory.Spaces.fetch(input, :map) do
+      space = %{
+        space
+        | data: Map.put(space.data, input.arguments.key, input.arguments.value),
+          rev: space.rev + 1
+      }
 
-    Aikido.Types.ActionResult.new(
-      state:
-        Aikido.Memory.Slice.put_in_space(
-          memory,
-          name,
-          key,
-          value,
-          ActionOptions.from_input(input)
-        ),
-      directives: []
-    )
+      Aikido.Memory.Spaces.commit(
+        input,
+        Map.put(input.arguments.state.spaces, input.arguments.space, space)
+      )
+    end
   end
 end

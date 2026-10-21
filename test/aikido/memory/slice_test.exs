@@ -65,7 +65,7 @@ defmodule AikidoTest.Memory.SliceTest do
     for {default, type} <- [{%{count: 1}, :kv}, {[1, 2], :list}] do
       input =
         Ash.ActionInput.for_action(Aikido.Memory.Slice, :ensure_space, %{
-          state: Aikido.Memory.Slice.new(),
+          state: Ash.create!(Aikido.Memory.Slice, %{}),
           space: :example,
           default: default
         })
@@ -77,7 +77,7 @@ defmodule AikidoTest.Memory.SliceTest do
 
     input =
       Ash.ActionInput.for_action(Aikido.Memory.Slice, :ensure_space, %{
-        state: Aikido.Memory.Slice.new(),
+        state: Ash.create!(Aikido.Memory.Slice, %{}),
         space: :example
       })
 
@@ -87,7 +87,7 @@ defmodule AikidoTest.Memory.SliceTest do
   end
 
   test "replacing a space increments its existing revision and keeps replacement metadata" do
-    original = Aikido.Memory.Slice.new(id: "revision-test", now: 0)
+    original = Ash.create!(Aikido.Memory.Slice, %{id: "revision-test"})
 
     final =
       Enum.reduce(1..2, original, fn count, state ->
@@ -108,14 +108,28 @@ defmodule AikidoTest.Memory.SliceTest do
         result.state
       end)
 
-    replacement = Aikido.Memory.Space.new!(data: %{fresh: true})
+    replacement = Aikido.Memory.Types.Space.new!(data: %{fresh: true})
     state = %{final | spaces: Map.put(final.spaces, :world, %{final.spaces.world | rev: 5})}
-    updated = Aikido.Memory.Slice.update_space(state, :world, fn _ -> replacement end, now: 0)
+
+    updated =
+      Aikido.Memory.Slice
+      |> Ash.ActionInput.for_action(:update_space, %{
+        state: state,
+        space: :world,
+        value: replacement
+      })
+      |> Ash.run_action!()
+      |> Map.fetch!(:state)
+
     assert updated.spaces.world.rev == 6
     assert updated.spaces.world.data == %{fresh: true}
 
-    assert Aikido.Memory.Slice.put_space(state, :world, replacement, now: 0).spaces.world.rev ==
-             0
+    replaced =
+      Aikido.Memory.Slice
+      |> Ash.ActionInput.for_action(:put_space, %{state: state, space: :world, value: replacement})
+      |> Ash.run_action!()
+
+    assert replaced.state.spaces.world.rev == 0
 
     assert original.spaces.world.rev == 0
     assert original.spaces.world.data == %{}
@@ -125,14 +139,14 @@ defmodule AikidoTest.Memory.SliceTest do
     for action <- [:put_space, :update_space] do
       input =
         Ash.ActionInput.for_action(Aikido.Memory.Slice, action, %{
-          state: Aikido.Memory.Slice.new(now: 0),
+          state: Ash.create!(Aikido.Memory.Slice, %{}),
           space: :world,
           value: %{data: %{count: 1}}
         })
 
       assert input.valid?
 
-      assert %Aikido.Memory.Space{data: %{count: 1}, rev: 0, metadata: %{}} =
+      assert %Aikido.Memory.Types.Space{data: %{count: 1}, rev: 0, metadata: %{}} =
                input.arguments.value
 
       assert {:ok, result} = Ash.run_action(input)
@@ -140,7 +154,7 @@ defmodule AikidoTest.Memory.SliceTest do
 
       invalid =
         Ash.ActionInput.for_action(Aikido.Memory.Slice, action, %{
-          state: Aikido.Memory.Slice.new(now: 0),
+          state: Ash.create!(Aikido.Memory.Slice, %{}),
           space: :world,
           value: %{rev: -1, metadata: "invalid"}
         })

@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Remove the memory slice’s parallel state API and timestamp option wrapper.
+  Native actions own mutations, share space bookkeeping, and return structured
+  argument errors. Move the space payload contract to `Aikido.Memory.Types.Space`.
+
 - Remove the identity slice’s parallel constructor/mutation API and timestamp
   option wrapper. Evolution and profile changes run directly in native Ash actions.
 
