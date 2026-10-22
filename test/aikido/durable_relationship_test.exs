@@ -79,6 +79,39 @@ defmodule AikidoTest.DurableRelationshipTest do
     assert {:ok, nil} = AgentServer.state(restored, &{:ok, &1.parent})
   end
 
+  test "restoring a child without its parent honors stop policy and retains the logical binding",
+       %{
+         instance: instance,
+         durable: durable
+       } do
+    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "missing-parent")
+
+    {:ok, child} =
+      AikidoTest.Case.start_test_agent(instance, Minimal,
+        id: "missing-parent/worker",
+        on_parent_death: :stop,
+        parent: %{pid: parent, id: "missing-parent", tag: :worker}
+      )
+
+    assert :ok = Aikido.Durable.stop(durable, child)
+    assert :ok = Aikido.Durable.stop(durable, parent)
+
+    {:ok, restored} = Aikido.Durable.start(durable, "missing-parent/worker", agent: Minimal)
+    ref = Process.monitor(restored)
+    assert_receive {:DOWN, ^ref, :process, ^restored, _}, 5000
+    assert :error = Aikido.Durable.lookup(durable, "missing-parent/worker")
+
+    assert {:ok, %{parent_id: "missing-parent"}} =
+             Aikido.Durable.parent_binding(durable, "missing-parent/worker")
+
+    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "missing-parent")
+
+    {:ok, child} =
+      AikidoTest.Case.start_test_agent(instance, Minimal, id: "missing-parent/worker")
+
+    assert {:ok, %{pid: ^parent}} = AgentServer.state(child, &{:ok, &1.parent})
+  end
+
   test "parent bindings survive a complete instance restart", %{
     instance: instance,
     directory: directory

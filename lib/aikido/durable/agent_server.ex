@@ -10,7 +10,7 @@ defmodule Aikido.Durable.AgentServer do
 
     encode(%{
       options: boot_options(state.options),
-      parent: parent_binding(runtime.parent),
+      parent: parent_binding(runtime.parent) || state[:unresolved_parent],
       permanent: state.permanent,
       agent: serialize_agent(agent, runtime.agent_module),
       cron_specs: runtime.cron_specs
@@ -73,10 +73,17 @@ defmodule Aikido.Durable.AgentServer do
 
   @impl true
   def init(saved) do
+    saved_parent = Map.get(saved, :parent, saved.options[:parent])
+
     options =
       saved.options
-      |> Keyword.put(:parent, Map.get(saved, :parent, saved.options[:parent]))
+      |> Keyword.put(:parent, saved_parent)
       |> restore_parent()
+
+    unresolved_parent =
+      if saved_parent && is_nil(options[:parent]) &&
+           options[:on_parent_death] not in [:continue, :emit_orphan],
+         do: saved_parent
 
     options =
       if saved[:agent],
@@ -98,7 +105,15 @@ defmodule Aikido.Durable.AgentServer do
            Map.has_key?(saved, :agent) && !Map.get(saved, :initial?, false)}
         )
 
-        {:ok, %{runtime: runtime, options: saved.options, permanent: saved.permanent},
+        if unresolved_parent, do: send(self(), :aikido_missing_parent)
+
+        {:ok,
+         %{
+           runtime: runtime,
+           options: saved.options,
+           permanent: saved.permanent,
+           unresolved_parent: unresolved_parent
+         },
          permanent: saved.permanent,
          meta: %{
            key: runtime.durable_key,
@@ -129,6 +144,15 @@ defmodule Aikido.Durable.AgentServer do
     result = AgentServer.handle_continue(continue, state.runtime)
     if restored?, do: enqueue_team_reconciliation(state.runtime)
     wrap_runtime_reply(result, state)
+  end
+
+  def handle_info(:aikido_missing_parent, %{unresolved_parent: parent} = state)
+      when not is_nil(parent) do
+    if is_nil(state.runtime.parent) do
+      wrap_runtime_reply({:stop, {:shutdown, {:parent_down, :noproc}}, state.runtime}, state)
+    else
+      {:noreply, %{state | unresolved_parent: nil}}
+    end
   end
 
   def handle_info(message, state),
@@ -195,12 +219,14 @@ defmodule Aikido.Durable.AgentServer do
   defp restore_parent(options) do
     case options[:parent] do
       %{id: id} = parent ->
-        case lookup_saved_process(options[:aikido], id, parent[:partition]) do
+        pool = options[:durable_server] || Aikido.durable_supervisor_name(options[:aikido])
+
+        case lookup_saved_process(pool, id, parent[:partition]) do
           nil ->
             Keyword.delete(options, :parent)
 
           pid ->
-            parent = parent |> Map.put(:pid, pid) |> restore_team_reference(options[:aikido])
+            parent = parent |> Map.put(:pid, pid) |> restore_team_reference(pool)
             Keyword.put(options, :parent, parent)
         end
 
@@ -209,19 +235,19 @@ defmodule Aikido.Durable.AgentServer do
     end
   end
 
-  defp restore_team_reference(parent, instance) do
+  defp restore_team_reference(parent, pool) do
     meta = Map.get(parent, :meta, %{})
 
     if meta[:team_id] do
-      pid = lookup_saved_process(instance, meta.team_id, parent[:partition])
+      pid = lookup_saved_process(pool, meta.team_id, parent[:partition])
       Map.put(parent, :meta, Map.put(meta, :team_pid, pid))
     else
       Map.put(parent, :meta, meta)
     end
   end
 
-  defp lookup_saved_process(instance, id, partition) do
-    case Aikido.Durable.lookup(Aikido.durable_supervisor_name(instance), id, partition: partition) do
+  defp lookup_saved_process(pool, id, partition) do
+    case Aikido.Durable.lookup(pool, id, partition: partition) do
       {:ok, pid} -> pid
       :error -> nil
     end
