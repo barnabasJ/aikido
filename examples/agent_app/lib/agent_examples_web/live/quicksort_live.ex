@@ -8,61 +8,60 @@ defmodule AgentExamplesWeb.QuicksortLive do
   def mount(_, _, socket) do
     socket =
       assign(socket,
-        nodes: %{},
+        tree: AgentExamples.Quicksort.TreeView.new(),
         sort_topic: nil,
         started_at: nil,
         elapsed: nil,
+        history_available: true,
+        root_monitor: nil,
+        root_unavailable: nil,
         focus: "root",
         size: 4096
       )
 
-    {:ok, restore_retained_tree(socket)}
+    {:ok, restore_session_history(socket)}
   end
 
-  defp restore_retained_tree(socket) do
+  defp restore_session_history(socket) do
     if connected?(socket) && active?(socket.assigns.run) do
-      pid = socket.assigns.run.record.pid
+      topic = AgentExamples.Quicksort.RunHistory.topic(socket.assigns.run.record.id)
+      Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
 
-      with {:ok, topic} <- Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.state.topic}),
-           true <- is_binary(topic) && topic != "" do
-        Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
+      socket =
+        assign(socket,
+          sort_topic: topic,
+          root_monitor: Process.monitor(socket.assigns.run.record.pid)
+        )
 
-        socket
-        |> assign(sort_topic: topic)
-        |> start_async(:restore_tree, fn -> AgentExamples.Quicksort.TreeSnapshot.read(pid) end)
-      else
-        _ -> socket
+      case AgentExamples.Quicksort.RunHistory.fetch(topic) do
+        {:ok, tree} -> assign(socket, tree: tree)
+        :error -> assign(socket, history_available: own(socket.assigns.run)[:status] == :idle)
       end
     else
       socket
     end
   end
 
-  def handle_async(:restore_tree, {:ok, restored}, socket) do
-    nodes =
-      Enum.reduce(restored, socket.assigns.nodes, fn {_, node}, nodes ->
-        adopt_node(nodes, node)
-      end)
-
-    {:noreply, assign(socket, nodes: nodes)}
-  end
-
-  def handle_async(:restore_tree, {:exit, _}, socket), do: {:noreply, socket}
-
   def handle_event("restart_sort", _, socket) do
     owner = socket.assigns.owner
 
+    socket = release_root_monitor(socket)
+
     case AgentExamples.Playground.stop(owner, "quicksort") do
       :ok ->
-        if socket.assigns.sort_topic,
-          do: Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
+        if socket.assigns.sort_topic do
+          Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
+          AgentExamples.Quicksort.RunHistory.close(socket.assigns.sort_topic)
+        end
 
         {:noreply,
          socket
          |> assign(
            run: AgentExamples.Playground.get(owner, "quicksort"),
            starting: true,
-           nodes: %{},
+           history_available: true,
+           root_unavailable: nil,
+           tree: AgentExamples.Quicksort.TreeView.new(),
            sort_topic: nil,
            started_at: nil,
            elapsed: nil,
@@ -84,12 +83,16 @@ defmodule AgentExamplesWeb.QuicksortLive do
       if socket.assigns.sort_topic,
         do: Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
 
-      topic = "quicksort:" <> Ash.UUIDv7.generate()
+      topic = AgentExamples.Quicksort.RunHistory.topic(socket.assigns.run.record.id)
+      AgentExamples.Quicksort.RunHistory.open(topic)
       :ok = Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
 
       socket =
-        assign(socket,
-          nodes: %{},
+        assign(release_root_monitor(socket),
+          history_available: true,
+          root_unavailable: nil,
+          root_monitor: Process.monitor(socket.assigns.run.record.pid),
+          tree: AgentExamples.Quicksort.TreeView.new(),
           sort_topic: topic,
           started_at: System.monotonic_time(:millisecond),
           elapsed: nil,
@@ -112,86 +115,54 @@ defmodule AgentExamplesWeb.QuicksortLive do
     do: {:noreply, assign(socket, focus: branch)}
 
   def handle_info({:quicksort_progress, topic, node}, %{assigns: %{sort_topic: topic}} = socket) do
-    nodes = socket.assigns.nodes |> adopt_node(node) |> drain_progress(topic, 500)
+    tree =
+      socket.assigns.tree
+      |> AgentExamples.Quicksort.TreeView.put_node(node)
+      |> drain_progress(topic, 500)
 
     elapsed =
-      if socket.assigns.started_at && nodes["root"] && nodes["root"].status == :completed,
-        do:
-          socket.assigns.elapsed ||
-            System.monotonic_time(:millisecond) - socket.assigns.started_at,
-        else: nil
+      if socket.assigns.started_at && tree.nodes["root"] &&
+           tree.nodes["root"].status == :completed,
+         do:
+           socket.assigns.elapsed ||
+             System.monotonic_time(:millisecond) - socket.assigns.started_at,
+         else: nil
 
-    {:noreply, assign(socket, nodes: nodes, elapsed: elapsed)}
+    {:noreply, assign(socket, tree: tree, elapsed: elapsed)}
   end
 
   def handle_info({:quicksort_progress, _, _}, socket), do: {:noreply, socket}
 
   # Batch already delivered notifications into one render; never query agents repeatedly.
-  defp drain_progress(nodes, _topic, 0), do: nodes
+  def handle_info({:DOWN, ref, :process, _, reason}, %{assigns: %{root_monitor: ref}} = socket),
+    do: {:noreply, assign(socket, root_unavailable: inspect(reason), root_monitor: nil)}
 
-  defp drain_progress(nodes, topic, remaining) do
+  defp drain_progress(tree, _topic, 0), do: tree
+
+  defp drain_progress(tree, topic, remaining) do
     receive do
       {:quicksort_progress, ^topic, node} ->
-        nodes |> adopt_node(node) |> drain_progress(topic, remaining - 1)
+        tree
+        |> AgentExamples.Quicksort.TreeView.put_node(node)
+        |> drain_progress(topic, remaining - 1)
     after
-      0 -> nodes
+      0 -> tree
     end
   end
 
-  defp adopt_node(nodes, node) do
-    case nodes[node.branch] do
-      %{status: :completed} -> nodes
-      %{status: :sorting} when node.status == :idle -> nodes
-      _ -> Map.put(nodes, node.branch, node)
-    end
-  end
-
-  defp visible_nodes(nodes, focus) do
-    nodes
-    |> Map.values()
-    |> Enum.filter(&String.starts_with?(&1.branch, focus))
-    |> Enum.sort_by(&{String.length(&1.branch), &1.branch})
-    |> Enum.take(80)
-  end
-
-  defp diagram_nodes(nodes, focus) do
-    nodes
-    |> Map.values()
-    |> Enum.filter(
-      &(String.starts_with?(&1.branch, focus) &&
-          String.length(&1.branch) <= String.length(focus) + 6)
-    )
-    |> Enum.sort_by(& &1.branch)
-    |> Enum.map(fn node ->
-      relative = String.replace_prefix(node.branch, focus, "")
-
-      {left, width} =
-        relative
-        |> String.graphemes()
-        |> Enum.reduce({0.0, 960.0}, fn direction, {left, width} ->
-          {if(direction == "R", do: left + width / 2, else: left), width / 2}
-        end)
-
-      Map.merge(node, %{x: left + width / 2, y: 24 + String.length(relative) * 42})
-    end)
+  defp release_root_monitor(socket) do
+    if socket.assigns.root_monitor, do: Process.demonitor(socket.assigns.root_monitor, [:flush])
+    assign(socket, root_monitor: nil)
   end
 
   defp node_color(:completed), do: "#187c69"
   defp node_color(:sorting), do: "#e3a641"
   defp node_color(:idle), do: "#879d99"
+  defp node_color(:failed), do: "#bd5547"
 
   def render(assigns) do
     assigns =
-      assign(assigns,
-        diagram: diagram_nodes(assigns.nodes, assigns.focus),
-        completed: Enum.count(assigns.nodes, fn {_, node} -> node.status == :completed end),
-        levels:
-          assigns.nodes
-          |> Map.values()
-          |> Enum.frequencies_by(&(String.length(&1.branch) - 4))
-          |> Enum.sort(),
-        visible: visible_nodes(assigns.nodes, assigns.focus)
-      )
+      assign(assigns, AgentExamples.Quicksort.TreeView.summarize(assigns.tree, assigns.focus))
 
     ~H"""
     <.page {assigns}>
@@ -230,10 +201,14 @@ defmodule AgentExamplesWeb.QuicksortLive do
       </section>
       <section class="panel" id="sort-metrics">
         <h2>The BEAM at work</h2>
-        <div class="hero-pills">
-          <span id="sort-spawned">{map_size(@nodes)} agents spawned</span>
-          <span>{map_size(@nodes) - @completed} sorting</span>
+        <p :if={!@history_available} id="history-unavailable">This older run has no recorded session history. Restart the example to track every spawned agent across reconnects.</p>
+        <p :if={@root_unavailable && active?(@run)} role="alert" id="sort-root-unavailable">The sorting root stopped: {@root_unavailable}. This run cannot continue.</p>
+        <p :if={own(@run)[:status] == :failed} role="alert" id="sort-failure">Sorting failed: {inspect(own(@run)[:error])}. Restart the example after addressing the activation failure.</p>
+        <div :if={@history_available} class="hero-pills">
+          <span id="sort-spawned">{map_size(@tree.nodes)} agents spawned</span>
+          <span>{map_size(@tree.nodes) - @completed - @failed} sorting</span>
           <span>{@completed} completed</span>
+          <span :if={@failed > 0} id="sort-failed">{@failed} failed</span>
           <span id="sort-depth">Depth {if @levels == [],
             do: 0,
             else: @levels |> List.last() |> elem(0)}</span>
@@ -250,7 +225,11 @@ defmodule AgentExamplesWeb.QuicksortLive do
         </p>
         <div class="sort-levels">
           <div :for={{depth, count} <- @levels} class="sort-level">
-            <span>Depth {depth}</span><meter min="0" max={max(map_size(@nodes), 1)} value={count} /><strong>{count} agents</strong>
+            <span>Depth {depth}</span><meter
+              min="0"
+              max={max(map_size(@tree.nodes), 1)}
+              value={count}
+            /><strong>{count} agents</strong>
           </div>
         </div>
         <details :if={own(@run)[:status] == :completed} id="sort-result">
@@ -266,7 +245,7 @@ defmodule AgentExamplesWeb.QuicksortLive do
         <p>Showing up to 80 nodes beneath {@focus}. Select a branch to inspect its descendants.
           The display is limited; process creation is not.</p>
         <p class="sort-legend">
-          <span>● Spawned</span><span>● Sorting / waiting for children</span><span>● Completed</span>
+          <span>● Spawned</span><span>● Sorting / waiting for children</span><span>● Completed</span><span style="color:#bd5547">● Failed</span>
         </p>
         <p class="muted">Live updates add nodes and change their color. Completed nodes stay visible.
           The diagram shows six levels at a time; select a node to zoom into its subtree.</p>

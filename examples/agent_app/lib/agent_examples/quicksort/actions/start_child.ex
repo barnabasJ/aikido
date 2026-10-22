@@ -5,8 +5,16 @@ defmodule AgentExamples.Quicksort.Actions.StartChild do
   def run(input, _opts, _context) do
     state = input.arguments.state
 
-    case Map.fetch(state.partitions, input.arguments.tag) do
+    case if(state.status == :sorting,
+           do: Map.fetch(state.partitions, input.arguments.tag),
+           else: :error
+         ) do
       {:ok, numbers} ->
+        state = %{
+          state
+          | started_children: Map.put(state.started_children, input.arguments.tag, true)
+        }
+
         signal = %Aikido.Signal{
           type: "quicksort.sort",
           source: "/examples/quicksort",
@@ -28,7 +36,10 @@ defmodule AgentExamples.Quicksort.Actions.StartChild do
         )
 
       :error ->
-        Aikido.Types.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(
+          state: state,
+          directives: [%Aikido.Directives.StopChild{tag: input.arguments.tag}]
+        )
     end
   end
 end

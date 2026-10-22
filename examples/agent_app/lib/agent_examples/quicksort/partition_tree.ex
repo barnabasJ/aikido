@@ -17,14 +17,17 @@ defmodule AgentExamples.Quicksort.PartitionTree do
   end
 
   def spawn_partitions(state) do
-    Enum.map(state.partitions, fn {branch, _numbers} ->
-      %Aikido.Directives.SpawnAgent{
-        agent: AgentExamples.Quicksort,
-        tag: branch,
-        restart?: false,
-        opts: %{initial_state: %{branch: state.branch <> branch}, on_parent_death: :stop}
-      }
-    end)
+    Enum.map(state.partitions, fn {branch, _numbers} -> spawn_partition(state, branch) end)
+  end
+
+  @doc "Describes activation of one retained partition under its stable parent/branch identity."
+  def spawn_partition(state, branch) do
+    %Aikido.Directives.SpawnAgent{
+      agent: AgentExamples.Quicksort,
+      tag: branch,
+      restart?: false,
+      opts: %{initial_state: %{branch: state.branch <> branch}, on_parent_death: :stop}
+    }
   end
 
   def finish_or_wait(state, context) do
@@ -65,4 +68,36 @@ defmodule AgentExamples.Quicksort.PartitionTree do
   end
 
   defp reply_to_parent(_state, _context), do: []
+  @doc "Records an unrecoverable pending partition failure and notifies its parent."
+  def fail_partition(state, data, context) do
+    branch = Map.get(data, :branch, data[:tag])
+
+    if state.status == :sorting && Map.has_key?(state.partitions, branch) &&
+         !Map.has_key?(state.results, branch) do
+      state = %{state | status: :failed, error: %{branch: branch, reason: data.reason}}
+      notify = AgentExamples.Quicksort.PartitionTree.progress(state, context)
+
+      replies =
+        case context[:parent] do
+          %Aikido.AgentServer.ParentRef{pid: pid, tag: tag} ->
+            [
+              %Aikido.Directives.Emit{
+                target: pid,
+                signal: %Aikido.Signal{
+                  type: "quicksort.failed",
+                  source: "/examples/quicksort",
+                  data: %{branch: tag, reason: state.error}
+                }
+              }
+            ]
+
+          _ ->
+            []
+        end
+
+      Aikido.Types.ActionResult.new(state: state, directives: [notify | replies])
+    else
+      Aikido.Types.ActionResult.new(state: state)
+    end
+  end
 end

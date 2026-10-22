@@ -14,6 +14,7 @@ defmodule AgentExamples.Quicksort.Progress do
 
   @impl true
   def notify(%{data: %{topic: topic, node: node}}) do
+    AgentExamples.Quicksort.RunHistory.record(topic, node)
     Phoenix.PubSub.broadcast(AgentExamples.PubSub, topic, {:quicksort_progress, topic, node})
   end
 end

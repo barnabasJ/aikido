@@ -12,6 +12,7 @@ defmodule AgentExamples.Application do
         {Phoenix.PubSub, name: AgentExamples.PubSub},
         {Task.Supervisor, name: AgentExamples.WebTasks},
         AgentExamples.Playground,
+        AgentExamples.Quicksort.RunHistory,
         AgentExamplesWeb.Endpoint
       ],
       strategy: :one_for_one,

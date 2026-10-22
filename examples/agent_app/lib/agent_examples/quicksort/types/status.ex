@@ -4,6 +4,7 @@ defmodule AgentExamples.Quicksort.Types.Status do
     values: [
       idle: "Awaiting input",
       sorting: "Waiting for child partitions",
-      completed: "Partition sorted"
+      completed: "Partition sorted",
+      failed: "A child could not start or exited before returning its result"
     ]
 end

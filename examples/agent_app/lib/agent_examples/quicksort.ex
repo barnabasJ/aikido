@@ -14,6 +14,11 @@ defmodule AgentExamples.Quicksort do
         public? true
       end
 
+      attribute :error, :term do
+        description "Failure preventing this partition from completing."
+        public? true
+      end
+
       attribute :topic, :string do
         description "Application-owned PubSub topic for this sorting tree."
         default ""
@@ -43,6 +48,16 @@ defmodule AgentExamples.Quicksort do
         default %{}
       end
 
+      attribute :child_attempts, :map do
+        description "Retry counts for child activation failures, keyed by partition."
+        default %{}
+      end
+
+      attribute :started_children, :map do
+        description "Ready partitions whose delayed activation retries must be ignored."
+        default %{}
+      end
+
       attribute :results, :map do
         description "Completed child partitions keyed by branch."
         default %{}
@@ -54,6 +69,15 @@ defmodule AgentExamples.Quicksort do
         public? true
       end
     end
+
+    route Aikido.AgentServer.Signals.ChildStartFailed,
+          AgentExamples.Quicksort.Actions.ScheduleChildRetry, public?: false
+
+    route AgentExamples.Quicksort.Signals.RetryChild, AgentExamples.Quicksort.Actions.RetryChild,
+      public?: false
+
+    route [Aikido.AgentServer.Signals.ChildExit, AgentExamples.Quicksort.Signals.Failed],
+          AgentExamples.Quicksort.Actions.Fail, public?: false
 
     route AgentExamples.Quicksort.Signals.Sort, AgentExamples.Quicksort.Actions.Partition
 
