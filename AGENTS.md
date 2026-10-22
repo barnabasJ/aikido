@@ -74,6 +74,7 @@ does not permit other runtime effects inside reducers.
 - Place example resources beside their own implementation and signal files. Keep source-viewer paths and categories aligned with the declared native contracts when files move.
 
 ## Standards
+- Write the project name as **Aikido** in UI copy and prose. Keep native code identifiers, package names, paths and URLs in their canonical form.
 - Break multi-step logic into helpers named for the operations they perform. Pipe state through pure transformation steps and use `with` for steps that can fail. Apply this to helpers, runtime code, DSL expansion and examples as well as reducers. Expose smaller documented operations when an umbrella helper mixes concerns, rather than inventing another vague wrapper. Keep cohesive declarations and required behaviour callback names.
 - Name helper modules for the data or lifecycle they own, and keep only operations with that shared responsibility together. Separate policy checks from unrelated cleanup or runtime effects; avoid generic names such as `Completion`, `Context` or `Execution` when a concrete subject can be named.
 - Give each operation one canonical name. Call shared operations directly instead of adding differently named forwarding helpers; keep adapters only when they perform a distinct conversion or policy step.

@@ -6,6 +6,8 @@
 
 ### Changed
 
+- Capitalize Aikido consistently in example branding and document the naming convention.
+
 - Show scripts and results for each team tool call, distinguish failed calls
   from successful results, and reuse existing offline workers on repeated tasks.
 

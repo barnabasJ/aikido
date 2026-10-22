@@ -11,8 +11,8 @@ defmodule AgentExamplesWeb.Components do
     ~H"""
     <div class="app-shell">
       <aside class="sidebar">
-        <.link navigate="/" class="brand"><span class="brand-icon">a</span>
-        aikido <span class="brand-tag">playground</span></.link>
+        <.link navigate="/" class="brand"><span class="brand-icon">A</span>
+        Aikido <span class="brand-tag">playground</span></.link>
         <p class="nav-heading">EXPLORE THE EXAMPLES</p>
         <nav aria-label="Examples">
           <.link
