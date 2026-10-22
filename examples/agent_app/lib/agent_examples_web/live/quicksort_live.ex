@@ -206,7 +206,7 @@ defmodule AgentExamplesWeb.QuicksortLive do
       assign(assigns, AgentExamples.Quicksort.TreeView.summarize(assigns.tree, assigns.focus))
 
     ~H"""
-    <.page {assigns}>
+    <.page {assigns} show_signal_activity={false}>
       <section class="panel">
         <h2>One partition, one agent</h2>
         <p>
@@ -333,6 +333,7 @@ defmodule AgentExamplesWeb.QuicksortLive do
           </button>
         </div>
       </section>
+      <aside class="sort-sidebar">
       <section class="panel" id="sort-depth-breakdown">
         <h2>Agents by depth</h2>
 
@@ -353,6 +354,8 @@ defmodule AgentExamplesWeb.QuicksortLive do
           <pre style="max-height:240px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere">{inspect(own(@run)[:result], limit: :infinity)}</pre>
         </details>
       </section>
+      <.signal_activity run={@run} />
+      </aside>
       </div>
     </.page>
     """

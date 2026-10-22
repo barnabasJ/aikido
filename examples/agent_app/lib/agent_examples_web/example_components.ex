@@ -17,6 +17,7 @@ defmodule AgentExamplesWeb.ExampleComponents do
   attr :lua, :boolean, required: true
   attr :system_prompt, :string, required: true
   attr :max_iterations, :any, required: true
+  attr :show_signal_activity, :boolean, default: true
   slot :inner_block, required: true
   slot :inspector
 
@@ -140,17 +141,7 @@ defmodule AgentExamplesWeb.ExampleComponents do
               </dd>
             </dl><button :if={active?(@run)} id="stop-example" phx-click="stop" class="button danger">Stop example</button>
           </section>
-          <section class="panel">
-            <div class="section-heading">
-              <h2>Signal activity</h2><span>Latest first · UTC</span>
-            </div><p :if={!@run || @run.events == []} class="muted">
-              Signals will appear here as you interact.
-            </p><ol id="events" class="events">
-              <li :for={event <- if(@run, do: Enum.take(@run.events, 20), else: [])}>
-                <span>{event.time}</span><code>{event.type}</code>
-              </li>
-            </ol>
-          </section>
+          <.signal_activity :if={@show_signal_activity} run={@run} />
         </aside>
       </div>
       <section class="definitions" id="definitions" aria-label="Example source definitions">
@@ -175,6 +166,24 @@ defmodule AgentExamplesWeb.ExampleComponents do
         Instances stay available while the server runs. Stop an example to release its processes.
       </footer>
     </.shell>
+    """
+  end
+
+  attr :run, :any, required: true
+
+  def signal_activity(assigns) do
+    ~H"""
+    <section class="panel" id="signal-activity">
+      <div class="section-heading">
+        <h2>Signal activity</h2><span>Latest first · UTC</span>
+      </div><p :if={!@run || @run.events == []} class="muted">
+        Signals will appear here as you interact.
+      </p><ol id="events" class="events">
+        <li :for={event <- if(@run, do: Enum.take(@run.events, 20), else: [])}>
+          <span>{event.time}</span><code>{event.type}</code>
+        </li>
+      </ol>
+    </section>
     """
   end
 

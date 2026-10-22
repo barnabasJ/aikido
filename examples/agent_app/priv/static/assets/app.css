@@ -16,3 +16,5 @@
 .workspace:has(.sort-visualization)>.primary-column{display:contents}.workspace:has(.sort-visualization)>.primary-column>.panel{grid-column:1}.workspace:has(.sort-visualization)>.inspector{grid-column:2;grid-row:1}.sort-visualization{grid-column:1/-1}@media(max-width:1100px){.workspace:has(.sort-visualization)>.inspector{grid-column:1;grid-row:auto}}
 
 #sort-depth-breakdown>h2{font-size:15px}#sort-depth-breakdown>p{font-size:12px;line-height:1.6;color:var(--muted)}
+
+.workspace:has(.sort-visualization){align-items:start}.workspace:has(.sort-visualization)>.primary-column>.panel{margin-bottom:0}.sort-sidebar{min-width:0}.sort-sidebar .events code{overflow-wrap:anywhere}
