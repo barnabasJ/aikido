@@ -1,0 +1,197 @@
+{
+  "operation": "offline SQLite checkpoint and VACUUM; compared deterministic logical-data hashes before and after, and PRAGMA quick_check",
+  "records": [
+    {
+      "store": "quicksort-ten-native-60s",
+      "shard": "shard_0.db",
+      "logical_sha256": "f9604988bcb35c0de9c33d9477f271ad6e66294ec1586dbc16e2b95a74781b44",
+      "bytes": 152379392
+    },
+    {
+      "store": "quicksort-ten-native-60s",
+      "shard": "shard_1.db",
+      "logical_sha256": "a54a127f14a2937867bc7af51f93814f173dff4d07d50ccc43baabfdd2962056",
+      "bytes": 151584768
+    },
+    {
+      "store": "quicksort-ten-native-60s",
+      "shard": "shard_2.db",
+      "logical_sha256": "861ff832c1be31e9316e00d87c879e64e5046ebbcea9378233bec310c81d01ad",
+      "bytes": 152186880
+    },
+    {
+      "store": "quicksort-ten-native-60s",
+      "shard": "shard_3.db",
+      "logical_sha256": "a1a2559a112a95636535847de214b2498bad2bf7571fb80d77967b7ad5f6fa71",
+      "bytes": 151875584
+    },
+    {
+      "store": "quicksort-ten-native-60s",
+      "shard": "shard_4.db",
+      "logical_sha256": "f6dcc6db6d255a1d3f56c39a4fd2dff94562e7140f0d18394bc806fb007f2019",
+      "bytes": 151961600
+    },
+    {
+      "store": "quicksort-ten-native-60s",
+      "shard": "shard_5.db",
+      "logical_sha256": "64b6559267415922d9e3a50ab19410fc4e6eae6abb83e6325a00537381a5398f",
+      "bytes": 152825856
+    },
+    {
+      "store": "quicksort-ten-native-60s",
+      "shard": "shard_6.db",
+      "logical_sha256": "f0de274680a879f15493babea12b1f51b48f1605eca174c3d638148dc52c115c",
+      "bytes": 151732224
+    },
+    {
+      "store": "quicksort-ten-native-60s",
+      "shard": "shard_7.db",
+      "logical_sha256": "a7b1d9c12ede68c8feb9a17dde582b58cccd5fe0ec16023686c17f1aecf1fec9",
+      "bytes": 152117248
+    },
+    {
+      "store": "quicksort-ten-stable-identities",
+      "shard": "shard_0.db",
+      "logical_sha256": "8224d7ac2917575550f49429f69dc0f3b6c7c96e23fff96bf626689af5a425d8",
+      "bytes": 28909568
+    },
+    {
+      "store": "quicksort-ten-stable-identities",
+      "shard": "shard_1.db",
+      "logical_sha256": "2ba1323194c49ea593bd78b2ad273102efb40d50015c7d07dff10c3455e0f951",
+      "bytes": 33419264
+    },
+    {
+      "store": "quicksort-ten-stable-identities",
+      "shard": "shard_2.db",
+      "logical_sha256": "aff88395d1716c993c7065e408b7cb719e37f9971b5167d65684b93655f4e6bd",
+      "bytes": 29442048
+    },
+    {
+      "store": "quicksort-ten-stable-identities",
+      "shard": "shard_3.db",
+      "logical_sha256": "b9cdf9d56058838b5dba9e4238f9d8cd5f00acaddf14920ab33662f3a972fc5c",
+      "bytes": 35102720
+    },
+    {
+      "store": "quicksort-ten-stable-identities",
+      "shard": "shard_4.db",
+      "logical_sha256": "0c3127be7069f78c154adf938f9e901733af82fb04eca715c15ca66c9bc71864",
+      "bytes": 32821248
+    },
+    {
+      "store": "quicksort-ten-stable-identities",
+      "shard": "shard_5.db",
+      "logical_sha256": "5d8c7b6e607101949fd8eef6e9d9646127bea5fe272611b4b312f901b3e1715f",
+      "bytes": 33796096
+    },
+    {
+      "store": "quicksort-ten-stable-identities",
+      "shard": "shard_6.db",
+      "logical_sha256": "5a0b570d419deb71877a24de7bce3a5802ee24baec0f016102c4d7c34eb24a4b",
+      "bytes": 34803712
+    },
+    {
+      "store": "quicksort-ten-stable-identities",
+      "shard": "shard_7.db",
+      "logical_sha256": "a3c0d0a34051bd1f5b853603c1868020874c50514a0e837a0463822017d49639",
+      "bytes": 30052352
+    },
+    {
+      "store": "quicksort-repeated-100k",
+      "shard": "shard_0.db",
+      "logical_sha256": "f025f4d124493d930197d0672e860d1efbbcbe8573fad77673a3857a4411487a",
+      "bytes": 127209472
+    },
+    {
+      "store": "quicksort-repeated-100k",
+      "shard": "shard_1.db",
+      "logical_sha256": "85d0b5f7fd2337969c12121937add432d04944ce388d459815183413cd5a5e43",
+      "bytes": 117059584
+    },
+    {
+      "store": "quicksort-repeated-100k",
+      "shard": "shard_2.db",
+      "logical_sha256": "91c70e00664dd101c26c7b9e9a340a39d122a4290b8ea09aa4051b8e327c87ad",
+      "bytes": 67506176
+    },
+    {
+      "store": "quicksort-repeated-100k",
+      "shard": "shard_3.db",
+      "logical_sha256": "144f6d435b9ad92f982c6703b279b3e9e42814d834d131c1bc7a36826a9debfa",
+      "bytes": 97894400
+    },
+    {
+      "store": "quicksort-repeated-100k",
+      "shard": "shard_4.db",
+      "logical_sha256": "86f8943d26ba77ce9b844c3021e3d73ae7832b2a0b4b66404b411f5bd0b7a68c",
+      "bytes": 88936448
+    },
+    {
+      "store": "quicksort-repeated-100k",
+      "shard": "shard_5.db",
+      "logical_sha256": "05b28b843768e2ec844d4c2d54fbcf1b046b916c19089ddc5c937f57ce559318",
+      "bytes": 66232320
+    },
+    {
+      "store": "quicksort-repeated-100k",
+      "shard": "shard_6.db",
+      "logical_sha256": "c570d33191e8b7ee7c291067aa503f692b874cdd93a76077e1bbe50a81c79551",
+      "bytes": 65757184
+    },
+    {
+      "store": "quicksort-repeated-100k",
+      "shard": "shard_7.db",
+      "logical_sha256": "9be54f196d734ce5f0df1066e3cd5110af3c2371d60ad5d3a8ecc631d402552f",
+      "bytes": 66887680
+    },
+    {
+      "store": "quicksort-ten-truncate-10k",
+      "shard": "shard_0.db",
+      "logical_sha256": "8b5b11975760094ea20a77e5618f75429ad6a050b82e606d54dd51693df0a293",
+      "bytes": 20758528
+    },
+    {
+      "store": "quicksort-ten-truncate-10k",
+      "shard": "shard_1.db",
+      "logical_sha256": "72ac3c50bfa0b0546c195ad2ce0608d6e685c1ee5501271a76779ca258a7f5eb",
+      "bytes": 20545536
+    },
+    {
+      "store": "quicksort-ten-truncate-10k",
+      "shard": "shard_2.db",
+      "logical_sha256": "b44d7cb721eb1b800bae6da0ac27313639f154e417ac71bfa9f40461cdb72d2c",
+      "bytes": 19988480
+    },
+    {
+      "store": "quicksort-ten-truncate-10k",
+      "shard": "shard_3.db",
+      "logical_sha256": "3afebd9f224894a0838b10790993e27e1b28f610e7a820a10030274e96378776",
+      "bytes": 20103168
+    },
+    {
+      "store": "quicksort-ten-truncate-10k",
+      "shard": "shard_4.db",
+      "logical_sha256": "16c5c4774f75301cb30a7eca61e3e63aeeead1a9242c778f53e1ff1d614bdf05",
+      "bytes": 20164608
+    },
+    {
+      "store": "quicksort-ten-truncate-10k",
+      "shard": "shard_5.db",
+      "logical_sha256": "09ba16023ffdddd3bc8166f18594b3ade2ad5a70a23c8302558ef21a49be9628",
+      "bytes": 20557824
+    },
+    {
+      "store": "quicksort-ten-truncate-10k",
+      "shard": "shard_6.db",
+      "logical_sha256": "93d23a6192e021e34f2a83e30b22f9667a3b0f6621e483321ba5d4e17be28577",
+      "bytes": 20717568
+    },
+    {
+      "store": "quicksort-ten-truncate-10k",
+      "shard": "shard_7.db",
+      "logical_sha256": "71b49d3e0b9d72df2e29b7fb462fb9b32bba27d1e2097f17c71a88b4ef1ed159",
+      "bytes": 20254720
+    }
+  ]
+}

@@ -258,3 +258,50 @@ This confirms normal-path lifecycle cleanup at that size, but not stable disk
 usage or full-size timing. After the benchmark VM exited, offline WAL checkpoints
 reclaimed log space without deleting records. These maintenance operations were
 outside the timed runs and are not hidden in the reported restart path.
+
+### Native checkpoint at restart
+
+The [serialized native checkpoint diagnostic](results/quicksort-ten-native-checkpoint-10k-2026-10-22.json)
+called `EKV.WALCheckpointer.checkpoint/2` for each shard at the quiet run boundary.
+All eight shards completed their passive checkpoints in all ten iterations. WAL
+occupancy stayed at about 3.2–3.5 GB rather than growing across iterations.
+
+The actual `Quicksort.Restart` path now waits for the old tree to exit and asks
+EKV's own checkpointer to finish each shard before starting the new root. This
+runs in the external restart task, serializes with EKV's background checkpointer,
+and preserves stored data. No direct SQL maintenance is part of this path.
+Other application roots remain alive; concurrent writes can still make a passive
+checkpoint incomplete, so this does not promise a globally quiescent store.
+
+[Ten runs through that updated normal path](results/quicksort-ten-restart-checkpoint-10k-2026-10-22.json)
+used one VM and the unchanged existing store, without diagnostic maintenance flags.
+Every result and worker exit was verified. Sorting took 9.8–15.1 seconds;
+restart, including checkpointing, took 1.2–4.4 seconds. Post-run BEAM memory was
+167–189 MB, with one root, one saved agent, no I/O tasks and no histories.
+Logical WAL occupancy stayed between 2.5 and 3.0 GB. Final stop left zero live
+and saved agents, tasks and histories. Native consensus metadata remains;
+its key count is bounded for these repeated input values.
+
+Two browser runs on the restored port-4042 preview sorted and verified all
+10,000 values in 15.730s and 12.191s, with a native-checkpoint restart between them.
+The final browser restart cleared the history, and its idle root was stopped.
+All 79 example tests and the repository quality checks passed.
+
+Full-size verification of this change is pending disk headroom. The earlier
+disk-full incident also stopped the old preview runtime; its eight SQLite shards
+passed integrity checks and the preview was restored without wiping its store or
+relaxing safe deserialization. One old idle test root was stopped through the
+normal domain action after its application modules loaded. Provider storage was
+untouched. The workspace's ZFS snapshots retain about 50 GB of historical blocks;
+autosnapshots can retain old WAL blocks even after the database checkpoints them.
+No filesystem snapshots were deleted. Offline diagnostic compaction preserved
+logical-data hashes and passed integrity checks for all 32 shards; it is not a
+substitute for the pending full-size runtime verification.
+
+The preview-store audit after those browser tests had zero live agents, I/O tasks
+and histories, and 205 MB of BEAM-accounted memory. It also found 11,728 saved
+temporary children under the different, older failed tree
+`01a16407-8d30-7991-8d67-4d8549307509`: 10,747 marked running and 981 marked stopped
+gracefully despite no live processes. These are saved snapshots, not EKV Paxos
+metadata. They remain in place; complete cleanup of the whole preview store has
+not been established. None belonged to the two newly verified browser runs.
