@@ -356,3 +356,15 @@ database files about 384 MB on this compressed filesystem. Passive checkpointing
 allows reuse and does not promise immediate file truncation. Native EKV metadata
 and reusable storage remain; completed agent snapshots and live processes do not.
 The bounded key set assumes the same repeated input values.
+
+
+### Starting after process recovery
+
+The playground resolves Stop by the stable agent ID, rather than assuming its
+cached PID is still current. Quicksort's Start button uses the same monitored
+teardown path as Restart whenever a previous browser run exists. Teardown also
+stops surviving processes under that root's identity prefix; recovered descendants
+may no longer have their original live parent monitors. A replacement root is
+started only after those processes exit. Other browser-owned trees are excluded.
+Regression tests cover a stale cached PID, an existing replacement root, a
+detached descendant, preservation of another root and a subsequent successful sort.

@@ -12,6 +12,7 @@ defmodule AgentExamples.Quicksort.Restart do
 
     try do
       with :ok <- AgentExamples.Playground.stop(owner, "quicksort"),
+           :ok <- stop_surviving_tree_processes(monitors),
            :ok <- await_tree_exit(monitors, deadline),
            :ok <- checkpoint_agent_store() do
         AgentExamples.Playground.start(owner, "quicksort", %{})
@@ -19,6 +20,24 @@ defmodule AgentExamples.Quicksort.Restart do
     after
       for ref <- Map.keys(monitors), do: Process.demonitor(ref, [:flush])
     end
+  end
+
+  # Recovery can replace parents without reconstructing their old live child
+  # monitors. Retire every process in this tree, including detached descendants.
+  defp stop_surviving_tree_processes(monitors) do
+    Enum.reduce_while(monitors, :ok, fn {_ref, pid}, :ok ->
+      if Process.alive?(pid) do
+        case AgentExamples.Agents.quicksort_stop(pid) do
+          {:ok, _} ->
+            {:cont, :ok}
+
+          {:error, reason} ->
+            if Process.alive?(pid), do: {:halt, {:error, reason}}, else: {:cont, :ok}
+        end
+      else
+        {:cont, :ok}
+      end
+    end)
   end
 
   # A fully checkpointed WAL can be reused by the next writer. Background passive

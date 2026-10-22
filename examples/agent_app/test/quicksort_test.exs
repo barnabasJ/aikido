@@ -100,6 +100,22 @@ defmodule AgentExamples.QuicksortTest do
            end)
   end
 
+  test "playground stop resolves a replacement process instead of trusting its old PID" do
+    owner = "stale-stop:" <> Ash.UUIDv7.generate()
+    {:ok, run} = AgentExamples.Playground.start(owner, "quicksort", %{})
+    Agents.quicksort_stop!(run.record)
+    replacement = Agents.quicksort_start!(%{id: run.record.id})
+    on_exit(fn -> Agents.quicksort_stop(replacement) end)
+    monitor = Process.monitor(replacement.pid)
+
+    assert :ok = AgentExamples.Playground.stop(owner, "quicksort")
+    assert_receive {:DOWN, ^monitor, :process, _, _}, 5000
+    assert AgentExamples.Playground.get(owner, "quicksort").status == :stopped
+
+    assert :error =
+             Aikido.Durable.lookup(Aikido.durable_supervisor_name(Aikido.Default), run.record.id)
+  end
+
   test "empty and equal-valued inputs complete without children" do
     for numbers <- [[], [3], [3, 3, 3]] do
       root = Agents.quicksort_start!(%{})

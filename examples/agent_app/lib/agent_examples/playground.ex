@@ -292,7 +292,7 @@ defmodule AgentExamples.Playground do
     key = {owner, slug}
 
     case state.runs[key] do
-      %{status: status} = run when status != :stopped ->
+      %{record: _} = run ->
         case stop_live_agent(run.record) do
           {:ok, _receipt} ->
             state = reply_to_run_requests(state, key, {:error, :stopped})
@@ -320,13 +320,18 @@ defmodule AgentExamples.Playground do
     end
   end
 
-  defp stop_live_agent(%{pid: pid} = record) do
-    if Process.alive?(pid) do
-      (Map.get(record, :resource) || record.__struct__)
-      |> Ash.ActionInput.for_action(:stop, %{agent: record})
-      |> Ash.run_action()
-    else
-      {:ok, :already_stopped}
+  defp stop_live_agent(record) do
+    resource = Map.get(record, :resource) || record.__struct__
+    pool = Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource))
+
+    case Aikido.Durable.lookup(pool, record.id) do
+      {:ok, _pid} ->
+        resource
+        |> Ash.ActionInput.for_action(:stop, %{agent: record.id})
+        |> Ash.run_action()
+
+      :error ->
+        {:ok, :already_stopped}
     end
   end
 

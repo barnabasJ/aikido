@@ -75,7 +75,7 @@ defmodule AgentExamplesWeb.ExamplePage do
     {:halt,
      socket
      |> assign(starting: true, error: nil)
-     |> start_async(:start_example, fn -> Playground.start(owner, slug, params) end)}
+     |> start_async(:start_example, fn -> start_example(owner, slug, params) end)}
   end
 
   defp handle_event("stop", _, socket) do
@@ -84,6 +84,14 @@ defmodule AgentExamplesWeb.ExamplePage do
   end
 
   defp handle_event(_, _, socket), do: {:cont, socket}
+
+  defp start_example(owner, "quicksort", params) do
+    if Playground.get(owner, "quicksort"),
+      do: AgentExamples.Quicksort.Restart.restart(owner),
+      else: Playground.start(owner, "quicksort", params)
+  end
+
+  defp start_example(owner, slug, params), do: Playground.start(owner, slug, params)
 
   defp handle_async(:start_example, {:ok, {:ok, run}}, socket),
     do: {:halt, assign(socket, run: run, starting: false, error: nil)}

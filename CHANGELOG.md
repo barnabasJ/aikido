@@ -24,6 +24,10 @@
 
 ### Changed
 
+- Resolve playground stops by stable agent identity after DurableServer replaces
+  a PID. Quicksort Start reuses the teardown/restart path and retires detached
+  recovered descendants before recreating its root.
+
 - Finish native EKV passive checkpoints after quicksort teardown and before
   starting the replacement root, so consecutive sorting runs can reuse their WAL.
 

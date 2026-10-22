@@ -953,6 +953,38 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert :error = AgentExamples.Quicksort.RunHistory.fetch(topic)
   end
 
+  test "starting a stopped quicksort retires a replacement PID for the same identity", %{
+    conn: conn
+  } do
+    {:ok, view, _} = live(conn, "/examples/quicksort")
+    owner = start(view, "quicksort")
+    old = Playground.get(owner, "quicksort").record
+    assert :ok = Playground.stop(owner, "quicksort")
+    replacement = AgentExamples.Agents.quicksort_start!(%{id: old.id})
+    monitor = Process.monitor(replacement.pid)
+    detached = AgentExamples.Agents.quicksort_start!(%{id: old.id <> "/partition/42"})
+    detached_monitor = Process.monitor(detached.pid)
+    on_exit(fn -> AgentExamples.Agents.quicksort_stop(detached) end)
+    independent = AgentExamples.Agents.quicksort_start!(%{})
+    on_exit(fn -> AgentExamples.Agents.quicksort_stop(independent) end)
+
+    start(view, "quicksort")
+
+    assert_receive {:DOWN, ^monitor, :process, _, _}, 5000
+    assert_receive {:DOWN, ^detached_monitor, :process, _, _}, 5000
+    fresh = Playground.get(owner, "quicksort")
+    assert fresh.record.id == old.id
+    assert fresh.record.pid != replacement.pid
+    assert Process.alive?(fresh.record.pid)
+    assert Process.alive?(independent.pid)
+    assert fresh.snapshot.own.status == :idle
+    refute render(view) =~ "already_started"
+
+    view |> form("#quicksort-form", %{size: "32"}) |> render_submit()
+    await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
+    assert Playground.get(owner, "quicksort").snapshot.own.result == Enum.to_list(1..32)
+  end
+
   test "quicksort coalesces progress bursts without regressing terminal nodes", %{conn: conn} do
     {:ok, view, _} = live(conn, "/examples/quicksort")
     owner = start(view, "quicksort")
