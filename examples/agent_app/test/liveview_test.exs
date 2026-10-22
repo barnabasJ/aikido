@@ -888,10 +888,37 @@ defmodule AgentExamplesWeb.LiveViewTest do
     render_async(reconnected, 15_000)
     assert has_element?(reconnected, "#sort-spawned", "32 agents spawned")
     assert has_element?(reconnected, ".sort-diagram circle[data-status=completed]")
+
+    old_id = Playground.get(owner, "quicksort").record.id
+
+    old_tree =
+      Aikido.Default
+      |> Aikido.durable_supervisor_name()
+      |> Aikido.Durable.members()
+      |> Enum.filter(fn {id, _} -> id == old_id || String.starts_with?(id, old_id <> "/") end)
+
+    assert length(old_tree) == 32
     reconnected |> element("button[phx-click=restart_sort]") |> render_click()
     render_async(reconnected, 15_000)
     assert Playground.get(owner, "quicksort").snapshot.own.status == :idle
+    assert Playground.get(owner, "quicksort").record.id != old_id
+    assert Enum.all?(old_tree, fn {_, pid} -> !Process.alive?(pid) end)
     assert has_element?(reconnected, "#sort-spawned", "0 agents spawned")
+  end
+
+  test "quicksort can restart after its root has already stopped", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/quicksort")
+    owner = start(view, "quicksort")
+    old = Playground.get(owner, "quicksort").record
+    AgentExamples.Agents.quicksort_stop!(old)
+
+    view |> element("button[phx-click=restart_sort]") |> render_click()
+    render_async(view, 15_000)
+
+    fresh = Playground.get(owner, "quicksort")
+    assert fresh.record.id != old.id
+    assert Process.alive?(fresh.record.pid)
+    assert fresh.snapshot.own.status == :idle
   end
 
   test "quicksort coalesces progress bursts without regressing terminal nodes", %{conn: conn} do

@@ -154,3 +154,29 @@ There were no failed activations, retries or callback exceptions in either final
 run. Regression tests additionally cover capacity rejection, parent death during
 activation, late readiness, stale retries, retry exhaustion, repeated/reordered
 progress, independent roots and reconnect history.
+
+### Consecutive runs and restart teardown
+
+The two 100,000-agent validations above waited for every monitored descendant to
+exit between runs. They did not establish the timing of the original UI restart:
+that returned after stopping the root, while descendant deletion continued.
+The UI now waits asynchronously for the previous tree's monitored processes to
+exit before it starts a fresh root. Completion still retains agents for inspection;
+the restart button explicitly displays the release phase.
+
+A later failed run in the same preview left 46,699 live agents. Stopping its root
+terminated all 46,699 with `{:shutdown, :delete}` in 22.020 seconds. Afterward there
+were zero registered agents and zero I/O tasks. BEAM-accounted memory fell from
+about 5.9 GB to 0.57 GB; OS RSS fell from about 14.6 GB to 6.3 GB. These are different
+measurements: RSS also includes allocator capacity, native allocations and shared
+file mappings. EKV retains native tombstones and Paxos metadata beyond logical
+agent deletion. The measurements establish that process teardown completes, but
+do not prove that teardown overlap explains every slowdown across repeated runs.
+
+With monitored UI restarts, three consecutive 10,000-agent browser runs against
+that same existing eight-shard store took 6.508s, 7.057s and 6.643s (random trees,
+depths 32, 35 and 29). Between the second and third runs, native membership
+contained only the new idle root, with zero I/O tasks and 0.49 GB BEAM-accounted
+memory. The third result was checked against every value in `1..10000` in the
+browser. This smaller regression check does not replace a repeat of the larger
+stress test or isolate storage retention from host memory pressure.

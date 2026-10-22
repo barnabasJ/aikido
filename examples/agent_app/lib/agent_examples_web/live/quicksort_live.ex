@@ -15,6 +15,7 @@ defmodule AgentExamplesWeb.QuicksortLive do
         history_available: true,
         root_monitor: nil,
         root_unavailable: nil,
+        restarting: false,
         focus: "root",
         size: 4096
       )
@@ -44,44 +45,29 @@ defmodule AgentExamplesWeb.QuicksortLive do
     end
   end
 
+  def handle_event("restart_sort", _, %{assigns: %{starting: true}} = socket),
+    do: {:noreply, socket}
+
   def handle_event("restart_sort", _, socket) do
     owner = socket.assigns.owner
 
     socket = socket |> release_root_monitor() |> put_private(:quicksort_pending, %{})
 
-    case AgentExamples.Playground.stop(owner, "quicksort") do
-      :ok ->
-        if socket.assigns.sort_topic do
-          Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
-          AgentExamples.Quicksort.RunHistory.close(socket.assigns.sort_topic)
-        end
-
-        {:noreply,
-         socket
-         |> assign(
-           run: AgentExamples.Playground.get(owner, "quicksort"),
-           starting: true,
-           history_available: true,
-           root_unavailable: nil,
-           tree: AgentExamples.Quicksort.TreeView.new(),
-           sort_topic: nil,
-           started_at: nil,
-           elapsed: nil,
-           focus: "root",
-           error: nil
-         )
-         |> start_async(:start_example, fn ->
-           AgentExamples.Playground.start(owner, "quicksort", %{})
-         end)}
-
-      {:error, reason} ->
-        {:noreply, assign(socket, error: reason)}
+    if socket.assigns.sort_topic do
+      Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
     end
+
+    {:noreply,
+     socket
+     |> assign(starting: true, restarting: true, error: nil)
+     |> start_async(:restart_sort, fn ->
+       AgentExamples.Quicksort.Restart.restart(owner)
+     end)}
   end
 
   def handle_event("sort", %{"size" => size}, socket) do
     with {size, ""} when size in 1..100_000 <- Integer.parse(size),
-         true <- active?(socket.assigns.run) do
+         true <- !socket.assigns.starting && active?(socket.assigns.run) do
       if socket.assigns.sort_topic do
         Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
         AgentExamples.Quicksort.RunHistory.close(socket.assigns.sort_topic)
@@ -117,6 +103,35 @@ defmodule AgentExamplesWeb.QuicksortLive do
 
   def handle_event("focus", %{"branch" => branch}, socket),
     do: {:noreply, assign(socket, focus: branch)}
+
+  def handle_async(:restart_sort, {:ok, {:ok, run}}, socket) do
+    {:noreply,
+     assign(socket,
+       run: run,
+       starting: false,
+       restarting: false,
+       history_available: true,
+       root_unavailable: nil,
+       tree: AgentExamples.Quicksort.TreeView.new(),
+       sort_topic: nil,
+       started_at: nil,
+       elapsed: nil,
+       focus: "root",
+       error: nil
+     )}
+  end
+
+  def handle_async(:restart_sort, {:ok, {:error, reason}}, socket),
+    do: {:noreply, assign(socket, starting: false, restarting: false, error: reason)}
+
+  def handle_async(:restart_sort, {:exit, reason}, socket),
+    do:
+      {:noreply,
+       assign(socket,
+         starting: false,
+         restarting: false,
+         error: "Could not restart: #{inspect(reason)}"
+       )}
 
   def handle_info({:quicksort_progress, topic, node}, %{assigns: %{sort_topic: topic}} = socket) do
     pending = Map.get(socket.private, :quicksort_pending, %{})
@@ -198,18 +213,19 @@ defmodule AgentExamplesWeb.QuicksortLive do
             <button
               type="submit"
               class="button primary"
-              disabled={!active?(@run) || own(@run)[:status] != :idle}
+              disabled={@starting || !active?(@run) || own(@run)[:status] != :idle}
             >Spawn sorting tree →</button>
             <button
               type="button"
               class="button"
               phx-click="restart_sort"
               disabled={!active?(@run) || @starting}
-            >Restart example</button>
+            >{if @restarting, do: "Releasing previous tree…", else: "Restart example"}</button>
           </div>
         </form>
         <p class="muted">
-          Restart releases the old tree and creates a fresh root. Then choose a size and spawn again.
+          Sorting completion keeps the agents available for inspection. Restart waits for the old
+          tree's processes to exit before enabling a fresh root.
         </p>
       </section>
       <section class="panel" id="sort-metrics">

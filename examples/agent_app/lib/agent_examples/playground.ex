@@ -293,9 +293,7 @@ defmodule AgentExamples.Playground do
 
     case state.runs[key] do
       %{status: status} = run when status != :stopped ->
-        case (Map.get(run.record, :resource) || run.record.__struct__)
-             |> Ash.ActionInput.for_action(:stop, %{agent: run.record})
-             |> Ash.run_action() do
+        case stop_live_agent(run.record) do
           {:ok, _receipt} ->
             state = reply_to_run_requests(state, key, {:error, :stopped})
             for {_ref, {^key, task}} <- state.tasks, do: Task.shutdown(task, :brutal_kill)
@@ -319,6 +317,16 @@ defmodule AgentExamples.Playground do
 
       _ ->
         {:reply, :ok, state}
+    end
+  end
+
+  defp stop_live_agent(%{pid: pid} = record) do
+    if Process.alive?(pid) do
+      (Map.get(record, :resource) || record.__struct__)
+      |> Ash.ActionInput.for_action(:stop, %{agent: record})
+      |> Ash.run_action()
+    else
+      {:ok, :already_stopped}
     end
   end
 

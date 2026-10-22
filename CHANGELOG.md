@@ -16,6 +16,8 @@
 
 ### Changed
 
+- Wait for the quicksort tree's monitored processes to exit before restart enables
+  the next root, keeping descendant teardown out of the next sorting run.
 - Forward native local EKV configuration and DurableServer activation options.
   The large quicksort example allows a 30-second activation budget.
 - Batch quicksort display updates at ten frames per second, preserve counts in
