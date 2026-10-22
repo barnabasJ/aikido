@@ -47,7 +47,7 @@ defmodule AgentExamples.Playground do
     do: {:reply, Map.get(state.providers, owner, AI.Providers.defaults()), state}
 
   def handle_call({:provider_key, owner, provider}, _, state) do
-    case state.credentials[{owner, to_string(provider)}] do
+    case state.credentials[{owner, AI.Providers.credential_provider(provider)}] do
       nil -> {:reply, {:error, "Configure an API key in the example app's provider form."}, state}
       key -> {:reply, {:ok, key}, state}
     end
@@ -58,7 +58,12 @@ defmodule AgentExamples.Playground do
          {:ok, key} <- resolve_provider_key(owner, settings, params, state) do
       credentials =
         if settings.mode == "live",
-          do: Map.put(state.credentials, {owner, settings.provider}, key),
+          do:
+            Map.put(
+              state.credentials,
+              {owner, AI.Providers.credential_provider(settings.provider)},
+              key
+            ),
           else: state.credentials
 
       state = %{
@@ -387,7 +392,7 @@ defmodule AgentExamples.Playground do
   defp resolve_provider_key(owner, settings, params, state) do
     key = String.trim(params["api_key"] || "")
     provider = Enum.find(ReqLLM.Providers.list(), &(to_string(&1) == settings.provider))
-    saved = state.credentials[{owner, settings.provider}]
+    saved = state.credentials[{owner, AI.Providers.credential_provider(settings.provider)}]
 
     case if(key == "", do: saved || environment_key(provider), else: key) do
       nil -> {:error, "Enter an API key for the selected provider."}
@@ -754,12 +759,17 @@ defmodule AgentExamples.Playground do
            :tool_error_streak,
            :estimated_tokens
          ])
-         |> Map.put(:hook_messages, hook_injected_context_messages(ai)),
+         |> Map.put(:hook_messages, hook_injected_context_messages(ai))
+         |> Map.put(:model_label, model_label(Map.get(ai, :model))),
        todos: Map.get(Map.get(state.agent.state, :todos, %{}), :items, []),
        members: member_snapshots(team, resource),
        tasks: task_snapshots(team)
      }}
   end
+
+  defp model_label(%{provider: provider, id: id}), do: "#{provider}:#{id}"
+  defp model_label(model) when is_binary(model), do: model
+  defp model_label(_), do: "Not configured"
 
   defp member_snapshots(team, resource) do
     fixed =

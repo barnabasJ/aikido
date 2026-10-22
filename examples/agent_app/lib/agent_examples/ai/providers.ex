@@ -1,7 +1,15 @@
 defmodule AgentExamples.AI.Providers do
   @moduledoc "Provider choices and native ReqLLM model validation for the browser's shared AI settings."
 
-  def defaults, do: %{mode: "offline", provider: "zai", model: "glm-5.3", key_configured?: false}
+  def defaults,
+    do: %{mode: "offline", provider: "zai_coder", model: "glm-5.3", key_configured?: false}
+
+  @doc "z.ai endpoint variants use the same account key; keep one browser credential for that family."
+  def credential_provider(provider)
+      when provider in [:zai, :zai_coder, :zai_coding_plan, "zai", "zai_coder", "zai_coding_plan"],
+      do: "zai"
+
+  def credential_provider(provider), do: to_string(provider)
 
   def choices do
     ReqLLM.Providers.list()

@@ -691,6 +691,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
       owner = start(page, example.slug)
       run = Playground.get(owner, example.slug)
       assert run.mode == "live"
+      assert has_element?(page, "#active-model", "zai:glm-5.3")
 
       assert {:ok,
               %{client: AgentExamples.AI.LiveClient, model: %{provider: :zai, id: "glm-5.3"}}} =

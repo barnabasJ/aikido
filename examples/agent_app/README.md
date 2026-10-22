@@ -81,7 +81,8 @@ example server's memory, scoped to the browser session; the form never renders
 a saved key back. Agent snapshots contain a browser credential reference, not
 the key. Restarting the server clears saved keys, so enter yours again before
 using a restored conversation. Restart an active example after changing provider
-or model. An empty key field keeps a previously saved key for that provider;
+or model. An empty key field keeps a previously saved key for that provider. The z.ai
+standard and coding-plan entries share the same submitted account key;
 provider environment keys such as `ZAI_API_KEY` can also be used when saving.
 
 Live mode uses native ReqLLM for every AI page, including streaming pages.

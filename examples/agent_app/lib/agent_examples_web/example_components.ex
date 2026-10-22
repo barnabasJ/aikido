@@ -134,6 +134,8 @@ defmodule AgentExamplesWeb.ExampleComponents do
               </dt><dd :if={Catalog.ai?(@example)}>
                 {if @run, do: Map.get(@run.snapshot.ai, :iteration, 0), else: 0}
               </dd>
+              <dt :if={Catalog.ai?(@example) && @run}>Model in this agent</dt>
+              <dd :if={Catalog.ai?(@example) && @run} id="active-model">{Map.get(@run.snapshot.ai, :model_label, "Not configured")}</dd>
             </dl><button :if={active?(@run)} id="stop-example" phx-click="stop" class="button danger">Stop example</button>
           </section>
           <section class="panel">

@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Retain the submitted browser key when switching z.ai endpoint variants and
+  default the example form to the coding-plan provider. Verify the native coding
+  request URL independently of the provider's billing response.
+
 - Add browser-session provider, model and API-key settings shared by every AI
   playground example and its workers. Use native ReqLLM in live mode, resolve
   keys from server memory outside agent state, and support z.ai standard and

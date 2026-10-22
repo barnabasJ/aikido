@@ -84,4 +84,65 @@ defmodule AgentExamples.ProviderTest do
 
     refute message =~ key
   end
+
+  test "coding-plan providers send requests to the coding endpoint" do
+    for provider <- [:zai_coder, :zai_coding_plan] do
+      owner = Ash.UUIDv7.generate()
+
+      assert {:ok, _} =
+               Playground.configure_provider(owner, %{
+                 "mode" => "live",
+                 "provider" => to_string(provider),
+                 "model" => "glm-5.3-flash",
+                 "api_key" => "endpoint-test"
+               })
+
+      Req.Test.stub(__MODULE__, fn conn ->
+        assert conn.request_path == "/api/coding/paas/v4/chat/completions"
+
+        Req.Test.json(conn, %{
+          id: "test",
+          model: "glm-5.3-flash",
+          choices: [
+            %{
+              index: 0,
+              message: %{role: "assistant", content: "coding endpoint"},
+              finish_reason: "stop"
+            }
+          ]
+        })
+      end)
+
+      assert {:ok, _} =
+               AI.LiveClient.generate_text(
+                 %{credential_owner: owner, provider: provider, id: "glm-5.3-flash"},
+                 [ReqLLM.Context.user("hello")],
+                 req_http_options: [plug: {Req.Test, __MODULE__}]
+               )
+    end
+  end
+
+  test "switching z.ai endpoints preserves the submitted key instead of selecting an environment key" do
+    owner = Ash.UUIDv7.generate()
+
+    params = %{
+      "mode" => "live",
+      "provider" => "zai",
+      "model" => "glm-5.3-flash",
+      "api_key" => "submitted-plan-key"
+    }
+
+    assert {:ok, _} = Playground.configure_provider(owner, params)
+
+    for provider <- ["zai_coder", "zai_coding_plan", "zai"] do
+      assert {:ok, _} =
+               Playground.configure_provider(owner, %{
+                 params
+                 | "provider" => provider,
+                   "api_key" => ""
+               })
+
+      assert {:ok, "submitted-plan-key"} = Playground.provider_key(owner, provider)
+    end
+  end
 end
