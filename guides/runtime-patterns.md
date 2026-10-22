@@ -490,3 +490,12 @@ from the same per-agent shared context, as Makewright does. Supply that context
 through `tool_context.context.shared` or the caller's Ash context. Aikido
 preserves actor, tenant and configured application context when invoking the
 native tools; Lua's inner Ash actions still perform their own authorization.
+
+### Model and tool attempt deadlines
+
+`model_timeout_ms` and `tool_timeout_ms` bound each individual attempt. Retrying
+creates a fresh deadline after the cancellation-aware backoff. The retry count
+bounds the number of attempts; these options do not impose an overall run limit.
+Streaming progress requires nonempty text, thinking, tool-call content or a
+multimodal content part. Metadata and empty chunks do not extend the progress
+clock. Cancellation interrupts attempts and retry backoff and releases cleanup.

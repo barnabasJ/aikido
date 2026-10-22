@@ -14,7 +14,7 @@ defmodule Aikido.AiReact.ModelStream do
           response.stream,
           fn -> {"", "", System.monotonic_time(:millisecond)} end,
           fn chunk, {text, thinking, last_emit} ->
-            if chunk.type in [:content, :thinking, :tool_call], do: notify.(:progress)
+            if generation_progress?(chunk), do: notify.(:progress)
             text = if chunk.type == :content, do: text <> (chunk.text || ""), else: text
 
             thinking =
@@ -41,4 +41,19 @@ defmodule Aikido.AiReact.ModelStream do
       ReqLLM.StreamResponse.to_response(%{response | stream: stream})
     end
   end
+
+  @doc "Whether a parsed chunk contains generation content rather than an empty heartbeat."
+  def generation_progress?(%{type: type, text: text}) when type in [:content, :thinking],
+    do: is_binary(text) && text != ""
+
+  def generation_progress?(%{type: :tool_call} = chunk),
+    do: nonempty?(chunk.name) || nonempty?(chunk.arguments)
+
+  def generation_progress?(%{type: :content_part, content_part: part}), do: nonempty?(part)
+  def generation_progress?(_chunk), do: false
+
+  defp nonempty?(value) when is_binary(value), do: value != ""
+  defp nonempty?(value) when is_map(value), do: map_size(value) > 0
+  defp nonempty?(value) when is_list(value), do: value != []
+  defp nonempty?(_value), do: false
 end

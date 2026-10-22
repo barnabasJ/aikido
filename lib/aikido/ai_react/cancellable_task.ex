@@ -3,7 +3,7 @@ defmodule Aikido.AiReact.CancellableTask do
   Owns cancellable I/O attempts for a ReAct model call or tool setup/execution.
 
   Runs in supervised work outside the agent mailbox. It retries eligible
-  failures, enforces total and progress deadlines, and releases cleanup
+  failures, enforces per-attempt and progress deadlines, and releases cleanup
   callbacks when work finishes or the owning run ends. It never writes state.
   """
   require Ash.Tracer
@@ -25,12 +25,11 @@ defmodule Aikido.AiReact.CancellableTask do
     with {:ok, subscription} <-
            Aikido.AgentServer.subscribe(owner, "ai.react.**", selector, once: true) do
       monitor = Process.monitor(owner)
-      deadline = now() + Keyword.fetch!(opts, :timeout)
 
       try do
         case Aikido.AgentServer.state(owner, &{:ok, selector.(&1)}) do
           {:ok, :skip} ->
-            execute_attempt(owner, supervisor, work, opts, subscription, monitor, deadline, 0)
+            execute_attempt(owner, supervisor, work, opts, subscription, monitor, 0)
 
           _ ->
             {:error, :cancelled}
@@ -42,7 +41,8 @@ defmodule Aikido.AiReact.CancellableTask do
     end
   end
 
-  defp execute_attempt(owner, supervisor, work, opts, sub, monitor, deadline, number) do
+  defp execute_attempt(owner, supervisor, work, opts, sub, monitor, number) do
+    deadline = now() + Keyword.fetch!(opts, :timeout)
     parent = self()
     key = make_ref()
 
@@ -66,32 +66,29 @@ defmodule Aikido.AiReact.CancellableTask do
           {:error, reason}
       end
 
-    if retry_allowed?(result, number, deadline, opts) do
-      delay = retry_delay(number, deadline, opts)
+    if retry_allowed?(result, number, opts) do
+      delay = retry_delay(number, opts)
 
       receive do
         {:aikido_subscription, ^sub, _} -> {:error, :cancelled}
         {:DOWN, ^monitor, :process, _, _} -> {:error, :cancelled}
       after
         delay ->
-          if now() < deadline,
-            do:
-              execute_attempt(owner, supervisor, work, opts, sub, monitor, deadline, number + 1),
-            else: {:error, :timeout}
+          execute_attempt(owner, supervisor, work, opts, sub, monitor, number + 1)
       end
     else
       result
     end
   end
 
-  defp retry_allowed?(result, number, deadline, opts) do
+  defp retry_allowed?(result, number, opts) do
     number < Keyword.get(opts, :retries, 0) && Aikido.Error.retryable?(result) &&
-      match?({:error, _}, result) && now() < deadline && result != {:error, :cancelled}
+      match?({:error, _}, result) && result != {:error, :cancelled}
   end
 
-  defp retry_delay(number, deadline, opts) do
+  defp retry_delay(number, opts) do
     backoff = round(Keyword.get(opts, :backoff, 200) * :math.pow(2, number))
-    min(min(backoff, 30_000), max(deadline - now(), 0))
+    min(backoff, 30_000)
   end
 
   defp start_attempt(supervisor, work, opts, transfer, parent, key, number) do
@@ -128,27 +125,33 @@ defmodule Aikido.AiReact.CancellableTask do
          opts,
          cleanups
        ) do
+    remaining = min(deadline, progress) - now()
+
     result =
-      receive do
-        {^task_ref, value} ->
-          value
+      if remaining <= 0 do
+        {:error, :timeout}
+      else
+        receive do
+          {^task_ref, value} ->
+            value
 
-        {:DOWN, ^task_ref, :process, _, reason} ->
-          {:error, reason}
+          {:DOWN, ^task_ref, :process, _, reason} ->
+            {:error, reason}
 
-        {^key, :progress} ->
-          {:continue, now() + Keyword.get(opts, :progress_timeout, opts[:timeout]), cleanups}
+          {^key, :progress} ->
+            {:continue, now() + Keyword.get(opts, :progress_timeout, opts[:timeout]), cleanups}
 
-        {^key, {:cleanup, cleanup}} ->
-          {:continue, progress, [cleanup | cleanups]}
+          {^key, {:cleanup, cleanup}} ->
+            {:continue, progress, [cleanup | cleanups]}
 
-        {:aikido_subscription, ^sub, _} ->
-          {:error, :cancelled}
+          {:aikido_subscription, ^sub, _} ->
+            {:error, :cancelled}
 
-        {:DOWN, ^monitor, :process, _, _} ->
-          {:error, :cancelled}
-      after
-        max(min(deadline, progress) - now(), 0) -> {:error, :timeout}
+          {:DOWN, ^monitor, :process, _, _} ->
+            {:error, :cancelled}
+        after
+          remaining -> {:error, :timeout}
+        end
       end
 
     case result do

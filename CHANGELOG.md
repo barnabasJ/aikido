@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Give each model/tool retry a fresh attempt deadline. Retry backoff is outside
+  that deadline. Empty streaming chunks no longer count as generation progress.
+
 - Give helper modules responsibility-specific names. Separate ReAct todo
   requirements from run-state initialization and cleanup; keep conversation
   token accounting outside the handoff protocol. Group team member process

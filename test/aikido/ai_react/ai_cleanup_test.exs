@@ -51,4 +51,44 @@ defmodule Aikido.AICleanupTest do
     assert_receive :remaining_cleanup
     assert Task.Supervisor.children(supervisor) == []
   end
+
+  test "each retry receives a fresh deadline and backoff does not consume it", context do
+    owner = start_server(context, __MODULE__.Owner, initial_state: %{request_id: "retry"})
+    supervisor = start_supervised!(Task.Supervisor)
+
+    work = fn _notify, attempt ->
+      if attempt == 0, do: {:error, :timeout}, else: {:ok, :recovered}
+    end
+
+    assert {:ok, :recovered} =
+             Aikido.AiReact.CancellableTask.run_cancellable_attempts(
+               owner,
+               "retry",
+               supervisor,
+               work,
+               timeout: 100,
+               retries: 1,
+               backoff: 150
+             )
+  end
+
+  test "only nonempty generation chunks reset streaming progress" do
+    alias Aikido.AiReact.ModelStream
+    alias ReqLLM.StreamChunk
+
+    refute ModelStream.generation_progress?(StreamChunk.text(""))
+    refute ModelStream.generation_progress?(StreamChunk.thinking(""))
+    refute ModelStream.generation_progress?(StreamChunk.meta(%{usage: 1}))
+
+    refute ModelStream.generation_progress?(%StreamChunk{
+             type: :tool_call,
+             name: "",
+             arguments: %{}
+           })
+
+    assert ModelStream.generation_progress?(StreamChunk.text("answer"))
+    assert ModelStream.generation_progress?(StreamChunk.thinking("reasoning"))
+    assert ModelStream.generation_progress?(StreamChunk.tool_call("lookup", %{}))
+    assert ModelStream.generation_progress?(%StreamChunk{type: :tool_call, arguments: "{\"x\":"})
+  end
 end
