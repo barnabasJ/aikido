@@ -67,3 +67,15 @@ On team restoration, previously dispatched/activating tasks fail explicitly with
 effects are not replayed automatically. Applications can choose whether to retry
 work after observing that outcome. Completion notifications are signal delivery,
 not a durable exactly-once outbox guarantee.
+
+
+## Member identities
+
+A team root may use an application-selected ID such as `workflow/42`.
+Member IDs follow ownership, not activation order: a top-level `:analyst` is
+`workflow/42/analyst`; a `:helper` owned by that analyst is
+`workflow/42/analyst/helper`. Names are escaped using
+`Aikido.Agent.child_id/2`, so slashes inside a name remain one component.
+`Aikido.Team.Topology.member_id/3` derives the same ID from a validated topology
+without starting any processes. Restarting the same workflow can reuse that
+identity; a new workflow execution needs its own root namespace.

@@ -60,6 +60,17 @@ defmodule Aikido.Team.Topology do
     for {name, %{activation: :eager}} <- nodes, do: name
   end
 
+  @doc "Derives a member's stable ID through its ownership ancestry beneath the team's root ID."
+  def member_id(%__MODULE__{nodes: nodes} = topology, root_id, name) do
+    parent_id =
+      case Map.fetch!(nodes, name).owner do
+        nil -> root_id
+        owner -> member_id(topology, root_id, owner)
+      end
+
+    Aikido.Agent.child_id(parent_id, name)
+  end
+
   def members_with_dependents(%__MODULE__{nodes: nodes}, names),
     do: expand_dependents(nodes, names, :all)
 

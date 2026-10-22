@@ -138,7 +138,7 @@ defmodule Aikido.Directives.SpawnAgent do
       {:error, reason} ->
         report_failure(
           parent_pid,
-          opts[:id] || "#{state.id}/#{tag_component(tag)}",
+          opts[:id] || Aikido.Agent.child_id(state.id, tag),
           tag,
           reason,
           signal
@@ -154,7 +154,7 @@ defmodule Aikido.Directives.SpawnAgent do
          %{tag: tag, opts: opts} = directive,
          signal
        ) do
-    child_id = opts[:id] || "#{state.id}/#{tag_component(tag)}"
+    child_id = opts[:id] || Aikido.Agent.child_id(state.id, tag)
 
     try do
       case spawn_child(state, parent_pid, directive) do
@@ -169,6 +169,12 @@ defmodule Aikido.Directives.SpawnAgent do
   end
 
   defp report_failure(parent, child_id, tag, reason, signal) do
+    reason =
+      case reason do
+        {:already_started, _pid} -> {:already_started, child_id}
+        other -> other
+      end
+
     failure =
       Aikido.AgentServer.Signals.ChildStartFailed.new!(%{
         child_id: child_id,
@@ -185,7 +191,7 @@ defmodule Aikido.Directives.SpawnAgent do
          parent_pid,
          %{agent: agent, tag: tag, opts: opts, meta: meta, restart?: restart?} = directive
        ) do
-    child_id = opts[:id] || "#{state.id}/#{tag_component(tag)}"
+    child_id = opts[:id] || Aikido.Agent.child_id(state.id, tag)
     child_partition = Map.get(opts, :partition, state.partition)
 
     parent_ref = %{
@@ -234,15 +240,5 @@ defmodule Aikido.Directives.SpawnAgent do
     |> Map.put(:parent, parent_ref)
     |> Map.put(:aikido, state.aikido)
     |> Map.to_list()
-  end
-
-  defp tag_component(tag) do
-    to_string(tag)
-  rescue
-    _error in [Protocol.UndefinedError, ArgumentError] ->
-      encoded =
-        tag |> :erlang.term_to_binary([:deterministic]) |> Base.url_encode64(padding: false)
-
-      "term:" <> encoded
   end
 end

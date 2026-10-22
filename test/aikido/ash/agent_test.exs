@@ -9,6 +9,15 @@ defmodule AikidoTest.AshTest do
     :ok
   end
 
+  test "duplicate workflow activation reports its stable ID instead of its PID" do
+    id = "workflow/42/review"
+    assert {:ok, _reference} = AikidoTest.AshFixtures.Domain.counter_start(%{id: id})
+    assert {:error, error} = AikidoTest.AshFixtures.Domain.counter_start(%{id: id})
+    message = Exception.message(error)
+    assert message =~ id
+    refute message =~ "#PID"
+  end
+
   test "generic commands accept IDs and PIDs and return compact receipts" do
     assert function_exported?(AikidoTest.AshFixtures.Domain, :counter_start, 1)
     assert function_exported?(AikidoTest.AshFixtures.Domain, :counter_add, 2)

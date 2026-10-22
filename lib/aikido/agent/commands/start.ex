@@ -35,8 +35,22 @@ defmodule Aikido.Agent.Commands.Start do
     options = activation_options(resource, input, context, runtime_options)
 
     CommandRuntime.catch_runtime_exit(fn ->
-      with {:ok, pid} <- Aikido.Durable.start(pool, input.arguments.id, options) do
-        configure_topology_or_stop_agent(resource, input, context, topology, pid, runtime_options)
+      case Aikido.Durable.start(pool, input.arguments.id, options) do
+        {:ok, pid} ->
+          configure_topology_or_stop_agent(
+            resource,
+            input,
+            context,
+            topology,
+            pid,
+            runtime_options
+          )
+
+        {:error, {:already_started, _pid}} ->
+          {:error, {:already_started, input.arguments.id}}
+
+        {:error, _} = error ->
+          error
       end
     end)
   end

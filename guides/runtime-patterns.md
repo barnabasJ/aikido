@@ -59,6 +59,26 @@ is the runtime callback implementation hosted by DurableServer. Configure
 return state transitions and directives without performing side effects. All
 side effects belong in directives; results return through signals.
 
+Choose a root `id` explicitly when an application must recover the same logical
+execution, for example `"workflow/#{workflow_id}/review"`. Starting a stopped
+permanent agent with that same ID restores its snapshot; a new workflow execution
+should receive a different root ID. Root IDs share a namespace within their
+Aikido instance and partition, so the application must choose distinct roots.
+
+`Aikido.Agent.child_id(parent_id, child_name)` derives deterministic child IDs.
+For example, a reviewer beneath `workflow/42` is `workflow/42/reviewer`, and its
+helper is `workflow/42/reviewer/helper`. Names are escaped as individual path
+components: the name `"reviewer/helper"` becomes `reviewer%2Fhelper`, distinct from
+that nested hierarchy. SpawnAgent uses this derivation unless an ID is supplied
+explicitly. Team members follow their declared ownership ancestry. A child's
+stable ID is independent of its PID and of activation attempts.
+
+Recovery resolves saved parents within the same DurableServer pool and partition.
+If a saved parent is unavailable and `on_parent_death: :stop` applies, the child
+stops instead of continuing as an unowned agent. Permanent snapshots retain the
+logical parent binding so a later explicit activation can reconnect it; temporary
+snapshots are deleted on that stop.
+
 Keep completion requirements and hook planning visible as separate steps in a
 reducer rather than calling a helper that combines both:
 

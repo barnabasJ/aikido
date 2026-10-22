@@ -172,7 +172,13 @@ defmodule Aikido.Team.TopologyOperation do
     effect =
       Directives.async_task(
         {Aikido.Team.MemberProcesses, :start_member,
-         [spec.resource, member_id(context.agent_id, name), initial, parent, context]},
+         [
+           spec.resource,
+           Topology.member_id(state.topology, context.agent_id, name),
+           initial,
+           parent,
+           context
+         ]},
         success_type: "aikido.ash.team.started",
         error_type: "aikido.ash.team.failed",
         payload: %{member: name, operation_id: state.operation.id}
@@ -184,7 +190,11 @@ defmodule Aikido.Team.TopologyOperation do
   defp member_parent(state, name, owner, context, config) do
     %{
       pid: if(owner, do: state.members[owner], else: context.agent_pid),
-      id: if(owner, do: member_id(context.agent_id, owner), else: context.agent_id),
+      id:
+        if(owner,
+          do: Topology.member_id(state.topology, context.agent_id, owner),
+          else: context.agent_id
+        ),
       tag: name,
       partition: context.partition,
       meta: %{
@@ -252,6 +262,4 @@ defmodule Aikido.Team.TopologyOperation do
     do:
       state.operation.id == id && state.operation.status == :running &&
         state.operation.awaiting == step
-
-  defp member_id(id, name), do: id <> "/" <> to_string(name)
 end

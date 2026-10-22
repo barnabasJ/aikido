@@ -22,6 +22,29 @@ end
 defmodule AikidoTest.AgentTest do
   use ExUnit.Case, async: true
 
+  test "child identities are deterministic and escape topology names as individual components" do
+    assert Aikido.Agent.child_id("workflow/42", :reviewer) == "workflow/42/reviewer"
+
+    assert Aikido.Agent.child_id("workflow/42", "reviewer/helper") ==
+             "workflow/42/reviewer%2Fhelper"
+
+    assert Aikido.Agent.child_id("workflow/42/reviewer", :helper) == "workflow/42/reviewer/helper"
+
+    refute Aikido.Agent.child_id("workflow/42", "a/b") ==
+             Aikido.Agent.child_id("workflow/42/a", "b")
+
+    refute Aikido.Agent.child_id("workflow/42", "a%2Fb") ==
+             Aikido.Agent.child_id("workflow/42", "a/b")
+
+    topology = %Aikido.Team.Topology{nodes: %{analyst: %{owner: nil}, helper: %{owner: :analyst}}}
+
+    assert Aikido.Team.Topology.member_id(topology, "workflow/42", :helper) ==
+             "workflow/42/analyst/helper"
+
+    assert Aikido.Team.Topology.member_id(topology, "workflow/43", :helper) ==
+             "workflow/43/analyst/helper"
+  end
+
   describe("module definition") do
     test "defines metadata accessors via Info" do
       assert Map.get(Aikido.Agent.Info.agent_options(AikidoTest.TestAgents.Basic), :name) ==

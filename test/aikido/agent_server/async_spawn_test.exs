@@ -138,7 +138,7 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest do
     assert failure.type == "aikido.agent.child.start_failed"
     assert failure.data.child_id == runtime.id
     assert failure.data.tag == "retryable"
-    assert match?({:already_started, _}, failure.data.reason)
+    assert failure.data.reason == {:already_started, runtime.id}
     assert Aikido.Signal.get(failure, :tenant) == "tenant-a"
   end
 
