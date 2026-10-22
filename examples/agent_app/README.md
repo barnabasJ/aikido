@@ -229,3 +229,13 @@ AI descendant, including dynamically spawned workers and nested teams. Existing
 AgentServer subscriptions update each card's task, model-turn count, pending tool
 results and answer. “Tool calls pending” includes time spent in gates or delegated
 work; it does not claim that a tool is executing CPU work. This view does not poll.
+
+In the team example, **Run Lua script** is the model-facing `run_lua` tool. AshLua
+exposes the domain's `agents` namespace: `members`, `spawn`, `delegate`, `stop`
+and `remove`. For example, `agents.delegate({input = {member = "analyst",
+text = "Review this evidence"}})` runs the scoped Ash delegation action. That
+action sends a task signal through the team; the teammate's answer returns as a
+correlated result signal. The tool task waits, while agent mailboxes stay responsive.
+Expand a tool entry to inspect its script/input and result. Tool failures remain
+marked **Failed** even if the model subsequently completes the conversation.
+The offline script reads the roster before spawning and reuses workers on later prompts.

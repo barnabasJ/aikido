@@ -16,7 +16,8 @@ defmodule AgentExamples.AI.ActivityTest do
     activity = AgentExamples.AI.Activity.from_state(state)
     assert activity.task == "Review the evidence"
     assert activity.stage == "Tool calls pending"
-    assert activity.tools == [%{name: "delegate", finished?: false}]
+    assert [%{name: "delegate", status: :pending, input: input}] = activity.tools
+    assert input =~ "analyst"
 
     answered =
       ReqLLM.Context.append(context, ReqLLM.Context.tool_result("call-1", "delegate", "Done"))
@@ -24,9 +25,8 @@ defmodule AgentExamples.AI.ActivityTest do
     state = %{state | context: answered, pending_tool_calls: []}
     assert AgentExamples.AI.Activity.from_state(state).stage == "Waiting for model response"
 
-    assert AgentExamples.AI.Activity.from_state(state).tools == [
-             %{name: "delegate", finished?: true}
-           ]
+    assert [%{name: "delegate", status: :completed}] =
+             AgentExamples.AI.Activity.from_state(state).tools
 
     assert AgentExamples.AI.Activity.from_state(%{state | status: :setup}).stage ==
              "Preparing tools"
@@ -37,5 +37,28 @@ defmodule AgentExamples.AI.ActivityTest do
     assert AgentExamples.AI.Activity.from_state(
              Map.merge(state, %{status: :completed, result: "Verified"})
            ).output == "Verified"
+  end
+
+  test "failed tool results stay visible even when the model completes its answer" do
+    call =
+      ReqLLM.ToolCall.new(
+        "failed",
+        "run_lua",
+        ~s|{"input":{"script":"return agents.members({})"}}|
+      )
+
+    context =
+      ReqLLM.Context.new([
+        ReqLLM.Context.user("Inspect the team"),
+        ReqLLM.Context.assistant("", tool_calls: [call]),
+        ReqLLM.Context.tool_result(
+          "failed",
+          "run_lua",
+          ~s({"error":{"message":"Worker already exists"}})
+        )
+      ])
+
+    assert [%{label: "Run Lua script", status: :failed, input: "return agents.members({})"}] =
+             AgentExamples.AI.Activity.from_state(%{status: :completed, context: context}).tools
   end
 end

@@ -90,44 +90,43 @@ defmodule AgentExamples.AI.ScriptedClient do
   defp plan_team_delegation(results, query, lua?) do
     task = String.trim_leading(query, "orchestrate:") |> String.trim()
 
-    case length(results) do
-      0 ->
-        respond_with_team_tool(
-          "spawn_worker",
-          %{name: "specialist", specialty: "independent verification"},
-          lua?
-        )
+    operations = [
+      {"spawn_worker", %{name: "specialist", specialty: "independent verification"}},
+      {"delegate", %{member: "analyst", text: "expand: #{task}"}},
+      {"delegate", %{member: "reviewer", text: task}},
+      {"delegate", %{member: "specialist", text: task}}
+    ]
 
-      1 ->
-        respond_with_team_tool("delegate", %{member: "analyst", text: "expand: #{task}"}, lua?)
-
-      2 ->
-        respond_with_team_tool("delegate", %{member: "reviewer", text: task}, lua?)
-
-      3 ->
-        respond_with_team_tool("delegate", %{member: "specialist", text: task}, lua?)
-
-      _ ->
-        respond_with_tool_results(results)
-    end
+    request_next_team_operation(results, operations, lua?)
   end
 
   defp plan_worker_delegation(results, query, lua?) do
     task = String.trim_leading(query, "expand:") |> String.trim()
 
-    case length(results) do
-      0 ->
-        respond_with_team_tool(
-          "spawn_worker",
-          %{name: "analyst-helper", specialty: "word counting"},
-          lua?
-        )
+    operations = [
+      {"spawn_worker", %{name: "analyst-helper", specialty: "word counting"}},
+      {"delegate", %{member: "analyst-helper", text: task}}
+    ]
 
-      1 ->
-        respond_with_team_tool("delegate", %{member: "analyst-helper", text: task}, lua?)
+    request_next_team_operation(results, operations, lua?)
+  end
 
-      _ ->
-        respond_with_tool_results(results)
+  defp request_next_team_operation([], _operations, lua?),
+    do: respond_with_team_tool("team_roster", %{}, lua?)
+
+  defp request_next_team_operation([roster | _] = results, operations, lua?) do
+    roster = roster |> message_text() |> Jason.decode!()
+    members = Map.get(roster["result"] || roster, "members", [])
+
+    operations =
+      Enum.reject(operations, fn
+        {"spawn_worker", %{name: name}} -> name in members
+        _ -> false
+      end)
+
+    case Enum.at(operations, length(results) - 1) do
+      {name, arguments} -> respond_with_team_tool(name, arguments, lua?)
+      nil -> respond_with_tool_results(results)
     end
   end
 
@@ -136,6 +135,7 @@ defmodule AgentExamples.AI.ScriptedClient do
   defp respond_with_team_tool(name, arguments, true) do
     action =
       case name do
+        "team_roster" -> "members"
         "spawn_worker" -> "spawn"
         "delegate" -> "delegate"
       end

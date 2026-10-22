@@ -281,12 +281,27 @@ defmodule AgentExamplesWeb.LiveViewTest do
            )
 
     assert has_element?(view, "#team-activity [data-agent='Orchestrator / analyst-helper']")
-    assert has_element?(view, "#team-activity", "Result received")
+    assert has_element?(view, "#team-activity", "Succeeded")
 
     {:ok, reloaded, _} = live(conn, "/examples/research-team")
     assert has_element?(reloaded, "#member-count", "4 members")
     assert has_element?(reloaded, "#messages", "Lua:")
     refute Playground.get("another-browser", "research-team")
+
+    view
+    |> form("#prompt-form", %{query: "orchestrate: Count this second task"})
+    |> render_submit()
+
+    await(
+      owner,
+      "research-team",
+      &(&1.status == :completed && List.last(&1.messages).text =~ "Words: 4"),
+      30_000
+    )
+
+    assert has_element?(view, "#member-count", "4 members")
+    refute has_element?(view, "#team-activity [data-tool-status=failed]")
+    refute has_element?(view, "#messages", "Tool error:")
   end
 
   test "the hooks page runs offline and shows applied context and script definitions", %{

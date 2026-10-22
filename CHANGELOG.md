@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Show scripts and results for each team tool call, distinguish failed calls
+  from successful results, and reuse existing offline workers on repeated tasks.
+
 - Show per-agent task, lifecycle stage, model turns, tool results and output in
   the research-team playground, updated through existing subscriptions for
   fixed members and dynamically spawned descendants.
