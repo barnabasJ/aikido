@@ -6,6 +6,10 @@ defmodule Aikido.AiReact.Signals.Deliver do
     type "ai.react.deliver"
 
     schema do
+      attribute :todo, Aikido.Todo.Item do
+        description "Optional blocking work item added atomically with this incoming conversation message."
+      end
+
       attribute :metadata, :map do
         description "Application metadata accompanying the delivered message."
         default %{}

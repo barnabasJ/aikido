@@ -518,3 +518,43 @@ older generations; stale readiness and failures cannot install or fail the new
 setup. Refresh during a synchronous hook waits for its gate. Idle refreshes
 update configuration for the next run. Incoming refreshes must match the active
 run’s actor and tenant, and preparation retains native Ash authorization.
+
+### Todo continuation, verification and incoming work
+
+Todo completion still defaults to waiting for external work. To let an assistant
+continue working after an incomplete answer, mount `Aikido.Todo.Slice` and set:
+
+```elixir
+options %{
+  completion: :todos,
+  todo_continuation: :continue,
+  max_todo_continuations: 3,
+  todo_verifier: {MyApp.Evidence, :verify}
+}
+```
+
+The verifier is optional. It is a native Ash generic action accepting `answer`,
+`todos` (the blocking items), and `metadata`, returning a boolean verdict. It
+runs in cancellable supervised work with the caller's scope and application
+context. It may inspect external evidence; the reducer only adopts its result.
+A true verdict accepts the answer, so the application owns what constitutes
+sufficient evidence. False waits or requests another model turn according to
+`todo_continuation`. Verifier errors fail the run. External todo changes on a
+waiting run go through verification again. Both the continuation budget and the
+normal model-iteration limit bound further work. An exhausted continuation
+returns `{:todo_continuation_limit, count}`. Blocked todos fail explicitly.
+
+The public `deliver` command can include a typed `todo` alongside `text` and
+`request_id`. It adds the item and starts or queues the incoming conversation
+text in the same state transition. Duplicate item IDs or a missing todo mount
+reject the entire delivery. Workflow IDs belong in application metadata; tool
+implementations can update the application's database and use the ordinary todo
+commands to record evidence.
+
+Optional `max_consecutive_tool_errors` and `max_repeated_tool_cycles` bounds
+stop a run after consecutive failing batches or repeated cycles of one to four
+batches. A successful batch resets the error streak. Native Ash AI errors remain
+model-visible tool results, with an additional error marker for the guard;
+business tool errors are not retried as transport failures. Both guards default
+to nil, preserving model recovery and the existing repeated-call warning.
+

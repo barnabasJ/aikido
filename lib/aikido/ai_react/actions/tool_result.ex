@@ -41,16 +41,23 @@ defmodule Aikido.AiReact.Actions.ToolResult do
   end
 
   defp record_received_result(state, data) do
-    result = %{tool_call_id: data.tool_call_id, name: data.name, content: data.content}
+    result = %{
+      tool_call_id: data.tool_call_id,
+      name: data.name,
+      content: data.content,
+      error?: Map.get(data, :error?, false)
+    }
+
     %{state | tool_results_received: state.tool_results_received ++ [result]}
   end
 
   defp resume_when_batch_complete(state) do
     if length(state.tool_results_received) == length(state.pending_tool_calls) do
-      state
-      |> record_batch_signature()
-      |> clear_completed_batch()
-      |> request_next_model_turn()
+      state = state |> record_batch_signature() |> clear_completed_batch()
+
+      if state.status == :failed,
+        do: Aikido.Types.ActionResult.new(state: state),
+        else: Aikido.AiReact.RunState.request_model_turn(state)
     else
       Aikido.Types.ActionResult.new(state: state)
     end
@@ -62,27 +69,11 @@ defmodule Aikido.AiReact.Actions.ToolResult do
     state
     |> maybe_append_cycle_warning(state.previous_tool_signature, signature)
     |> Map.put(:previous_tool_signature, signature)
+    |> Aikido.AiReact.ToolLoopGuard.record_batch(signature)
   end
 
   defp clear_completed_batch(state) do
     %{state | pending_tool_calls: [], tool_results_received: []}
-  end
-
-  defp request_next_model_turn(state) do
-    {tools, _registry} = state.prepared_tools
-
-    directive = %Aikido.AiReact.Directives.LLMCall{
-      options: Map.get(state, :options, %{}),
-      iteration: state.iteration + 1,
-      tools: tools,
-      client: Map.get(state, :client, ReqLLM.Generation),
-      model: state.model,
-      context: state.context,
-      request_id: state.request_id,
-      llm_opts: state.llm_opts
-    }
-
-    Aikido.Types.ActionResult.new(state: state, directives: [directive])
   end
 
   defp maybe_append_cycle_warning(state, previous_signature, current_signature)

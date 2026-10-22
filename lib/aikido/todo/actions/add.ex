@@ -9,7 +9,7 @@ defmodule Aikido.Todo.Actions.Add do
       {:error, "Todo ID already exists"}
     else
       item = pending_item(input.arguments, input.arguments.state.revision + 1)
-      Items.append(input, item, expiration_directives(item))
+      Items.append(input, item, Items.expiration_directives(item))
     end
   end
 
@@ -25,18 +25,5 @@ defmodule Aikido.Todo.Actions.Add do
       revision: revision,
       timeout_ms: data[:timeout_ms]
     }
-  end
-
-  defp expiration_directives(%{timeout_ms: nil}), do: []
-
-  defp expiration_directives(item) do
-    [
-      Aikido.Directives.schedule(item.timeout_ms, %Aikido.Signal{
-        id: nil,
-        type: "aikido.todo.expire",
-        data: %{id: item.id, revision: item.revision},
-        source: "/aikido"
-      })
-    ]
   end
 end

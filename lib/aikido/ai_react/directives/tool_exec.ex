@@ -142,12 +142,14 @@ defmodule Aikido.AiReact.Directives.ToolExec do
     content =
       case result do
         {:ok, content} -> content
+        {:tool_error, content} -> content
         {:error, :timeout} -> Jason.encode!(%{error: "tool timeout"})
         {:error, :cancelled} -> Jason.encode!(%{error: "tool cancelled"})
         {:error, reason} -> Jason.encode!(%{error: AshAi.Tool.Errors.format(reason)})
       end
 
     data = %{
+      error?: match?({:error, _}, result) || match?({:tool_error, _}, result),
       tool_call_id: d.tool_call.id,
       name: d.tool_call.name,
       content: content,
@@ -176,11 +178,11 @@ defmodule Aikido.AiReact.Directives.ToolExec do
       {:ok, callback} ->
         case callback.(args, context) do
           {:ok, content, _raw} -> {:ok, content}
-          {:error, content} -> {:ok, content}
+          {:error, content} -> {:tool_error, content}
         end
 
       :error ->
-        {:ok, Jason.encode!(%{error: "tool not found: #{name}"})}
+        {:tool_error, Jason.encode!(%{error: "tool not found: #{name}"})}
     end
   end
 end

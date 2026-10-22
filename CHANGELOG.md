@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Add optional bounded todo continuation, scoped native verification, atomic
+  task/todo delivery, consecutive tool-error limits and repeating-cycle limits.
+
 - Add scoped native Ash tool preparation and a public safe-boundary refresh
   command. Correlate setup generations and ignore superseded results. Keep
   application discovery and native Ash AI tool options outside reducers.

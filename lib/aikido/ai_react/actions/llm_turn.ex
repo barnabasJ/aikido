@@ -29,7 +29,8 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
   end
 
   defp accepts_model_response?(state, data) do
-    is_nil(Map.get(state, :hook_terminal)) && state.status == :running &&
+    is_nil(Map.get(state, :hook_terminal)) && not state.todo_verification_pending &&
+      state.status == :running &&
       is_nil(Map.get(state, :handoff_pending)) && state.request_id == data.request_id &&
       (is_nil(data[:iteration]) || data.iteration == state.iteration + 1)
   end
@@ -66,7 +67,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
     if Map.get(state, :queued_messages, []) != [] && state.iteration < state.max_iterations do
       state
       |> resume_for_queued_messages()
-      |> request_next_model_turn()
+      |> Aikido.AiReact.RunState.request_model_turn()
     else
       complete_run(state, text)
     end
@@ -104,23 +105,6 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
       streaming_text: "",
       streaming_thinking: ""
     })
-  end
-
-  defp request_next_model_turn(state) do
-    {tools, _registry} = state.prepared_tools
-
-    directive = %Aikido.AiReact.Directives.LLMCall{
-      tools: tools,
-      client: Map.get(state, :client, ReqLLM.Generation),
-      model: state.model,
-      context: state.context,
-      request_id: state.request_id,
-      llm_opts: state.llm_opts,
-      options: Map.get(state, :options, %{}),
-      iteration: state.iteration + 1
-    }
-
-    Aikido.Types.ActionResult.new(state: state, directives: [directive])
   end
 
   defp record_pending_batch(state, calls) do

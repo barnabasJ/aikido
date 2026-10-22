@@ -27,6 +27,30 @@ defmodule Aikido.AiReact.Slice do
     description "Embedded ReAct conversation state and native signal reducers."
 
     schema do
+      attribute :tool_error_streak, :integer do
+        description "Consecutive completed tool batches containing execution errors."
+        default 0
+        allow_nil? false
+      end
+
+      attribute :tool_batch_history, {:array, :string} do
+        description "Bounded recent batch signatures used to detect repeating tool-call cycles."
+        default []
+        allow_nil? false
+      end
+
+      attribute :todo_continuations, :integer do
+        description "Additional model turns requested to finish or verify blocking todo work."
+        default 0
+        allow_nil? false
+      end
+
+      attribute :todo_verification_pending, :boolean do
+        description "Whether a scoped verifier is checking the current proposed answer."
+        default false
+        allow_nil? false
+      end
+
       attribute :tools_generation, :integer do
         description "Preparation generation used to reject superseded tool results."
         default 0
@@ -367,6 +391,9 @@ defmodule Aikido.AiReact.Slice do
 
     route Aikido.AiReact.Signals.ToolsReady, Aikido.AiReact.Actions.ToolsReady, public?: false
 
+    route Aikido.AiReact.Signals.TodosVerified, Aikido.AiReact.Actions.TodosVerified,
+      public?: false
+
     route Aikido.AiReact.Signals.RefreshTools, Aikido.AiReact.Actions.RefreshTools
 
     route Aikido.AiReact.Signals.Ask, Aikido.AiReact.Actions.Ask
@@ -403,6 +430,7 @@ defmodule Aikido.AiReact.Slice do
       Map.merge(state, %{
         handoff_pending: nil,
         prepared_tools: nil,
+        todo_verification_pending: false,
         tool_refresh_pending: false,
         tools_resume: nil,
         hooks_pending: %{},
@@ -430,6 +458,9 @@ defmodule Aikido.AiReact.Slice do
     Map.merge(state, %{
       handoff_pending: nil,
       prepared_tools: nil,
+      todo_verification_pending: false,
+      tool_refresh_pending: false,
+      tools_resume: nil,
       hooks_pending: %{},
       hook_terminal: nil,
       run_scope: %{},

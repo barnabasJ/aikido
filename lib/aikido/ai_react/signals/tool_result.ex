@@ -6,6 +6,12 @@ defmodule Aikido.AiReact.Signals.ToolResult do
     type "ai.react.tool.completed"
 
     schema do
+      attribute :error?, :boolean do
+        description "Whether this result represents a tool or runtime failure for optional loop guards."
+        default false
+        allow_nil? false
+      end
+
       attribute :tool_call_id, :string do
         description "Identifier correlating this result with one pending model-issued tool call."
         allow_nil? false

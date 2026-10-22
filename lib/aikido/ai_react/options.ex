@@ -12,6 +12,38 @@ defmodule Aikido.AiReact.Options do
                   ]
     end
 
+    field :todo_continuation, Aikido.AiReact.Types.TodoContinuation do
+      description "Whether open blocking todos wait for external work or trigger another model turn."
+      default :wait
+      allow_nil? false
+    end
+
+    field :max_todo_continuations, :integer do
+      description "Maximum additional model turns requested for unfulfilled or rejected todo work."
+      default 3
+      allow_nil? false
+      constraints min: 0
+    end
+
+    field :todo_verifier, :tuple do
+      description "Optional scoped Ash action {resource, action} accepting answer, todos and metadata and returning a boolean verdict."
+
+      constraints fields: [
+                    resource: [type: :atom, allow_nil?: false],
+                    action: [type: :atom, allow_nil?: false]
+                  ]
+    end
+
+    field :max_consecutive_tool_errors, :integer do
+      description "Optional consecutive failing tool-batch limit; nil leaves recovery to the model."
+      constraints min: 1
+    end
+
+    field :max_repeated_tool_cycles, :integer do
+      description "Optional repeat limit for tool cycles of one to four batches; nil keeps warning-only behavior."
+      constraints min: 2, max: 100
+    end
+
     field :completion, Aikido.AiReact.Types.CompletionMode do
       description "Whether the run completes from the model response or from the tracked todo state."
       default :model

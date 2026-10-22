@@ -13,13 +13,54 @@ defmodule Aikido.AiReact.Actions.Deliver do
   @impl true
   def run(input, _opts, _context) do
     with :ok <- RunCaller.validate_run_caller(input.arguments.state, input) do
-      if input.arguments.state.status in [:setup, :running] do
-        queue_incoming_conversation_text(input)
-      else
-        start_run_from_incoming_text(input)
-      end
+      result =
+        if input.arguments.state.status in [:setup, :running] do
+          queue_incoming_conversation_text(input)
+        else
+          start_run_from_incoming_text(input)
+        end
+
+      attach_incoming_todo(result, input)
     end
   end
+
+  defp attach_incoming_todo(
+         {:ok, result},
+         %{arguments: %{todo: %Aikido.Todo.Item{} = item}} = input
+       ) do
+    runtime = input.context.aikido
+    path = result.state.options.todo_path
+
+    case Map.get(runtime.agent.state, path) do
+      %{items: items, revision: revision} = todos ->
+        if Enum.any?(items, &(&1.id == item.id)) do
+          {:error, {:todo_exists, item.id}}
+        else
+          item = %{item | revision: revision + 1}
+
+          with {:ok, todo_result} <-
+                 Aikido.Todo.Items.append(
+                   %{input | arguments: %{state: todos}},
+                   item,
+                   Aikido.Todo.Items.expiration_directives(item)
+                 ) do
+            state = %Aikido.Types.SliceUpdate{
+              slices: %{runtime.slice_path => result.state, path => todo_result.state}
+            }
+
+            Aikido.Types.ActionResult.new(
+              state: state,
+              directives: result.directives ++ todo_result.directives
+            )
+          end
+        end
+
+      _ ->
+        {:error, :todo_slice_not_mounted}
+    end
+  end
+
+  defp attach_incoming_todo(result, _input), do: result
 
   defp queue_incoming_conversation_text(input) do
     input.arguments.state

@@ -44,6 +44,20 @@ defmodule Aikido.Todo.Items do
     )
   end
 
+  @doc "Describe the optional item deadline, correlated with its addition revision."
+  def expiration_directives(%{timeout_ms: nil}), do: []
+
+  def expiration_directives(item) do
+    [
+      Aikido.Directives.schedule(item.timeout_ms, %Aikido.Signal{
+        id: nil,
+        type: "aikido.todo.expire",
+        data: %{id: item.id, revision: item.revision},
+        source: "/aikido"
+      })
+    ]
+  end
+
   defp cast_item(%_{} = item), do: item
 
   defp cast_item(item),

@@ -33,12 +33,9 @@ defmodule Aikido.AiReact.RunState do
       ) do
     agent_state = (input.context.aikido[:agent] && input.context.aikido.agent.state) || %{}
 
-    state =
-      state
-      |> Aikido.AiReact.TodoRequirements.resolve_run_status(agent_state)
-      |> clear_tools_and_handoff()
-
-    {:ok, %{result | state: state}}
+    {state, directives} = Aikido.AiReact.TodoRequirements.plan_run_outcome(state, agent_state)
+    state = clear_tools_and_handoff(state)
+    {:ok, %{result | state: state, directives: result.directives ++ directives}}
   end
 
   def resolve_run_outcome({:ok, %{state: %{status: :failed} = state} = result}, _input) do
@@ -51,6 +48,7 @@ defmodule Aikido.AiReact.RunState do
   def clear_tools_and_handoff(%{status: status} = state) when status in [:completed, :failed] do
     Map.merge(state, %{
       prepared_tools: nil,
+      todo_verification_pending: false,
       handoff_pending: nil,
       tools_resume: nil,
       tool_refresh_pending: false
@@ -58,6 +56,24 @@ defmodule Aikido.AiReact.RunState do
   end
 
   def clear_tools_and_handoff(state), do: state
+
+  @doc "Describe the next model turn using this run’s prepared tools and conversation."
+  def request_model_turn(state) do
+    {tools, _registry} = state.prepared_tools
+
+    directive = %Aikido.AiReact.Directives.LLMCall{
+      tools: tools,
+      client: state.client,
+      model: state.model,
+      context: state.context,
+      request_id: state.request_id,
+      llm_opts: state.llm_opts,
+      options: state.options,
+      iteration: state.iteration + 1
+    }
+
+    Aikido.Types.ActionResult.new(state: state, directives: [directive])
+  end
 
   defp resolve_configuration(data, state) do
     model = data[:model] || Map.get(state, :model)
@@ -118,6 +134,8 @@ defmodule Aikido.AiReact.RunState do
     |> Map.merge(configuration)
     |> Map.merge(%{
       status: :setup,
+      todo_continuations: 0,
+      todo_verification_pending: false,
       request_id: data.request_id,
       run_metadata: data[:metadata] || %{},
       prepared_tools: nil,
@@ -138,6 +156,8 @@ defmodule Aikido.AiReact.RunState do
       pending_tool_calls: [],
       tool_results_received: [],
       previous_tool_signature: nil,
+      tool_error_streak: 0,
+      tool_batch_history: [],
       hooks_pending: %{},
       hook_sequence: 0,
       hook_context: [],

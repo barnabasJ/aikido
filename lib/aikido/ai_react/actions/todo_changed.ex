@@ -8,13 +8,14 @@ defmodule Aikido.AiReact.Actions.TodoChanged do
     state = input.arguments.state
 
     if state.status == :waiting do
-      state =
+      {state, directives} =
         state
-        |> TodoRequirements.resolve_run_status(input.context.aikido.agent.state)
-        |> RunState.clear_tools_and_handoff()
+        |> TodoRequirements.plan_run_outcome(input.context.aikido.agent.state)
+
+      state = RunState.clear_tools_and_handoff(state)
 
       HookQueue.queue_event_hooks(
-        Aikido.Types.ActionResult.new(state: state),
+        Aikido.Types.ActionResult.new(state: state, directives: directives),
         :after_model,
         %{
           todo_completion: true

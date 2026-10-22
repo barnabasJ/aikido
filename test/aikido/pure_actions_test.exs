@@ -146,7 +146,7 @@ defmodule Aikido.PureActionsTest do
     example_paths =
       "examples/agent_app/lib/agent_examples/**/*.ex"
       |> Path.wildcard()
-      |> Enum.reject(&String.starts_with?(&1, "examples/agent_app/lib/agent_examples/ai/tools/"))
+      |> Enum.reject(&(String.contains?(&1, "/tools/") || String.contains?(&1, "/commands/")))
 
     shared_reducer_paths = [
       "lib/aikido/team/action_adapter.ex",
@@ -157,7 +157,8 @@ defmodule Aikido.PureActionsTest do
       "lib/aikido/ai_react/hook_queue.ex",
       "lib/aikido/ai_react/run_caller.ex",
       "lib/aikido/ai_react/run_state.ex",
-      "lib/aikido/ai_react/todo_requirements.ex"
+      "lib/aikido/ai_react/todo_requirements.ex",
+      "lib/aikido/ai_react/tool_loop_guard.ex"
     ]
 
     paths =
