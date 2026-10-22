@@ -15,7 +15,9 @@ defmodule Aikido.AiReact.CancellableTask do
       if Enum.any?(runtime.agent.state, fn
            {_, %{request_id: ^request_id, status: status} = slice}
            when status in [:setup, :running] ->
-             Map.get(slice, :hook_terminal) not in [:completed, :failed]
+             Map.get(slice, :hook_terminal) not in [:completed, :failed] &&
+               (is_nil(opts[:generation]) ||
+                  Map.get(slice, :tools_generation) == opts[:generation])
 
            _ ->
              false

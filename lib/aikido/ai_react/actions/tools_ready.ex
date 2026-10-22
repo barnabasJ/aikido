@@ -9,7 +9,7 @@ defmodule Aikido.AiReact.Actions.ToolsReady do
     state = input.arguments.state
 
     if state.request_id == input.arguments.request_id && state.status == :setup &&
-         is_nil(state.prepared_tools) do
+         is_nil(state.prepared_tools) && state.tools_generation == input.arguments.generation do
       {tools, _registry} = input.arguments.prepared_tools
 
       state =
@@ -19,7 +19,7 @@ defmodule Aikido.AiReact.Actions.ToolsReady do
 
       directive = %LLMCall{
         options: state.options,
-        iteration: 1,
+        iteration: state.iteration + 1,
         client: state.client,
         model: state.model,
         context: state.context,
@@ -28,7 +28,14 @@ defmodule Aikido.AiReact.Actions.ToolsReady do
         tools: tools
       }
 
-      HookQueue.queue_before_model_hooks(state, directive)
+      case state.tools_resume do
+        nil ->
+          HookQueue.queue_before_model_hooks(state, directive)
+
+        %{queue: queue, status: status} ->
+          state = Map.put(state, :tools_resume, nil)
+          HookQueue.release_queued_steps(state, [{:effect, directive} | queue], status, [])
+      end
     else
       Aikido.Types.ActionResult.new(state: state)
     end

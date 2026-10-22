@@ -3,6 +3,24 @@ defmodule Aikido.AiReact.Directives.PrepareTools do
   use Aikido.Directive
 
   typed_struct do
+    field :generation, :integer do
+      description "Tool preparation generation rejected if superseded by a refresh."
+      default 0
+      allow_nil? false
+    end
+
+    field :metadata, :map do
+      description "Application configuration passed to the native preparation action."
+      default %{}
+      allow_nil? false
+    end
+
+    field :tool_context, :map do
+      description "Application tool context supplied to the scoped preparation action."
+      default %{}
+      allow_nil? false
+    end
+
     field :options, Aikido.AiReact.Options do
       description "Execution policy used to supervise preparation of the run's native Ash AI tools."
       default %Aikido.AiReact.Options{}
@@ -36,7 +54,7 @@ defmodule Aikido.AiReact.Directives.PrepareTools do
 
     task = %Aikido.Directives.AsyncTask{
       work: fn -> prepare_tools_and_build_ready_signal(directive, scope, owner, supervisor) end,
-      payload: %{request_id: directive.request_id},
+      payload: %{request_id: directive.request_id, generation: directive.generation},
       error_type: "ai.react.failed"
     }
 
@@ -49,22 +67,57 @@ defmodule Aikido.AiReact.Directives.PrepareTools do
              owner,
              directive.request_id,
              supervisor,
-             fn _, _ -> {:ok, build_native_tools_and_registry(directive, scope)} end,
+             fn _, _ -> build_native_tools_and_registry(directive, scope) end,
              tracer: scope[:tracer],
+             generation: directive.generation,
              timeout: directive.options.model_timeout_ms
            ) do
       Aikido.Signal.new!("ai.react.tools.ready", %{
         request_id: directive.request_id,
+        generation: directive.generation,
         prepared_tools: prepared
       })
     end
   end
 
   defp build_native_tools_and_registry(directive, scope) do
-    directive.tool_options
-    |> Keyword.merge(Ash.Scope.to_opts(scope, context: scope[:context] || %{}))
-    |> Keyword.put(:tools, directive.tools)
-    |> Keyword.drop([:tracer, :authorize?])
-    |> AshAi.build_tools_and_registry()
+    defaults = Keyword.put(directive.tool_options, :tools, directive.tools)
+
+    context =
+      DeepMerge.deep_merge(directive.tool_context[:context] || %{}, scope[:context] || %{})
+
+    scope_options = Ash.Scope.to_opts(scope, context: context)
+
+    with {:ok, options} <- prepare_native_options(directive, defaults, scope_options) do
+      prepared =
+        options
+        |> Keyword.merge(scope_options)
+        |> Keyword.drop([:tracer, :authorize?])
+        |> AshAi.build_tools_and_registry()
+
+      {:ok, prepared}
+    end
+  end
+
+  defp prepare_native_options(%{options: %{tool_preparation: nil}}, defaults, _scope),
+    do: {:ok, defaults}
+
+  defp prepare_native_options(
+         %{options: %{tool_preparation: {resource, action}}} = directive,
+         defaults,
+         scope
+       ) do
+    with {:ok, options} <-
+           resource
+           |> Ash.ActionInput.for_action(
+             action,
+             %{options: defaults, metadata: directive.metadata},
+             scope
+           )
+           |> Ash.run_action(scope) do
+      if Keyword.keyword?(options),
+        do: {:ok, options},
+        else: {:error, "Tool preparation must return native Ash AI keyword options"}
+    end
   end
 end

@@ -27,6 +27,22 @@ defmodule Aikido.AiReact.Slice do
     description "Embedded ReAct conversation state and native signal reducers."
 
     schema do
+      attribute :tools_generation, :integer do
+        description "Preparation generation used to reject superseded tool results."
+        default 0
+        allow_nil? false
+      end
+
+      attribute :tool_refresh_pending, :boolean do
+        description "Whether native tools must be rebuilt before the next model request."
+        default false
+        allow_nil? false
+      end
+
+      attribute :tools_resume, :term do
+        description "Transient model continuation retained while a tool refresh is prepared."
+      end
+
       attribute :handoff_pending, :integer do
         description "Identifier of the context handoff awaiting a summary result."
       end
@@ -351,6 +367,8 @@ defmodule Aikido.AiReact.Slice do
 
     route Aikido.AiReact.Signals.ToolsReady, Aikido.AiReact.Actions.ToolsReady, public?: false
 
+    route Aikido.AiReact.Signals.RefreshTools, Aikido.AiReact.Actions.RefreshTools
+
     route Aikido.AiReact.Signals.Ask, Aikido.AiReact.Actions.Ask
     route Aikido.AiReact.Signals.Message, Aikido.AiReact.Actions.Message
     route Aikido.AiReact.Signals.Deliver, Aikido.AiReact.Actions.Deliver
@@ -385,6 +403,8 @@ defmodule Aikido.AiReact.Slice do
       Map.merge(state, %{
         handoff_pending: nil,
         prepared_tools: nil,
+        tool_refresh_pending: false,
+        tools_resume: nil,
         hooks_pending: %{},
         hook_terminal: nil,
         run_scope: %{},

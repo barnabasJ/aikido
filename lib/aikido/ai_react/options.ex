@@ -3,6 +3,15 @@ defmodule Aikido.AiReact.Options do
   use Ash.TypedStruct
 
   typed_struct do
+    field :tool_preparation, :tuple do
+      description "Optional native Ash action {resource, action} accepting options and metadata and returning native Ash AI options."
+
+      constraints fields: [
+                    resource: [type: :atom, allow_nil?: false],
+                    action: [type: :atom, allow_nil?: false]
+                  ]
+    end
+
     field :completion, Aikido.AiReact.Types.CompletionMode do
       description "Whether the run completes from the model response or from the tracked todo state."
       default :model

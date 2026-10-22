@@ -25,7 +25,8 @@ defmodule Aikido.AiReact.Actions.Failed do
     slice = input.arguments.state
 
     cond do
-      slice.request_id != id ->
+      slice.request_id != id ||
+          (input.arguments[:generation] && input.arguments.generation != slice.tools_generation) ->
         Aikido.Types.ActionResult.new(state: slice, directives: [])
 
       slice.status not in [:setup, :running] || not is_nil(Map.get(slice, :handoff_pending)) ->

@@ -49,7 +49,12 @@ defmodule Aikido.AiReact.RunState do
 
   @doc "Discard prepared tools and pending handoff only after a run completes or fails."
   def clear_tools_and_handoff(%{status: status} = state) when status in [:completed, :failed] do
-    Map.merge(state, %{prepared_tools: nil, handoff_pending: nil})
+    Map.merge(state, %{
+      prepared_tools: nil,
+      handoff_pending: nil,
+      tools_resume: nil,
+      tool_refresh_pending: false
+    })
   end
 
   def clear_tools_and_handoff(state), do: state
@@ -116,6 +121,8 @@ defmodule Aikido.AiReact.RunState do
       request_id: data.request_id,
       run_metadata: data[:metadata] || %{},
       prepared_tools: nil,
+      tool_refresh_pending: false,
+      tools_resume: nil,
       handoff_pending: nil,
       handoff_count: 0,
       last_handoff: nil,
@@ -139,9 +146,23 @@ defmodule Aikido.AiReact.RunState do
     })
   end
 
-  defp request_tool_setup(state) do
+  @doc "Enter setup and request a new, correlated native tool preparation generation."
+  def request_tool_setup(state) do
+    generation = Map.get(state, :tools_generation, 0) + 1
+
+    state =
+      Map.merge(state, %{
+        status: :setup,
+        prepared_tools: nil,
+        tools_generation: generation,
+        tool_refresh_pending: false
+      })
+
     directive = %Aikido.AiReact.Directives.PrepareTools{
       options: state.options,
+      generation: generation,
+      metadata: state.run_metadata,
+      tool_context: state.tool_context,
       tools: state.tools,
       tool_options: state.tool_options,
       request_id: state.request_id

@@ -499,3 +499,22 @@ bounds the number of attempts; these options do not impose an overall run limit.
 Streaming progress requires nonempty text, thinking, tool-call content or a
 multimodal content part. Metadata and empty chunks do not extend the progress
 clock. Cancellation interrupts attempts and retry backoff and releases cleanup.
+
+### Application-owned tool preparation and refresh
+
+Set `options.tool_preparation` to `{MyApp.Tools, :prepare}`. This scoped native
+Ash generic action accepts `options` (the native Ash AI keyword options) and
+`metadata` (the run metadata), and returns native Ash AI keyword options. It runs
+in supervised, cancellable setup work before the model. The application can
+perform MCP discovery here and return `extra_tools`; Aikido does not discover MCP
+servers or invent another tool format. The returned descriptions and callbacks
+are transient. The action reference and application configuration can be saved
+and evaluated again on the next run after restore.
+
+The public `refresh_tools` command accepts replacement `tools`, replacement
+`tool_options`, and a deep-merged `tool_context`. Active model/tool work retains
+its current registry until the next model boundary. Setup refreshes supersede
+older generations; stale readiness and failures cannot install or fail the new
+setup. Refresh during a synchronous hook waits for its gate. Idle refreshes
+update configuration for the next run. Incoming refreshes must match the active
+run’s actor and tenant, and preparation retains native Ash authorization.

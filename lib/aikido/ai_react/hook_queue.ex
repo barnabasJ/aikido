@@ -124,12 +124,32 @@ defmodule Aikido.AiReact.HookQueue do
     state = state |> append_queued_text_to_conversation() |> append_hook_text_to_conversation()
     effect = %{effect | context: state.context}
 
-    {state, effect} =
-      if Aikido.AiReact.ConversationHandoff.required?(state, effect),
-        do: Aikido.AiReact.ConversationHandoff.prepare_request(state, effect),
-        else: {state, effect}
+    if state.tool_refresh_pending do
+      state = Map.put(state, :tools_resume, %{queue: rest, status: status})
 
-    release_queued_steps(state, rest, status, directives ++ [effect])
+      with {:ok, result} <- Aikido.AiReact.RunState.request_tool_setup(state) do
+        {:ok, %{result | directives: directives ++ result.directives}}
+      end
+    else
+      {state, effect} =
+        if Aikido.AiReact.ConversationHandoff.required?(state, effect),
+          do: Aikido.AiReact.ConversationHandoff.prepare_request(state, effect),
+          else: {state, effect}
+
+      release_queued_steps(state, rest, status, directives ++ [effect])
+    end
+  end
+
+  def release_queued_steps(
+        state,
+        [{:effect, %Aikido.AiReact.Directives.PrepareTools{}} | rest],
+        _status,
+        directives
+      )
+      when state.tool_refresh_pending do
+    with {:ok, result} <- Aikido.AiReact.RunState.request_tool_setup(state) do
+      release_queued_steps(result.state, rest, :setup, directives ++ result.directives)
+    end
   end
 
   def release_queued_steps(state, [{:effect, effect} | rest], status, directives),

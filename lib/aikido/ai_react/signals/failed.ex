@@ -6,6 +6,10 @@ defmodule Aikido.AiReact.Signals.Failed do
     type "ai.react.failed"
 
     schema do
+      attribute :generation, :integer do
+        description "Optional preparation generation; failures from superseded setups are ignored."
+      end
+
       attribute :reason, :term do
         description "Failure reason reported by the supervised operation."
         allow_nil? false
