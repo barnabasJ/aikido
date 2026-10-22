@@ -2,6 +2,90 @@ defmodule AgentExamples.Catalog do
   @moduledoc "The runnable examples and the descriptions shown on their LiveView pages."
   @examples [
     %{
+      slug: "lua-permissions",
+      title: "Lua permissions and scope",
+      eyebrow: "Makewright · filtered VM functions",
+      resource: AgentExamples.LuaAssistant,
+      kind: :ai,
+      description:
+        "Select Lua functions per agent and carry actor and tenant through to inner Ash actions.",
+      detail:
+        "Execution and documentation resolve their entrypoints from the same declarative application context. Allow or remove the scope function, then run a script or request docs. These controls simulate an app-owned permission decision; a real application must derive that decision from its own authorization rather than trusting client-supplied flags.",
+      flow: [
+        "Application permissions",
+        "Same eval/docs entrypoints",
+        "Lua → native Ash action",
+        "Original actor + tenant"
+      ]
+    },
+    %{
+      slug: "adaptive-tools",
+      title: "Tool setup and refresh",
+      eyebrow: "Makewright · application tool configuration",
+      resource: AgentExamples.AdaptiveAssistant,
+      kind: :ai,
+      description: "Prepare native tools from application context and refresh them during a run.",
+      detail:
+        "Setup simulates a remote catalog request. Switch between analysis and stamping during setup or before the next prompt. A refresh during model or tool work is applied before the next model request. Queued messages and cancellation remain available. The application owns discovery and the permitted tool set; the library builds the native Ash AI registry.",
+      flow: [
+        "Application context",
+        "Scoped preparation action",
+        "Generation-safe refresh",
+        "Prepared tools → model"
+      ]
+    },
+    %{
+      slug: "verified-work",
+      title: "Verified task delivery",
+      eyebrow: "Makewright · bounded todo continuation",
+      resource: AgentExamples.VerifiedAssistant,
+      kind: :ai,
+      description:
+        "Deliver a task and its todo atomically, then require tool evidence before completion.",
+      detail:
+        "Deliver work to start a run. The offline model first proposes an answer without evidence. A native application verifier rejects it, the library requests another turn, and the evidence tool completes the todo through a public command. The verifier then accepts the answer. Continuation is optional and bounded; ordinary assistants still wait for external work by default.",
+      flow: [
+        "Message + todo",
+        "Provisional answer",
+        "Verifier rejects → continue",
+        "Evidence tool → verified answer"
+      ]
+    },
+    %{
+      slug: "resilience",
+      title: "Retries and loop guards",
+      eyebrow: "Makewright · failure isolation",
+      resource: AgentExamples.ResilientAssistant,
+      kind: :ai,
+      description:
+        "Exercise retry exhaustion, deadlines, cancellation and optional tool loop limits.",
+      detail:
+        "Choose retry to exhaust one retry, wait to test the three-second deadline or cancel while work is pending, cycle to repeat alternating tools, or errors to repeat failing tools. All tools run through Ash AI. Cycle and error limits are opt-in; the configured limit stops the run with a visible error rather than consuming the remaining model turns.",
+      flow: [
+        "Deterministic failure",
+        "Bounded attempts",
+        "Result signals",
+        "Recovery or explicit failure"
+      ]
+    },
+    %{
+      slug: "recovery",
+      title: "Checkpoint recovery",
+      eyebrow: "Makewright · DurableServer",
+      resource: AgentExamples.RecoverableAssistant,
+      kind: :ai,
+      description:
+        "Stop a permanent conversation and restore the same identity with retained history.",
+      detail:
+        "Send a prompt, stop the example, then start it again. This page reuses the stable agent ID and DurableServer restores the conversation. A new prompt reports how many user messages were retained. Prepared tool functions are rebuilt for each run. Interrupted effects and Lua VMs are not replayed. Delete the saved identity explicitly when you no longer need it.",
+      flow: [
+        "Conversation",
+        "Checkpoint + stop",
+        "Same ID → restore",
+        "Fresh tools + retained history"
+      ]
+    },
+    %{
       slug: "counter",
       title: "Counter",
       eyebrow: "State & contracts",

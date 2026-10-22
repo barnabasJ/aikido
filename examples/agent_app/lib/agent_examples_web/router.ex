@@ -18,6 +18,11 @@ defmodule AgentExamplesWeb.Router do
 
     live_session :examples, session: {__MODULE__, :live_session, []} do
       live("/", IndexLive)
+      live("/examples/lua-permissions", LuaPermissionsLive)
+      live("/examples/adaptive-tools", AdaptiveToolsLive)
+      live("/examples/verified-work", VerifiedWorkLive)
+      live("/examples/resilience", ResilienceLive)
+      live("/examples/recovery", RecoveryLive)
       live("/examples/counter", CounterLive)
       live("/examples/checklist", ChecklistLive)
       live("/examples/notebook", NotebookLive)

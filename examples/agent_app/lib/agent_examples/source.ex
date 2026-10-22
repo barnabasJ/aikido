@@ -137,6 +137,9 @@ defmodule AgentExamples.Source do
     )
   end
 
+  defp supporting_modules(slug) when slug in ["adaptive-tools", "verified-work", "resilience"],
+    do: [AgentExamples.Scenarios, Aikido.Todo]
+
   defp supporting_modules("hook-requests"), do: [AgentExamples.Playground]
 
   defp supporting_modules("conversation"), do: [Aikido.Todo]

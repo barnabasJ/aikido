@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Add isolated offline Makewright examples for dynamic tool refresh, filtered
+  Lua functions and scope, verified work, failure handling and checkpoint
+  recovery, with LiveView behavior tests and a scenario coverage checklist.
+
 - Add optional bounded todo continuation, scoped native verification, atomic
   task/todo delivery, consecutive tool-error limits and repeating-cycle limits.
 

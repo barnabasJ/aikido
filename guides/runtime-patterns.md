@@ -558,3 +558,5 @@ model-visible tool results, with an additional error marker for the guard;
 business tool errors are not retried as transport failures. Both guards default
 to nil, preserving model recovery and the existing repeated-call warning.
 
+See the example app's [Makewright scenario checklist](../examples/agent_app/MAKEWRIGHT.md)
+for isolated browser flows and the tests that cover each integration boundary.

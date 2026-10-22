@@ -59,9 +59,13 @@ defmodule AgentExamples.Playground do
           {:reply, :ok, state}
         end
 
-      %{status: :running} = run when slug == "conversation" ->
+      %{status: :running} = run when slug in ["conversation", "adaptive-tools", "recovery"] ->
         case run.record.resource
-             |> Ash.ActionInput.for_action(:message, %{agent: run.record.id, text: query})
+             |> Ash.ActionInput.for_action(
+               :message,
+               %{agent: run.record.id, text: query},
+               run.scope
+             )
              |> Ash.run_action() do
           {:ok, _} ->
             {:reply, :ok,
@@ -76,6 +80,46 @@ defmodule AgentExamples.Playground do
 
       _ ->
         {:reply, {:error, "Start an idle example before sending a prompt."}, state}
+    end
+  end
+
+  def handle_call({:command, owner, slug, :deliver, input}, _, state) do
+    key = {owner, slug}
+
+    case state.runs[key] do
+      %{status: status} = run when status in [:ready, :completed, :failed] ->
+        task =
+          Task.Supervisor.async_nolink(AgentExamples.WebTasks, fn ->
+            Aikido.AgentServer.call_until(
+              run.record.pid,
+              fn -> dispatch_command(run, :deliver, input) end,
+              "ai.react.**",
+              fn runtime ->
+                ai = runtime.agent.state.ai
+
+                cond do
+                  ai.request_id != input.request_id -> :skip
+                  ai.status == :completed -> {:ok, ai.result}
+                  ai.status == :failed -> {:error, ai.error}
+                  true -> :skip
+                end
+              end,
+              timeout: 30_000
+            )
+          end)
+
+        run = %{
+          run
+          | status: :running,
+            error: nil,
+            messages: run.messages ++ [%{role: :user, text: input.text}]
+        }
+
+        state = %{state | tasks: Map.put(state.tasks, task.ref, {key, task})}
+        {:reply, :ok, broadcast_and_store_run(state, key, run)}
+
+      _ ->
+        {:reply, {:error, "Start an idle example before delivering work."}, state}
     end
   end
 
@@ -292,6 +336,7 @@ defmodule AgentExamples.Playground do
     Task.Supervisor.async_nolink(AgentExamples.WebTasks, fn ->
       AI.ask(record, query,
         timeout: 180_000,
+        ash: [actor: %{id: owner}, tenant: "playground"],
         metadata: %{playground: %{owner: owner, slug: slug}}
       )
     end)
@@ -317,8 +362,8 @@ defmodule AgentExamples.Playground do
 
   defp dispatch_command(run, action, input) do
     run.record.resource
-    |> Ash.ActionInput.for_action(action, Map.put(input, :agent, run.record.id))
-    |> Ash.run_action()
+    |> Ash.ActionInput.for_action(action, Map.put(input, :agent, run.record.id), run.scope)
+    |> Ash.run_action(run.scope)
   end
 
   defp create_run(_key, nil, _, state), do: {:reply, {:error, "Unknown example"}, state}
@@ -326,6 +371,7 @@ defmodule AgentExamples.Playground do
   defp create_run(key, example, options, state) do
     with {:ok, attributes} <- attributes(example, options),
          attributes = with_request_callback(example, attributes, key),
+         attributes = restore_example_identity(example, attributes, state.runs[key]),
          {:ok, record} <-
            example.resource |> Ash.ActionInput.for_action(:start, attributes) |> Ash.run_action() do
       pid = record.pid
@@ -341,6 +387,7 @@ defmodule AgentExamples.Playground do
 
       run = %{
         record: record,
+        scope: [actor: %{id: elem(key, 0)}, tenant: "playground"],
         requests: [],
         status: :ready,
         mode: options["mode"] || "offline",
@@ -502,6 +549,15 @@ defmodule AgentExamples.Playground do
     end)
   end
 
+  defp restore_example_identity(%{slug: "recovery"}, attributes, %{record: record}),
+    do: Map.put(attributes, :id, record.id)
+
+  defp restore_example_identity(_, attributes, _), do: attributes
+
+  defp example_tools(%{slug: "lua-permissions"}, _), do: [:scoped_lua, :scoped_lua_docs]
+  defp example_tools(%{slug: "verified-work"}, _), do: [:record_evidence]
+  defp example_tools(%{slug: "resilience"}, _), do: [:text_stats, :stamp, :fail_example]
+
   defp example_tools(example, options) do
     tools = AI.Tools.for_assistant()
 
@@ -529,10 +585,17 @@ defmodule AgentExamples.Playground do
   defp model_attributes(example, _options) do
     attributes = AI.offline()
 
-    attributes =
-      if example.slug == "conversation",
-        do: Map.put(attributes, :client, AI.StreamingClient),
-        else: attributes
+    client =
+      case example.slug do
+        slug when slug in ["conversation", "recovery"] -> AI.StreamingClient
+        "lua-permissions" -> AgentExamples.LuaAssistant.Client
+        "adaptive-tools" -> AgentExamples.AdaptiveAssistant.Client
+        "verified-work" -> AgentExamples.VerifiedAssistant.Client
+        "resilience" -> AgentExamples.ResilientAssistant.Client
+        _ -> AI.ScriptedClient
+      end
+
+    attributes = Map.put(attributes, :client, client)
 
     {:ok, attributes}
   end
@@ -571,7 +634,13 @@ defmodule AgentExamples.Playground do
            :hook_errors,
            :streaming_text,
            :streaming_thinking,
-           :usage
+           :usage,
+           :tools_generation,
+           :tool_refresh_pending,
+           :todo_continuations,
+           :todo_verification_pending,
+           :tool_error_streak,
+           :estimated_tokens
          ])
          |> Map.put(:hook_messages, hook_injected_context_messages(ai)),
        todos: Map.get(Map.get(state.agent.state, :todos, %{}), :items, []),

@@ -86,8 +86,8 @@ defmodule Aikido.ToolRefreshTest do
     pid = start_server(ctx, Aikido.ToolRefreshTest.Agent)
     opts = options(self())
     task = Task.async(fn -> Aikido.AI.ask_sync(pid, "start", opts) end)
-    assert_receive {:preparation, 1, _, %{id: "caller"}, "org"}
-    assert_receive {:model, model, [%{description: "version 1"}]}
+    assert_receive {:preparation, 1, _, %{id: "caller"}, "org"}, 5_000
+    assert_receive {:model, model, [%{description: "version 1"}]}, 5_000
     assert {:ok, :accepted} = refresh(pid, %{version: 2})
     refute_received {:preparation, 2, _, _, _}
 

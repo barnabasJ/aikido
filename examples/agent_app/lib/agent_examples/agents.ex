@@ -5,11 +5,19 @@ defmodule AgentExamples.Agents do
     extensions: [Aikido.Domain.Extension, AshAi, AshLua.Domain]
 
   resources do
+    resource AgentExamples.LuaAssistant.Tools
+    resource AgentExamples.AdaptiveAssistant.ToolPreparation
+    resource AgentExamples.VerifiedAssistant.Verification
+    resource AgentExamples.ResilientAssistant.Failures
     resource AgentExamples.AI.Tools
     resource AgentExamples.AI.LuaSurface
   end
 
   lua do
+    namespace "session" do
+      action :whoami, AgentExamples.LuaAssistant.Tools, :whoami
+    end
+
     namespace "analysis" do
       action :text_stats, AgentExamples.AI.Tools, :text_stats, labels: [:analysis]
     end
@@ -24,6 +32,10 @@ defmodule AgentExamples.Agents do
   end
 
   tools do
+    tool :scoped_lua, AgentExamples.LuaAssistant.Tools, :eval
+    tool :scoped_lua_docs, AgentExamples.LuaAssistant.Tools, :docs
+    tool :record_evidence, AgentExamples.VerifiedAssistant.Verification, :record_evidence
+    tool :fail_example, AgentExamples.ResilientAssistant.Failures, :fail
     tool :team_roster, AgentExamples.AI.Tools, :team_roster
     tool :spawn_worker, AgentExamples.AI.Tools, :spawn_worker
     tool :delegate, AgentExamples.AI.Tools, :delegate
@@ -36,6 +48,11 @@ defmodule AgentExamples.Agents do
   end
 
   agents do
+    agent :lua_assistant, AgentExamples.LuaAssistant
+    agent :adaptive, AgentExamples.AdaptiveAssistant
+    agent :verified, AgentExamples.VerifiedAssistant
+    agent :resilient, AgentExamples.ResilientAssistant
+    agent :recoverable, AgentExamples.RecoverableAssistant
     agent :conversation, AgentExamples.ConversationAssistant
     agent :assistant, AgentExamples.Assistant
     agent :hooked_assistant, AgentExamples.HookedAssistant

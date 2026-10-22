@@ -105,7 +105,11 @@ defmodule Aikido.MixProject do
           "guides/runtime-patterns.md",
           "guides/multi-tenancy.md"
         ],
-        Examples: ["examples/agent_app/README.md", "examples/agent_app/AI.md"],
+        Examples: [
+          "examples/agent_app/README.md",
+          "examples/agent_app/AI.md",
+          "examples/agent_app/MAKEWRIGHT.md"
+        ],
         Project: ["CONTRIBUTING.md", "CHANGELOG.md", "LICENSE"]
       ],
       extras: [
@@ -116,6 +120,8 @@ defmodule Aikido.MixProject do
         {"guides/multi-tenancy.md", title: "Multi-Tenancy"},
         {"examples/agent_app/README.md", title: "Example Application", filename: "example-app"},
         {"examples/agent_app/AI.md", title: "AI Examples", filename: "ai-examples"},
+        {"examples/agent_app/MAKEWRIGHT.md",
+         title: "Makewright Scenarios", filename: "makewright-scenarios"},
         {"CONTRIBUTING.md", title: "Contributing"},
         {"CHANGELOG.md", title: "Changelog"},
         {"LICENSE", title: "Apache 2.0 License"}

@@ -26,6 +26,11 @@ asset build, database, or API key is needed for offline mode.
 
 | Page | Browser interaction |
 | --- | --- |
+| `/examples/adaptive-tools` | Prepare application-selected tools; refresh during setup and queue a message |
+| `/examples/lua-permissions` | Change the Lua function surface and inspect actor/tenant propagation |
+| `/examples/verified-work` | Deliver a task and todo atomically; verify evidence after bounded continuation |
+| `/examples/resilience` | Exercise deadlines, retries, cancellation and tool loop guards |
+| `/examples/recovery` | Stop/start the same permanent identity and verify retained conversation |
 | `/examples/counter` | Add, increase/decrease through one typed union handler, and count every signal |
 | `/examples/checklist` | Add and complete items; inspect progress |
 | `/examples/notebook` | Append notes to the embedded journal |
@@ -39,6 +44,9 @@ asset build, database, or API key is needed for offline mode.
 | `/examples/researcher` | Try the research role independently |
 | `/examples/reviewer` | Try the review role independently |
 | `/examples/research-team` | Run orchestration and watch dynamic workers appear |
+
+See [the Makewright scenario checklist](MAKEWRIGHT.md) for prescribed offline flows
+and their integration tests.
 
 The nested-teams page builds one mixed ownership tree. Choose an agent or team
 in **Parent node**, choose **Agent** or **Team**, and spawn a child. Repeat at

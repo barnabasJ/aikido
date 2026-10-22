@@ -25,6 +25,11 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
   test "each example has its own LiveView and shared navigation", %{conn: conn} do
     pages = [
+      {"lua-permissions", AgentExamplesWeb.LuaPermissionsLive},
+      {"adaptive-tools", AgentExamplesWeb.AdaptiveToolsLive},
+      {"verified-work", AgentExamplesWeb.VerifiedWorkLive},
+      {"resilience", AgentExamplesWeb.ResilienceLive},
+      {"recovery", AgentExamplesWeb.RecoveryLive},
       {"counter", AgentExamplesWeb.CounterLive},
       {"checklist", AgentExamplesWeb.ChecklistLive},
       {"notebook", AgentExamplesWeb.NotebookLive},
@@ -667,6 +672,133 @@ defmodule AgentExamplesWeb.LiveViewTest do
         ] do
       assert conn |> get(path) |> response(200) |> byte_size() > 0
     end
+  end
+
+  test "tool setup can be refreshed and receive queued messages before the first model turn", %{
+    conn: conn
+  } do
+    {:ok, view, _} = live(conn, "/examples/adaptive-tools")
+    owner = start(view, "adaptive-tools")
+    assert :ok = Playground.command(owner, "adaptive-tools", :ask, %{query: "first"})
+    await(owner, "adaptive-tools", &(&1.snapshot.ai.status == :setup))
+    view |> element("button[phx-value-set=stamp]") |> render_click()
+
+    assert :ok =
+             Playground.command(owner, "adaptive-tools", :ask, %{query: "queued during setup"})
+
+    await(owner, "adaptive-tools", &(&1.status == :completed))
+    run = Playground.get(owner, "adaptive-tools")
+    assert run.snapshot.ai.tools_generation == 2
+    assert List.last(run.messages).text =~ "Prepared tools: stamp"
+    assert List.last(run.messages).text =~ "refreshed"
+    assert has_element?(view, "#tool-refresh")
+  end
+
+  test "delivered todo work is verified only after the evidence tool completes it", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/verified-work")
+    owner = start(view, "verified-work")
+    view |> element("#deliver-work") |> render_click()
+    await(owner, "verified-work", &(&1.status == :completed))
+    run = Playground.get(owner, "verified-work")
+    assert run.snapshot.ai.todo_continuations == 1
+
+    assert [%{id: "delivered-work", status: :completed, result: "Checked by the evidence tool"}] =
+             run.snapshot.todos
+
+    assert List.last(run.messages).text =~ "Verified evidence"
+    assert Enum.any?(run.events, &(&1.type == "ai.react.todos.verified"))
+    assert has_element?(view, "#verified-answer", "Verified evidence")
+  end
+
+  test "real Ash AI errors and alternating calls trigger their optional guards", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/resilience")
+    owner = start(view, "resilience")
+
+    for {query, error} <- [
+          {"cycle", {:tool_cycle_limit, 2, 2}},
+          {"errors", {:tool_error_limit, 2}}
+        ] do
+      view |> element("#scenario-#{query}") |> render_click()
+      await(owner, "resilience", &(&1.status == :failed))
+      assert Playground.get(owner, "resilience").snapshot.ai.error == error
+    end
+  end
+
+  test "retry exhaustion and cancellation finish their waiters without blocking the page", %{
+    conn: conn
+  } do
+    {:ok, view, _} = live(conn, "/examples/resilience")
+    owner = start(view, "resilience")
+    view |> element("#scenario-retry") |> render_click()
+    await(owner, "resilience", &(&1.status == :failed))
+    assert Playground.get(owner, "resilience").snapshot.ai.error == :timeout
+    view |> element("#scenario-wait") |> render_click()
+    await(owner, "resilience", &(&1.snapshot.ai.status == :running))
+    view |> element("#cancel-run") |> render_click()
+    await(owner, "resilience", &(&1.status == :failed))
+    assert Playground.get(owner, "resilience").snapshot.ai.error == :cancelled
+  end
+
+  test "stopping and starting a permanent example restores its history under the same identity",
+       %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/recovery")
+    owner = start(view, "recovery")
+    assert :ok = Playground.command(owner, "recovery", :ask, %{query: "remember"})
+    await(owner, "recovery", &(&1.status == :completed))
+    previous = Playground.get(owner, "recovery").record
+    view |> element("#stop-example") |> render_click()
+    assert has_element?(view, "#start-form")
+    start(view, "recovery")
+    restored = Playground.get(owner, "recovery").record
+    assert restored.id == previous.id
+    assert restored.pid != previous.pid
+    assert :ok = Playground.command(owner, "recovery", :ask, %{query: "recall"})
+    await(owner, "recovery", &(&1.status == :completed))
+    assert List.last(Playground.get(owner, "recovery").messages).text =~ "2 user messages"
+    assert {:ok, _} = AgentExamples.Agents.recoverable_delete(restored)
+  end
+
+  test "Lua eval and docs use the same runtime entrypoints and retain the original scope", %{
+    conn: conn
+  } do
+    {:ok, view, _} = live(conn, "/examples/lua-permissions")
+    owner = start(view, "lua-permissions")
+    view |> element("#allow-scope") |> render_click()
+
+    assert :ok =
+             Playground.command(owner, "lua-permissions", :ask, %{
+               query: "return session.whoami()"
+             })
+
+    await(owner, "lua-permissions", &(&1.status == :completed))
+
+    answer =
+      Playground.get(owner, "lua-permissions").messages
+      |> List.last()
+      |> Map.fetch!(:text)
+      |> Jason.decode!()
+
+    assert answer["result"] == %{"actor" => %{"id" => owner}, "tenant" => "playground"}
+    view |> element("#deny-scope") |> render_click()
+    assert :ok = Playground.command(owner, "lua-permissions", :ask, %{query: "docs"})
+    await(owner, "lua-permissions", &(&1.status == :completed))
+    refute List.last(Playground.get(owner, "lua-permissions").messages).text =~ "session.whoami"
+
+    assert :ok =
+             Playground.command(owner, "lua-permissions", :ask, %{
+               query: "return session.whoami()"
+             })
+
+    await(owner, "lua-permissions", &(&1.status == :completed))
+
+    answer =
+      Playground.get(owner, "lua-permissions").messages
+      |> List.last()
+      |> Map.fetch!(:text)
+      |> Jason.decode!()
+
+    assert answer["error"]
+    assert answer["result"] == nil
   end
 
   defp start(view, slug, options \\ %{}) do
