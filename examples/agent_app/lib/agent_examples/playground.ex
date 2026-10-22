@@ -662,7 +662,7 @@ defmodule AgentExamples.Playground do
   end
 
   defp restore_example_identity(%{slug: slug}, attributes, %{record: record})
-       when slug in ["recovery", "quicksort"],
+       when slug == "recovery",
        do: Map.put(attributes, :id, record.id)
 
   defp restore_example_identity(_, attributes, _), do: attributes

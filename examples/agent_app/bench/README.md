@@ -215,7 +215,7 @@ and each post-run sample had one idle root, one saved agent and no I/O tasks.
 However, fresh identities added 100,000 Paxos keys per run, reaching 1,000,002;
 sort times ranged from 101.8 to 193.0 seconds. This was not stable storage usage.
 
-Restart now reuses the root identity and identifies each worker by its pivot value.
+That benchmark configuration reused the root identity and identified each worker by its pivot value.
 For a repeatedly shuffled fixed input range, the worker key set is bounded. UI
 histories use distinct per-run topics, so delayed old notifications cannot change
 the replacement graph. Tests cover ten shuffled runs and restarting active work.
@@ -368,3 +368,36 @@ may no longer have their original live parent monitors. A replacement root is
 started only after those processes exit. Other browser-owned trees are excluded.
 Regression tests cover a stale cached PID, an existing replacement root, a
 detached descendant, preservation of another root and a subsequent successful sort.
+
+
+### Current execution isolation and crash cleanup
+
+Quicksort Restart now creates a fresh root ID for each sorting execution.
+Children use the normal `parent_id/branch_name` derivation, so `L` below a root
+and `R` below that child have IDs `<root>/L` and `<root>/L/R`. Workflow callers
+can still supply an explicit root ID when recovering the same workflow execution.
+Quicksort retains its input-dependent pivot selection; changing root namespaces
+isolates differently shaped sorting trees without requiring a locally sorted pivot.
+
+Teardown removes both live descendants and saved crash checkpoints for the old
+Quicksort root before creating the next execution. Native DurableServer server
+information and the domain delete action perform this cleanup; other root
+namespaces and resources are excluded. The missing-parent recovery path honors
+`:stop` instead of retaining a parentless worker. Activation errors identify
+agents by stable ID, and the UI displays the underlying reason without recursively
+printing each parent's error wrapper.
+
+The earlier ten-run timing report used the former reused-root configuration.
+It remains evidence for that recorded configuration, not bounded metadata usage
+with fresh roots. Fresh executions intentionally allocate new native consensus
+keys; stopping agents deletes their snapshots and processes, not all EKV metadata.
+The sustained harness now checks that each replacement root has a different ID.
+
+
+The [existing-store recovery check](results/quicksort-fresh-root-recovery-2026-10-22.json)
+verified the previously failing 10,000-value input after crash-checkpoint cleanup,
+then completed two fresh-root 10,000-agent runs in 13.1 and 9.9 seconds. A further
+browser-driven run completed and verified every value in 9.4 seconds. The retired
+root namespaces had zero live processes and saved snapshots, the formerly
+conflicting process was dead, and no I/O tasks remained. The two current completed
+roots and their UI histories remain available for inspection.

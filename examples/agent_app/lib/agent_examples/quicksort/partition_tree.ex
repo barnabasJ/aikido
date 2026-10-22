@@ -23,18 +23,15 @@ defmodule AgentExamples.Quicksort.PartitionTree do
     Enum.map(state.partitions, fn {branch, _numbers} -> spawn_partition(state, branch) end)
   end
 
-  @doc "Reuses a pivot worker's durable key while preserving its actual parent and display branch."
+  @doc "Spawns a partition using the runtime's deterministic parent-ID/branch-name identity."
   def spawn_partition(state, branch) do
-    pivot = state.partitions |> Map.fetch!(branch) |> pivot()
-
     %Aikido.Directives.SpawnAgent{
       agent: AgentExamples.Quicksort,
       tag: branch,
       restart?: false,
       start_options: [timeout: 30_000],
       opts: %{
-        id: "#{state.root_id}/partition/#{pivot}",
-        initial_state: %{branch: state.branch <> branch, root_id: state.root_id},
+        initial_state: %{branch: state.branch <> branch},
         on_parent_death: :stop
       }
     }

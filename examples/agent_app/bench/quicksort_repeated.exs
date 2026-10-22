@@ -115,7 +115,7 @@ defmodule AgentExamples.Quicksort.Bench.Repeated do
       {restart_us, {:ok, fresh}} =
         :timer.tc(fn -> AgentExamples.Quicksort.Restart.restart(owner) end)
 
-      true = fresh.record.id == root.id
+      true = fresh.record.id != root.id
       true = fresh.record.pid != root.pid
       :error = AgentExamples.Quicksort.RunHistory.fetch(topic)
       GenServer.stop(probe)

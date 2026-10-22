@@ -194,6 +194,13 @@ defmodule AgentExamplesWeb.QuicksortLive do
   defp node_color(:idle), do: "#879d99"
   defp node_color(:failed), do: "#bd5547"
 
+  defp describe_sort_failure(%{reason: reason}), do: describe_sort_failure(reason)
+
+  defp describe_sort_failure({:already_started, id}) when is_binary(id),
+    do: "Agent #{id} is already running"
+
+  defp describe_sort_failure(reason), do: inspect(reason)
+
   def render(assigns) do
     assigns =
       assign(assigns, AgentExamples.Quicksort.TreeView.summarize(assigns.tree, assigns.focus))
@@ -231,14 +238,14 @@ defmodule AgentExamplesWeb.QuicksortLive do
         </form>
         <p class="muted">
           Sorted children stop after their results reach the parent. Their recorded nodes stay visible.
-          Restart waits for remaining processes and checkpoints EKV before enabling a fresh root.
+          Restart removes the old tree and crash snapshots, checkpoints EKV, then creates a new root ID.
         </p>
       </section>
       <section class="panel" id="sort-metrics">
         <h2>The BEAM at work</h2>
         <p :if={!@history_available} id="history-unavailable">This older run has no recorded session history. Restart the example to track every spawned agent across reconnects.</p>
         <p :if={@root_unavailable && active?(@run)} role="alert" id="sort-root-unavailable">The sorting root stopped: {@root_unavailable}. This run cannot continue.</p>
-        <p :if={own(@run)[:status] == :failed} role="alert" id="sort-failure">Sorting failed: {inspect(own(@run)[:error])}. Restart the example after addressing the activation failure.</p>
+        <p :if={own(@run)[:status] == :failed} role="alert" id="sort-failure">Sorting failed: {describe_sort_failure(own(@run)[:error])}. Restart the example after addressing the activation failure.</p>
         <div :if={@history_available} class="hero-pills">
           <span id="sort-spawned">{map_size(@tree.nodes)} agents spawned</span>
           <span>{map_size(@tree.nodes) - @completed - @failed} sorting</span>

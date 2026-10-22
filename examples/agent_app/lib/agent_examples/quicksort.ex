@@ -24,10 +24,6 @@ defmodule AgentExamples.Quicksort do
         default ""
       end
 
-      attribute :root_id, :string do
-        description "Root's durable identity, shared by this tree's reusable pivot worker keys."
-      end
-
       attribute :branch, :string do
         description "Path through the partition tree; L and R identify child partitions."
         default "root"

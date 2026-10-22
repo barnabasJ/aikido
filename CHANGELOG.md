@@ -6,9 +6,8 @@
 
 ### Added
 
-- Verify ten consecutive 100,000-agent quicksort runs in one VM and native EKV
-  store, recording stable lifecycle counts, bounded memory/storage and final
-  removal of all live and saved agents.
+- Record full-size quicksort lifecycle measurements and existing-store recovery
+  checks, distinguishing agent cleanup from retained native EKV metadata.
 
 - Add a sustained quicksort lifecycle benchmark with per-run process, memory,
   saved-agent and EKV metadata metrics, disk-space guards and recorded normal
@@ -34,9 +33,15 @@
 - Supervise the example app’s native EKV store explicitly and configure its
   DurableServer backend with a 60-second storage budget for large local trees.
 
-- Reuse quicksort root and pivot-worker identities across restarts so identical
-  input ranges do not allocate a new durable key set every run. Keep UI histories
-  on distinct run topics and discard notifications from replaced runs.
+- Give each Quicksort sorting execution a fresh root ID and derive children from
+  parent IDs and branch names. Delete saved crash checkpoints as well as live
+  descendants before starting a replacement tree.
+- Derive escaped deterministic child IDs with `Aikido.Agent.child_id/2`; team
+  members follow their ownership ancestry. Explicit root IDs support workflow
+  recovery independently of process PIDs.
+- Honor `on_parent_death: :stop` when a saved logical parent cannot be resolved,
+  retain permanent parent bindings and resolve parents within their actual
+  DurableServer pool. Report duplicate activation failures with stable IDs.
 
 - Retire completed quicksort child agents after their parent records the result,
   retaining the graph independently for inspection. Release replaced histories

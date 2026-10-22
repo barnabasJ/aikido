@@ -14,6 +14,7 @@ defmodule AgentExamples.Quicksort.Restart do
       with :ok <- AgentExamples.Playground.stop(owner, "quicksort"),
            :ok <- stop_surviving_tree_processes(monitors),
            :ok <- await_tree_exit(monitors, deadline),
+           :ok <- delete_saved_tree(run),
            :ok <- checkpoint_agent_store() do
         AgentExamples.Playground.start(owner, "quicksort", %{})
       end
@@ -21,6 +22,39 @@ defmodule AgentExamples.Quicksort.Restart do
       for ref <- Map.keys(monitors), do: Process.demonitor(ref, [:flush])
     end
   end
+
+  # A stopped process can still have a crash checkpoint. Reusing its pivot key
+  # must initialize a new partition, rather than restore the previous sort.
+  defp delete_saved_tree(%{record: %{id: root_id}}) do
+    Aikido.Default
+    |> Aikido.durable_supervisor_name()
+    |> DurableServer.Supervisor.stream_all_server_info()
+    |> Enum.reduce_while(:ok, fn info, :ok ->
+      case saved_tree_identity(info, root_id) do
+        nil ->
+          {:cont, :ok}
+
+        id ->
+          case AgentExamples.Agents.quicksort_delete(id) do
+            {:ok, _} -> {:cont, :ok}
+            {:error, reason} -> {:halt, {:error, reason}}
+          end
+      end
+    end)
+  end
+
+  defp delete_saved_tree(_), do: :ok
+
+  defp saved_tree_identity(%{module: Aikido.Durable.AgentServer} = info, root_id) do
+    saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
+    id = saved.options[:id]
+
+    if saved.options[:agent_module] == AgentExamples.Quicksort && is_binary(id) &&
+         (id == root_id || String.starts_with?(id, root_id <> "/")),
+       do: id
+  end
+
+  defp saved_tree_identity(_, _), do: nil
 
   # Recovery can replace parents without reconstructing their old live child
   # monitors. Retire every process in this tree, including detached descendants.

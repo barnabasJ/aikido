@@ -132,18 +132,45 @@ defmodule AgentExamples.QuicksortTest do
     end
   end
 
-  test "repeated shuffled sorts reuse durable identities and release each recorded history" do
-    owner = "repeat-test:" <> Ash.UUIDv7.generate()
-    {:ok, initial} = AgentExamples.Playground.start(owner, "quicksort", %{})
-    handler = {__MODULE__, make_ref()}
+  test "restart deletes an inactive worker crash checkpoint before reusing its pivot key" do
+    owner = "crash-checkpoint:" <> Ash.UUIDv7.generate()
+    {:ok, run} = AgentExamples.Playground.start(owner, "quicksort", %{})
+    pool = Aikido.durable_supervisor_name(Aikido.Default)
+    id = run.record.id <> "/partition/63"
 
-    :ok =
-      :telemetry.attach(
-        handler,
-        [:aikido, :agent_server, :ready],
-        &__MODULE__.capture_partition/4,
-        {self(), initial.record.id}
+    child =
+      AgentExamples.Quicksort
+      |> Ash.ActionInput.for_action(:start, %{id: id},
+        context: %{aikido_runtime_options: [restart?: false]}
       )
+      |> Ash.run_action!()
+
+    {storage_key, _} =
+      Enum.find(DurableServer.Supervisor.global_members(pool), fn {_, {pid, _}} ->
+        pid == child.pid
+      end)
+
+    monitor = Process.monitor(child.pid)
+    Process.exit(child.pid, :kill)
+    assert_receive {:DOWN, ^monitor, :process, _, :killed}, 5000
+    assert {:ok, _saved} = DurableServer.Supervisor.get_server_info(pool, storage_key)
+    on_exit(fn -> AgentExamples.Playground.stop(owner, "quicksort") end)
+
+    assert {:ok, fresh} = AgentExamples.Quicksort.Restart.restart(owner)
+    refute fresh.record.id == run.record.id
+    assert {:error, :not_found} = DurableServer.Supervisor.get_server_info(pool, storage_key)
+
+    replacement = Agents.quicksort_start!(%{id: id})
+    on_exit(fn -> Agents.quicksort_stop(replacement) end)
+
+    assert {:ok, :idle} =
+             Aikido.AgentServer.state(replacement.pid, &{:ok, &1.agent.state.state.status})
+  end
+
+  test "repeated shuffled sorts isolate each execution and release its processes and history" do
+    owner = "repeat-test:" <> Ash.UUIDv7.generate()
+    {:ok, _initial} = AgentExamples.Playground.start(owner, "quicksort", %{})
+    handler = {__MODULE__, make_ref()}
 
     on_exit(fn ->
       :telemetry.detach(handler)
@@ -154,6 +181,15 @@ defmodule AgentExamples.QuicksortTest do
       for _ <- 1..10, reduce: MapSet.new() do
         identities ->
           root = AgentExamples.Playground.get(owner, "quicksort").record
+
+          :ok =
+            :telemetry.attach(
+              handler,
+              [:aikido, :agent_server, :ready],
+              &__MODULE__.capture_partition/4,
+              {self(), root.id}
+            )
+
           topic = AgentExamples.Quicksort.RunHistory.topic(Ash.UUIDv7.generate())
           AgentExamples.Quicksort.RunHistory.open(topic)
           numbers = Enum.shuffle(Enum.to_list(1..32))
@@ -185,15 +221,16 @@ defmodule AgentExamples.QuicksortTest do
                 MapSet.put(identities, id)
             end
 
+          :telemetry.detach(handler)
           {:ok, fresh} = AgentExamples.Quicksort.Restart.restart(owner)
-          assert fresh.record.id == root.id
+          refute fresh.record.id == root.id
           refute fresh.record.pid == root.pid
           assert fresh.snapshot.own.status == :idle
           assert :error == AgentExamples.Quicksort.RunHistory.fetch(topic)
           identities
       end
 
-    assert MapSet.size(identities) <= 32
+    assert MapSet.size(identities) == 310
   end
 
   test "an active sort can be restarted and its replacement completes independently" do
@@ -209,7 +246,7 @@ defmodule AgentExamples.QuicksortTest do
     })
 
     {:ok, fresh} = AgentExamples.Quicksort.Restart.restart(owner)
-    assert fresh.record.id == initial.record.id
+    refute fresh.record.id == initial.record.id
     refute Process.alive?(initial.record.pid)
     assert fresh.snapshot.own.status == :idle
 

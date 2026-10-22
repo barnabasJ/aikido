@@ -17,7 +17,6 @@ defmodule AgentExamples.Quicksort.Actions.Partition do
       state = %{
         state
         | numbers: input.arguments.numbers,
-          root_id: state.root_id || context.agent_id,
           topic: input.arguments.topic,
           pivot: pivot,
           equal: equal,

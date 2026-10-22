@@ -902,7 +902,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     reconnected |> element("button[phx-click=restart_sort]") |> render_click()
     render_async(reconnected, 15_000)
     assert Playground.get(owner, "quicksort").snapshot.own.status == :idle
-    assert Playground.get(owner, "quicksort").record.id == old_id
+    refute Playground.get(owner, "quicksort").record.id == old_id
     assert Enum.all?(old_tree, fn {_, pid} -> !Process.alive?(pid) end)
     assert has_element?(reconnected, "#sort-spawned", "0 agents spawned")
 
@@ -929,7 +929,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     render_async(view, 15_000)
 
     fresh = Playground.get(owner, "quicksort")
-    assert fresh.record.id == old.id
+    refute fresh.record.id == old.id
     assert fresh.record.pid != old.pid
     assert Process.alive?(fresh.record.pid)
     assert fresh.snapshot.own.status == :idle
@@ -973,7 +973,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert_receive {:DOWN, ^monitor, :process, _, _}, 5000
     assert_receive {:DOWN, ^detached_monitor, :process, _, _}, 5000
     fresh = Playground.get(owner, "quicksort")
-    assert fresh.record.id == old.id
+    refute fresh.record.id == old.id
     assert fresh.record.pid != replacement.pid
     assert Process.alive?(fresh.record.pid)
     assert Process.alive?(independent.pid)
