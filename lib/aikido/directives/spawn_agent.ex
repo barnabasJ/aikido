@@ -100,8 +100,6 @@ defmodule Aikido.Directives.SpawnAgent do
   immediately.
   """
 
-  require Logger
-
   @reserved_child_opts [:agent, :agent_module, :id, :aikido, :parent, :partition]
 
   @impl true
@@ -118,16 +116,52 @@ defmodule Aikido.Directives.SpawnAgent do
 
     task = %Aikido.Directives.AsyncTask{
       work: fn ->
-        spawn_child(state, parent_pid, agent, tag, opts, meta, restart?)
+        start_child_or_report_failure(state, parent_pid, agent, tag, opts, meta, restart?, signal)
         {:signals, []}
       end
     }
 
     case Aikido.Directives.AsyncTask.start(task, signal, state) do
-      {:ok, _pid} -> :ok
-      {:error, reason} -> Logger.error("Failed to start agent spawn task: #{inspect(reason)}")
+      {:ok, _pid} ->
+        :ok
+
+      {:error, reason} ->
+        report_failure(
+          parent_pid,
+          opts[:id] || "#{state.id}/#{tag_component(tag)}",
+          tag,
+          reason,
+          signal
+        )
     end
 
+    :ok
+  end
+
+  defp start_child_or_report_failure(state, parent_pid, agent, tag, opts, meta, restart?, signal) do
+    child_id = opts[:id] || "#{state.id}/#{tag_component(tag)}"
+
+    try do
+      case spawn_child(state, parent_pid, agent, tag, opts, meta, restart?) do
+        :ok -> :ok
+        {:error, reason} -> report_failure(parent_pid, child_id, tag, reason, signal)
+      end
+    rescue
+      error -> report_failure(parent_pid, child_id, tag, error, signal)
+    catch
+      kind, reason -> report_failure(parent_pid, child_id, tag, {kind, reason}, signal)
+    end
+  end
+
+  defp report_failure(parent, child_id, tag, reason, signal) do
+    failure =
+      Aikido.AgentServer.Signals.ChildStartFailed.new!(%{
+        child_id: child_id,
+        tag: tag,
+        reason: reason
+      })
+
+    Aikido.AgentServer.cast(parent, Aikido.Signal.inherit(failure, signal))
     :ok
   end
 
@@ -165,11 +199,7 @@ defmodule Aikido.Directives.SpawnAgent do
         :ok
 
       {:error, reason} ->
-        Logger.error(
-          "AgentServer #{state.id} failed to spawn child #{child_id}: #{inspect(reason)}"
-        )
-
-        :ok
+        {:error, reason}
     end
   end
 
