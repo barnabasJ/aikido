@@ -24,14 +24,18 @@ defmodule AgentExamplesWeb.QuicksortLive do
   end
 
   defp restore_session_history(socket) do
-    if active?(socket.assigns.run) do
-      topic = AgentExamples.Quicksort.RunHistory.topic(socket.assigns.run.record.id)
+    topic = own(socket.assigns.run)[:topic]
+
+    if is_binary(topic) && topic != "" do
       socket = assign(socket, sort_topic: topic)
 
       socket =
         if connected?(socket) do
           Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
-          assign(socket, root_monitor: Process.monitor(socket.assigns.run.record.pid))
+
+          if active?(socket.assigns.run),
+            do: assign(socket, root_monitor: Process.monitor(socket.assigns.run.record.pid)),
+            else: socket
         else
           socket
         end
@@ -67,13 +71,15 @@ defmodule AgentExamplesWeb.QuicksortLive do
 
   def handle_event("sort", %{"size" => size}, socket) do
     with {size, ""} when size in 1..100_000 <- Integer.parse(size),
-         true <- !socket.assigns.starting && active?(socket.assigns.run) do
+         true <-
+           !socket.assigns.starting && active?(socket.assigns.run) &&
+             own(socket.assigns.run)[:status] == :idle do
       if socket.assigns.sort_topic do
         Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
         AgentExamples.Quicksort.RunHistory.close(socket.assigns.sort_topic)
       end
 
-      topic = AgentExamples.Quicksort.RunHistory.topic(socket.assigns.run.record.id)
+      topic = AgentExamples.Quicksort.RunHistory.topic(Ash.UUIDv7.generate())
       AgentExamples.Quicksort.RunHistory.open(topic)
       :ok = Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
 

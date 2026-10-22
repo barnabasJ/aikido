@@ -10,7 +10,6 @@ defmodule AgentExamples.Quicksort.Restart do
     try do
       with :ok <- AgentExamples.Playground.stop(owner, "quicksort"),
            :ok <- await_tree_exit(monitors, deadline) do
-        close_history(run)
         AgentExamples.Playground.start(owner, "quicksort", %{})
       end
     after
@@ -39,10 +38,4 @@ defmodule AgentExamples.Quicksort.Restart do
         {:error, "The previous sorting tree is still stopping. Try restarting again."}
     end
   end
-
-  defp close_history(%{record: %{id: id}}) do
-    id |> AgentExamples.Quicksort.RunHistory.topic() |> AgentExamples.Quicksort.RunHistory.close()
-  end
-
-  defp close_history(_), do: :ok
 end

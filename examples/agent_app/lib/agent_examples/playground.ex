@@ -490,11 +490,8 @@ defmodule AgentExamples.Playground do
     end
   end
 
-  defp close_replaced_sort_history(%{slug: "quicksort"}, %{record: %{id: id}}),
-    do:
-      id
-      |> AgentExamples.Quicksort.RunHistory.topic()
-      |> AgentExamples.Quicksort.RunHistory.close()
+  defp close_replaced_sort_history(%{slug: "quicksort"}, %{snapshot: %{own: %{topic: topic}}}),
+    do: AgentExamples.Quicksort.RunHistory.close(topic)
 
   defp close_replaced_sort_history(_, _), do: :ok
 
@@ -659,8 +656,9 @@ defmodule AgentExamples.Playground do
     end)
   end
 
-  defp restore_example_identity(%{slug: "recovery"}, attributes, %{record: record}),
-    do: Map.put(attributes, :id, record.id)
+  defp restore_example_identity(%{slug: slug}, attributes, %{record: record})
+       when slug in ["recovery", "quicksort"],
+       do: Map.put(attributes, :id, record.id)
 
   defp restore_example_identity(_, attributes, _), do: attributes
 
@@ -750,6 +748,7 @@ defmodule AgentExamples.Playground do
            :completed,
            :title,
            :status,
+           :topic,
            :result,
            :error
          ]),

@@ -2,7 +2,7 @@ defmodule AgentExamples.Quicksort.PartitionTree do
   @moduledoc "Pure partitioning, child descriptors and result assembly for recursive quicksort."
 
   def split(numbers) do
-    pivot = Enum.at(numbers, div(length(numbers), 2))
+    pivot = pivot(numbers)
 
     groups =
       Enum.group_by(numbers, fn number ->
@@ -16,18 +16,27 @@ defmodule AgentExamples.Quicksort.PartitionTree do
     {pivot, Map.get(groups, "equal", []), Map.take(groups, ["L", "R"])}
   end
 
+  @doc "Selects the middle value as the pivot for a nonempty partition."
+  def pivot(numbers), do: Enum.at(numbers, div(length(numbers), 2))
+
   def spawn_partitions(state) do
     Enum.map(state.partitions, fn {branch, _numbers} -> spawn_partition(state, branch) end)
   end
 
-  @doc "Describes activation of one retained partition under its stable parent/branch identity."
+  @doc "Reuses a pivot worker's durable key while preserving its actual parent and display branch."
   def spawn_partition(state, branch) do
+    pivot = state.partitions |> Map.fetch!(branch) |> pivot()
+
     %Aikido.Directives.SpawnAgent{
       agent: AgentExamples.Quicksort,
       tag: branch,
       restart?: false,
       start_options: [timeout: 30_000],
-      opts: %{initial_state: %{branch: state.branch <> branch}, on_parent_death: :stop}
+      opts: %{
+        id: "#{state.root_id}/partition/#{pivot}",
+        initial_state: %{branch: state.branch <> branch, root_id: state.root_id},
+        on_parent_death: :stop
+      }
     }
   end
 

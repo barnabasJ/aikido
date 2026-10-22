@@ -9,20 +9,21 @@ defmodule AgentExamples.Quicksort.Actions.Partition do
     if state.status != :idle do
       {:error, "Start a new sorting tree for another input."}
     else
+      context = input.context.aikido
+
       {pivot, equal, partitions} =
         AgentExamples.Quicksort.PartitionTree.split(input.arguments.numbers)
 
       state = %{
         state
         | numbers: input.arguments.numbers,
+          root_id: state.root_id || context.agent_id,
           topic: input.arguments.topic,
           pivot: pivot,
           equal: equal,
           partitions: partitions,
           status: :sorting
       }
-
-      context = input.context.aikido
 
       if map_size(partitions) == 0 do
         AgentExamples.Quicksort.PartitionTree.finish_or_wait(state, context)

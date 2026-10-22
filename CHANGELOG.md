@@ -16,6 +16,10 @@
 
 ### Changed
 
+- Reuse quicksort root and pivot-worker identities across restarts so identical
+  input ranges do not allocate a new durable key set every run. Keep UI histories
+  on distinct run topics and discard notifications from replaced runs.
+
 - Retire completed quicksort child agents after their parent records the result,
   retaining the graph independently for inspection. Release replaced histories
   when a stopped example is started again after reconnecting.

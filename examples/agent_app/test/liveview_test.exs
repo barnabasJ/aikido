@@ -890,6 +890,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert has_element?(reconnected, ".sort-diagram circle[data-status=completed]")
 
     old_id = Playground.get(owner, "quicksort").record.id
+    old_topic = Playground.get(owner, "quicksort").snapshot.own.topic
 
     old_tree =
       Aikido.Default
@@ -901,9 +902,21 @@ defmodule AgentExamplesWeb.LiveViewTest do
     reconnected |> element("button[phx-click=restart_sort]") |> render_click()
     render_async(reconnected, 15_000)
     assert Playground.get(owner, "quicksort").snapshot.own.status == :idle
-    assert Playground.get(owner, "quicksort").record.id != old_id
+    assert Playground.get(owner, "quicksort").record.id == old_id
     assert Enum.all?(old_tree, fn {_, pid} -> !Process.alive?(pid) end)
     assert has_element?(reconnected, "#sort-spawned", "0 agents spawned")
+
+    reconnected |> form("#quicksort-form", %{size: "32"}) |> render_submit()
+    await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
+    assert Playground.get(owner, "quicksort").snapshot.own.topic != old_topic
+
+    send(
+      reconnected.pid,
+      {:quicksort_progress, old_topic, %{branch: "stale", status: :completed}}
+    )
+
+    send(reconnected.pid, :flush_quicksort_progress)
+    assert has_element?(reconnected, "#sort-spawned", "32 agents spawned")
   end
 
   test "quicksort can restart after its root has already stopped", %{conn: conn} do
@@ -916,7 +929,8 @@ defmodule AgentExamplesWeb.LiveViewTest do
     render_async(view, 15_000)
 
     fresh = Playground.get(owner, "quicksort")
-    assert fresh.record.id != old.id
+    assert fresh.record.id == old.id
+    assert fresh.record.pid != old.pid
     assert Process.alive?(fresh.record.pid)
     assert fresh.snapshot.own.status == :idle
   end
@@ -928,7 +942,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     owner = start(view, "quicksort")
     view |> form("#quicksort-form", %{size: "32"}) |> render_submit()
     await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
-    topic = AgentExamples.Quicksort.RunHistory.topic(Playground.get(owner, "quicksort").record.id)
+    topic = Playground.get(owner, "quicksort").snapshot.own.topic
     assert {:ok, _tree} = AgentExamples.Quicksort.RunHistory.fetch(topic)
     assert :ok = Playground.stop(owner, "quicksort")
     GenServer.stop(view.pid)
@@ -944,7 +958,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     owner = start(view, "quicksort")
     view |> form("#quicksort-form", %{size: "1"}) |> render_submit()
     await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
-    topic = AgentExamples.Quicksort.RunHistory.topic(Playground.get(owner, "quicksort").record.id)
+    topic = Playground.get(owner, "quicksort").snapshot.own.topic
     node = %{branch: "rootL", id: "display-test", status: :completed, count: 1, pivot: 1}
     send(view.pid, {:quicksort_progress, topic, node})
     for _ <- 1..1000, do: send(view.pid, {:quicksort_progress, topic, %{node | status: :idle}})

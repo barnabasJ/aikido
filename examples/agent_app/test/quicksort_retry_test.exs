@@ -47,6 +47,7 @@ defmodule AgentExamples.Quicksort.RetryTest do
 
   defp state,
     do: %{
+      root_id: "root",
       status: :sorting,
       branch: "root",
       topic: "test",
