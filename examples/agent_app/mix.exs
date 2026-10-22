@@ -9,6 +9,7 @@ defmodule AgentExamples.MixProject do
       consolidate_protocols: Mix.env() != :test,
       deps: [
         {:aikido, path: "../.."},
+        {:benchee, "~> 1.5", only: :dev, runtime: false},
         {:ash, "~> 3.36"},
         {:ash_sqlite, "~> 0.2.19"},
         {:ash_cloak, "~> 0.4"},
@@ -26,6 +27,7 @@ defmodule AgentExamples.MixProject do
       ],
       aliases: [
         demo: "run -e AgentExamples.Demo.run()",
+        "bench.quicksort": "run --no-start bench/quicksort.exs",
         "spark.formatter":
           "spark.formatter --extensions AshAi,AshLua.Domain,AshLua.EvalActions,AshSqlite.DataLayer,AshCloak",
         "ai.demo": "run -e AgentExamples.AI.Demo.run()",

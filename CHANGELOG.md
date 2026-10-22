@@ -6,11 +6,20 @@
 
 ### Added
 
+- Add isolated Benchee suites for real persisted quicksort trees, native EKV shard
+  comparisons, checkpoint/WAL metrics and full descendant cleanup checks.
+
 - Add a realtime recursive quicksort example: each nonempty partition spawns a
   real Aikido agent, with retained color-coded nodes, subtree inspection, reconnect
   support and a one-button restart. A 4,096-value browser run created 4,096 agents.
 
 ### Changed
+
+- Report child activation failures as scoped signals. Quicksort retains failed
+  partitions for bounded retries and preserves display history across reconnects.
+
+- Maintain quicksort UI counts incrementally and traverse only visible branches;
+  identify reconnect restoration explicitly and ignore stale restoration results.
 
 - Allow up to 100,000 values in the recursive quicksort example.
 

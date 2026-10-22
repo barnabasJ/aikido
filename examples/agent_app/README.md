@@ -266,3 +266,14 @@ example to sort another list. The form accepts up to 100,000 values, and the exa
 runtime permits 20,000 concurrent I/O tasks to accommodate large bursts of spawning
 and progress notifications. This is a lifecycle demonstration, not a claim that
 process-based quicksort outperforms `Enum.sort/1`.
+
+Benchmark the actual recursive tree and its UI with `mix bench.quicksort`.
+See [the benchmark guide](bench/README.md) for native EKV shard comparisons,
+checkpoint/WAL measurements, process cleanup checks and performance limits.
+The UI maintains counts incrementally and visits only visible branches. Display summaries live in the example app independently of the LiveView and
+sorting processes, so reconnects retain recorded nodes and counts. This history
+is in memory and does not survive an app restart. Child activation failures return
+signals to the parent, which retains the partition and retries transient failures
+up to eight times with exponential backoff capped at ten seconds. Readiness makes
+pending retries obsolete; exhaustion marks the affected branch and its ancestors
+failed. This does not guarantee recovery from sustained storage overload.
