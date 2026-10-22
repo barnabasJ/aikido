@@ -272,6 +272,16 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert has_element?(view, ".subworker", "analyst-helper")
     assert has_element?(view, "#member-count", "4 members")
     assert has_element?(view, "#tasks", "completed")
+    assert has_element?(view, "#team-activity [data-agent=Orchestrator]", "Completed")
+
+    assert has_element?(
+             view,
+             "#team-activity [data-agent='Orchestrator / analyst']",
+             "Model turns:"
+           )
+
+    assert has_element?(view, "#team-activity [data-agent='Orchestrator / analyst-helper']")
+    assert has_element?(view, "#team-activity", "Result received")
 
     {:ok, reloaded, _} = live(conn, "/examples/research-team")
     assert has_element?(reloaded, "#member-count", "4 members")

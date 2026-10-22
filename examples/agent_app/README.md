@@ -223,3 +223,9 @@ The default runtime uses DurableServer with a local EKV store under
 `_build/aikido_durable`. Configure `{Aikido, durable: [data_dir: "priv/agent-state"]}`
 for a stable directory, or supply a shared DurableServer backend. Agent and
 slice serialization callbacks remain supported.
+
+The research-team page shows live activity cards for the orchestrator and every
+AI descendant, including dynamically spawned workers and nested teams. Existing
+AgentServer subscriptions update each card's task, model-turn count, pending tool
+results and answer. “Tool calls pending” includes time spent in gates or delegated
+work; it does not claim that a tool is executing CPU work. This view does not poll.

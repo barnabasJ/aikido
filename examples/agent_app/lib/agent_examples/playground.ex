@@ -730,6 +730,7 @@ defmodule AgentExamples.Playground do
        resource: resource,
        team?: resource && !is_nil(Aikido.Agent.Info.team_config(resource)),
        children: %{},
+       activity: if(map_size(ai) > 0, do: AI.Activity.from_state(ai)),
        own:
          Map.take(own, [
            :count,

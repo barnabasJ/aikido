@@ -135,7 +135,9 @@ defmodule AgentExamplesWeb.ExampleComponents do
                 {if @run, do: Map.get(@run.snapshot.ai, :iteration, 0), else: 0}
               </dd>
               <dt :if={Catalog.ai?(@example) && @run}>Model in this agent</dt>
-              <dd :if={Catalog.ai?(@example) && @run} id="active-model">{Map.get(@run.snapshot.ai, :model_label, "Not configured")}</dd>
+              <dd :if={Catalog.ai?(@example) && @run} id="active-model">
+                {Map.get(@run.snapshot.ai, :model_label, "Not configured")}
+              </dd>
             </dl><button :if={active?(@run)} id="stop-example" phx-click="stop" class="button danger">Stop example</button>
           </section>
           <section class="panel">
@@ -267,6 +269,67 @@ defmodule AgentExamplesWeb.ExampleComponents do
       </div>
     </section>
     """
+  end
+
+  attr :run, :any, required: true
+
+  def team_activity(assigns) do
+    assigns =
+      assign(assigns, :agents, if(assigns.run, do: active_agents(assigns.run.snapshot), else: []))
+
+    ~H"""
+    <section :if={@run} class="panel team-activity" id="team-activity">
+      <div class="section-heading">
+        <h2>What the team is doing</h2>
+        <span>{Enum.count(@agents, &(active?(@run) && &1.activity.status in [:setup, :running, :waiting]))} active · {length(
+          @agents
+        )} agents</span>
+      </div>
+      <div class="agent-activity-grid">
+        <article
+          :for={agent <- @agents}
+          class="agent-activity"
+          data-agent={agent.path}
+          data-status={if active?(@run), do: agent.activity.status, else: :stopped}
+        >
+          <div class="agent-activity-heading">
+            <strong>{agent.path}</strong><span class="status-pill">{if active?(@run), do: agent.activity.stage, else: "Stopped"}</span>
+          </div>
+          <p class="muted">Model turns: {agent.activity.iteration}</p>
+          <p :if={agent.activity.task} class="agent-task">{agent.activity.task}</p>
+          <ul :if={agent.activity.tools != []} class="agent-tools">
+            <li :for={tool <- agent.activity.tools}>
+              <code>{tool.name}</code><span>{if tool.finished?,
+                do: "Result received",
+                else: "Pending result"}</span>
+            </li>
+          </ul>
+          <details
+            :if={agent.activity.output not in [nil, ""]}
+            open={agent.activity.status == :running}
+          >
+            <summary>
+              {if agent.activity.status == :completed, do: "Answer", else: "Latest output"}
+            </summary>
+            <pre>{agent.activity.output}</pre>
+          </details>
+          <p :if={agent.activity.error} class="error-banner">{result_text(agent.activity.error)}</p>
+        </article>
+      </div>
+    </section>
+    """
+  end
+
+  defp active_agents(snapshot, path \\ ["Orchestrator"]) do
+    own =
+      if snapshot.activity,
+        do: [%{path: Enum.join(path, " / "), activity: snapshot.activity}],
+        else: []
+
+    own ++
+      Enum.flat_map(Enum.sort_by(snapshot.children, &elem(&1, 0)), fn {name, child} ->
+        active_agents(child, path ++ [name])
+      end)
   end
 
   def active?(nil), do: false

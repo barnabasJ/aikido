@@ -11,6 +11,7 @@ defmodule AgentExamplesWeb.ResearchTeamLive do
   def render(assigns) do
     ~H"""
     <.page {assigns}>
+      <.team_activity run={@run} />
       <.conversation run={@run} prompt="orchestrate: Signals carry results" />
       <.team_topology run={@run} orchestrator />
     </.page>
