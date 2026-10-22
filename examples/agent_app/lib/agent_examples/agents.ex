@@ -43,8 +43,26 @@ defmodule AgentExamples.Agents do
     tool :remove_worker, AgentExamples.AI.Tools, :remove_worker
     tool :text_stats, AgentExamples.AI.Tools, :text_stats
     tool :stamp, AgentExamples.AI.Tools, :stamp
-    tool :run_lua, AgentExamples.AI.LuaSurface, :eval
-    tool :lua_docs, AgentExamples.AI.LuaSurface, :docs
+
+    tool :run_lua, AgentExamples.AI.LuaSurface, :eval do
+      description """
+      Execute Lua against the exposed Ash actions. Calls return result, err; a failure
+      returns nil, err rather than raising. Use return assert(agents.members({})) to
+      inspect teammates, or return assert(agents.delegate({input = {member = "analyst",
+      text = "Review the evidence"}})) to delegate. Check errors or use assert; pcall
+      alone does not detect returned errors. Read lua_docs for available functions.
+      """
+    end
+
+    tool :lua_docs, AgentExamples.AI.LuaSurface, :docs do
+      description """
+      Discover the exposed Lua API. Pass input = {} for the callable/topic index,
+      input = {name = "full"} for full documentation, or an exact indexed name such
+      as agents.spawn, agents.delegate, agents.members, transactions or error-handling.
+      Bare namespaces such as agents are not callable names. Search accepts a short
+      term such as spawn; use a returned exact name to fetch its contract.
+      """
+    end
   end
 
   agents do

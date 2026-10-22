@@ -95,9 +95,16 @@ defmodule Aikido.NativeToolResultsTest do
     assert length(messages) == length(results)
     by_id = Map.new(messages, &{&1.tool_call_id, &1})
 
-    for {{_status, value}, index} <- Enum.with_index(results) do
+    for {{status, value}, index} <- Enum.with_index(results) do
       id = "native_#{index}"
-      assert by_id[id] == ReqLLM.Context.tool_result(id, "native_output", value)
+      expected = ReqLLM.Context.tool_result(id, "native_output", value)
+
+      expected = %{
+        expected
+        | metadata: Map.put(expected.metadata, :aikido_tool_error?, status == :error)
+      }
+
+      assert by_id[id] == expected
     end
 
     assert ReqLLM.ToolResult.output_from_message(by_id["native_5"]) == structured.output

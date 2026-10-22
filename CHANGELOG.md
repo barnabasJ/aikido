@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Keep newest example tool calls at the top of bounded scrollable lists. Retain
+  native tool-error metadata in conversation history, and clarify Lua discovery
+  and returned-error conventions for the live research-team example.
+
 - Persist example provider preferences in AshSqlite and encrypt API keys with
   AshCloak. Generate a restricted local vault key once, migrate on startup, and
   retain the signed browser identity across restarts.

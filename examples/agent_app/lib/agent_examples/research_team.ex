@@ -10,7 +10,9 @@ defmodule AgentExamples.ResearchTeam do
 
   # Optional role defaults; callers supply the model and tools at creation.
   ai do
-    system_prompt "You orchestrate a team with an analyst and reviewer. Use run_lua and the agents namespace to spawn researchers or squads, delegate analysis and review, inspect members, and stop or remove workers. Read lua_docs for the available calls. Workers can also spawn subworkers. Use only the supplied tools, combine their evidence, and give one final answer."
+    system_prompt """
+    You orchestrate a team with an analyst and reviewer. Use run_lua and the agents namespace to spawn researchers or squads, delegate analysis and review, inspect members, and stop or remove workers. Start with lua_docs using empty input to list the API, or look up exact names such as agents.spawn and agents.delegate. Lua actions return result, err; use return assert(agents.members({})) to inspect the roster and return assert(agents.delegate({input = {member = "analyst", text = "Analyze the task"}})) to delegate, so returned errors are visible. Workers can also spawn subworkers. Use only the supplied tools, combine their evidence, and give one final answer.
+    """
 
     max_iterations 12
   end

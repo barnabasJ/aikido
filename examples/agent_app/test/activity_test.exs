@@ -61,4 +61,24 @@ defmodule AgentExamples.AI.ActivityTest do
     assert [%{label: "Run Lua script", status: :failed, input: "return agents.members({})"}] =
              AgentExamples.AI.Activity.from_state(%{status: :completed, context: context}).tools
   end
+
+  test "native plain-text errors retain their error status, and ended runs do not claim pending work" do
+    calls = [
+      ReqLLM.ToolCall.new("docs-error", "lua_docs", "{}"),
+      ReqLLM.ToolCall.new("unfinished", "run_lua", "{}")
+    ]
+
+    result = ReqLLM.Context.tool_result("docs-error", "lua_docs", "name: no callable found")
+    result = %{result | metadata: %{aikido_tool_error?: true}}
+
+    context =
+      ReqLLM.Context.new([
+        ReqLLM.Context.user("Inspect tools"),
+        ReqLLM.Context.assistant("", tool_calls: calls),
+        result
+      ])
+
+    assert [%{status: :failed}, %{status: :unfinished}] =
+             AgentExamples.AI.Activity.from_state(%{status: :completed, context: context}).tools
+  end
 end

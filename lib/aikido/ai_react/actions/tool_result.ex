@@ -37,7 +37,11 @@ defmodule Aikido.AiReact.Actions.ToolResult do
 
   defp append_tool_message(state, data) do
     message = ReqLLM.Context.tool_result(data.tool_call_id, data.name, data.content)
-    Conversation.append_message(state, message)
+
+    metadata =
+      Map.put(message.metadata, :aikido_tool_error?, Map.get(data, :error?, false))
+
+    Conversation.append_message(state, %{message | metadata: metadata})
   end
 
   defp record_received_result(state, data) do

@@ -305,13 +305,21 @@ defmodule AgentExamplesWeb.ExampleComponents do
           <p class="muted">Model turns: {agent.activity.iteration}</p>
           <p :if={agent.activity.task} class="agent-task">{agent.activity.task}</p>
           <div :if={agent.activity.tools != []} class="agent-tools">
-            <p class="muted">Tools used for this task</p>
-            <details :for={tool <- agent.activity.tools} data-tool-status={tool.status}>
+            <p class="muted">Tools used for this task · latest first</p>
+            <details
+              :for={tool <- Enum.reverse(agent.activity.tools)}
+              id={
+                if tool[:id],
+                  do: "tool-#{Base.url_encode64(agent.path <> ":" <> tool.id, padding: false)}"
+              }
+              data-tool-status={tool.status}
+            >
               <summary>
                 {tool.label}<span>{case tool.status do
                   :pending -> "Pending result"
                   :completed -> "Succeeded"
                   :failed -> "Failed"
+                  :unfinished -> "Run ended without result"
                 end}</span>
               </summary>
               <small>Tool: {tool.name}</small>

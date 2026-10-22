@@ -8,7 +8,7 @@ defmodule AgentExamples.AI.Activity do
     results =
       for %{role: :tool, tool_call_id: id} = message <- messages,
           into: %{},
-          do: {id, message_text(message)}
+          do: {id, message}
 
     pending = Map.get(state, :pending_tool_calls, [])
 
@@ -17,7 +17,7 @@ defmodule AgentExamples.AI.Activity do
       stage: stage(state, pending),
       iteration: Map.get(state, :iteration, 0),
       task: latest_user_text(messages),
-      tools: Enum.map(calls, &describe_tool_call(&1, results)),
+      tools: Enum.map(calls, &describe_tool_call(&1, results, Map.get(state, :status))),
       output: Map.get(state, :result) || Map.get(state, :streaming_text, ""),
       error: Map.get(state, :error)
     }
@@ -39,17 +39,18 @@ defmodule AgentExamples.AI.Activity do
     Enum.drop(messages, start)
   end
 
-  defp describe_tool_call(call, results) do
+  defp describe_tool_call(call, results, status) do
     result = Map.get(results, call.id)
     arguments = decode_arguments(call.function.arguments)
     input = Map.get(arguments, "input", arguments)
 
     %{
+      id: call.id,
       name: call.function.name,
       label: tool_label(call.function.name),
-      status: tool_status(result),
+      status: tool_status(result, status),
       input: Map.get(input, "script") || Jason.encode!(arguments, pretty: true),
-      result: result
+      result: if(result, do: message_text(result))
     }
   end
 
@@ -62,12 +63,17 @@ defmodule AgentExamples.AI.Activity do
     end
   end
 
-  defp tool_status(nil), do: :pending
+  defp tool_status(nil, status) when status in [:completed, :failed], do: :unfinished
+  defp tool_status(nil, _), do: :pending
 
-  defp tool_status(result) do
-    case Jason.decode(result) do
-      {:ok, %{"error" => error}} when not is_nil(error) -> :failed
-      _ -> :completed
+  defp tool_status(message, _) do
+    if message.metadata[:aikido_tool_error?] do
+      :failed
+    else
+      case Jason.decode(message_text(message)) do
+        {:ok, %{"error" => error}} when not is_nil(error) -> :failed
+        _ -> :completed
+      end
     end
   end
 
