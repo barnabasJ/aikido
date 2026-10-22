@@ -8,6 +8,7 @@ defmodule AgentExamples.Application do
         AgentExamples.Settings.Vault,
         AgentExamples.Settings.Repo,
         {Ecto.Migrator, repos: [AgentExamples.Settings.Repo], log: false},
+        {EKV, Application.fetch_env!(:agent_examples, :store)},
         {Aikido, max_tasks: 20_000},
         {Phoenix.PubSub, name: AgentExamples.PubSub},
         {Task.Supervisor, name: AgentExamples.WebTasks},
@@ -15,7 +16,7 @@ defmodule AgentExamples.Application do
         AgentExamples.Quicksort.RunHistory,
         AgentExamplesWeb.Endpoint
       ],
-      strategy: :one_for_one,
+      strategy: :rest_for_one,
       name: AgentExamples.Supervisor
     )
   end

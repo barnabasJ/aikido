@@ -16,6 +16,9 @@
 
 ### Changed
 
+- Supervise the example app’s native EKV store explicitly and configure its
+  DurableServer backend with a 60-second storage budget for large local trees.
+
 - Reuse quicksort root and pivot-worker identities across restarts so identical
   input ranges do not allocate a new durable key set every run. Keep UI histories
   on distinct run topics and discard notifications from replaced runs.

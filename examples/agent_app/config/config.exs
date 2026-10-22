@@ -4,28 +4,31 @@ config :agent_examples,
   ash_domains: [AgentExamples.Agents, AgentExamples.Settings],
   ecto_repos: [AgentExamples.Settings.Repo]
 
-config :aikido, :durable,
-  ekv_options: [shards: String.to_integer(System.get_env("AIKIDO_EXAMPLES_EKV_SHARDS", "1"))]
-
-if directory = System.get_env("AIKIDO_DURABLE_DIR") do
-  config :aikido, :durable, data_dir: directory
-end
-
-config :ash, default_string_length_count: :codepoints
-config :phoenix, :filter_parameters, ["api_key"]
-
-# Test VMs and the running playground must never open the same local EKV files.
-# Set AIKIDO_DURABLE_DIR when running the server in MIX_ENV=test to retain state.
-if config_env() == :test do
-  directory =
-    System.get_env("AIKIDO_DURABLE_DIR") ||
+# Keep test VMs and the running playground on separate native EKV directories.
+store_directory =
+  System.get_env("AIKIDO_DURABLE_DIR") ||
+    if config_env() == :test do
       Path.join(
         System.tmp_dir!(),
         "aikido-examples-#{System.pid()}-#{System.system_time(:microsecond)}"
       )
+    else
+      Path.expand("../_build/aikido_durable/Elixir.Aikido.Default.DurableAgents", __DIR__)
+    end
 
-  config :aikido, :durable, data_dir: directory
-end
+config :agent_examples, :store,
+  name: AgentExamples.Store,
+  data_dir: store_directory,
+  cluster_size: 1,
+  node_id: "local",
+  shards: String.to_integer(System.get_env("AIKIDO_EXAMPLES_EKV_SHARDS", "1")),
+  gc_interval: 30_000
+
+config :aikido, :durable,
+  backend: {DurableServer.Backends.EKVStore, name: AgentExamples.Store, timeout: 60_000}
+
+config :ash, default_string_length_count: :codepoints
+config :phoenix, :filter_parameters, ["api_key"]
 
 config :spark, :formatter,
   remove_parens?: true,
