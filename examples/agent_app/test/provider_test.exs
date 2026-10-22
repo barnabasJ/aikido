@@ -1,0 +1,87 @@
+defmodule AgentExamples.ProviderTest do
+  use ExUnit.Case, async: false
+  alias AgentExamples.{AI, Playground}
+
+  test "keys are isolated between browser sessions and blank updates keep the existing key" do
+    owner = Ash.UUIDv7.generate()
+
+    params = %{
+      "mode" => "live",
+      "provider" => "zai",
+      "model" => "glm-5.3",
+      "api_key" => "local-test-key"
+    }
+
+    assert {:ok, _} = Playground.configure_provider(owner, params)
+    assert {:ok, _} = Playground.configure_provider(owner, Map.put(params, "api_key", ""))
+    assert {:ok, "local-test-key"} = Playground.provider_key(owner, :zai)
+    assert {:error, _} = Playground.provider_key(Ash.UUIDv7.generate(), :zai)
+    refute inspect(Playground.provider_settings(owner)) =~ "local-test-key"
+    refute inspect(:sys.get_status(Playground), limit: :infinity) =~ "local-test-key"
+  end
+
+  test "the live client uses the native z.ai request with the session key, without a network call" do
+    owner = Ash.UUIDv7.generate()
+
+    assert {:ok, _} =
+             Playground.configure_provider(owner, %{
+               "mode" => "live",
+               "provider" => "zai",
+               "model" => "glm-5.3",
+               "api_key" => "native-request-test"
+             })
+
+    Req.Test.stub(__MODULE__, fn conn ->
+      assert Plug.Conn.get_req_header(conn, "authorization") == ["Bearer native-request-test"]
+      assert conn.host == "api.z.ai"
+
+      Req.Test.json(conn, %{
+        id: "test",
+        model: "glm-5.3",
+        choices: [
+          %{
+            index: 0,
+            message: %{role: "assistant", content: "Real provider path"},
+            finish_reason: "stop"
+          }
+        ],
+        usage: %{prompt_tokens: 1, completion_tokens: 2, total_tokens: 3}
+      })
+    end)
+
+    assert {:ok, response} =
+             AI.LiveClient.generate_text(
+               %{credential_owner: owner, provider: :zai, id: "glm-5.3"},
+               [ReqLLM.Context.user("hello")],
+               req_http_options: [plug: {Req.Test, __MODULE__}]
+             )
+
+    assert ReqLLM.Response.text(response) == "Real provider path"
+  end
+
+  test "provider errors cannot copy the submitted key into public run errors" do
+    owner = Ash.UUIDv7.generate()
+    key = "redaction-test-key"
+
+    assert {:ok, _} =
+             Playground.configure_provider(owner, %{
+               "mode" => "live",
+               "provider" => "zai",
+               "model" => "glm-5.3",
+               "api_key" => key
+             })
+
+    Req.Test.stub(__MODULE__, fn conn ->
+      conn |> Plug.Conn.put_status(401) |> Req.Test.json(%{error: %{message: "Rejected #{key}"}})
+    end)
+
+    assert {:error, message} =
+             AI.LiveClient.generate_text(
+               %{credential_owner: owner, provider: :zai, id: "glm-5.3"},
+               [ReqLLM.Context.user("hello")],
+               req_http_options: [plug: {Req.Test, __MODULE__}]
+             )
+
+    refute message =~ key
+  end
+end

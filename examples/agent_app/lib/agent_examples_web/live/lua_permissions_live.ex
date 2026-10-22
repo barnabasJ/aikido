@@ -19,9 +19,21 @@ defmodule AgentExamplesWeb.LuaPermissionsLive do
     <.page {assigns}>
       <section :if={active?(@run)} class="panel" id="lua-permissions">
         <h2>Application-owned Lua functions</h2>
-        <p>Initially no functions are exposed. Allow session.whoami, then submit the script. Its result shows the browser actor and playground tenant. Send docs to compare the visible documentation after revoking access.</p>
-        <button id="allow-scope" class="button secondary" phx-click="permissions" phx-value-allow="true">Allow scope function</button>
-        <button id="deny-scope" class="button secondary" phx-click="permissions" phx-value-allow="false">Remove all functions</button>
+        <p>
+          Initially no functions are exposed. Allow session.whoami, then submit the script. Its result shows the browser actor and playground tenant. Send docs to compare the visible documentation after revoking access.
+        </p>
+        <button
+          id="allow-scope"
+          class="button secondary"
+          phx-click="permissions"
+          phx-value-allow="true"
+        >Allow scope function</button>
+        <button
+          id="deny-scope"
+          class="button secondary"
+          phx-click="permissions"
+          phx-value-allow="false"
+        >Remove all functions</button>
       </section>
       <.conversation run={@run} prompt="return session.whoami()" />
     </.page>

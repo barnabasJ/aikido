@@ -2,6 +2,7 @@ import Config
 
 config :agent_examples, ash_domains: [AgentExamples.Agents]
 config :ash, default_string_length_count: :codepoints
+config :phoenix, :filter_parameters, ["api_key"]
 
 # Test VMs and the running playground must never open the same local EKV files.
 # Set AIKIDO_DURABLE_DIR when running the server in MIX_ENV=test to retain state.

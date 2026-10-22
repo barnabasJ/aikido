@@ -5,7 +5,12 @@ examples use deterministic offline model clients while executing native Ash AI
 tools, AshLua, directives, signals, and DurableServer. Select offline mode for
 the prescribed scenarios. The scripted model controls the sequence; it does not
 mock the runtime integration or call a provider. Live provider behavior remains
-a separate application integration check.
+a separate application integration check. To try a real model, select Live in
+the shared provider form on any AI page, choose the provider and model, enter
+your key and save. All AI pages then use native ReqLLM with that provider,
+including their workers. Scripted response sequences are offline-specific;
+real models decide their own tool calls. Live resilience uses longer deadlines
+so the offline three-second simulation does not cut off provider generation.
 
 Every page contains its resource, slice, signal, action, directive and supporting
 source definitions. Agents and slices are expanded initially. Each page has its

@@ -6,6 +6,11 @@
 
 ### Changed
 
+- Add browser-session provider, model and API-key settings shared by every AI
+  playground example and its workers. Use native ReqLLM in live mode, resolve
+  keys from server memory outside agent state, and support z.ai standard and
+  coding-plan endpoints alongside registered providers.
+
 - Add isolated offline Makewright examples for dynamic tool refresh, filtered
   Lua functions and scope, verified work, failure handling and checkpoint
   recovery, with LiveView behavior tests and a scenario coverage checklist.

@@ -47,7 +47,7 @@ defmodule AgentExamples.AI do
   @doc "Assign work from an external caller or a tool task, then await its correlated result."
   def delegate(team, member, text, opts \\ []) do
     task_id = Ash.UUIDv7.generate()
-    timeout = Keyword.get(opts, :timeout, 20_000)
+    timeout = Keyword.get(opts, :timeout, 240_000)
     resource = Map.get(team, :resource) || team.__struct__
     ash_opts = Keyword.get(opts, :ash, [])
 

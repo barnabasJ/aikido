@@ -10,6 +10,9 @@ defmodule AgentExamplesWeb.ExampleComponents do
   attr :starting, :boolean, required: true
   attr :error, :any, required: true
   attr :mode, :string, required: true
+  attr :provider, :string, required: true
+  attr :key_configured, :boolean, required: true
+  attr :provider_saved, :boolean, required: true
   attr :model, :string, required: true
   attr :lua, :boolean, required: true
   attr :system_prompt, :string, required: true
@@ -36,6 +39,50 @@ defmodule AgentExamplesWeb.ExampleComponents do
       <div :if={@error || (@run && @run.error)} role="alert" id="error" class="error-banner">
         {@error || @run.error}
       </div>
+      <section :if={Catalog.ai?(@example)} class="panel" id="shared-ai-settings">
+        <h2>AI provider · shared by all AI examples</h2>
+        <form
+          id="provider-form"
+          phx-submit="save_provider"
+          phx-change="provider_settings"
+          class="settings-grid"
+        >
+          <label>Model mode<select name="mode"><option value="offline" selected={@mode == "offline"}>
+            Offline · scripted model
+          </option><option value="live" selected={@mode == "live"}>Live · your provider</option></select></label>
+          <label :if={@mode == "live"}>Provider<select name="provider"><option
+            :for={{label, value} <- AgentExamples.AI.Providers.choices()}
+            value={value}
+            selected={@provider == value}
+          >
+            {label}
+          </option></select></label>
+          <label :if={@mode == "live"}>Model ID<input
+            name="model"
+            value={@model}
+            placeholder="glm-5.3"
+            required
+          /></label>
+          <label :if={@mode == "live"}>API key<input
+            type="password"
+            name="api_key"
+            value=""
+            autocomplete="off"
+            placeholder={
+              if @key_configured,
+                do: "Key saved · leave blank to keep it",
+                else: "Your provider API key"
+            }
+          /></label>
+          <p class="muted settings-note">
+            Save once for this browser session. All AI examples and their workers use these settings when started. Restart an active example to change its provider. Keys stay in server memory and are never included in agent checkpoints.
+          </p>
+          <button id="save-provider" class="button secondary">Save AI settings</button>
+          <p :if={@provider_saved} role="status" id="provider-saved">
+            AI settings saved for all AI examples.
+          </p>
+        </form>
+      </section>
       <div class="workspace">
         <div class="primary-column">
           <section :if={!active?(@run)} class="panel" id="start-panel">
@@ -44,17 +91,9 @@ defmodule AgentExamplesWeb.ExampleComponents do
             </div>
             <form id="start-form" phx-submit="start" phx-change="settings">
               <div :if={Catalog.ai?(@example)} class="settings-grid">
-                <label>Model mode<select name="mode"><option
-                  value="offline"
-                  selected={@mode == "offline"}
-                >
-                  Offline · scripted model
-                </option><option value="live" selected={@mode == "live"}>Live · z.ai</option></select></label>
-                <label :if={@mode == "live"}>Model<input
-                  name="model"
-                  value={@model}
-                  placeholder="zai:glm-5.3"
-                /></label>
+                <input type="hidden" name="mode" value={@mode} />
+                <input type="hidden" name="provider" value={@provider} />
+                <input type="hidden" name="model" value={@model} />
                 <label>Maximum model turns<input
                   type="number"
                   name="max_iterations"
@@ -70,7 +109,7 @@ defmodule AgentExamplesWeb.ExampleComponents do
                   checked={@lua}
                 /> Include Ash AI + Lua tools</label>
                 <p class="muted settings-note">
-                  Offline mode runs real tools without a key. Live mode reads ZAI_API_KEY from the server environment.
+                  Offline mode runs real tools without a key. Live mode uses the shared provider settings above.
                 </p>
               </div>
               <button class="button primary" disabled={@starting}>{if @starting,

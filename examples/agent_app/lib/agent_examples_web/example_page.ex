@@ -7,6 +7,7 @@ defmodule AgentExamplesWeb.ExamplePage do
   def on_mount(slug, _params, %{"browser_id" => owner}, socket) do
     example = Catalog.find(slug)
     if connected?(socket), do: Playground.subscribe()
+    provider = Playground.provider_settings(owner)
 
     socket =
       socket
@@ -17,8 +18,11 @@ defmodule AgentExamplesWeb.ExamplePage do
         run: Playground.get(owner, slug),
         starting: false,
         error: nil,
-        mode: "offline",
-        model: System.get_env("AIKIDO_AI_MODEL", "zai:glm-5.3"),
+        mode: provider.mode,
+        provider: provider.provider,
+        model: provider.model,
+        key_configured: provider.key_configured?,
+        provider_saved: false,
         lua: true,
         system_prompt: ai_default(example, :system_prompt, ""),
         max_iterations: ai_default(example, :max_iterations, 10)
@@ -28,6 +32,26 @@ defmodule AgentExamplesWeb.ExamplePage do
       |> attach_hook(:example_start, :handle_async, &handle_async/3)
 
     {:cont, socket}
+  end
+
+  defp handle_event("provider_settings", params, socket) do
+    {:halt,
+     assign(socket,
+       mode: params["mode"] || "offline",
+       provider: params["provider"] || socket.assigns.provider,
+       model: params["model"] || socket.assigns.model,
+       provider_saved: false
+     )}
+  end
+
+  defp handle_event("save_provider", params, socket) do
+    case Playground.configure_provider(socket.assigns.owner, params) do
+      {:ok, settings} ->
+        {:halt, assign_provider(socket, settings) |> assign(error: nil, provider_saved: true)}
+
+      {:error, error} ->
+        {:halt, assign(socket, error: error, provider_saved: false)}
+    end
   end
 
   defp handle_event("settings", params, socket) do
@@ -44,6 +68,9 @@ defmodule AgentExamplesWeb.ExamplePage do
   defp handle_event("start", params, socket) do
     owner = socket.assigns.owner
     slug = socket.assigns.example.slug
+
+    params =
+      Map.take(params, ["mode", "provider", "model", "lua", "system_prompt", "max_iterations"])
 
     {:halt,
      socket
@@ -69,6 +96,15 @@ defmodule AgentExamplesWeb.ExamplePage do
 
   defp handle_async(_, _, socket), do: {:cont, socket}
 
+  defp handle_info({:provider_updated, owner}, socket) do
+    socket =
+      if owner == socket.assigns.owner,
+        do: assign_provider(socket, Playground.provider_settings(owner)),
+        else: socket
+
+    {:halt, socket}
+  end
+
   defp handle_info({:run_updated, owner, slug}, socket) do
     socket =
       if owner == socket.assigns.owner && slug == socket.assigns.example.slug,
@@ -79,6 +115,15 @@ defmodule AgentExamplesWeb.ExamplePage do
   end
 
   defp handle_info(_, socket), do: {:cont, socket}
+
+  defp assign_provider(socket, settings),
+    do:
+      assign(socket,
+        mode: settings.mode,
+        provider: settings.provider,
+        model: settings.model,
+        key_configured: settings.key_configured?
+      )
 
   def command(socket, action, input) do
     result = Playground.command(socket.assigns.owner, socket.assigns.example.slug, action, input)

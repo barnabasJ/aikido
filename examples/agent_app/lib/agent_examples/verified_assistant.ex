@@ -11,7 +11,7 @@ defmodule AgentExamples.VerifiedAssistant do
   end
 
   ai do
-    system_prompt "Use the supplied tools and report their evidence."
+    system_prompt "Complete the delivered work item by calling record_evidence with its ID, then report the evidence. A proposed answer is accepted only after the verifier confirms that the evidence tool recorded completion. Do not claim completion before using the tool."
     max_iterations 12
 
     options %{

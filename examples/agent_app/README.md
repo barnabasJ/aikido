@@ -67,11 +67,29 @@ They are held in memory until you stop them or stop the server. The Stop button
 releases the example's processes, including team descendants. The server binds
 to the local machine; use `PORT=4001 mix phx.server` to choose another port.
 
-AI pages default to a scripted offline model. To try live mode, set
-`ZAI_API_KEY` in the server's environment, restart the server, choose Live, and
-enter an enabled model ID. Keys are never entered into the web form. The Lua
-checkbox controls whether actual Ash AI/AshLua tools are added to the runtime
-tool list. See [AI.md](AI.md) for tool and provider details.
+AI pages default to a scripted offline model. To use a real provider, open any
+AI example and use **AI provider · shared by all AI examples**:
+
+1. Choose **Live · your provider**.
+2. Select **z.ai · standard API** or **z.ai · coding plan** for the key you have.
+3. Enter your model ID and API key, then select **Save AI settings**.
+4. Start an example and send a task. All AI examples and their fixed/dynamic
+   workers use this browser session's saved provider settings at startup.
+
+The provider list comes from ReqLLM's registered providers. Keys stay in the
+example server's memory, scoped to the browser session; the form never renders
+a saved key back. Agent snapshots contain a browser credential reference, not
+the key. Restarting the server clears saved keys, so enter yours again before
+using a restored conversation. Restart an active example after changing provider
+or model. An empty key field keeps a previously saved key for that provider;
+provider environment keys such as `ZAI_API_KEY` can also be used when saving.
+
+Live mode uses native ReqLLM for every AI page, including streaming pages.
+The resilience page keeps deterministic retry/wait simulations in offline mode;
+its live mode uses provider-appropriate timeouts and prompts for the loop-guard
+scenarios. The Lua checkbox controls whether Ash AI/AshLua tools are added to
+ordinary assistants; specialized scenarios retain their dedicated tool sets.
+See [AI.md](AI.md) for tool and provider details.
 
 The command-line demos are also available:
 

@@ -6,6 +6,15 @@ defmodule AgentExamples.Playground do
 
   def start_link(_), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   def subscribe, do: Phoenix.PubSub.subscribe(AgentExamples.PubSub, @topic)
+  def provider_settings(owner), do: GenServer.call(__MODULE__, {:provider_settings, owner})
+
+  def configure_provider(owner, params),
+    do: GenServer.call(__MODULE__, {:configure_provider, owner, params})
+
+  @doc false
+  def provider_key(owner, provider),
+    do: GenServer.call(__MODULE__, {:provider_key, owner, provider})
+
   def get(owner, slug), do: GenServer.call(__MODULE__, {:get, owner, slug})
 
   def start(owner, slug, options),
@@ -21,9 +30,50 @@ defmodule AgentExamples.Playground do
   def stop(owner, slug), do: GenServer.call(__MODULE__, {:stop, owner, slug}, 15_000)
 
   @impl true
-  def init(_), do: {:ok, %{runs: %{}, tasks: %{}, subscriptions: %{}, requests: %{}}}
+  def init(_),
+    do:
+      {:ok,
+       %{
+         runs: %{},
+         tasks: %{},
+         subscriptions: %{},
+         requests: %{},
+         providers: %{},
+         credentials: %{}
+       }}
 
   @impl true
+  def handle_call({:provider_settings, owner}, _, state),
+    do: {:reply, Map.get(state.providers, owner, AI.Providers.defaults()), state}
+
+  def handle_call({:provider_key, owner, provider}, _, state) do
+    case state.credentials[{owner, to_string(provider)}] do
+      nil -> {:reply, {:error, "Configure an API key in the example app's provider form."}, state}
+      key -> {:reply, {:ok, key}, state}
+    end
+  end
+
+  def handle_call({:configure_provider, owner, params}, _, state) do
+    with {:ok, settings} <- AI.Providers.validate(params),
+         {:ok, key} <- resolve_provider_key(owner, settings, params, state) do
+      credentials =
+        if settings.mode == "live",
+          do: Map.put(state.credentials, {owner, settings.provider}, key),
+          else: state.credentials
+
+      state = %{
+        state
+        | providers: Map.put(state.providers, owner, settings),
+          credentials: credentials
+      }
+
+      Phoenix.PubSub.broadcast(AgentExamples.PubSub, @topic, {:provider_updated, owner})
+      {:reply, {:ok, settings}, state}
+    else
+      {:error, _} = error -> {:reply, error, state}
+    end
+  end
+
   def handle_call({:get, owner, slug}, _, state), do: {:reply, state.runs[{owner, slug}], state}
 
   def handle_call({:start, owner, slug, options}, _, state) do
@@ -332,10 +382,37 @@ defmodule AgentExamples.Playground do
 
   def handle_info(_, state), do: {:noreply, state}
 
+  defp resolve_provider_key(_owner, %{mode: "offline"}, _params, _state), do: {:ok, nil}
+
+  defp resolve_provider_key(owner, settings, params, state) do
+    key = String.trim(params["api_key"] || "")
+    provider = Enum.find(ReqLLM.Providers.list(), &(to_string(&1) == settings.provider))
+    saved = state.credentials[{owner, settings.provider}]
+
+    case if(key == "", do: saved || environment_key(provider), else: key) do
+      nil -> {:error, "Enter an API key for the selected provider."}
+      value -> {:ok, value}
+    end
+  end
+
+  defp environment_key(provider) do
+    case ReqLLM.Keys.get(provider) do
+      {:ok, key, _source} -> key
+      _ -> nil
+    end
+  end
+
+  @impl true
+  def format_status(status),
+    do:
+      status
+      |> Map.put(:state, %{status.state | credentials: :redacted})
+      |> Map.put(:message, :redacted)
+
   defp start_prompt_task(record, query, owner, slug) do
     Task.Supervisor.async_nolink(AgentExamples.WebTasks, fn ->
       AI.ask(record, query,
-        timeout: 180_000,
+        timeout: 900_000,
         ash: [actor: %{id: owner}, tenant: "playground"],
         metadata: %{playground: %{owner: owner, slug: slug}}
       )
@@ -369,6 +446,8 @@ defmodule AgentExamples.Playground do
   defp create_run(_key, nil, _, state), do: {:reply, {:error, "Unknown example"}, state}
 
   defp create_run(key, example, options, state) do
+    options = Map.merge(shared_provider_options(key, state), options)
+
     with {:ok, attributes} <- attributes(example, options),
          attributes = with_request_callback(example, attributes, key),
          attributes = restore_example_identity(example, attributes, state.runs[key]),
@@ -532,6 +611,7 @@ defmodule AgentExamples.Playground do
           |> ai_overrides()
           |> Map.merge(model)
           |> Map.put(:tools, example_tools(example, options))
+          |> apply_live_scenario_defaults(example, options)
 
         {:ok, attributes}
       end
@@ -539,6 +619,20 @@ defmodule AgentExamples.Playground do
       {:ok, %{}}
     end
   end
+
+  defp apply_live_scenario_defaults(attributes, example, %{"mode" => "live"}) do
+    defaults = Ash.Resource.Info.attribute(example.resource, :options).default
+
+    options =
+      defaults
+      |> Aikido.AiReact.Options.new!()
+      |> Map.put(:model_timeout_ms, 120_000)
+      |> Map.put(:tool_timeout_ms, 300_000)
+
+    Map.put(attributes, :options, options)
+  end
+
+  defp apply_live_scenario_defaults(attributes, _example, _options), do: attributes
 
   defp ai_overrides(options) do
     Enum.reduce([:system_prompt, :max_iterations], %{}, fn key, attributes ->
@@ -568,17 +662,35 @@ defmodule AgentExamples.Playground do
     end
   end
 
+  defp shared_provider_options({owner, _slug}, state) do
+    settings = Map.get(state.providers, owner, AI.Providers.defaults())
+
+    %{
+      "mode" => settings.mode,
+      "provider" => settings.provider,
+      "model" => settings.model,
+      "credential_owner" => owner,
+      "key_configured" => settings.key_configured?
+    }
+  end
+
   defp model_attributes(_example, %{"mode" => "live"} = options) do
-    with key when is_binary(key) and key != "" <- System.get_env("ZAI_API_KEY"),
-         [provider, id] when id != "" <- String.split(options["model"] || "", ":", parts: 2),
-         true <- provider in ["zai", "zai_coder"] do
+    with true <-
+           options["key_configured"] ||
+             {:error, "Save an API key in the shared provider form first."},
+         {:ok, settings} <- AI.Providers.validate(options) do
+      provider = Enum.find(ReqLLM.Providers.list(), &(to_string(&1) == settings.provider))
+
       {:ok,
        %{
-         client: ReqLLM.Generation,
-         model: %{provider: if(provider == "zai", do: :zai, else: :zai_coder), id: id}
+         client: AI.LiveClient,
+         model: %{
+           provider: provider,
+           id: settings.model,
+           credential_owner: options["credential_owner"]
+         },
+         tool_options: [otp_app: :agent_examples]
        }}
-    else
-      _ -> {:error, "Live mode needs ZAI_API_KEY on the server and a model such as zai:glm-5.3."}
     end
   end
 

@@ -655,12 +655,57 @@ defmodule AgentExamplesWeb.LiveViewTest do
              )
   end
 
-  test "live mode shows an actionable configuration error without creating a run", %{conn: conn} do
+  test "the shared provider form validates live settings before starting an example", %{
+    conn: conn
+  } do
     {:ok, view, _} = live(conn, "/examples/assistant")
-    view |> form("#start-form", %{mode: "live"}) |> render_change()
-    view |> form("#start-form", %{mode: "live", model: "unsupported:model"}) |> render_submit()
-    render_async(view)
-    assert has_element?(view, "#error", "Live mode needs")
+    view |> form("#provider-form", %{mode: "live"}) |> render_change()
+
+    view
+    |> form("#provider-form", %{mode: "live", provider: "zai", model: "glm-5.3", api_key: ""})
+    |> render_submit()
+
+    assert has_element?(view, "#error", "Enter an API key")
+  end
+
+  test "provider settings and a hidden key are shared across every AI example", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/assistant")
+    view |> form("#provider-form", %{mode: "live"}) |> render_change()
+
+    view
+    |> form("#provider-form", %{
+      mode: "live",
+      provider: "zai",
+      model: "glm-5.3",
+      api_key: "test-only-browser-key"
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#provider-saved")
+    refute render(view) =~ "test-only-browser-key"
+
+    for example <- Enum.filter(Catalog.all(), &Catalog.ai?/1) do
+      {:ok, page, _} = live(conn, "/examples/#{example.slug}")
+      assert has_element?(page, "#provider-form option[value=zai][selected]")
+      assert has_element?(page, "#provider-form input[name=api_key][type=password][value='']")
+      owner = start(page, example.slug)
+      run = Playground.get(owner, example.slug)
+      assert run.mode == "live"
+
+      assert {:ok,
+              %{client: AgentExamples.AI.LiveClient, model: %{provider: :zai, id: "glm-5.3"}}} =
+               Aikido.AgentServer.state(run.record.pid, &{:ok, &1.agent.state.ai})
+
+      dumped = Aikido.Durable.AgentServer.dump_state(:sys.get_state(run.record.pid).user_state)
+      restored = Aikido.Durable.AgentServer.load_state(1, dumped)
+      refute inspect(restored, limit: :infinity) =~ "test-only-browser-key"
+      refute inspect(run, limit: :infinity) =~ "test-only-browser-key"
+
+      for member <- run.snapshot.members do
+        assert {:ok, AgentExamples.AI.LiveClient} =
+                 Aikido.AgentServer.state(member.pid, &{:ok, &1.agent.state.ai.client})
+      end
+    end
   end
 
   test "browser assets are served locally without a Node build", %{conn: conn} do
