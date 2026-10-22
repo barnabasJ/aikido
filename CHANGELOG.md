@@ -16,6 +16,9 @@
 
 ### Changed
 
+- Retire completed quicksort child agents after their parent records the result,
+  retaining the graph independently for inspection. Release replaced histories
+  when a stopped example is started again after reconnecting.
 - Wait for the quicksort tree's monitored processes to exit before restart enables
   the next root, keeping descendant teardown out of the next sorting run.
 - Forward native local EKV configuration and DurableServer activation options.

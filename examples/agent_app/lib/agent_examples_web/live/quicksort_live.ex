@@ -224,8 +224,8 @@ defmodule AgentExamplesWeb.QuicksortLive do
           </div>
         </form>
         <p class="muted">
-          Sorting completion keeps the agents available for inspection. Restart waits for the old
-          tree's processes to exit before enabling a fresh root.
+          Sorted children stop after their results reach the parent. Their recorded nodes stay visible.
+          Restart waits for any remaining processes before enabling a fresh root.
         </p>
       </section>
       <section class="panel" id="sort-metrics">
@@ -250,7 +250,7 @@ defmodule AgentExamplesWeb.QuicksortLive do
               )}</span>
         </div>
         <p>
-          Completed agents remain alive until the root stops. Counts describe this sorting run, not the whole BEAM VM.
+          Completed child agents are released; their recorded nodes remain visible. Counts describe this sorting run, not currently live processes.
         </p>
         <div class="sort-levels">
           <div :for={{depth, count} <- @levels} class="sort-level">

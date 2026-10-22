@@ -897,7 +897,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
       |> Aikido.Durable.members()
       |> Enum.filter(fn {id, _} -> id == old_id || String.starts_with?(id, old_id <> "/") end)
 
-    assert length(old_tree) == 32
+    assert length(old_tree) in 1..32
     reconnected |> element("button[phx-click=restart_sort]") |> render_click()
     render_async(reconnected, 15_000)
     assert Playground.get(owner, "quicksort").snapshot.own.status == :idle
@@ -919,6 +919,24 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert fresh.record.id != old.id
     assert Process.alive?(fresh.record.pid)
     assert fresh.snapshot.own.status == :idle
+  end
+
+  test "a stopped quicksort history is released when a reconnected browser starts again", %{
+    conn: conn
+  } do
+    {:ok, view, _} = live(conn, "/examples/quicksort")
+    owner = start(view, "quicksort")
+    view |> form("#quicksort-form", %{size: "32"}) |> render_submit()
+    await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
+    topic = AgentExamples.Quicksort.RunHistory.topic(Playground.get(owner, "quicksort").record.id)
+    assert {:ok, _tree} = AgentExamples.Quicksort.RunHistory.fetch(topic)
+    assert :ok = Playground.stop(owner, "quicksort")
+    GenServer.stop(view.pid)
+
+    {:ok, reconnected, _} = live(conn, "/examples/quicksort")
+    start(reconnected, "quicksort")
+
+    assert :error = AgentExamples.Quicksort.RunHistory.fetch(topic)
   end
 
   test "quicksort coalesces progress bursts without regressing terminal nodes", %{conn: conn} do

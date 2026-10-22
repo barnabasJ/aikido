@@ -260,8 +260,9 @@ and return directives. Native Ash notifications publish progress to LiveView.
 
 The counters and depth histogram cover the entire tree. Select a node in the
 six-level diagram or the bounded node list to inspect a subtree. Rendering limits
-never limit agent creation. Completed agents stay alive for inspection; stopping
-the root stops its descendants and deletes their temporary snapshots. Start a new
+never limit agent creation. A child stops after its parent records the sorted result;
+its recorded node remains available for inspection. Stopping the root releases any
+remaining descendants and deletes their temporary snapshots. Start a new
 example to sort another list. The form accepts up to 100,000 values, and the example
 runtime permits 20,000 concurrent I/O tasks to accommodate large bursts of spawning
 and progress notifications. This is a lifecycle demonstration, not a claim that

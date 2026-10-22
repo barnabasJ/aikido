@@ -460,6 +460,7 @@ defmodule AgentExamples.Playground do
          attributes = restore_example_identity(example, attributes, state.runs[key]),
          {:ok, record} <-
            example.resource |> Ash.ActionInput.for_action(:start, attributes) |> Ash.run_action() do
+      close_replaced_sort_history(example, state.runs[key])
       pid = record.pid
 
       {:ok, ref, snapshot} = subscribe_snapshot(pid)
@@ -488,6 +489,14 @@ defmodule AgentExamples.Playground do
       {:error, reason} -> {:reply, {:error, error_text(reason)}, state}
     end
   end
+
+  defp close_replaced_sort_history(%{slug: "quicksort"}, %{record: %{id: id}}),
+    do:
+      id
+      |> AgentExamples.Quicksort.RunHistory.topic()
+      |> AgentExamples.Quicksort.RunHistory.close()
+
+  defp close_replaced_sort_history(_, _), do: :ok
 
   defp watch_children(key, snapshot, path, state) do
     snapshot = %{

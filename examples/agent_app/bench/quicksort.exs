@@ -305,7 +305,7 @@ defmodule AgentExamples.Quicksort.Bench do
   defp stop_runtime(input) do
     storage = storage_metrics(input.directory)
     members = Aikido.Durable.members(Aikido.durable_supervisor_name(Aikido.Default))
-    true = length(members) == input.size
+    true = length(members) in 1..input.size
     monitors = MapSet.new(Enum.map(members, fn {_, pid} -> Process.monitor(pid) end))
 
     {cleanup_us, :ok} =
@@ -325,6 +325,7 @@ defmodule AgentExamples.Quicksort.Bench do
       sort_us: input.sort_us,
       cleanup_us: cleanup_us,
       leftover_agents: 0,
+      live_agents_at_completion: length(members),
       storage: storage,
       notifications: input.notifications,
       vm_memory_bytes: :erlang.memory(:total)
