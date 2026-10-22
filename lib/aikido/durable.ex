@@ -17,6 +17,7 @@ defmodule Aikido.Durable do
     partition: [type: :any],
     permanent: [type: :boolean, default: true],
     data_dir: [type: :string],
+    ekv_options: [type: :keyword_list, default: []],
     prefix: [type: :string],
     backend: [type: :any],
     durable_options: [type: :keyword_list, default: []]
@@ -59,8 +60,12 @@ defmodule Aikido.Durable do
         Path.join([File.cwd!(), "_build", "aikido_durable", Atom.to_string(name)])
       end)
 
-    {[{EKV, name: ekv, data_dir: directory, cluster_size: 1, node_id: "local", shards: 1}],
-     {DurableServer.Backends.EKVStore, name: ekv}}
+    store_options =
+      [cluster_size: 1, node_id: "local", shards: 1]
+      |> Keyword.merge(opts[:ekv_options])
+      |> Keyword.merge(name: ekv, data_dir: directory)
+
+    {[{EKV, store_options}], {DurableServer.Backends.EKVStore, name: ekv}}
   end
 
   defp durable_supervisor_options(opts, name, backend) do
@@ -90,11 +95,14 @@ defmodule Aikido.Durable do
     }
   end
 
-  def start(name, key, opts \\ []), do: activate(name, key, opts, :start_child)
+  @doc "Activates an identity with native DurableServer caller/placement options as the final argument."
+  def start(name, key, opts \\ [], start_options \\ []),
+    do: activate(name, key, opts, start_options, :start_child)
 
-  def ensure_started(name, key, opts \\ []), do: activate(name, key, opts, :ensure_started_child)
+  def ensure_started(name, key, opts \\ [], start_options \\ []),
+    do: activate(name, key, opts, start_options, :ensure_started_child)
 
-  defp activate(name, key, opts, operation) do
+  defp activate(name, key, opts, start_options, operation) do
     config = config(name)
     partition = Keyword.get(opts, :partition, config.partition)
     agent = Keyword.get(opts, :agent, config.agent)
@@ -116,7 +124,7 @@ defmodule Aikido.Durable do
 
     spec = {Aikido.Durable.AgentServer, key: key(key, partition), initial_state: initial}
 
-    case apply(DurableServer.Supervisor, operation, [name, spec]) do
+    case apply(DurableServer.Supervisor, operation, [name, spec, start_options]) do
       {:ok, {pid, _}} -> {:ok, pid}
       {:error, {:already_started, {pid, _}}} -> {:error, {:already_started, pid}}
       {:error, _} = error -> error

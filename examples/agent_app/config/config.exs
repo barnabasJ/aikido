@@ -4,6 +4,13 @@ config :agent_examples,
   ash_domains: [AgentExamples.Agents, AgentExamples.Settings],
   ecto_repos: [AgentExamples.Settings.Repo]
 
+config :aikido, :durable,
+  ekv_options: [shards: String.to_integer(System.get_env("AIKIDO_EXAMPLES_EKV_SHARDS", "1"))]
+
+if directory = System.get_env("AIKIDO_DURABLE_DIR") do
+  config :aikido, :durable, data_dir: directory
+end
+
 config :ash, default_string_length_count: :codepoints
 config :phoenix, :filter_parameters, ["api_key"]
 

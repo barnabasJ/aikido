@@ -277,3 +277,16 @@ signals to the parent, which retains the partition and retries transient failure
 up to eight times with exponential backoff capped at ten seconds. Readiness makes
 pending retries obsolete; exhaustion marks the affected branch and its ancestors
 failed. This does not guarantee recovery from sustained storage overload.
+
+For the 100,000-agent stress test, use eight native EKV shards and a fresh directory:
+
+```sh
+AIKIDO_EXAMPLES_EKV_SHARDS=8 AIKIDO_DURABLE_DIR=_build/quicksort-eight-shards mix phx.server
+```
+
+Do not reuse a one-shard directory with eight shards: EKV fixes the physical
+partitioning when the store is created. The normal one-shard configuration stays
+compatible with existing example stores. Both configurations checkpoint agents;
+this setting does not disable persistence. Browser progress renders at most ten
+times per second, with terminal root events flushed immediately. Every node's
+status is retained independently of that rendering rate.

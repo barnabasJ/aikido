@@ -108,6 +108,24 @@ defmodule AikidoTest.DurableTest do
     }
   end
 
+  test "local storage forwards native EKV shard configuration", %{
+    directory: directory,
+    instance: instance
+  } do
+    name = AikidoTest.ShardedDurableSupervisor
+
+    start_supervised!(
+      {Aikido.Durable,
+       name: name,
+       aikido: instance,
+       data_dir: Path.join(directory, "sharded"),
+       ekv_options: [shards: 8]}
+    )
+
+    config = EKV.Supervisor.get_config(Module.concat(name, Store))
+    assert config.num_shards == 8
+  end
+
   test("concurrent activation uses one native DurableServer", %{durable: durable}) do
     pids =
       1..12

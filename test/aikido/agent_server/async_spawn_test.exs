@@ -142,6 +142,22 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest do
     assert Aikido.Signal.get(failure, :tenant) == "tenant-a"
   end
 
+  test "native activation options reach DurableServer validation", context do
+    parent = start_server(context, __MODULE__.Harness)
+    {:ok, runtime} = Aikido.AgentServer.state(parent, &{:ok, &1})
+
+    directive = %Aikido.Directives.SpawnAgent{
+      agent: __MODULE__.Harness,
+      tag: :invalid_deadline,
+      start_options: [timeout: 0]
+    }
+
+    assert :ok = Aikido.Directives.SpawnAgent.exec(directive, signal("test.spawn"), runtime)
+    assert_receive {:"$gen_cast", {:signal, failure}}, 5_000
+    assert failure.data.reason.__struct__ == ArgumentError
+    assert failure.data.reason.message =~ ":timeout must be a positive integer"
+  end
+
   test "generic child startup cannot block the owning agent and supports native :ignore",
        context do
     parent = start_server(context, __MODULE__.Harness)

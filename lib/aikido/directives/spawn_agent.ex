@@ -73,6 +73,13 @@ defmodule Aikido.Directives.SpawnAgent do
       description "Options for child AgentServer"
     end
 
+    field :start_options, {:array, :tuple} do
+      description "Native DurableServer start options, including the caller deadline and placement policy."
+      constraints items: [fields: [key: [type: :atom], value: [type: :term]]]
+      allow_nil? false
+      default []
+    end
+
     field :meta, :map do
       allow_nil? false
       default %{}
@@ -103,7 +110,7 @@ defmodule Aikido.Directives.SpawnAgent do
   @reserved_child_opts [:agent, :agent_module, :id, :aikido, :parent, :partition]
 
   @impl true
-  def exec(%{agent: agent, tag: tag, opts: opts, meta: meta, restart?: restart?}, signal, state) do
+  def exec(%{tag: tag, opts: opts} = directive, signal, state) do
     parent_pid = self()
     scope = Aikido.Signal.ctx(signal)
 
@@ -114,9 +121,12 @@ defmodule Aikido.Directives.SpawnAgent do
         Ash.Scope.to_opts(scope, context: Map.get(scope, :context) || %{})
       )
 
+    directive = %{directive | opts: opts}
+    runtime = Map.take(state, [:id, :partition, :aikido])
+
     task = %Aikido.Directives.AsyncTask{
       work: fn ->
-        start_child_or_report_failure(state, parent_pid, agent, tag, opts, meta, restart?, signal)
+        start_child_or_report_failure(runtime, parent_pid, directive, signal)
         {:signals, []}
       end
     }
@@ -138,11 +148,16 @@ defmodule Aikido.Directives.SpawnAgent do
     :ok
   end
 
-  defp start_child_or_report_failure(state, parent_pid, agent, tag, opts, meta, restart?, signal) do
+  defp start_child_or_report_failure(
+         state,
+         parent_pid,
+         %{tag: tag, opts: opts} = directive,
+         signal
+       ) do
     child_id = opts[:id] || "#{state.id}/#{tag_component(tag)}"
 
     try do
-      case spawn_child(state, parent_pid, agent, tag, opts, meta, restart?) do
+      case spawn_child(state, parent_pid, directive) do
         :ok -> :ok
         {:error, reason} -> report_failure(parent_pid, child_id, tag, reason, signal)
       end
@@ -165,7 +180,11 @@ defmodule Aikido.Directives.SpawnAgent do
     :ok
   end
 
-  defp spawn_child(state, parent_pid, agent, tag, opts, meta, restart?) do
+  defp spawn_child(
+         state,
+         parent_pid,
+         %{agent: agent, tag: tag, opts: opts, meta: meta, restart?: restart?} = directive
+       ) do
     child_id = opts[:id] || "#{state.id}/#{tag_component(tag)}"
     child_partition = Map.get(opts, :partition, state.partition)
 
@@ -182,11 +201,14 @@ defmodule Aikido.Directives.SpawnAgent do
     case Aikido.Durable.start(
            Aikido.durable_supervisor_name(state.aikido),
            child_id,
-           agent: agent,
-           initial_state: Keyword.get(child_opts, :initial_state, %{}),
-           partition: child_partition,
-           agent_opts: child_opts,
-           permanent: restart?
+           [
+             agent: agent,
+             initial_state: Keyword.get(child_opts, :initial_state, %{}),
+             partition: child_partition,
+             agent_opts: child_opts,
+             permanent: restart?
+           ],
+           Map.get(directive, :start_options, [])
          ) do
       {:ok, pid} ->
         if !Process.alive?(parent_pid) do

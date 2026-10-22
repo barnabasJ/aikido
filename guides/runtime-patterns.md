@@ -7,7 +7,17 @@ teams. Add `Aikido.AI.Extension` for model turns and dynamically supplied tools.
 The default `Aikido` supervision tree uses DurableServer for activation, snapshots,
 and recovery. Configure its backend with `durable: [...]`. Use `Aikido.Durable`
 for a separately configured DurableServer namespace; it delegates process ownership
-and storage to DurableServer.
+and storage to DurableServer. Local EKV options can be supplied directly, for example
+`durable: [data_dir: "path/to/fresh-store", ekv_options: [shards: 8]]`.
+The existing one-shard default is retained for compatibility. The example app can select
+eight shards with `AIKIDO_EXAMPLES_EKV_SHARDS=8`. EKV records the shard count on disk;
+changing it requires a fresh store or a separate migration, not reopening existing
+files with a different count. Explicit `backend` configurations own their own options.
+`SpawnAgent.start_options` forwards native DurableServer activation options,
+including `timeout`. This bounds the supervised activation task's wait rather than
+blocking the parent. The large quicksort example uses a 30-second activation budget;
+storage operations keep their own deadlines, and rejected starts still return
+failure signals.
 
 Activate agents through their generated domain `start` action. Adding `Aikido`
 to the application supervision tree starts one shared runtime. Its DurableServer

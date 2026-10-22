@@ -26,6 +26,7 @@ defmodule AgentExamples.Quicksort.PartitionTree do
       agent: AgentExamples.Quicksort,
       tag: branch,
       restart?: false,
+      start_options: [timeout: 30_000],
       opts: %{initial_state: %{branch: state.branch <> branch}, on_parent_death: :stop}
     }
   end
