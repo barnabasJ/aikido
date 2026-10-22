@@ -23,6 +23,9 @@
 
 ### Changed
 
+- Scope Quicksort restart cleanup to its previous tree's identities instead of
+  scanning the entire durable store, preserving resource checks and child cleanup.
+
 - Resolve playground stops by stable agent identity after DurableServer replaces
   a PID. Quicksort Start reuses the teardown/restart path and retires detached
   recovered descendants before recreating its root.

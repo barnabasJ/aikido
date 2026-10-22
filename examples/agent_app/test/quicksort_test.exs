@@ -37,12 +37,19 @@ defmodule AgentExamples.QuicksortTest do
 
     children =
       for _ <- 1..(length(Enum.uniq(numbers)) - 1) do
-        assert_receive {:partition_ready, _id, pid}, 5000
-        {pid, Process.monitor(pid)}
+        assert_receive {:partition_ready, id, pid}, 5000
+        {id, pid, Process.monitor(pid)}
       end
 
-    for {pid, monitor} <- children do
+    for {id, pid, monitor} <- children do
       assert_receive {:DOWN, ^monitor, :process, ^pid, _}, 10_000
+
+      assert {:error, :not_found} =
+               Aikido.Durable.delete(
+                 Aikido.durable_supervisor_name(Aikido.Default),
+                 id,
+                 agent: AgentExamples.Quicksort
+               )
     end
 
     assert Process.alive?(root.pid)
@@ -132,11 +139,21 @@ defmodule AgentExamples.QuicksortTest do
     end
   end
 
-  test "restart deletes an inactive worker crash checkpoint before reusing its pivot key" do
+  test "restart deletes a recorded inactive worker crash checkpoint without scanning other trees" do
     owner = "crash-checkpoint:" <> Ash.UUIDv7.generate()
     {:ok, run} = AgentExamples.Playground.start(owner, "quicksort", %{})
     pool = Aikido.durable_supervisor_name(Aikido.Default)
-    id = run.record.id <> "/partition/63"
+    id = Aikido.Agent.child_id(run.record.id, "L")
+    topic = run.snapshot.own.topic
+    AgentExamples.Quicksort.RunHistory.open(topic)
+
+    AgentExamples.Quicksort.RunHistory.record(topic, %{
+      id: id,
+      branch: "rootL",
+      status: :sorting,
+      count: 1,
+      pivot: 63
+    })
 
     child =
       AgentExamples.Quicksort
@@ -165,6 +182,59 @@ defmodule AgentExamples.QuicksortTest do
 
     assert {:ok, :idle} =
              Aikido.AgentServer.state(replacement.pid, &{:ok, &1.agent.state.state.status})
+  end
+
+  test "restart reconstructs child identities when display history is unavailable" do
+    owner = "lost-history:" <> Ash.UUIDv7.generate()
+    {:ok, run} = AgentExamples.Playground.start(owner, "quicksort", %{})
+    on_exit(fn -> AgentExamples.Playground.stop(owner, "quicksort") end)
+    signal = AgentExamples.Quicksort.Signals.Sort.new!(%{numbers: [3, 1, 2], topic: owner})
+
+    assert {:ok, [1, 2, 3]} =
+             Aikido.AgentServer.call_until(
+               run.record.pid,
+               signal,
+               "quicksort.**",
+               fn runtime ->
+                 if runtime.agent.state.state.status == :completed,
+                   do: {:ok, runtime.agent.state.state.result},
+                   else: :skip
+               end
+             )
+
+    # Reproduce an inactive checkpoint at a real partition identity with no UI index.
+    id = Aikido.Agent.child_id(run.record.id, "R")
+    pool = Aikido.durable_supervisor_name(Aikido.Default)
+
+    case Aikido.Durable.lookup(pool, id) do
+      {:ok, pid} ->
+        monitor = Process.monitor(pid)
+        assert_receive {:DOWN, ^monitor, :process, ^pid, _}, 5000
+
+      :error ->
+        :ok
+    end
+
+    child =
+      AgentExamples.Quicksort
+      |> Ash.ActionInput.for_action(:start, %{id: id},
+        context: %{aikido_runtime_options: [restart?: false]}
+      )
+      |> Ash.run_action!()
+
+    monitor = Process.monitor(child.pid)
+    Process.exit(child.pid, :kill)
+    assert_receive {:DOWN, ^monitor, :process, _, :killed}, 5000
+    AgentExamples.Quicksort.RunHistory.close(owner)
+
+    assert {:ok, _fresh} = AgentExamples.Quicksort.Restart.restart(owner)
+
+    assert {:error, :not_found} =
+             Aikido.Durable.delete(
+               Aikido.durable_supervisor_name(Aikido.Default),
+               id,
+               agent: AgentExamples.Quicksort
+             )
   end
 
   test "repeated shuffled sorts isolate each execution and release its processes and history" do

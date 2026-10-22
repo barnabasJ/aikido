@@ -380,9 +380,17 @@ Quicksort retains its input-dependent pivot selection; changing root namespaces
 isolates differently shaped sorting trees without requiring a locally sorted pivot.
 
 Teardown removes both live descendants and saved crash checkpoints for the old
-Quicksort root before creating the next execution. Native DurableServer server
-information and the domain delete action perform this cleanup; other root
-namespaces and resources are excluded. The missing-parent recovery path honors
+Quicksort root before creating the next execution. Cleanup reads only the old tree's deterministic identities, reconstructed from
+its input and recorded display history, plus any live descendants. Bounded
+concurrent native deletes check resource ownership; already deleted partitions
+are skipped. It does not enumerate the durable store or inspect other runs'
+snapshots. Other root namespaces and resources are excluded.
+
+In the existing eight-shard preview store, a full saved-agent scan took 7,960 ms
+with only two saved agents. After a browser-driven 10,000-agent sort, targeted
+restart took 358 ms: one live old root before teardown, zero old-tree processes
+after teardown, and a fresh replacement root. All 10,000 sorted values were
+verified. This is a single restart measurement, not a sustained throughput claim. The missing-parent recovery path honors
 `:stop` instead of retaining a parentless worker. Activation errors identify
 agents by stable ID, and the UI displays the underlying reason without recursively
 printing each parent's error wrapper.
