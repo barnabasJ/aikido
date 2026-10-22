@@ -93,7 +93,7 @@ example_locals_without_parens =
     "{mix,.formatter}.exs",
     "{bench,config,lib,test}/**/*.{ex,exs}",
     "examples/*/{mix,.formatter}.exs",
-    "examples/*/{config,lib,test}/**/*.{ex,exs}"
+    "examples/*/{bench,config,lib,test}/**/*.{ex,exs}"
   ],
   locals_without_parens: Enum.uniq(spark_locals_without_parens ++ example_locals_without_parens),
   export: [locals_without_parens: spark_locals_without_parens]

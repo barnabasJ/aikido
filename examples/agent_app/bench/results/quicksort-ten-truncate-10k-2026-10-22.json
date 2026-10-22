@@ -1,0 +1,5147 @@
+{
+  "status": "ten completed smaller diagnostic runs; explicit WAL maintenance enabled; not proof of full-size stability",
+  "records": [
+    {
+      "at": "2026-10-22T16:49:53.124079Z",
+      "phase": "baseline",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 307175424,
+          "Pss": 362847232,
+          "Rss": 424595456,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50012,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 19058688,
+            "live": 0,
+            "deleted": 1258,
+            "pages": 4653,
+            "wal_bytes": 4152,
+            "free_pages": 20,
+            "kv": 1258,
+            "kv_keyrefs": 1258,
+            "kv_oplog": 8716,
+            "kv_paxos": 1258
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 18583552,
+            "live": 0,
+            "deleted": 1237,
+            "pages": 4537,
+            "wal_bytes": 4152,
+            "free_pages": 3,
+            "kv": 1237,
+            "kv_keyrefs": 1237,
+            "kv_oplog": 8647,
+            "kv_paxos": 1237
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 18796544,
+            "live": 0,
+            "deleted": 1205,
+            "pages": 4589,
+            "wal_bytes": 4152,
+            "free_pages": 39,
+            "kv": 1205,
+            "kv_keyrefs": 1205,
+            "kv_oplog": 8503,
+            "kv_paxos": 1205
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 19816448,
+            "live": 1,
+            "deleted": 1276,
+            "pages": 4838,
+            "wal_bytes": 41232,
+            "free_pages": 61,
+            "kv": 1277,
+            "kv_keyrefs": 1277,
+            "kv_oplog": 8926,
+            "kv_paxos": 1277
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 19693568,
+            "live": 0,
+            "deleted": 1305,
+            "pages": 4808,
+            "wal_bytes": 4152,
+            "free_pages": 8,
+            "kv": 1305,
+            "kv_keyrefs": 1305,
+            "kv_oplog": 9143,
+            "kv_paxos": 1305
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 18882560,
+            "live": 0,
+            "deleted": 1244,
+            "pages": 4610,
+            "wal_bytes": 4152,
+            "free_pages": 18,
+            "kv": 1244,
+            "kv_keyrefs": 1244,
+            "kv_oplog": 8650,
+            "kv_paxos": 1244
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 19296256,
+            "live": 0,
+            "deleted": 1265,
+            "pages": 4711,
+            "wal_bytes": 4152,
+            "free_pages": 10,
+            "kv": 1265,
+            "kv_keyrefs": 1265,
+            "kv_oplog": 8889,
+            "kv_paxos": 1265
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 19144704,
+            "live": 1,
+            "deleted": 1210,
+            "pages": 4674,
+            "wal_bytes": 144232,
+            "free_pages": 51,
+            "kv": 1211,
+            "kv_keyrefs": 1211,
+            "kv_oplog": 8532,
+            "kv_paxos": 1211
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 0,
+            "last_checkpoint": null,
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 0,
+            "last_checkpoint": null,
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 0,
+            "last_checkpoint": null,
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 0,
+            "last_checkpoint": null,
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 0,
+            "last_checkpoint": null,
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 0,
+            "last_checkpoint": null,
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 0,
+            "last_checkpoint": null,
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 0,
+            "last_checkpoint": null,
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1636113,
+          "atom_used": 1636113,
+          "binary": 1464752,
+          "code": 37876303,
+          "ets": 3545432,
+          "processes": 31169176,
+          "processes_used": 31094344,
+          "system": 112752808,
+          "total": 143921984
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9826896
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4720648
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{Module.ParallelChecker, :\"-inner_spawn/6-fun-1-\", 7}",
+            "name": "[]",
+            "pid": "#PID<0.655.0>",
+            "bytes": 230352
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Mix.State",
+            "pid": "#PID<0.102.0>",
+            "bytes": 122152
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 110464
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.658.0>",
+            "bytes": 68248
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":application_controller",
+            "pid": "#PID<0.45.0>",
+            "bytes": 56760
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_lifecycle_manager",
+            "pid": "#PID<0.589.0>",
+            "bytes": 55872
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents",
+            "pid": "#PID<0.564.0>",
+            "bytes": 42864
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_7",
+            "pid": "#PID<0.555.0>",
+            "bytes": 42452
+          },
+          {
+            "function": "{:init, :boot_loop, 2}",
+            "name": ":init",
+            "pid": "#PID<0.0.0>",
+            "bytes": 42328
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1266,
+            "bytes": 1687760
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": "Req.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      }
+    },
+    {
+      "size": 10000,
+      "at": "2026-10-22T16:50:02.706346Z",
+      "phase": "run",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 573820928,
+          "Pss": 652441600,
+          "Rss": 716652544,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 36716544,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 9165,
+            "wal_bytes": 414467912,
+            "free_pages": 5,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 17368,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 37437440,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 9206,
+            "wal_bytes": 417697992,
+            "free_pages": 22,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 17339,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 30420992,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 9051,
+            "wal_bytes": 410047152,
+            "free_pages": 2,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 17063,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 32481280,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 9579,
+            "wal_bytes": 437762392,
+            "free_pages": 3,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 18035,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 33976320,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 9639,
+            "wal_bytes": 435261552,
+            "free_pages": 30,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 18210,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 34168832,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 9019,
+            "wal_bytes": 404546952,
+            "free_pages": 0,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 17102,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 35729408,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 9259,
+            "wal_bytes": 409350872,
+            "free_pages": 37,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 17392,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 36483072,
+            "live": 1,
+            "deleted": 2490,
+            "pages": 9623,
+            "wal_bytes": 431302232,
+            "free_pages": 113,
+            "kv": 2491,
+            "kv_keyrefs": 2491,
+            "kv_oplog": 17495,
+            "kv_paxos": 2491
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 3,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 385285952,
+              "complete?": true,
+              "log_frames": 93516,
+              "checkpointed_frames": 93516,
+              "duration_us": 526882
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 3,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 411097752,
+              "complete?": true,
+              "log_frames": 99781,
+              "checkpointed_frames": 99781,
+              "duration_us": 226204
+            },
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 3,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 410047152,
+              "complete?": true,
+              "log_frames": 99526,
+              "checkpointed_frames": 99526,
+              "duration_us": 191567
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 2,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 253062792,
+              "complete?": true,
+              "log_frames": 61423,
+              "checkpointed_frames": 61423,
+              "duration_us": 338710
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 2,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 282615552,
+              "complete?": true,
+              "log_frames": 68596,
+              "checkpointed_frames": 68596,
+              "duration_us": 556920
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 2,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 322002752,
+              "complete?": true,
+              "log_frames": 78156,
+              "checkpointed_frames": 78156,
+              "duration_us": 229156
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 2,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 342231952,
+              "complete?": false,
+              "log_frames": 83066,
+              "checkpointed_frames": 82867,
+              "duration_us": 282147
+            },
+            "starved?": true,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 2,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 353331232,
+              "complete?": true,
+              "log_frames": 85760,
+              "checkpointed_frames": 85760,
+              "duration_us": 346265
+            },
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 3790688,
+          "code": 39180903,
+          "ets": 3792840,
+          "processes": 59355232,
+          "processes_used": 52229576,
+          "system": 117915080,
+          "total": 177270312
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9571144
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4721824
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 4119656
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 2921296
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 689696
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_3",
+            "pid": "#PID<0.551.0>",
+            "bytes": 428620
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_0",
+            "pid": "#PID<0.548.0>",
+            "bytes": 426660
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_1",
+            "pid": "#PID<0.549.0>",
+            "bytes": 405980
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_replica_5",
+            "pid": "#PID<0.575.0>",
+            "bytes": 285012
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_replica_7",
+            "pid": "#PID<0.577.0>",
+            "bytes": 284868
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": "Req.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      },
+      "lifecycle": {
+        "spawned": 10000,
+        "failures": [],
+        "peak_agents": 3332,
+        "peak_memory": 736721080
+      },
+      "iteration": 1,
+      "wal_maintenance": [
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 284082,
+          "shard": "shard_0.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 132295,
+          "shard": "shard_1.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 1173,
+          "shard": "shard_2.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 3247,
+          "shard": "shard_3.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 282131,
+          "shard": "shard_4.db"
+        },
+        {
+          "result": "{:ok, [[1, -1, -1]]}",
+          "duration_us": 4,
+          "shard": "shard_5.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 135563,
+          "shard": "shard_6.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 211314,
+          "shard": "shard_7.db"
+        }
+      ],
+      "sort_us": 8108845,
+      "restart_us": 35523,
+      "root_id": "01a16484-e319-7028-bec1-43af2288433a"
+    },
+    {
+      "size": 10000,
+      "at": "2026-10-22T16:50:17.072896Z",
+      "phase": "run",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 628334592,
+          "Pss": 738442240,
+          "Rss": 820506624,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 49803264,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 12300,
+            "wal_bytes": 374421512,
+            "free_pages": 28,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 25974,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 43376640,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 12303,
+            "wal_bytes": 370540472,
+            "free_pages": 44,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 25857,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 43716608,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 12068,
+            "wal_bytes": 366589392,
+            "free_pages": 2,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 25505,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 47083520,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 12916,
+            "wal_bytes": 401877192,
+            "free_pages": 11,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 27306,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 47980544,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 12861,
+            "wal_bytes": 395219272,
+            "free_pages": 9,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 27334,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 46399488,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 12065,
+            "wal_bytes": 369988392,
+            "free_pages": 0,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 25662,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 48431104,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 12271,
+            "wal_bytes": 366247432,
+            "free_pages": 18,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 25823,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 50696192,
+            "live": 1,
+            "deleted": 2491,
+            "pages": 12918,
+            "wal_bytes": 393822592,
+            "free_pages": 61,
+            "kv": 2492,
+            "kv_keyrefs": 2492,
+            "kv_oplog": 26543,
+            "kv_paxos": 2492
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 6,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 355930952,
+              "complete?": true,
+              "log_frames": 86391,
+              "checkpointed_frames": 86391,
+              "duration_us": 1683260
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 6,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 370540472,
+              "complete?": true,
+              "log_frames": 89937,
+              "checkpointed_frames": 89937,
+              "duration_us": 315902
+            },
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 5,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 174238952,
+              "complete?": true,
+              "log_frames": 42291,
+              "checkpointed_frames": 42291,
+              "duration_us": 1502126
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 5,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 200355632,
+              "complete?": true,
+              "log_frames": 48630,
+              "checkpointed_frames": 48630,
+              "duration_us": 335906
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 5,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 227774232,
+              "complete?": true,
+              "log_frames": 55285,
+              "checkpointed_frames": 55285,
+              "duration_us": 469514
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 5,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 258237512,
+              "complete?": true,
+              "log_frames": 62679,
+              "checkpointed_frames": 62679,
+              "duration_us": 1731958
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 5,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 299808312,
+              "complete?": true,
+              "log_frames": 72769,
+              "checkpointed_frames": 72769,
+              "duration_us": 370582
+            },
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 5,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 317462512,
+              "complete?": true,
+              "log_frames": 77054,
+              "checkpointed_frames": 77054,
+              "duration_us": 534060
+            },
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 3905576,
+          "code": 39180903,
+          "ets": 3813912,
+          "processes": 66431176,
+          "processes_used": 58941096,
+          "system": 118125824,
+          "total": 184557000
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9571872
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 5091920
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 4749832
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4722136
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 2546952
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 1118248
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_3",
+            "pid": "#PID<0.551.0>",
+            "bytes": 426756
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_0",
+            "pid": "#PID<0.548.0>",
+            "bytes": 426676
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_5",
+            "pid": "#PID<0.553.0>",
+            "bytes": 287268
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_2",
+            "pid": "#PID<0.550.0>",
+            "bytes": 287260
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": "Req.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      },
+      "lifecycle": {
+        "spawned": 10000,
+        "failures": [],
+        "peak_agents": 4251,
+        "peak_memory": 749335568
+      },
+      "iteration": 2,
+      "wal_maintenance": [
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 237524,
+          "shard": "shard_0.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 1537,
+          "shard": "shard_1.db"
+        },
+        {
+          "result": "{:ok, [[1, -1, -1]]}",
+          "duration_us": 4,
+          "shard": "shard_2.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 582616,
+          "shard": "shard_3.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 441908,
+          "shard": "shard_4.db"
+        },
+        {
+          "result": "{:ok, [[1, -1, -1]]}",
+          "duration_us": 4,
+          "shard": "shard_5.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 306647,
+          "shard": "shard_6.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 321630,
+          "shard": "shard_7.db"
+        }
+      ],
+      "sort_us": 11912474,
+      "restart_us": 33875,
+      "root_id": "01a16484-e319-7028-bec1-43af2288433a"
+    },
+    {
+      "size": 10000,
+      "at": "2026-10-22T16:50:35.397391Z",
+      "phase": "run",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 587673600,
+          "Pss": 991898624,
+          "Rss": 1295138816,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 57171968,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 13958,
+            "wal_bytes": 405807672,
+            "free_pages": 10979,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 91,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 56569856,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 13961,
+            "wal_bytes": 399429912,
+            "free_pages": 11005,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 132,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 56188928,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 13718,
+            "wal_bytes": 387028712,
+            "free_pages": 10798,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 161,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 60088320,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 14670,
+            "wal_bytes": 423478352,
+            "free_pages": 9786,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 6480,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 59965440,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 14640,
+            "wal_bytes": 418237712,
+            "free_pages": 11503,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 6,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 56348672,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 13757,
+            "wal_bytes": 396883752,
+            "free_pages": 10787,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 112,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 57200640,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 13965,
+            "wal_bytes": 394485912,
+            "free_pages": 10927,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 226,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 60096512,
+            "live": 1,
+            "deleted": 2491,
+            "pages": 14672,
+            "wal_bytes": 418686792,
+            "free_pages": 11691,
+            "kv": 2492,
+            "kv_keyrefs": 2492,
+            "kv_oplog": 5,
+            "kv_paxos": 2492
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 9,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 372707592,
+              "complete?": true,
+              "log_frames": 90463,
+              "checkpointed_frames": 90463,
+              "duration_us": 495046
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 9,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 396603592,
+              "complete?": true,
+              "log_frames": 96263,
+              "checkpointed_frames": 96263,
+              "duration_us": 603178
+            },
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 8,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 184427712,
+              "complete?": true,
+              "log_frames": 44764,
+              "checkpointed_frames": 44764,
+              "duration_us": 401265
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 8,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 209790432,
+              "complete?": true,
+              "log_frames": 50920,
+              "checkpointed_frames": 50920,
+              "duration_us": 575977
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 8,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 250833872,
+              "complete?": true,
+              "log_frames": 60882,
+              "checkpointed_frames": 60882,
+              "duration_us": 1991954
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 8,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 275277832,
+              "complete?": true,
+              "log_frames": 66815,
+              "checkpointed_frames": 66815,
+              "duration_us": 391786
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 8,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 307883512,
+              "complete?": true,
+              "log_frames": 74729,
+              "checkpointed_frames": 74729,
+              "duration_us": 533519
+            },
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 8,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 336863592,
+              "complete?": true,
+              "log_frames": 81763,
+              "checkpointed_frames": 81763,
+              "duration_us": 1964226
+            },
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 3773544,
+          "code": 39180903,
+          "ets": 3860864,
+          "processes": 66233696,
+          "processes_used": 59648960,
+          "system": 117946456,
+          "total": 184180152
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9573320
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 4731320
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4723232
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 4119656
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 2185968
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 1803848
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_1",
+            "pid": "#PID<0.549.0>",
+            "bytes": 1120700
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_2",
+            "pid": "#PID<0.550.0>",
+            "bytes": 690404
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_7",
+            "pid": "#PID<0.555.0>",
+            "bytes": 426708
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_5",
+            "pid": "#PID<0.553.0>",
+            "bytes": 426676
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": "Req.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      },
+      "lifecycle": {
+        "spawned": 10000,
+        "failures": [],
+        "peak_agents": 3682,
+        "peak_memory": 684246328
+      },
+      "iteration": 3,
+      "wal_maintenance": [
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 896765,
+          "shard": "shard_0.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 251871,
+          "shard": "shard_1.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 2745,
+          "shard": "shard_2.db"
+        },
+        {
+          "result": "{:ok, [[1, -1, -1]]}",
+          "duration_us": 4,
+          "shard": "shard_3.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 2636795,
+          "shard": "shard_4.db"
+        },
+        {
+          "result": "{:ok, [[1, -1, -1]]}",
+          "duration_us": 4,
+          "shard": "shard_5.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 120282,
+          "shard": "shard_6.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 119723,
+          "shard": "shard_7.db"
+        }
+      ],
+      "sort_us": 13947558,
+      "restart_us": 32832,
+      "root_id": "01a16484-e319-7028-bec1-43af2288433a"
+    },
+    {
+      "size": 10000,
+      "at": "2026-10-22T16:50:46.483700Z",
+      "phase": "run",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 594690048,
+          "Pss": 933948416,
+          "Rss": 1155715072,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 57171968,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 13958,
+            "wal_bytes": 388108152,
+            "free_pages": 7874,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 8701,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 57184256,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 13961,
+            "wal_bytes": 386184112,
+            "free_pages": 7923,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 8706,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 56188928,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 13718,
+            "wal_bytes": 384816272,
+            "free_pages": 7701,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 8699,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 60088320,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 14670,
+            "wal_bytes": 840076272,
+            "free_pages": 8299,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 9210,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 59965440,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 14640,
+            "wal_bytes": 412263712,
+            "free_pages": 8209,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 9179,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 56348672,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 13757,
+            "wal_bytes": 381256592,
+            "free_pages": 7764,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 8608,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 57200640,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 13965,
+            "wal_bytes": 383246552,
+            "free_pages": 7791,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 8714,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 60096512,
+            "live": 1,
+            "deleted": 2491,
+            "pages": 14672,
+            "wal_bytes": 402845392,
+            "free_pages": 8414,
+            "kv": 2492,
+            "kv_keyrefs": 2492,
+            "kv_oplog": 8917,
+            "kv_paxos": 2492
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 12,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 321706112,
+              "complete?": true,
+              "log_frames": 78084,
+              "checkpointed_frames": 78084,
+              "duration_us": 567255
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 12,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 354563112,
+              "complete?": true,
+              "log_frames": 86059,
+              "checkpointed_frames": 86059,
+              "duration_us": 1115227
+            },
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 12,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 361723672,
+              "complete?": true,
+              "log_frames": 87797,
+              "checkpointed_frames": 87797,
+              "duration_us": 263849
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 12,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 813926632,
+              "complete?": true,
+              "log_frames": 197555,
+              "checkpointed_frames": 197555,
+              "duration_us": 395074
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 12,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 412263712,
+              "complete?": true,
+              "log_frames": 100064,
+              "checkpointed_frames": 100064,
+              "duration_us": 525953
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 11,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 246759192,
+              "complete?": true,
+              "log_frames": 59893,
+              "checkpointed_frames": 59893,
+              "duration_us": 171496
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 11,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 269159632,
+              "complete?": true,
+              "log_frames": 65330,
+              "checkpointed_frames": 65330,
+              "duration_us": 238194
+            },
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 11,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 283616712,
+              "complete?": false,
+              "log_frames": 68839,
+              "checkpointed_frames": 68831,
+              "duration_us": 362108
+            },
+            "starved?": true,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 4995936,
+          "code": 39180903,
+          "ets": 3879272,
+          "processes": 60247144,
+          "processes_used": 53432064,
+          "system": 119243152,
+          "total": 179490296
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9574720
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4723544
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 3147328
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 2922352
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 1804832
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 1574440
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_5",
+            "pid": "#PID<0.553.0>",
+            "bytes": 287316
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_replica_3",
+            "pid": "#PID<0.573.0>",
+            "bytes": 285156
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_3",
+            "pid": "#PID<0.551.0>",
+            "bytes": 264580
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_4",
+            "pid": "#PID<0.552.0>",
+            "bytes": 264076
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": "Req.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      },
+      "lifecycle": {
+        "spawned": 10000,
+        "failures": [],
+        "peak_agents": 3116,
+        "peak_memory": 613725440
+      },
+      "iteration": 4,
+      "wal_maintenance": [
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 549246,
+          "shard": "shard_0.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 263364,
+          "shard": "shard_1.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 382420,
+          "shard": "shard_2.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 504516,
+          "shard": "shard_3.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 3558,
+          "shard": "shard_4.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 2861,
+          "shard": "shard_5.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 3154,
+          "shard": "shard_6.db"
+        },
+        {
+          "result": "{:ok, [[1, -1, -1]]}",
+          "duration_us": 3,
+          "shard": "shard_7.db"
+        }
+      ],
+      "sort_us": 8648317,
+      "restart_us": 39101,
+      "root_id": "01a16484-e319-7028-bec1-43af2288433a"
+    },
+    {
+      "size": 10000,
+      "at": "2026-10-22T16:50:59.984808Z",
+      "phase": "run",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 661053440,
+          "Pss": 1113947136,
+          "Rss": 1406906368,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 57171968,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 13958,
+            "wal_bytes": 406067232,
+            "free_pages": 10779,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 904,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 57184256,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 13961,
+            "wal_bytes": 398824272,
+            "free_pages": 10825,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 715,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 56188928,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 13718,
+            "wal_bytes": 387440712,
+            "free_pages": 10629,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 821,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 60088320,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 14670,
+            "wal_bytes": 428360552,
+            "free_pages": 11633,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 12,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 59965440,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 14640,
+            "wal_bytes": 419601432,
+            "free_pages": 11461,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 301,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 56348672,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 13757,
+            "wal_bytes": 390736712,
+            "free_pages": 10546,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 1116,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 57200640,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 13965,
+            "wal_bytes": 392162232,
+            "free_pages": 10863,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 770,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 60096512,
+            "live": 1,
+            "deleted": 2491,
+            "pages": 14672,
+            "wal_bytes": 417224192,
+            "free_pages": 11732,
+            "kv": 2492,
+            "kv_keyrefs": 2492,
+            "kv_oplog": 36,
+            "kv_paxos": 2492
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 15,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 394201632,
+              "complete?": true,
+              "log_frames": 95680,
+              "checkpointed_frames": 95680,
+              "duration_us": 951559
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 15,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 396105072,
+              "complete?": true,
+              "log_frames": 96142,
+              "checkpointed_frames": 96142,
+              "duration_us": 212505
+            },
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 15,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 387440712,
+              "complete?": true,
+              "log_frames": 94039,
+              "checkpointed_frames": 94039,
+              "duration_us": 178729
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 14,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 224255752,
+              "complete?": true,
+              "log_frames": 54431,
+              "checkpointed_frames": 54431,
+              "duration_us": 315631
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 14,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 250100512,
+              "complete?": true,
+              "log_frames": 60704,
+              "checkpointed_frames": 60704,
+              "duration_us": 407993
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 14,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 278338992,
+              "complete?": true,
+              "log_frames": 67558,
+              "checkpointed_frames": 67558,
+              "duration_us": 1224661
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 14,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 311521472,
+              "complete?": true,
+              "log_frames": 75612,
+              "checkpointed_frames": 75612,
+              "duration_us": 474355
+            },
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 14,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 334066112,
+              "complete?": true,
+              "log_frames": 81084,
+              "checkpointed_frames": 81084,
+              "duration_us": 750832
+            },
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 3755056,
+          "code": 39180903,
+          "ets": 3903216,
+          "processes": 68739160,
+          "processes_used": 61307248,
+          "system": 118073240,
+          "total": 186812400
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9575840
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 5091920
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 4775416
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4724720
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 4720736
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 2186296
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_6",
+            "pid": "#PID<0.554.0>",
+            "bytes": 426772
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_4",
+            "pid": "#PID<0.552.0>",
+            "bytes": 426628
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":memsup",
+            "pid": "#PID<0.323.0>",
+            "bytes": 286960
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_3",
+            "pid": "#PID<0.551.0>",
+            "bytes": 285484
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": "Req.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      },
+      "lifecycle": {
+        "spawned": 10000,
+        "failures": [],
+        "peak_agents": 3690,
+        "peak_memory": 690107440
+      },
+      "iteration": 5,
+      "wal_maintenance": [
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 76932,
+          "shard": "shard_0.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 52806,
+          "shard": "shard_1.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 2711,
+          "shard": "shard_2.db"
+        },
+        {
+          "result": "{:ok, [[1, -1, -1]]}",
+          "duration_us": 5,
+          "shard": "shard_3.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 284690,
+          "shard": "shard_4.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 146645,
+          "shard": "shard_5.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 121893,
+          "shard": "shard_6.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 232083,
+          "shard": "shard_7.db"
+        }
+      ],
+      "sort_us": 12187492,
+      "restart_us": 30127,
+      "root_id": "01a16484-e319-7028-bec1-43af2288433a"
+    },
+    {
+      "size": 10000,
+      "at": "2026-10-22T16:51:12.128503Z",
+      "phase": "run",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 726089728,
+          "Pss": 1080863744,
+          "Rss": 1465425920,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 57171968,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 13958,
+            "wal_bytes": 397823112,
+            "free_pages": 7510,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 9686,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 57184256,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 13961,
+            "wal_bytes": 390448312,
+            "free_pages": 7661,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 9324,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 56188928,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 13718,
+            "wal_bytes": 379097712,
+            "free_pages": 7647,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 9241,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 60088320,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 14670,
+            "wal_bytes": 416894592,
+            "free_pages": 8300,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 9250,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 59965440,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 14640,
+            "wal_bytes": 408629872,
+            "free_pages": 8225,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 9364,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 56348672,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 13757,
+            "wal_bytes": 385516672,
+            "free_pages": 7480,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 9676,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 57200640,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 13965,
+            "wal_bytes": 381182432,
+            "free_pages": 7856,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 9213,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 60096512,
+            "live": 1,
+            "deleted": 2491,
+            "pages": 14672,
+            "wal_bytes": 402231512,
+            "free_pages": 8472,
+            "kv": 2492,
+            "kv_keyrefs": 2492,
+            "kv_oplog": 8920,
+            "kv_paxos": 2492
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 18,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 320894472,
+              "complete?": true,
+              "log_frames": 77887,
+              "checkpointed_frames": 77887,
+              "duration_us": 1124624
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 18,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 356647832,
+              "complete?": false,
+              "log_frames": 86565,
+              "checkpointed_frames": 86554,
+              "duration_us": 358073
+            },
+            "starved?": true,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 18,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 367986072,
+              "complete?": true,
+              "log_frames": 89317,
+              "checkpointed_frames": 89317,
+              "duration_us": 340020
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 18,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 413145392,
+              "complete?": true,
+              "log_frames": 100278,
+              "checkpointed_frames": 100278,
+              "duration_us": 497349
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 17,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 200499832,
+              "complete?": true,
+              "log_frames": 48665,
+              "checkpointed_frames": 48665,
+              "duration_us": 358911
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 17,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 227292192,
+              "complete?": true,
+              "log_frames": 55168,
+              "checkpointed_frames": 55168,
+              "duration_us": 1412525
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 17,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 265097312,
+              "complete?": true,
+              "log_frames": 64344,
+              "checkpointed_frames": 64344,
+              "duration_us": 318749
+            },
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 17,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 282529032,
+              "complete?": true,
+              "log_frames": 68575,
+              "checkpointed_frames": 68575,
+              "duration_us": 373883
+            },
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 3651344,
+          "code": 39180903,
+          "ets": 3917648,
+          "processes": 67423872,
+          "processes_used": 59874640,
+          "system": 117986512,
+          "total": 185410384
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9577032
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 5092240
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 4745128
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4722904
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 3518712
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 1807832
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_3",
+            "pid": "#PID<0.551.0>",
+            "bytes": 689836
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_4",
+            "pid": "#PID<0.552.0>",
+            "bytes": 426788
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":memsup",
+            "pid": "#PID<0.323.0>",
+            "bytes": 286960
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_replica_3",
+            "pid": "#PID<0.573.0>",
+            "bytes": 285132
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": ":req_llm_schema_cache",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "ReqLLM.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "ReqLLM.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "ReqLLM.Finch.SupervisorRegistry.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      },
+      "lifecycle": {
+        "spawned": 10000,
+        "failures": [],
+        "peak_agents": 4265,
+        "peak_memory": 762608720
+      },
+      "iteration": 6,
+      "wal_maintenance": [
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 729680,
+          "shard": "shard_0.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 300963,
+          "shard": "shard_1.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 387654,
+          "shard": "shard_2.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 121494,
+          "shard": "shard_3.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 3674,
+          "shard": "shard_4.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 3399,
+          "shard": "shard_5.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 772231,
+          "shard": "shard_6.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 6201,
+          "shard": "shard_7.db"
+        }
+      ],
+      "sort_us": 9343338,
+      "restart_us": 29541,
+      "root_id": "01a16484-e319-7028-bec1-43af2288433a"
+    },
+    {
+      "size": 10000,
+      "at": "2026-10-22T16:51:23.880626Z",
+      "phase": "run",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 630919168,
+          "Pss": 1050045440,
+          "Rss": 1341358080,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 57171968,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 13958,
+            "wal_bytes": 389686112,
+            "free_pages": 4398,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 18305,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 57184256,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 13961,
+            "wal_bytes": 386353032,
+            "free_pages": 4645,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 17890,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 56188928,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 13718,
+            "wal_bytes": 385941032,
+            "free_pages": 4550,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 17765,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 60088320,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 14670,
+            "wal_bytes": 415382552,
+            "free_pages": 5011,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 18416,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 59965440,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 14640,
+            "wal_bytes": 414871672,
+            "free_pages": 4912,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 18527,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 56348672,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 13757,
+            "wal_bytes": 378001792,
+            "free_pages": 4509,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 18048,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 57200640,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 13965,
+            "wal_bytes": 387160552,
+            "free_pages": 4795,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 17782,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 60096512,
+            "live": 1,
+            "deleted": 2491,
+            "pages": 14672,
+            "wal_bytes": 409190192,
+            "free_pages": 5163,
+            "kv": 2492,
+            "kv_keyrefs": 2492,
+            "kv_oplog": 17940,
+            "kv_paxos": 2492
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 21,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 367195032,
+              "complete?": true,
+              "log_frames": 89125,
+              "checkpointed_frames": 89125,
+              "duration_us": 528150
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 21,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 385112912,
+              "complete?": true,
+              "log_frames": 93474,
+              "checkpointed_frames": 93474,
+              "duration_us": 185838
+            },
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 21,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 385941032,
+              "complete?": true,
+              "log_frames": 93675,
+              "checkpointed_frames": 93675,
+              "duration_us": 158799
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 20,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 230134992,
+              "complete?": true,
+              "log_frames": 55858,
+              "checkpointed_frames": 55858,
+              "duration_us": 316949
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 20,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 261117392,
+              "complete?": true,
+              "log_frames": 63378,
+              "checkpointed_frames": 63378,
+              "duration_us": 386383
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 20,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 288606032,
+              "complete?": true,
+              "log_frames": 70050,
+              "checkpointed_frames": 70050,
+              "duration_us": 537326
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 20,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 322628992,
+              "complete?": true,
+              "log_frames": 78308,
+              "checkpointed_frames": 78308,
+              "duration_us": 309258
+            },
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 20,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 336793552,
+              "complete?": true,
+              "log_frames": 81746,
+              "checkpointed_frames": 81746,
+              "duration_us": 351994
+            },
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 1626416,
+          "code": 39180903,
+          "ets": 3933656,
+          "processes": 65629056,
+          "processes_used": 58289648,
+          "system": 116016800,
+          "total": 181645856
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9571168
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 5092456
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4722936
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 2927840
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 2546448
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 1804632
+          },
+          {
+            "function": "{EKV.Sqlite3NIF, :ekv_fetch_all, 3}",
+            "name": "AgentExamples.Store_ekv_replica_7",
+            "pid": "#PID<0.555.0>",
+            "bytes": 460140
+          },
+          {
+            "function": "{EKV.Sqlite3NIF, :ekv_execute, 2}",
+            "name": "AgentExamples.Store_ekv_replica_0",
+            "pid": "#PID<0.548.0>",
+            "bytes": 460132
+          },
+          {
+            "function": "{EKV.Sqlite3NIF, :ekv_execute, 2}",
+            "name": "AgentExamples.Store_ekv_replica_1",
+            "pid": "#PID<0.549.0>",
+            "bytes": 460132
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{EKV.Sqlite3NIF, :ekv_step, 2}",
+            "name": "AgentExamples.Store_ekv_replica_5",
+            "pid": "#PID<0.553.0>",
+            "bytes": 426644
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":\"durable_server_discovery_skip_Elixir.Aikido.Default.DurableAgents\"",
+            "size": 692,
+            "bytes": 159336
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": ":req_llm_schema_cache",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "ReqLLM.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "ReqLLM.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      },
+      "lifecycle": {
+        "spawned": 10000,
+        "failures": [],
+        "peak_agents": 3317,
+        "peak_memory": 641944864
+      },
+      "iteration": 7,
+      "wal_maintenance": [
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 331249,
+          "shard": "shard_0.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 108979,
+          "shard": "shard_1.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 152455,
+          "shard": "shard_2.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 69891,
+          "shard": "shard_3.db"
+        },
+        {
+          "result": "{:ok, [[1, -1, -1]]}",
+          "duration_us": 11,
+          "shard": "shard_4.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 169114,
+          "shard": "shard_5.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 168754,
+          "shard": "shard_6.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 212279,
+          "shard": "shard_7.db"
+        }
+      ],
+      "sort_us": 10141807,
+      "restart_us": 34709,
+      "root_id": "01a16484-e319-7028-bec1-43af2288433a"
+    },
+    {
+      "size": 10000,
+      "at": "2026-10-22T16:51:37.413436Z",
+      "phase": "run",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 629788672,
+          "Pss": 984980480,
+          "Rss": 1151995904,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 57171968,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 13958,
+            "wal_bytes": 393777272,
+            "free_pages": 7904,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 8719,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 57184256,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 13961,
+            "wal_bytes": 386427192,
+            "free_pages": 8079,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 8531,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 56188928,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 13718,
+            "wal_bytes": 383032312,
+            "free_pages": 7880,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 8467,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 60088320,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 14670,
+            "wal_bytes": 417858672,
+            "free_pages": 8326,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 9197,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 59965440,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 14640,
+            "wal_bytes": 415019992,
+            "free_pages": 8262,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 9167,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 56348672,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 13757,
+            "wal_bytes": 382826312,
+            "free_pages": 7873,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 8497,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 57200640,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 13965,
+            "wal_bytes": 378632152,
+            "free_pages": 8113,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 8388,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 60096512,
+            "live": 1,
+            "deleted": 2491,
+            "pages": 14672,
+            "wal_bytes": 410854672,
+            "free_pages": 8476,
+            "kv": 2492,
+            "kv_keyrefs": 2492,
+            "kv_oplog": 9041,
+            "kv_paxos": 2492
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 24,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 266778272,
+              "complete?": true,
+              "log_frames": 64752,
+              "checkpointed_frames": 64752,
+              "duration_us": 367575
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 24,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 295037352,
+              "complete?": true,
+              "log_frames": 71611,
+              "checkpointed_frames": 71611,
+              "duration_us": 524396
+            },
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 24,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 327095072,
+              "complete?": true,
+              "log_frames": 79392,
+              "checkpointed_frames": 79392,
+              "duration_us": 1081370
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 24,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 343364952,
+              "complete?": true,
+              "log_frames": 83341,
+              "checkpointed_frames": 83341,
+              "duration_us": 321905
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 24,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 377392032,
+              "complete?": true,
+              "log_frames": 91600,
+              "checkpointed_frames": 91600,
+              "duration_us": 427882
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 24,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 381128872,
+              "complete?": true,
+              "log_frames": 92507,
+              "checkpointed_frames": 92507,
+              "duration_us": 436876
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 23,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 211257152,
+              "complete?": true,
+              "log_frames": 51276,
+              "checkpointed_frames": 51276,
+              "duration_us": 1327439
+            },
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 23,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 240739872,
+              "complete?": true,
+              "log_frames": 58432,
+              "checkpointed_frames": 58432,
+              "duration_us": 267012
+            },
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 5072216,
+          "code": 39180903,
+          "ets": 3957824,
+          "processes": 66955720,
+          "processes_used": 59492904,
+          "system": 119489776,
+          "total": 186445496
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9572648
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 5092240
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 5091920
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4723528
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 2925008
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 1804632
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_1",
+            "pid": "#PID<0.549.0>",
+            "bytes": 427148
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_0",
+            "pid": "#PID<0.548.0>",
+            "bytes": 426660
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_2",
+            "pid": "#PID<0.550.0>",
+            "bytes": 385268
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_4",
+            "pid": "#PID<0.552.0>",
+            "bytes": 380364
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":\"durable_server_discovery_skip_Elixir.Aikido.Default.DurableAgents\"",
+            "size": 805,
+            "bytes": 181936
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": ":req_llm_schema_cache",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "ReqLLM.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "ReqLLM.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      },
+      "lifecycle": {
+        "spawned": 10000,
+        "failures": [],
+        "peak_agents": 3291,
+        "peak_memory": 637555872
+      },
+      "iteration": 8,
+      "wal_maintenance": [
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 841476,
+          "shard": "shard_0.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 953643,
+          "shard": "shard_1.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 1105576,
+          "shard": "shard_2.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 3907,
+          "shard": "shard_3.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 66886,
+          "shard": "shard_4.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 18658,
+          "shard": "shard_5.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 128,
+          "shard": "shard_6.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 1611,
+          "shard": "shard_7.db"
+        }
+      ],
+      "sort_us": 10162714,
+      "restart_us": 33195,
+      "root_id": "01a16484-e319-7028-bec1-43af2288433a"
+    },
+    {
+      "size": 10000,
+      "at": "2026-10-22T16:51:54.067930Z",
+      "phase": "run",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 709464064,
+          "Pss": 1051982848,
+          "Rss": 1258704896,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 57171968,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 13958,
+            "wal_bytes": 386662032,
+            "free_pages": 4877,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 17279,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 57184256,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 13961,
+            "wal_bytes": 390559552,
+            "free_pages": 5005,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 17137,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 56188928,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 13718,
+            "wal_bytes": 389673752,
+            "free_pages": 4808,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 17053,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 60088320,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 14670,
+            "wal_bytes": 420676752,
+            "free_pages": 4992,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 18428,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 59965440,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 14640,
+            "wal_bytes": 418241832,
+            "free_pages": 4852,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 18386,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 56348672,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 13757,
+            "wal_bytes": 381013512,
+            "free_pages": 4906,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 16913,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 57200640,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 13965,
+            "wal_bytes": 386254152,
+            "free_pages": 5081,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 16890,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 60096512,
+            "live": 1,
+            "deleted": 2491,
+            "pages": 14672,
+            "wal_bytes": 403006072,
+            "free_pages": 5265,
+            "kv": 2492,
+            "kv_keyrefs": 2492,
+            "kv_oplog": 17921,
+            "kv_paxos": 2492
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 27,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 274857592,
+              "complete?": true,
+              "log_frames": 66713,
+              "checkpointed_frames": 66713,
+              "duration_us": 1958312
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 27,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 295799552,
+              "complete?": true,
+              "log_frames": 71796,
+              "checkpointed_frames": 71796,
+              "duration_us": 405921
+            },
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 27,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 327572992,
+              "complete?": true,
+              "log_frames": 79508,
+              "checkpointed_frames": 79508,
+              "duration_us": 814634
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 27,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 373061912,
+              "complete?": true,
+              "log_frames": 90549,
+              "checkpointed_frames": 90549,
+              "duration_us": 2265600
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 27,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 408947112,
+              "complete?": true,
+              "log_frames": 99259,
+              "checkpointed_frames": 99259,
+              "duration_us": 581148
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 26,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 170889392,
+              "complete?": true,
+              "log_frames": 41478,
+              "checkpointed_frames": 41478,
+              "duration_us": 2466730
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 26,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 201278512,
+              "complete?": true,
+              "log_frames": 48854,
+              "checkpointed_frames": 48854,
+              "duration_us": 356190
+            },
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 26,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 221281112,
+              "complete?": true,
+              "log_frames": 53709,
+              "checkpointed_frames": 53709,
+              "duration_us": 676673
+            },
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 3517488,
+          "code": 39180903,
+          "ets": 3987384,
+          "processes": 69068360,
+          "processes_used": 62160288,
+          "system": 117888256,
+          "total": 186956616
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9573544
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 5092456
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 5091920
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 4737432
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4726248
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 1804632
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_0",
+            "pid": "#PID<0.548.0>",
+            "bytes": 427180
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":memsup",
+            "pid": "#PID<0.323.0>",
+            "bytes": 319432
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_replica_5",
+            "pid": "#PID<0.575.0>",
+            "bytes": 285012
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_replica_4",
+            "pid": "#PID<0.574.0>",
+            "bytes": 284964
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":\"durable_server_discovery_skip_Elixir.Aikido.Default.DurableAgents\"",
+            "size": 943,
+            "bytes": 209536
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": "Req.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      },
+      "lifecycle": {
+        "spawned": 10000,
+        "failures": [],
+        "peak_agents": 3902,
+        "peak_memory": 714990368
+      },
+      "iteration": 9,
+      "wal_maintenance": [
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 226949,
+          "shard": "shard_0.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 416229,
+          "shard": "shard_1.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 371907,
+          "shard": "shard_2.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 291393,
+          "shard": "shard_3.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 152669,
+          "shard": "shard_4.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 97061,
+          "shard": "shard_5.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 45878,
+          "shard": "shard_6.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 4038,
+          "shard": "shard_7.db"
+        }
+      ],
+      "sort_us": 14656176,
+      "restart_us": 29922,
+      "root_id": "01a16484-e319-7028-bec1-43af2288433a"
+    },
+    {
+      "size": 10000,
+      "at": "2026-10-22T16:52:05.724064Z",
+      "phase": "run",
+      "resources": {
+        "ports": 5,
+        "processes": 434,
+        "os": {
+          "Anonymous": 719917056,
+          "Pss": 1081392128,
+          "Rss": 1248432128,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 57171968,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 13958,
+            "wal_bytes": 389710832,
+            "free_pages": 7971,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 8607,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 57184256,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 13961,
+            "wal_bytes": 391288792,
+            "free_pages": 8097,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 8621,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 56188928,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 13718,
+            "wal_bytes": 381701552,
+            "free_pages": 8006,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 8458,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 60088320,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 14670,
+            "wal_bytes": 419935152,
+            "free_pages": 8392,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 9237,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 59965440,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 14640,
+            "wal_bytes": 410389112,
+            "free_pages": 8436,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 9094,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 56348672,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 13757,
+            "wal_bytes": 378726912,
+            "free_pages": 8018,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 8391,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 57200640,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 13965,
+            "wal_bytes": 387840352,
+            "free_pages": 8016,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 8542,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 60096512,
+            "live": 1,
+            "deleted": 2491,
+            "pages": 14672,
+            "wal_bytes": 414146552,
+            "free_pages": 8454,
+            "kv": 2492,
+            "kv_keyrefs": 2492,
+            "kv_oplog": 9057,
+            "kv_paxos": 2492
+          }
+        ],
+        "agents": 1,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 30,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 301884792,
+              "complete?": true,
+              "log_frames": 73273,
+              "checkpointed_frames": 73273,
+              "duration_us": 323704
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 30,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 327078592,
+              "complete?": true,
+              "log_frames": 79388,
+              "checkpointed_frames": 79388,
+              "duration_us": 401204
+            },
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 30,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 353982192,
+              "complete?": true,
+              "log_frames": 85918,
+              "checkpointed_frames": 85918,
+              "duration_us": 1160962
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 30,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 394222232,
+              "complete?": true,
+              "log_frames": 95685,
+              "checkpointed_frames": 95685,
+              "duration_us": 366160
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 30,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 410389112,
+              "complete?": true,
+              "log_frames": 99609,
+              "checkpointed_frames": 99609,
+              "duration_us": 396200
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 29,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 213481952,
+              "complete?": true,
+              "log_frames": 51816,
+              "checkpointed_frames": 51816,
+              "duration_us": 308792
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 29,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 238004192,
+              "complete?": true,
+              "log_frames": 57768,
+              "checkpointed_frames": 57768,
+              "duration_us": 391435
+            },
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 29,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 255905592,
+              "complete?": true,
+              "log_frames": 62113,
+              "checkpointed_frames": 62113,
+              "duration_us": 1110374
+            },
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 3326016,
+          "code": 39180903,
+          "ets": 4002344,
+          "processes": 66088736,
+          "processes_used": 59204800,
+          "system": 117721712,
+          "total": 183810448
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9576296
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 5092240
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4726280
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 4723776
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 2546448
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 1804632
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_3",
+            "pid": "#PID<0.551.0>",
+            "bytes": 426692
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":memsup",
+            "pid": "#PID<0.323.0>",
+            "bytes": 319432
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_2",
+            "pid": "#PID<0.550.0>",
+            "bytes": 285492
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_replica_1",
+            "pid": "#PID<0.571.0>",
+            "bytes": 285060
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":\"durable_server_discovery_skip_Elixir.Aikido.Default.DurableAgents\"",
+            "size": 1012,
+            "bytes": 223336
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": "Req.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 1
+      },
+      "lifecycle": {
+        "spawned": 10000,
+        "failures": [],
+        "peak_agents": 3594,
+        "peak_memory": 674944352
+      },
+      "iteration": 10,
+      "wal_maintenance": [
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 327400,
+          "shard": "shard_0.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 235090,
+          "shard": "shard_1.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 296374,
+          "shard": "shard_2.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 272489,
+          "shard": "shard_3.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 2936,
+          "shard": "shard_4.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 2687,
+          "shard": "shard_5.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 2990,
+          "shard": "shard_6.db"
+        },
+        {
+          "result": "{:ok, [[0, 0, 0]]}",
+          "duration_us": 410163,
+          "shard": "shard_7.db"
+        }
+      ],
+      "sort_us": 9546048,
+      "restart_us": 29104,
+      "root_id": "01a16484-e319-7028-bec1-43af2288433a"
+    },
+    {
+      "at": "2026-10-22T16:52:05.829740Z",
+      "phase": "final",
+      "resources": {
+        "ports": 5,
+        "processes": 432,
+        "os": {
+          "Anonymous": 682020864,
+          "Pss": 1043102720,
+          "Rss": 1696952320,
+          "Swap": 0
+        },
+        "directory": "/home/joba/sandbox/jido/examples/agent_app/_build/quicksort-ten-truncate-10k",
+        "atoms": 50358,
+        "shards": [
+          {
+            "name": "shard_0.db",
+            "bytes": 57171968,
+            "live": 0,
+            "deleted": 2496,
+            "pages": 13958,
+            "wal_bytes": 0,
+            "free_pages": 7971,
+            "kv": 2496,
+            "kv_keyrefs": 2496,
+            "kv_oplog": 8607,
+            "kv_paxos": 2496
+          },
+          {
+            "name": "shard_1.db",
+            "bytes": 57184256,
+            "live": 0,
+            "deleted": 2463,
+            "pages": 13961,
+            "wal_bytes": 0,
+            "free_pages": 8097,
+            "kv": 2463,
+            "kv_keyrefs": 2463,
+            "kv_oplog": 8621,
+            "kv_paxos": 2463
+          },
+          {
+            "name": "shard_2.db",
+            "bytes": 56188928,
+            "live": 0,
+            "deleted": 2417,
+            "pages": 13718,
+            "wal_bytes": 0,
+            "free_pages": 8006,
+            "kv": 2417,
+            "kv_keyrefs": 2417,
+            "kv_oplog": 8458,
+            "kv_paxos": 2417
+          },
+          {
+            "name": "shard_3.db",
+            "bytes": 60088320,
+            "live": 1,
+            "deleted": 2591,
+            "pages": 14670,
+            "wal_bytes": 53592,
+            "free_pages": 8391,
+            "kv": 2592,
+            "kv_keyrefs": 2592,
+            "kv_oplog": 9238,
+            "kv_paxos": 2592
+          },
+          {
+            "name": "shard_4.db",
+            "bytes": 59965440,
+            "live": 0,
+            "deleted": 2610,
+            "pages": 14640,
+            "wal_bytes": 0,
+            "free_pages": 8436,
+            "kv": 2610,
+            "kv_keyrefs": 2610,
+            "kv_oplog": 9094,
+            "kv_paxos": 2610
+          },
+          {
+            "name": "shard_5.db",
+            "bytes": 56348672,
+            "live": 0,
+            "deleted": 2456,
+            "pages": 13757,
+            "wal_bytes": 0,
+            "free_pages": 8018,
+            "kv": 2456,
+            "kv_keyrefs": 2456,
+            "kv_oplog": 8391,
+            "kv_paxos": 2456
+          },
+          {
+            "name": "shard_6.db",
+            "bytes": 57200640,
+            "live": 0,
+            "deleted": 2476,
+            "pages": 13965,
+            "wal_bytes": 0,
+            "free_pages": 8016,
+            "kv": 2476,
+            "kv_keyrefs": 2476,
+            "kv_oplog": 8542,
+            "kv_paxos": 2476
+          },
+          {
+            "name": "shard_7.db",
+            "bytes": 60096512,
+            "live": 0,
+            "deleted": 2492,
+            "pages": 14672,
+            "wal_bytes": 94792,
+            "free_pages": 8453,
+            "kv": 2492,
+            "kv_keyrefs": 2492,
+            "kv_oplog": 9059,
+            "kv_paxos": 2492
+          }
+        ],
+        "agents": 0,
+        "wal": [
+          {
+            "status": "open",
+            "checkpoint_count": 31,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 0,
+              "complete?": true,
+              "log_frames": 0,
+              "checkpointed_frames": 0,
+              "duration_us": 51
+            },
+            "starved?": false,
+            "shard": 0
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 31,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 0,
+              "complete?": true,
+              "log_frames": 0,
+              "checkpointed_frames": 0,
+              "duration_us": 37
+            },
+            "starved?": false,
+            "shard": 1
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 31,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 0,
+              "complete?": true,
+              "log_frames": 0,
+              "checkpointed_frames": 0,
+              "duration_us": 47
+            },
+            "starved?": false,
+            "shard": 2
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 30,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 394222232,
+              "complete?": true,
+              "log_frames": 95685,
+              "checkpointed_frames": 95685,
+              "duration_us": 366160
+            },
+            "starved?": false,
+            "shard": 3
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 30,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 410389112,
+              "complete?": true,
+              "log_frames": 99609,
+              "checkpointed_frames": 99609,
+              "duration_us": 396200
+            },
+            "starved?": false,
+            "shard": 4
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 30,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 378726912,
+              "complete?": true,
+              "log_frames": 91924,
+              "checkpointed_frames": 91924,
+              "duration_us": 394147
+            },
+            "starved?": false,
+            "shard": 5
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 30,
+            "last_checkpoint": {
+              "busy": 0,
+              "wal_bytes": 387840352,
+              "complete?": true,
+              "log_frames": 94136,
+              "checkpointed_frames": 94136,
+              "duration_us": 414958
+            },
+            "starved?": false,
+            "shard": 6
+          },
+          {
+            "status": "open",
+            "checkpoint_count": 30,
+            "last_checkpoint": {
+              "busy": 1,
+              "wal_bytes": -4088,
+              "complete?": false,
+              "log_frames": -1,
+              "checkpointed_frames": -1,
+              "duration_us": 39
+            },
+            "starved?": false,
+            "shard": 7
+          }
+        ],
+        "vm_pid": "1979002",
+        "backend_timeout_ms": 60000,
+        "beam_memory": {
+          "atom": 1650490,
+          "atom_used": 1650490,
+          "binary": 3365048,
+          "code": 39180903,
+          "ets": 4001072,
+          "processes": 63917880,
+          "processes_used": 57032400,
+          "system": 117757880,
+          "total": 181675760
+        },
+        "top_processes": [
+          {
+            "function": "{:code_server, :loop, 1}",
+            "name": ":code_server",
+            "pid": "#PID<0.50.0>",
+            "bytes": 9969088
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Quicksort.RunHistory",
+            "pid": "#PID<0.608.0>",
+            "bytes": 9576296
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Playground",
+            "pid": "#PID<0.607.0>",
+            "bytes": 5092264
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":file_server_2",
+            "pid": "#PID<0.53.0>",
+            "bytes": 4726312
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_dynamic",
+            "pid": "#PID<0.587.0>",
+            "bytes": 4723784
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.TaskSupervisor",
+            "pid": "#PID<0.561.0>",
+            "bytes": 2546448
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "[]",
+            "pid": "#PID<0.645.0>",
+            "bytes": 428008
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_3",
+            "pid": "#PID<0.551.0>",
+            "bytes": 426724
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": ":memsup",
+            "pid": "#PID<0.323.0>",
+            "bytes": 319432
+          },
+          {
+            "function": "{Process, :info, 2}",
+            "name": "[]",
+            "pid": "#PID<0.95.0>",
+            "bytes": 285536
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "AgentExamples.Store_ekv_replica_2",
+            "pid": "#PID<0.550.0>",
+            "bytes": 285492
+          },
+          {
+            "function": "{:gen_server, :loop, 5}",
+            "name": "Aikido.Default.DurableAgents_replica_1",
+            "pid": "#PID<0.571.0>",
+            "bytes": 285060
+          }
+        ],
+        "top_ets": [
+          {
+            "name": ":code_server",
+            "size": 1303,
+            "bytes": 1754408
+          },
+          {
+            "name": "Module.ParallelChecker",
+            "size": 1161,
+            "bytes": 550624
+          },
+          {
+            "name": ":ac_tab",
+            "size": 226,
+            "bytes": 236560
+          },
+          {
+            "name": ":\"durable_server_discovery_skip_Elixir.Aikido.Default.DurableAgents\"",
+            "size": 1012,
+            "bytes": 223336
+          },
+          {
+            "name": ":logger",
+            "size": 4,
+            "bytes": 154752
+          },
+          {
+            "name": "Plug.Upload.Dir",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "Plug.Upload.Path",
+            "size": 0,
+            "bytes": 154272
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.PIDPartition0",
+            "size": 1,
+            "bytes": 152240
+          },
+          {
+            "name": "AgentExamples.Store_ekv_registry.KeyPartition0",
+            "size": 1,
+            "bytes": 152224
+          },
+          {
+            "name": "Req.Finch.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.PIDPartition0",
+            "size": 0,
+            "bytes": 152080
+          },
+          {
+            "name": "Req.Finch.SupervisorRegistry.KeyPartition0",
+            "size": 0,
+            "bytes": 152080
+          }
+        ],
+        "histories": 0,
+        "io_tasks": 0,
+        "saved_agents": 0
+      }
+    }
+  ]
+}

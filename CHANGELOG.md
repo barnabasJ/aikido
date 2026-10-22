@@ -6,6 +6,10 @@
 
 ### Added
 
+- Add a sustained quicksort lifecycle benchmark with per-run process, memory,
+  saved-agent and EKV metadata metrics, disk-space guards and recorded normal
+  versus explicit-WAL-maintenance diagnostics.
+
 - Add isolated Benchee suites for real persisted quicksort trees, native EKV shard
   comparisons, checkpoint/WAL metrics and full descendant cleanup checks.
 

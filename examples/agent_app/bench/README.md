@@ -85,8 +85,9 @@ propagates unrecoverable failures instead of waiting forever. The task budget al
 and telemetry module lookups also affect throughput. The full browser verification
 below covers the resulting configuration.
 
-Completed agents intentionally remain alive in this example for inspection until
-the root stops. Multiple browser-owned roots are independent. The benchmarks and
+Completed children are now stopped after their parent records the sorted result.
+The retained graph lives separately in the UI history; the root remains available
+until it is stopped. Multiple browser-owned roots are independent. The benchmarks and
 regression tests confirm complete descendant cleanup on a normal stop, including
 preserving another independently owned root. Existing runtime tests cover parent
 death during activation. These checks do not prove the earlier live roots were
@@ -161,8 +162,8 @@ The two 100,000-agent validations above waited for every monitored descendant to
 exit between runs. They did not establish the timing of the original UI restart:
 that returned after stopping the root, while descendant deletion continued.
 The UI now waits asynchronously for the previous tree's monitored processes to
-exit before it starts a fresh root. Completion still retains agents for inspection;
-the restart button explicitly displays the release phase.
+exit before it starts a fresh root. The restart button explicitly displays the release phase. Completed child
+workers are released while their recorded nodes remain available for inspection.
 
 A later failed run in the same preview left 46,699 live agents. Stopping its root
 terminated all 46,699 with `{:shutdown, :delete}` in 22.020 seconds. Afterward there
@@ -180,3 +181,80 @@ contained only the new idle root, with zero I/O tasks and 0.49 GB BEAM-accounted
 memory. The third result was checked against every value in `1..10000` in the
 browser. This smaller regression check does not replace a repeat of the larger
 stress test or isolate storage retention from host memory pressure.
+
+
+## Sustained lifecycle check
+
+Run ten consecutive full-size inputs in one VM and one unchanged EKV directory:
+
+```sh
+AIKIDO_EXAMPLES_EKV_SHARDS=8 AIKIDO_DURABLE_DIR=_build/quicksort-repeated \
+  mix run bench/quicksort_repeated.exs --runs 10 --size 100000
+```
+
+This uses the actual playground command and restart paths. Each run verifies every
+sorted value, records every agent readiness and exit, waits for child retirement,
+then restarts the root and checks that the old history is absent. JSONL records
+include BEAM memory, OS RSS/PSS, processes, ports, atoms, tasks, registered agents,
+saved identities, native WAL stats and SQLite row/page counts. The directory is
+not reset between runs. Unlike the isolated Benchee suite, this deliberately
+measures accumulation. It starts the example application and its local settings
+repository, but does not read provider keys or make AI requests.
+
+EKV's deletion tombstones and retained Paxos promises are measured separately
+from saved agents. Zero agent records does not mean zero physical metadata.
+The example supervises its EKV store explicitly so its native DurableServer
+backend can use a 60-second storage budget. The example uses native EKV GC at
+30-second intervals; library defaults and durability semantics are unchanged.
+
+### Repeated-run findings (2026-10-22)
+
+The [ten-run control](results/quicksort-ten-uuid-control-2026-10-22.json)
+completed all ten 100,000-agent sorts in one VM and store. Completed workers retired,
+and each post-run sample had one idle root, one saved agent and no I/O tasks.
+However, fresh identities added 100,000 Paxos keys per run, reaching 1,000,002;
+sort times ranged from 101.8 to 193.0 seconds. This was not stable storage usage.
+
+Restart now reuses the root identity and identifies each worker by its pivot value.
+For a repeatedly shuffled fixed input range, the worker key set is bounded. UI
+histories use distinct per-run topics, so delayed old notifications cannot change
+the replacement graph. Tests cover ten shuffled runs and restarting active work.
+
+The [subsequent full-size attempt](results/quicksort-six-stable-identities-2026-10-22.json)
+confirmed the key count plateaued at 100,002. Its first six completed sorts took
+87.6, 125.2, 171.4, 177.1, 223.6 and 221.2 seconds. Post-run BEAM memory remained
+273–348 MB, with one root, one saved agent and no I/O tasks, but native WAL files
+grew to about 24 GB of allocated disk space. The attempt ended when the workspace
+filesystem filled; it did not complete ten runs and has no final cleanup sample.
+Offline WAL checkpoints recovered space while preserving database records.
+Stable full-size timing is still unresolved.
+
+The repeated-run harness now checks available disk space before each run and
+stops its isolated VM if less than 2 GB remains. It never deletes saved records
+or resets the store between iterations. `--profile` records native EKV call-time
+counters; nested totals overlap and cannot be summed into elapsed time.
+`--truncate-wal` is an explicit diagnostic: it requests SQLite WAL truncation
+between completed runs and records success or busy results. This maintenance is
+not part of the normal playground restart path and must not be presented as a
+production performance fix.
+
+The [ten-run 10,000-agent diagnostic](results/quicksort-ten-truncate-10k-2026-10-22.json)
+completed with explicit WAL maintenance enabled. Sorting took 8.1–14.7 seconds;
+post-run BEAM memory stayed at 177–187 MB, with 434 processes, five ports, one
+root, one saved agent, no I/O tasks and no retained histories. Final stop left
+zero agents, saved agents, tasks and histories (432 processes). The store already
+contained the keys from an earlier failed diagnostic; those records were not
+reset. The new run's key set plateaued by iteration two. Some checkpoint attempts
+returned busy. These smaller measurements do not prove normal full-size restart
+stability, nor do they isolate elapsed time from host disk/GC contention.
+
+A [ten-run control without explicit maintenance](results/quicksort-ten-normal-10k-2026-10-22.json)
+then used that same existing store. Every 10,000-agent sort and descendant exit
+was verified. Each post-run sample had 434 processes, five ports, one root, one
+saved agent, zero I/O tasks and zero histories. Final stop again left zero live
+and saved agents. Post-run BEAM memory ranged from 174 to 191 MB. Sorting took
+8.3–19.5 seconds, while logical WAL occupancy increased from 3.5 GB to 22.9 GB.
+This confirms normal-path lifecycle cleanup at that size, but not stable disk
+usage or full-size timing. After the benchmark VM exited, offline WAL checkpoints
+reclaimed log space without deleting records. These maintenance operations were
+outside the timed runs and are not hidden in the reported restart path.

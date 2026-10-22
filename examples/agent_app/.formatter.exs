@@ -100,5 +100,5 @@ spark_locals_without_parens = [
   locals_without_parens:
     spark_locals_without_parens ++ [attr: 2, attr: 3, slot: 1, slot: 2, slot: 3],
   plugins: [Phoenix.LiveView.HTMLFormatter, Spark.Formatter],
-  inputs: ["{mix,.formatter}.exs", "{config,lib,test}/**/*.{ex,exs}"]
+  inputs: ["{mix,.formatter}.exs", "{bench,config,lib,test}/**/*.{ex,exs}"]
 ]
