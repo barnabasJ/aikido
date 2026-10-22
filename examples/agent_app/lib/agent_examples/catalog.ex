@@ -2,6 +2,17 @@ defmodule AgentExamples.Catalog do
   @moduledoc "The runnable examples and the descriptions shown on their LiveView pages."
   @examples [
     %{
+      slug: "quicksort",
+      title: "Recursive quicksort",
+      eyebrow: "BEAM · thousands of real agents",
+      resource: AgentExamples.Quicksort,
+      kind: :quicksort,
+      description: "Watch a sorting tree spawn a real Aikido agent for every nonempty partition.",
+      detail:
+        "Each agent picks a pivot, spawns children for smaller and larger values, then combines their results through signals. There is no local-sort cutoff or worker pool. Completed agents stay alive until you stop the root, which closes the tree. Large inputs create thousands of processes; the UI limits the visible rows rather than limiting the agents.",
+      flow: ["Partition", "Spawn child agents", "Sorted result signals", "Combine"]
+    },
+    %{
       slug: "lua-permissions",
       title: "Lua permissions and scope",
       eyebrow: "Makewright · filtered VM functions",

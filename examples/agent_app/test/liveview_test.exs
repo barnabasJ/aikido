@@ -34,6 +34,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
       {"checklist", AgentExamplesWeb.ChecklistLive},
       {"notebook", AgentExamplesWeb.NotebookLive},
       {"worker", AgentExamplesWeb.WorkerLive},
+      {"quicksort", AgentExamplesWeb.QuicksortLive},
       {"team", AgentExamplesWeb.TeamLive},
       {"nested-teams", AgentExamplesWeb.NestedTeamsLive},
       {"assistant", AgentExamplesWeb.AssistantLive},
@@ -870,6 +871,27 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
     assert answer["error"]
     assert answer["result"] == nil
+  end
+
+  test "recursive quicksort renders the real tree and sorted result", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/quicksort")
+    owner = start(view, "quicksort")
+    GenServer.stop(view.pid)
+    {:ok, view, _} = live(conn, "/examples/quicksort")
+    view |> form("#quicksort-form", %{size: "32"}) |> render_submit()
+    await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
+    assert Playground.get(owner, "quicksort").snapshot.own.result == Enum.to_list(1..32)
+    assert has_element?(view, "#sort-result summary", "Sorted 32 values")
+    assert has_element?(view, ".sort-diagram circle[data-status=completed]")
+    GenServer.stop(view.pid)
+    {:ok, reconnected, _} = live(conn, "/examples/quicksort")
+    render_async(reconnected, 15_000)
+    assert has_element?(reconnected, "#sort-spawned", "32 agents spawned")
+    assert has_element?(reconnected, ".sort-diagram circle[data-status=completed]")
+    reconnected |> element("button[phx-click=restart_sort]") |> render_click()
+    render_async(reconnected, 15_000)
+    assert Playground.get(owner, "quicksort").snapshot.own.status == :idle
+    assert has_element?(reconnected, "#sort-spawned", "0 agents spawned")
   end
 
   defp start(view, slug, options \\ %{}) do

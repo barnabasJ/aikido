@@ -66,6 +66,7 @@ defmodule AgentExamples.Agents do
   end
 
   agents do
+    agent :quicksort, AgentExamples.Quicksort
     agent :lua_assistant, AgentExamples.LuaAssistant
     agent :adaptive, AgentExamples.AdaptiveAssistant
     agent :verified, AgentExamples.VerifiedAssistant

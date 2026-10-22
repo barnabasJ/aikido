@@ -27,6 +27,7 @@ defmodule AgentExamplesWeb.Router do
       live("/examples/checklist", ChecklistLive)
       live("/examples/notebook", NotebookLive)
       live("/examples/worker", WorkerLive)
+      live("/examples/quicksort", QuicksortLive)
       live("/examples/team", TeamLive)
       live("/examples/nested-teams", NestedTeamsLive)
       live("/examples/assistant", AssistantLive)

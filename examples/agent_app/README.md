@@ -250,3 +250,19 @@ correlated result signal. The tool task waits, while agent mailboxes stay respon
 Expand a tool entry to inspect its script/input and result. Tool failures remain
 marked **Failed** even if the model subsequently completes the conversation.
 The offline script reads the roster before spawning and reuses workers on later prompts.
+
+The **Recursive quicksort** page (`/examples/quicksort`) demonstrates BEAM process
+fan-out without an AI provider. Start the example and sort 4,096 shuffled integers:
+every nonempty partition gets an Aikido agent, including singleton partitions.
+Each node spawns its smaller/larger children after choosing a pivot; child readiness
+and sorted results travel through typed signals. Reducers only compute partitions
+and return directives. Native Ash notifications publish progress to LiveView.
+
+The counters and depth histogram cover the entire tree. Select a node in the
+six-level diagram or the bounded node list to inspect a subtree. Rendering limits
+never limit agent creation. Completed agents stay alive for inspection; stopping
+the root stops its descendants and deletes their temporary snapshots. Start a new
+example to sort another list. The form accepts up to 10,000 values, and the example
+runtime permits 20,000 concurrent I/O tasks to accommodate large bursts of spawning
+and progress notifications. This is a lifecycle demonstration, not a claim that
+process-based quicksort outperforms `Enum.sort/1`.

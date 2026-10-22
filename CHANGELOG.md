@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+### Added
+
+- Add a realtime recursive quicksort example: each nonempty partition spawns a
+  real Aikido agent, with retained color-coded nodes, subtree inspection, reconnect
+  support and a one-button restart. A 4,096-value browser run created 4,096 agents.
+
 ### Changed
 
 - Keep newest example tool calls at the top of bounded scrollable lists. Retain

@@ -8,7 +8,7 @@ defmodule AgentExamples.Application do
         AgentExamples.Settings.Vault,
         AgentExamples.Settings.Repo,
         {Ecto.Migrator, repos: [AgentExamples.Settings.Repo], log: false},
-        Aikido,
+        {Aikido, max_tasks: 20_000},
         {Phoenix.PubSub, name: AgentExamples.PubSub},
         {Task.Supervisor, name: AgentExamples.WebTasks},
         AgentExamples.Playground,
