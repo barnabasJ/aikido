@@ -1,7 +1,10 @@
 defmodule AgentExamples.Quicksort.Restart do
   @moduledoc "Restarts a browser's sorting example after the previous tree has terminated."
 
-  @doc "Monitors the old tree before stopping its root, then starts a fresh root after teardown."
+  @doc """
+  Stops the old tree, awaits its processes, then checkpoints native EKV before
+  starting the replacement root. This external operation runs outside agents.
+  """
   def restart(owner, timeout \\ 300_000) do
     run = AgentExamples.Playground.get(owner, "quicksort")
     monitors = monitor_tree(run)
@@ -9,12 +12,27 @@ defmodule AgentExamples.Quicksort.Restart do
 
     try do
       with :ok <- AgentExamples.Playground.stop(owner, "quicksort"),
-           :ok <- await_tree_exit(monitors, deadline) do
+           :ok <- await_tree_exit(monitors, deadline),
+           :ok <- checkpoint_agent_store() do
         AgentExamples.Playground.start(owner, "quicksort", %{})
       end
     after
       for ref <- Map.keys(monitors), do: Process.demonitor(ref, [:flush])
     end
+  end
+
+  # A fully checkpointed WAL can be reused by the next writer. Background passive
+  # checkpoints can remain behind continuous partition writes across immediate runs.
+  defp checkpoint_agent_store do
+    store = Application.fetch_env!(:agent_examples, :store)
+    name = Keyword.fetch!(store, :name)
+
+    Enum.reduce_while(0..(Keyword.fetch!(store, :shards) - 1), :ok, fn shard, :ok ->
+      case EKV.WALCheckpointer.checkpoint(name, shard) do
+        {:ok, _stats} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, {:checkpoint_failed, shard, reason}}}
+      end
+    end)
   end
 
   defp monitor_tree(%{record: %{id: root_id}}) do

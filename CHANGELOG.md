@@ -20,6 +20,9 @@
 
 ### Changed
 
+- Finish native EKV passive checkpoints after quicksort teardown and before
+  starting the replacement root, so consecutive sorting runs can reuse their WAL.
+
 - Supervise the example app’s native EKV store explicitly and configure its
   DurableServer backend with a 60-second storage budget for large local trees.
 

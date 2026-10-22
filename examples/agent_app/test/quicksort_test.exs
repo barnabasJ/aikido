@@ -218,6 +218,45 @@ defmodule AgentExamples.QuicksortTest do
     assert result == Enum.to_list(1..64)
   end
 
+  test "restart checkpoints the shared store without stopping another owned tree" do
+    owner = "checkpoint-restart:" <> Ash.UUIDv7.generate()
+    other_owner = "checkpoint-independent:" <> Ash.UUIDv7.generate()
+    {:ok, initial} = AgentExamples.Playground.start(owner, "quicksort", %{})
+    {:ok, other} = AgentExamples.Playground.start(other_owner, "quicksort", %{})
+
+    on_exit(fn ->
+      AgentExamples.Playground.stop(owner, "quicksort")
+      AgentExamples.Playground.stop(other_owner, "quicksort")
+    end)
+
+    numbers = Enum.to_list(1..16)
+
+    signal =
+      AgentExamples.Quicksort.Signals.Sort.new!(%{
+        numbers: Enum.reverse(numbers),
+        topic: "independent"
+      })
+
+    assert {:ok, ^numbers} =
+             Aikido.AgentServer.call_until(
+               other.record.pid,
+               signal,
+               "quicksort.**",
+               fn runtime ->
+                 state = runtime.agent.state.state
+                 if state.status == :completed, do: {:ok, state.result}, else: :skip
+               end,
+               timeout: 30_000
+             )
+
+    assert {:ok, fresh} = AgentExamples.Quicksort.Restart.restart(owner)
+    refute fresh.record.pid == initial.record.pid
+    assert Process.alive?(other.record.pid)
+
+    assert {:ok, ^numbers} =
+             Aikido.AgentServer.state(other.record.pid, &{:ok, &1.agent.state.state.result})
+  end
+
   def capture_partition(_event, _measurements, metadata, {owner, root_id}) do
     if String.starts_with?(metadata.agent_id, root_id <> "/") do
       send(owner, {:partition_ready, metadata.agent_id, self()})

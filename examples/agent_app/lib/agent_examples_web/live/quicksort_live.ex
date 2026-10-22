@@ -231,7 +231,7 @@ defmodule AgentExamplesWeb.QuicksortLive do
         </form>
         <p class="muted">
           Sorted children stop after their results reach the parent. Their recorded nodes stay visible.
-          Restart waits for any remaining processes before enabling a fresh root.
+          Restart waits for remaining processes and checkpoints EKV before enabling a fresh root.
         </p>
       </section>
       <section class="panel" id="sort-metrics">
