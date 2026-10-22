@@ -23,15 +23,17 @@ defmodule AgentExamplesWeb.QuicksortLive do
   end
 
   defp restore_session_history(socket) do
-    if connected?(socket) && active?(socket.assigns.run) do
+    if active?(socket.assigns.run) do
       topic = AgentExamples.Quicksort.RunHistory.topic(socket.assigns.run.record.id)
-      Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
+      socket = assign(socket, sort_topic: topic)
 
       socket =
-        assign(socket,
-          sort_topic: topic,
-          root_monitor: Process.monitor(socket.assigns.run.record.pid)
-        )
+        if connected?(socket) do
+          Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
+          assign(socket, root_monitor: Process.monitor(socket.assigns.run.record.pid))
+        else
+          socket
+        end
 
       case AgentExamples.Quicksort.RunHistory.fetch(topic) do
         {:ok, tree} -> assign(socket, tree: tree)
@@ -45,7 +47,7 @@ defmodule AgentExamplesWeb.QuicksortLive do
   def handle_event("restart_sort", _, socket) do
     owner = socket.assigns.owner
 
-    socket = release_root_monitor(socket)
+    socket = socket |> release_root_monitor() |> put_private(:quicksort_pending, %{})
 
     case AgentExamples.Playground.stop(owner, "quicksort") do
       :ok ->
@@ -80,15 +82,17 @@ defmodule AgentExamplesWeb.QuicksortLive do
   def handle_event("sort", %{"size" => size}, socket) do
     with {size, ""} when size in 1..100_000 <- Integer.parse(size),
          true <- active?(socket.assigns.run) do
-      if socket.assigns.sort_topic,
-        do: Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
+      if socket.assigns.sort_topic do
+        Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
+        AgentExamples.Quicksort.RunHistory.close(socket.assigns.sort_topic)
+      end
 
       topic = AgentExamples.Quicksort.RunHistory.topic(socket.assigns.run.record.id)
       AgentExamples.Quicksort.RunHistory.open(topic)
       :ok = Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
 
       socket =
-        assign(release_root_monitor(socket),
+        assign(socket |> release_root_monitor() |> put_private(:quicksort_pending, %{}),
           history_available: true,
           root_unavailable: nil,
           root_monitor: Process.monitor(socket.assigns.run.record.pid),
@@ -115,10 +119,32 @@ defmodule AgentExamplesWeb.QuicksortLive do
     do: {:noreply, assign(socket, focus: branch)}
 
   def handle_info({:quicksort_progress, topic, node}, %{assigns: %{sort_topic: topic}} = socket) do
+    pending = Map.get(socket.private, :quicksort_pending, %{})
+
+    if map_size(pending) == 0 do
+      Process.send_after(self(), :flush_quicksort_progress, 100)
+    end
+
+    prior = Map.get(pending, node.branch)
+
+    node =
+      if prior &&
+           (prior.status in [:completed, :failed] ||
+              (prior.status == :sorting && node.status == :idle)), do: prior, else: node
+
+    if node.branch == "root" && node.status in [:completed, :failed],
+      do: send(self(), :flush_quicksort_progress)
+
+    {:noreply, put_private(socket, :quicksort_pending, Map.put(pending, node.branch, node))}
+  end
+
+  def handle_info(:flush_quicksort_progress, socket) do
+    pending = Map.get(socket.private, :quicksort_pending, %{})
+
     tree =
-      socket.assigns.tree
-      |> AgentExamples.Quicksort.TreeView.put_node(node)
-      |> drain_progress(topic, 500)
+      Enum.reduce(pending, socket.assigns.tree, fn {_, node}, tree ->
+        AgentExamples.Quicksort.TreeView.put_node(tree, node)
+      end)
 
     elapsed =
       if socket.assigns.started_at && tree.nodes["root"] &&
@@ -128,27 +154,14 @@ defmodule AgentExamplesWeb.QuicksortLive do
              System.monotonic_time(:millisecond) - socket.assigns.started_at,
          else: nil
 
-    {:noreply, assign(socket, tree: tree, elapsed: elapsed)}
+    {:noreply,
+     socket |> put_private(:quicksort_pending, %{}) |> assign(tree: tree, elapsed: elapsed)}
   end
 
   def handle_info({:quicksort_progress, _, _}, socket), do: {:noreply, socket}
 
-  # Batch already delivered notifications into one render; never query agents repeatedly.
   def handle_info({:DOWN, ref, :process, _, reason}, %{assigns: %{root_monitor: ref}} = socket),
     do: {:noreply, assign(socket, root_unavailable: inspect(reason), root_monitor: nil)}
-
-  defp drain_progress(tree, _topic, 0), do: tree
-
-  defp drain_progress(tree, topic, remaining) do
-    receive do
-      {:quicksort_progress, ^topic, node} ->
-        tree
-        |> AgentExamples.Quicksort.TreeView.put_node(node)
-        |> drain_progress(topic, remaining - 1)
-    after
-      0 -> tree
-    end
-  end
 
   defp release_root_monitor(socket) do
     if socket.assigns.root_monitor, do: Process.demonitor(socket.assigns.root_monitor, [:flush])

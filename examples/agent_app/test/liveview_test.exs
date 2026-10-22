@@ -894,6 +894,24 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert has_element?(reconnected, "#sort-spawned", "0 agents spawned")
   end
 
+  test "quicksort coalesces progress bursts without regressing terminal nodes", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/quicksort")
+    owner = start(view, "quicksort")
+    view |> form("#quicksort-form", %{size: "1"}) |> render_submit()
+    await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
+    topic = AgentExamples.Quicksort.RunHistory.topic(Playground.get(owner, "quicksort").record.id)
+    node = %{branch: "rootL", id: "display-test", status: :completed, count: 1, pivot: 1}
+    send(view.pid, {:quicksort_progress, topic, node})
+    for _ <- 1..1000, do: send(view.pid, {:quicksort_progress, topic, %{node | status: :idle}})
+    send(view.pid, :flush_quicksort_progress)
+    assert has_element?(view, "#sort-spawned", "2 agents spawned")
+
+    assert has_element?(
+             view,
+             ".sort-diagram g[phx-value-branch=rootL] circle[data-status=completed]"
+           )
+  end
+
   defp start(view, slug, options \\ %{}) do
     view |> form("#start-form", options) |> render_submit()
     render_async(view, 15_000)
