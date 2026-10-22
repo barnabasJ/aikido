@@ -12,6 +12,8 @@
 
 ### Changed
 
+- Allow up to 100,000 values in the recursive quicksort example.
+
 - Keep newest example tool calls at the top of bounded scrollable lists. Retain
   native tool-error metadata in conversation history, and clarify Lua discovery
   and returned-error conventions for the live research-team example.

@@ -79,7 +79,7 @@ defmodule AgentExamplesWeb.QuicksortLive do
   end
 
   def handle_event("sort", %{"size" => size}, socket) do
-    with {size, ""} when size in 1..10_000 <- Integer.parse(size),
+    with {size, ""} when size in 1..100_000 <- Integer.parse(size),
          true <- active?(socket.assigns.run) do
       if socket.assigns.sort_topic,
         do: Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
@@ -104,7 +104,7 @@ defmodule AgentExamplesWeb.QuicksortLive do
     else
       _ ->
         {:noreply,
-         assign(socket, error: "Start the example and choose between 1 and 10,000 values.")}
+         assign(socket, error: "Start the example and choose between 1 and 100,000 values.")}
     end
   end
 
@@ -206,7 +206,7 @@ defmodule AgentExamplesWeb.QuicksortLive do
             name="size"
             type="number"
             min="1"
-            max="10000"
+            max="100000"
             value={@size}
             required
           /></label>

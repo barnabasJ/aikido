@@ -262,7 +262,7 @@ The counters and depth histogram cover the entire tree. Select a node in the
 six-level diagram or the bounded node list to inspect a subtree. Rendering limits
 never limit agent creation. Completed agents stay alive for inspection; stopping
 the root stops its descendants and deletes their temporary snapshots. Start a new
-example to sort another list. The form accepts up to 10,000 values, and the example
+example to sort another list. The form accepts up to 100,000 values, and the example
 runtime permits 20,000 concurrent I/O tasks to accommodate large bursts of spawning
 and progress notifications. This is a lifecycle demonstration, not a claim that
 process-based quicksort outperforms `Enum.sort/1`.
