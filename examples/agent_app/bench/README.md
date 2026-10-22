@@ -227,7 +227,7 @@ confirmed the key count plateaued at 100,002. Its first six completed sorts took
 grew to about 24 GB of allocated disk space. The attempt ended when the workspace
 filesystem filled; it did not complete ten runs and has no final cleanup sample.
 Offline WAL checkpoints recovered space while preserving database records.
-Stable full-size timing is still unresolved.
+That attempt did not establish stable full-size timing.
 
 The repeated-run harness now checks available disk space before each run and
 stops its isolated VM if less than 2 GB remains. It never deletes saved records
@@ -287,21 +287,72 @@ Two browser runs on the restored port-4042 preview sorted and verified all
 The final browser restart cleared the history, and its idle root was stopped.
 All 79 example tests and the repository quality checks passed.
 
-Full-size verification of this change is pending disk headroom. The earlier
+The full-size verification below completed after disk headroom became available.
+The earlier
 disk-full incident also stopped the old preview runtime; its eight SQLite shards
 passed integrity checks and the preview was restored without wiping its store or
 relaxing safe deserialization. One old idle test root was stopped through the
 normal domain action after its application modules loaded. Provider storage was
-untouched. The workspace's ZFS snapshots retain about 50 GB of historical blocks;
+untouched. At the time, workspace ZFS snapshots retained about 50 GB of historical blocks;
 autosnapshots can retain old WAL blocks even after the database checkpoints them.
 No filesystem snapshots were deleted. Offline diagnostic compaction preserved
 logical-data hashes and passed integrity checks for all 32 shards; it is not a
-substitute for the pending full-size runtime verification.
+substitute for runtime verification.
 
 The preview-store audit after those browser tests had zero live agents, I/O tasks
 and histories, and 205 MB of BEAM-accounted memory. It also found 11,728 saved
 temporary children under the different, older failed tree
 `01a16407-8d30-7991-8d67-4d8549307509`: 10,747 marked running and 981 marked stopped
 gracefully despite no live processes. These are saved snapshots, not EKV Paxos
-metadata. They remain in place; complete cleanup of the whole preview store has
-not been established. None belonged to the two newly verified browser runs.
+metadata. None belonged to the two newly verified browser runs. With explicit
+owner approval, all 11,728 were subsequently deleted through the native domain
+delete action. The [cleanup verification](results/quicksort-preview-cleanup-2026-10-22.json)
+recorded zero remaining saved snapshots, live agents, tasks and histories.
+Provider credential storage was untouched.
+
+
+### Ten consecutive 100,000-agent runs
+
+The [full sustained verification](results/quicksort-ten-native-restart-100k-2026-10-22.json)
+completed ten independently shuffled 100,000-agent sorts through the actual
+Playground command and Restart paths, using one VM, one root identity and one
+unchanged native eight-shard EKV store. No diagnostic maintenance flags, store
+resets or VM restarts were used. Every sorted value and every worker exit was
+verified; all one million agent activations completed without unexpected exits.
+
+| Run | Sorting | Restart, including native checkpoint | BEAM memory after restart |
+| --- | ---: | ---: | ---: |
+| 1 | 96.9s | 2.5s | 276 MB |
+| 2 | 111.1s | 4.9s | 347 MB |
+| 3 | 120.7s | 2.4s | 340 MB |
+| 4 | 192.1s | 3.5s | 330 MB |
+| 5 | 145.0s | 3.4s | 345 MB |
+| 6 | 112.9s | 6.7s | 322 MB |
+| 7 | 126.1s | 3.3s | 339 MB |
+| 8 | 113.7s | 5.5s | 317 MB |
+| 9 | 121.1s | 4.8s | 348 MB |
+| 10 | 126.8s | 8.7s | 292 MB |
+
+The first five sorts had a median of 120.65 seconds; the last five had a median
+of 121.14 seconds. Individual timings varied under host I/O pressure, including
+the slower fourth run; this is evidence against progressive degradation in this
+workload, not a promise of identical elapsed times.
+
+Every restart returned to 434 processes, five ports, one idle root, one saved
+root, zero I/O tasks and zero retained histories. After initial module loading,
+the atom count stayed at 50,420. Post-restart BEAM memory stayed at 276–348 MB;
+OS RSS fluctuated between 2.04 and 2.72 GB. Sampled peak BEAM memory ranged from
+3.77 to 4.74 GB. Final stop left zero live agents, saved snapshots, I/O tasks and
+histories, with 432 application processes and five ports. All eight database
+shards passed read-only integrity checks after the benchmark VM exited.
+
+Native consensus keys plateaued at 100,002 after warmup; database files stayed
+at about 1.14 GB logically. WAL file lengths stayed around 29 GB across runs 2–9,
+rather than accumulating another run's writes each time; run 10 ended at 17 GB.
+All eight native checkpoints completed at every restart. These are logical file
+lengths, not outstanding uncheckpointed data or allocated disk blocks. After VM
+exit, the retained WAL files occupied about 3.86 GB of filesystem blocks and the
+database files about 384 MB on this compressed filesystem. Passive checkpointing
+allows reuse and does not promise immediate file truncation. Native EKV metadata
+and reusable storage remain; completed agent snapshots and live processes do not.
+The bounded key set assumes the same repeated input values.

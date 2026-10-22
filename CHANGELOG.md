@@ -6,6 +6,10 @@
 
 ### Added
 
+- Verify ten consecutive 100,000-agent quicksort runs in one VM and native EKV
+  store, recording stable lifecycle counts, bounded memory/storage and final
+  removal of all live and saved agents.
+
 - Add a sustained quicksort lifecycle benchmark with per-run process, memory,
   saved-agent and EKV metadata metrics, disk-space guards and recorded normal
   versus explicit-WAL-maintenance diagnostics.

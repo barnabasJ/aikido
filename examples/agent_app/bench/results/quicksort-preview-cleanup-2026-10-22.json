@@ -1,0 +1,19 @@
+{
+  "scope": {
+    "store": "_build/quicksort-eight-shards-final",
+    "child_prefix": "01a16407-8d30-7991-8d67-4d8549307509/",
+    "permanent": false
+  },
+  "method": "AgentExamples.Agents.quicksort_delete/1; eight concurrent calls; native EKV checkpoints after deletion",
+  "selected": 11728,
+  "deleted": 11728,
+  "errors": 0,
+  "after": {
+    "live_agents": 0,
+    "saved_snapshots": 0,
+    "web_tasks": 0,
+    "histories": 0,
+    "beam_bytes": 203969120
+  },
+  "provider_storage": "untouched"
+}
