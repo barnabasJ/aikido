@@ -1,5 +1,5 @@
 defmodule AgentExamples.AI.LiveClient do
-  @moduledoc "Resolves a browser's in-memory key at the I/O boundary and calls native ReqLLM. Agent state contains only the owner reference."
+  @moduledoc "Loads a browser's AshCloak-encrypted key at the I/O boundary and calls native ReqLLM. Agent state contains only the owner reference."
   @behaviour Aikido.AiReact.Client
 
   @impl true

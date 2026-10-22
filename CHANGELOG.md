@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Persist example provider preferences in AshSqlite and encrypt API keys with
+  AshCloak. Generate a restricted local vault key once, migrate on startup, and
+  retain the signed browser identity across restarts.
+
 - Capitalize Aikido consistently in example branding and document the naming convention.
 
 - Show scripts and results for each team tool call, distinguish failed calls

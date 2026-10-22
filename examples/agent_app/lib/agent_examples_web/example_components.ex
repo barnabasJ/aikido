@@ -75,7 +75,7 @@ defmodule AgentExamplesWeb.ExampleComponents do
             }
           /></label>
           <p class="muted settings-note">
-            Save once for this browser session. All AI examples and their workers use these settings when started. Restart an active example to change its provider. Keys stay in server memory and are never included in agent checkpoints.
+            Saved locally across restarts for this browser. All AI examples and workers use these settings when started. Restart an active example to change its provider. API keys are encrypted with AshCloak in SQLite and never included in agent checkpoints.
           </p>
           <button id="save-provider" class="button secondary">Save AI settings</button>
           <p :if={@provider_saved} role="status" id="provider-saved">

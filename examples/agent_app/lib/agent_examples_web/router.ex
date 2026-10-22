@@ -40,9 +40,7 @@ defmodule AgentExamplesWeb.Router do
   end
 
   defp browser_identity(conn, _) do
-    if get_session(conn, :browser_id),
-      do: conn,
-      else: put_session(conn, :browser_id, Ash.UUIDv7.generate())
+    put_session(conn, :browser_id, get_session(conn, :browser_id) || Ash.UUIDv7.generate())
   end
 
   def live_session(conn), do: %{"browser_id" => get_session(conn, :browser_id)}

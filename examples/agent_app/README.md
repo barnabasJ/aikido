@@ -76,14 +76,25 @@ AI example and use **AI provider · shared by all AI examples**:
 4. Start an example and send a task. All AI examples and their fixed/dynamic
    workers use this browser session's saved provider settings at startup.
 
-The provider list comes from ReqLLM's registered providers. Keys stay in the
-example server's memory, scoped to the browser session; the form never renders
-a saved key back. Agent snapshots contain a browser credential reference, not
-the key. Restarting the server clears saved keys, so enter yours again before
-using a restored conversation. Restart an active example after changing provider
-or model. An empty key field keeps a previously saved key for that provider. The z.ai
-standard and coding-plan entries share the same submitted account key;
-provider environment keys such as `ZAI_API_KEY` can also be used when saving.
+The provider list comes from ReqLLM's registered providers. Provider, model and
+mode are saved per signed browser identity in AshSqlite. AshCloak encrypts API
+keys; ordinary reads do not decrypt them, and the form never renders saved keys.
+Agent checkpoints retain only the browser credential reference. Restarting the
+server or browser retains these settings; clearing the browser cookie creates a
+new identity. Restart an active example after changing provider or model.
+An empty key field keeps the saved key for that provider. The z.ai standard and
+coding-plan entries share one account key; provider environment keys such as
+`ZAI_API_KEY` can also be used when saving.
+
+The example creates `.local/settings.sqlite3` and a random 32-byte
+`.local/credential.key` automatically, and applies native Ecto migrations at
+startup. Both files are gitignored. The directory is restricted to its owner
+(mode 0700), and the vault key uses mode 0600. Preserve both files to retain
+credentials: the key is needed to decrypt the database. This protects the database
+when copied alone; it does not protect against someone who can read both files.
+Set `AIKIDO_EXAMPLES_SETTINGS_DIR` to choose another local directory. Tests use
+an isolated temporary database and vault key. This is example-app configuration
+storage; agent persistence continues to use DurableServer.
 
 Live mode uses native ReqLLM for every AI page, including streaming pages.
 The resilience page keeps deterministic retry/wait simulations in offline mode;

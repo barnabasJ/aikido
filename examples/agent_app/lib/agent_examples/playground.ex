@@ -1,7 +1,7 @@
 defmodule AgentExamples.Playground do
   @moduledoc "In-memory browser runs, shared across the example LiveViews."
   use GenServer
-  alias AgentExamples.{AI, Catalog}
+  alias AgentExamples.{AI, Catalog, Settings}
   @topic "playground"
 
   def start_link(_), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -37,41 +37,30 @@ defmodule AgentExamples.Playground do
          runs: %{},
          tasks: %{},
          subscriptions: %{},
-         requests: %{},
-         providers: %{},
-         credentials: %{}
+         requests: %{}
        }}
 
   @impl true
   def handle_call({:provider_settings, owner}, _, state),
-    do: {:reply, Map.get(state.providers, owner, AI.Providers.defaults()), state}
+    do: {:reply, Settings.provider_settings(owner), state}
 
   def handle_call({:provider_key, owner, provider}, _, state) do
-    case state.credentials[{owner, AI.Providers.credential_provider(provider)}] do
-      nil -> {:reply, {:error, "Configure an API key in the example app's provider form."}, state}
-      key -> {:reply, {:ok, key}, state}
-    end
+    result =
+      case Settings.provider_key(owner, provider) do
+        {:error, :not_configured} ->
+          {:error, "Configure an API key in the example app's provider form."}
+
+        result ->
+          result
+      end
+
+    {:reply, result, state}
   end
 
   def handle_call({:configure_provider, owner, params}, _, state) do
     with {:ok, settings} <- AI.Providers.validate(params),
-         {:ok, key} <- resolve_provider_key(owner, settings, params, state) do
-      credentials =
-        if settings.mode == "live",
-          do:
-            Map.put(
-              state.credentials,
-              {owner, AI.Providers.credential_provider(settings.provider)},
-              key
-            ),
-          else: state.credentials
-
-      state = %{
-        state
-        | providers: Map.put(state.providers, owner, settings),
-          credentials: credentials
-      }
-
+         {:ok, key} <- resolve_provider_key(owner, settings, params),
+         {:ok, settings} <- Settings.save_provider(owner, settings, key) do
       Phoenix.PubSub.broadcast(AgentExamples.PubSub, @topic, {:provider_updated, owner})
       {:reply, {:ok, settings}, state}
     else
@@ -387,16 +376,25 @@ defmodule AgentExamples.Playground do
 
   def handle_info(_, state), do: {:noreply, state}
 
-  defp resolve_provider_key(_owner, %{mode: "offline"}, _params, _state), do: {:ok, nil}
+  defp resolve_provider_key(_owner, %{mode: "offline"}, _params), do: {:ok, nil}
 
-  defp resolve_provider_key(owner, settings, params, state) do
+  defp resolve_provider_key(owner, settings, params) do
     key = String.trim(params["api_key"] || "")
     provider = Enum.find(ReqLLM.Providers.list(), &(to_string(&1) == settings.provider))
-    saved = state.credentials[{owner, AI.Providers.credential_provider(settings.provider)}]
 
-    case if(key == "", do: saved || environment_key(provider), else: key) do
-      nil -> {:error, "Enter an API key for the selected provider."}
-      value -> {:ok, value}
+    if key != "" do
+      {:ok, key}
+    else
+      case Settings.provider_key(owner, settings.provider) do
+        {:error, :not_configured} ->
+          case environment_key(provider) do
+            nil -> {:error, "Enter an API key for the selected provider."}
+            key -> {:ok, key}
+          end
+
+        result ->
+          result
+      end
     end
   end
 
@@ -408,11 +406,7 @@ defmodule AgentExamples.Playground do
   end
 
   @impl true
-  def format_status(status),
-    do:
-      status
-      |> Map.put(:state, %{status.state | credentials: :redacted})
-      |> Map.put(:message, :redacted)
+  def format_status(status), do: Map.put(status, :message, :redacted)
 
   defp start_prompt_task(record, query, owner, slug) do
     Task.Supervisor.async_nolink(AgentExamples.WebTasks, fn ->
@@ -667,8 +661,8 @@ defmodule AgentExamples.Playground do
     end
   end
 
-  defp shared_provider_options({owner, _slug}, state) do
-    settings = Map.get(state.providers, owner, AI.Providers.defaults())
+  defp shared_provider_options({owner, _slug}, _state) do
+    settings = Settings.provider_settings(owner)
 
     %{
       "mode" => settings.mode,

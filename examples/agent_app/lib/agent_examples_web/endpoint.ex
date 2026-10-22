@@ -5,7 +5,8 @@ defmodule AgentExamplesWeb.Endpoint do
     store: :cookie,
     key: "_agent_examples",
     signing_salt: "example-session",
-    same_site: "Lax"
+    same_site: "Lax",
+    max_age: 31_536_000
   ]
   socket("/live", Phoenix.LiveView.Socket, websocket: [connect_info: [session: @session_options]])
 

@@ -10,6 +10,9 @@ defmodule AgentExamples.MixProject do
       deps: [
         {:aikido, path: "../.."},
         {:ash, "~> 3.36"},
+        {:ash_sqlite, "~> 0.2.19"},
+        {:ash_cloak, "~> 0.4"},
+        {:cloak, "~> 1.1"},
         {:phoenix, "~> 1.8"},
         {:phoenix_live_view, "~> 1.1"},
         {:phoenix_html, "~> 4.3"},
@@ -23,7 +26,8 @@ defmodule AgentExamples.MixProject do
       ],
       aliases: [
         demo: "run -e AgentExamples.Demo.run()",
-        "spark.formatter": "spark.formatter --extensions AshAi,AshLua.Domain,AshLua.EvalActions",
+        "spark.formatter":
+          "spark.formatter --extensions AshAi,AshLua.Domain,AshLua.EvalActions,AshSqlite.DataLayer,AshCloak",
         "ai.demo": "run -e AgentExamples.AI.Demo.run()",
         "ai.live": "run -e AgentExamples.AI.Demo.live()"
       ]

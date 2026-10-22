@@ -1,6 +1,9 @@
 import Config
 
-config :agent_examples, ash_domains: [AgentExamples.Agents]
+config :agent_examples,
+  ash_domains: [AgentExamples.Agents, AgentExamples.Settings],
+  ecto_repos: [AgentExamples.Settings.Repo]
+
 config :ash, default_string_length_count: :codepoints
 config :phoenix, :filter_parameters, ["api_key"]
 
@@ -26,7 +29,9 @@ config :spark, :formatter,
       Aikido.Agent.Extension,
       Aikido.Slice.Extension,
       Aikido.Team.Extension,
-      Aikido.AI.Extension
+      Aikido.AI.Extension,
+      AshSqlite.DataLayer,
+      AshCloak
     ]
   ],
   "Ash.Domain": [extensions: [Aikido.Domain.Extension]],
@@ -45,3 +50,21 @@ config :agent_examples, AgentExamplesWeb.Endpoint,
   live_view: [signing_salt: "example-live-view"],
   pubsub_server: AgentExamples.PubSub,
   render_errors: [formats: [html: AgentExamplesWeb.ErrorHTML], layout: false]
+
+settings_directory =
+  if config_env() == :test do
+    Path.join(
+      System.tmp_dir!(),
+      "aikido-settings-test-#{System.pid()}-#{System.unique_integer([:positive])}"
+    )
+  else
+    System.get_env("AIKIDO_EXAMPLES_SETTINGS_DIR") || Path.expand("../.local", __DIR__)
+  end
+
+config :agent_examples, :settings_directory, settings_directory
+
+config :agent_examples, AgentExamples.Settings.Repo,
+  database: Path.join(settings_directory, "settings.sqlite3"),
+  pool_size: 1,
+  busy_timeout: 5_000,
+  log: false
