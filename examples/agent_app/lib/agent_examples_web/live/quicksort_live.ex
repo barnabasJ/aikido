@@ -241,12 +241,19 @@ defmodule AgentExamplesWeb.QuicksortLive do
           Restart removes the old tree and crash snapshots, checkpoints EKV, then creates a new root ID.
         </p>
       </section>
-      <section class="panel" id="sort-metrics">
-        <h2>The BEAM at work</h2>
+      <div class="sort-visualization">
+      <section class="panel" id="sorting-tree">
+        <div class="section-heading">
+          <h2>Partition tree</h2>
+          <div class="sort-navigation">
+            <button class="button" phx-click="focus" phx-value-branch={String.slice(@focus, 0, max(String.length(@focus) - 1, 4))} disabled={@focus == "root"}>Up one parent</button>
+            <button class="button" phx-click="focus" phx-value-branch="root" disabled={@focus == "root"}>Back to root</button>
+          </div>
+        </div>
         <p :if={!@history_available} id="history-unavailable">This older run has no recorded session history. Restart the example to track every spawned agent across reconnects.</p>
         <p :if={@root_unavailable && active?(@run)} role="alert" id="sort-root-unavailable">The sorting root stopped: {@root_unavailable}. This run cannot continue.</p>
         <p :if={own(@run)[:status] == :failed} role="alert" id="sort-failure">Sorting failed: {describe_sort_failure(own(@run)[:error])}. Restart the example after addressing the activation failure.</p>
-        <div :if={@history_available} class="hero-pills">
+        <div :if={@history_available} class="hero-pills" id="sort-metrics">
           <span id="sort-spawned">{map_size(@tree.nodes)} agents spawned</span>
           <span>{map_size(@tree.nodes) - @completed - @failed} sorting</span>
           <span>{@completed} completed</span>
@@ -261,28 +268,6 @@ defmodule AgentExamplesWeb.QuicksortLive do
                 do: "Completed · restored view",
                 else: "Waiting for result"
               )}</span>
-        </div>
-        <p>
-          Completed child agents are released; their recorded nodes remain visible. Counts describe this sorting run, not currently live processes.
-        </p>
-        <div class="sort-levels">
-          <div :for={{depth, count} <- @levels} class="sort-level">
-            <span>Depth {depth}</span><meter
-              min="0"
-              max={max(map_size(@tree.nodes), 1)}
-              value={count}
-            /><strong>{count} agents</strong>
-          </div>
-        </div>
-        <details :if={own(@run)[:status] == :completed} id="sort-result">
-          <summary>Sorted {length(own(@run)[:result] || [])} values · show result</summary>
-          <pre style="max-height:240px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere">{inspect(own(@run)[:result], limit: :infinity)}</pre>
-        </details>
-      </section>
-      <section class="panel" id="sorting-tree">
-        <div class="section-heading">
-          <h2>Partition tree</h2>
-          <button class="button" phx-click="focus" phx-value-branch="root">Back to root</button>
         </div>
         <p>Showing up to 80 nodes beneath {@focus}. Select a branch to inspect its descendants.
           The display is limited; process creation is not.</p>
@@ -348,6 +333,27 @@ defmodule AgentExamplesWeb.QuicksortLive do
           </button>
         </div>
       </section>
+      <section class="panel" id="sort-depth-breakdown">
+        <h2>Agents by depth</h2>
+
+        <p>
+          Completed child agents are released; their recorded nodes remain visible. Counts describe this sorting run, not currently live processes.
+        </p>
+        <div class="sort-levels">
+          <div :for={{depth, count} <- @levels} class="sort-level">
+            <span>Depth {depth}</span><meter
+              min="0"
+              max={max(map_size(@tree.nodes), 1)}
+              value={count}
+            /><strong>{count} agents</strong>
+          </div>
+        </div>
+        <details :if={own(@run)[:status] == :completed} id="sort-result">
+          <summary>Sorted {length(own(@run)[:result] || [])} values · show result</summary>
+          <pre style="max-height:240px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere">{inspect(own(@run)[:result], limit: :infinity)}</pre>
+        </details>
+      </section>
+      </div>
     </.page>
     """
   end

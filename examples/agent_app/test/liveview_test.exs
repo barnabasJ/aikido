@@ -881,6 +881,13 @@ defmodule AgentExamplesWeb.LiveViewTest do
     view |> form("#quicksort-form", %{size: "32"}) |> render_submit()
     await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
     assert Playground.get(owner, "quicksort").snapshot.own.result == Enum.to_list(1..32)
+    assert has_element?(view, "#sorting-tree #sort-metrics")
+    assert has_element?(view, ".sort-visualization > #sort-depth-breakdown")
+    view |> element("button[phx-click=focus][phx-value-branch=rootL]") |> render_click()
+    view |> element(".sort-navigation button", "Up one parent") |> render_click()
+    assert has_element?(view, "#sorting-tree p", "Showing up to 80 nodes beneath root.")
+    assert has_element?(view, ".sort-navigation button[disabled]", "Up one parent")
+
     assert has_element?(view, "#sort-result summary", "Sorted 32 values")
     assert has_element?(view, ".sort-diagram circle[data-status=completed]")
     GenServer.stop(view.pid)

@@ -23,6 +23,9 @@
 
 ### Changed
 
+- Place Quicksort's depth breakdown beside its tree, move run counters above the
+  tree, and add navigation up one parent.
+
 - Scope Quicksort restart cleanup to its previous tree's identities instead of
   scanning the entire durable store, preserving resource checks and child cleanup.
 
