@@ -81,9 +81,9 @@ The stalled preview also logged `:max_children` spawn/notification failures whil
 its old runtime still had a 1,000-task limit. Its configured 20,000-task limit now
 loads on a full preview restart. Rejected and failed agent activations now send a correlated failure signal to
 the parent. The example retries pending partitions with bounded backoff, and
-propagates unrecoverable failures instead of waiting forever. A later live run
-still encountered native storage timeouts near 26,000 agents despite the larger
-task budget. These changes do not establish reliable 100,000-agent activation.
+propagates unrecoverable failures instead of waiting forever. The task budget alone is not sufficient: storage shard count, activation deadlines
+and telemetry module lookups also affect throughput. The full browser verification
+below covers the resulting configuration.
 
 Completed agents intentionally remain alive in this example for inspection until
 the root stops. Multiple browser-owned roots are independent. The benchmarks and
@@ -91,3 +91,66 @@ regression tests confirm complete descendant cleanup on a normal stop, including
 preserving another independently owned root. Existing runtime tests cover parent
 death during activation. These checks do not prove the earlier live roots were
 orphans, nor do they establish cleanup behavior under every overload condition.
+
+## Full browser verification
+
+Two independently shuffled 100,000-value inputs completed in the browser on
+2026-10-22 with eight native EKV shards, a 30-second activation caller budget,
+20,000 available I/O tasks and 100ms display batching. Persistence remained enabled.
+The machine used Elixir 1.19.5, OTP 28.5.0.4, 32 schedulers and 62 GiB RAM.
+
+| Check | Run 1 | Run 2 |
+| --- | ---: | ---: |
+| Browser time to sorted result | 64.899s | 69.473s |
+| Spawned / completed / registered agents | 100,000 | 100,000 |
+| Every rendered result value equals `1..100000` | yes | yes |
+| Count retained immediately after reconnect | 100,000 | 100,000 |
+| Child-start failures / retries / callback exceptions | 0 / 0 / 0 | 0 / 0 / 0 |
+| Monitored exits with `{:shutdown, :delete}` | 100,000 | 100,000 |
+| Cleanup observation window | 46.716s | 56.802s |
+| Sampled peak BEAM memory, decimal GB | 11.486 | 11.560 |
+| Largest sampled mailbox | 2,404 | 2,169 |
+
+Cleanup observation starts when monitors are installed, just before pressing Stop.
+It includes that short browser interaction interval. Both runs left zero live
+agents, zero saved agent records and zero I/O tasks. The second run used the same
+VM and store after the first tree was removed. No completed agents were retired
+early to reduce the process count.
+
+[The recorded counters and operation timings](results/quicksort-100k-2026-10-22.json)
+include five-second process/mailbox samples and native signal/directive telemetry.
+Samples can miss instantaneous peaks. BEAM memory excludes some native allocations
+and filesystem caches; it is not a whole-machine RSS measurement. This is a local
+stress check rather than a performance guarantee for every host.
+
+The profiles identified three distinct pressure points:
+
+- One EKV writer accumulated more than 13,000 requests. Eight native shards
+  distributed the writes; the largest recorded shard queues in the final runs
+  were 2,404 and 2,169. The scheduler run queue peaked at 13.
+- Repeated Spark host checks on a runtime name triggered failed module loading.
+  The code server accumulated nearly 7,000 requests. Checking the exported Spark
+  host marker first avoids these lookups for ordinary runtime names.
+- Progress rendering overwhelmed a WebSocket sender with roughly 5,000 messages
+  and 638 MB. Coalescing display updates at 100ms intervals removed that backlog
+  from the dominant sampled queues while retaining every node's terminal state.
+
+A five-second activation caller deadline could expire even when a child became
+ready afterward. The example now supplies a native 30-second caller deadline;
+backend storage deadlines and strict checkpoints remain in force. Failure/retry
+signals are counted directly, so a successful final answer cannot hide recovered
+activation failures in these two runs.
+
+Most reducer callbacks took less than 1ms. The second run had one `quicksort.sorted`
+callback lasting 106.4ms. Mean directive callback times were approximately 68–79µs
+for Notify, 68–70µs for SpawnAgent and 35–36µs for Emit; their supervised work and
+storage synchronization occur outside those callback durations. Concurrent totals
+must not be added together as a wall-clock breakdown.
+
+EKV still reported transient WAL checkpoint lag during writes. Native checkpoint
+statistics after cleanup showed `complete?: true`, `busy: 0`, equal log/checkpointed
+frame counts and `starved?: false` on all eight shards. The reports were not muted.
+There were no failed activations, retries or callback exceptions in either final
+run. Regression tests additionally cover capacity rejection, parent death during
+activation, late readiness, stale retries, retry exhaustion, repeated/reordered
+progress, independent roots and reconnect history.

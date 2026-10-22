@@ -11,15 +11,22 @@
 
 - Add a realtime recursive quicksort example: each nonempty partition spawns a
   real Aikido agent, with retained color-coded nodes, subtree inspection, reconnect
-  support and a one-button restart. A 4,096-value browser run created 4,096 agents.
+  support and a one-button restart. Two browser runs each created and completed
+  100,000 agents, verified every sorted value and deleted every agent afterward.
 
 ### Changed
+
+- Forward native local EKV configuration and DurableServer activation options.
+  The large quicksort example allows a 30-second activation budget.
+- Batch quicksort display updates at ten frames per second, preserve counts in
+  the initial reconnect render, and release replaced display histories.
+- Avoid failed module-load lookups for named runtimes in telemetry configuration.
 
 - Report child activation failures as scoped signals. Quicksort retains failed
   partitions for bounded retries and preserves display history across reconnects.
 
 - Maintain quicksort UI counts incrementally and traverse only visible branches;
-  identify reconnect restoration explicitly and ignore stale restoration results.
+  retain app-owned display summaries across reconnects.
 
 - Allow up to 100,000 values in the recursive quicksort example.
 
