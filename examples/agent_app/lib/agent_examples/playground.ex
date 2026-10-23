@@ -424,7 +424,7 @@ defmodule AgentExamples.Playground do
   defp start_prompt_task(record, query, owner, slug) do
     Task.Supervisor.async_nolink(AgentExamples.WebTasks, fn ->
       AI.ask(record, query,
-        timeout: 900_000,
+        timeout: 3_600_000,
         ash: [actor: %{id: owner}, tenant: "playground"],
         metadata: %{playground: %{owner: owner, slug: slug}}
       )
@@ -645,7 +645,7 @@ defmodule AgentExamples.Playground do
       defaults
       |> Aikido.AiReact.Options.new!()
       |> Map.put(:model_timeout_ms, 180_000)
-      |> Map.put(:tool_timeout_ms, 900_000)
+      |> Map.put(:tool_timeout_ms, 3_600_000)
       |> Map.put(:model_max_retries, 4)
       |> Map.put(:retry_backoff_ms, 10_000)
 

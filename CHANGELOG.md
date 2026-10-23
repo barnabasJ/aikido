@@ -31,6 +31,9 @@
 
 ### Changed
 
+- Give live playground requests a one-hour shared deadline while keeping each
+  model attempt bounded to three minutes; nested teams inherit the remaining time.
+
 - Default agents to native periodic synchronization, configurable at start through
   `sync: %{mode: :periodic | :automatic | :explicit, interval_ms: ...}`. Children
   inherit the parent policy unless explicitly configured otherwise.

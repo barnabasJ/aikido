@@ -297,8 +297,9 @@ times per second, with terminal root events flushed immediately. Every node's
 status is retained independently of that rendering rate.
 
 The live research demo defaults to 40 model turns, three minutes per model call,
-and fifteen minutes per tool call and top-level request. Transient model failures
-get up to four retries with bounded backoff, still inside the shared run deadline. Nested assignments inherit
+and one hour per tool call and top-level request. Transient model failures
+get up to four retries with bounded backoff, still inside the shared run deadline.
+Nested assignments inherit
 the parent's remaining absolute deadline instead of receiving fresh budgets.
 `agents.delegate` accepts `worker_lifecycle = "stop"` for one-off workers; omitted
 or `"keep"` retains reusable teammates. Select a tree node for its activity/state.

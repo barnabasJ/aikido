@@ -41,7 +41,7 @@ defmodule AgentExamples.ProviderTest do
              )
 
     assert options.model_timeout_ms == 180_000
-    assert options.tool_timeout_ms == 900_000
+    assert options.tool_timeout_ms == 3_600_000
     assert options.model_max_retries == 4
     assert options.retry_backoff_ms == 10_000
 
