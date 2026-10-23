@@ -248,9 +248,10 @@ defmodule AgentExamples.Catalog do
       eyebrow: "Dynamic orchestration",
       resource: AgentExamples.ResearchTeam,
       kind: :ai_team,
-      description: "An orchestrator, fixed workers, and workers that can create subworkers.",
+      description:
+        "An AI orchestrator creates research squads, nested subteams and specialist agents.",
       detail:
-        "The team itself is the orchestrator. It creates a specialist; its fixed analyst creates a helper; the reviewer checks the evidence. The graph grows as tools execute.",
+        "The live orchestrator chooses purpose-specific investigation and verification squads. Squads can create nested squads and researchers, while the fixed analyst and reviewer remain available. Prompts pass a depth budget with delegated tasks; each team also enforces its configured member limits. Offline mode uses a deterministic worker demonstration.",
       flow: ["Orchestrator", "Fixed workers", "Dynamic helpers", "Combined answer"]
     }
   ]

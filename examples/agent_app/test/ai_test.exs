@@ -257,7 +257,9 @@ defmodule AgentExamples.AITest do
     assert squad.tools == team.tools
 
     assert squad.system_prompt ==
-             Ash.Resource.Info.attribute(AgentExamples.ResearchSquad, :system_prompt).default
+             String.trim(
+               Ash.Resource.Info.attribute(AgentExamples.ResearchSquad, :system_prompt).default
+             )
 
     refute squad.system_prompt == team.system_prompt
 
@@ -271,6 +273,24 @@ defmodule AgentExamples.AITest do
              AgentExamples.Agents.research_team_inspect!(team.id).team.members,
              "squad-worker"
            )
+
+    assert {:ok, %{error: nil}} =
+             lua(
+               squad,
+               "return assert(agents.spawn({input = {name = 'subteam', template = 'squad'}}))"
+             )
+
+    squad = Agents.research_squad_inspect!(squad.id)
+    subteam = member(squad, "subteam")
+    assert subteam.__struct__ == AgentExamples.ResearchSquad
+    assert subteam.tools == team.tools
+
+    assert {:ok, %{error: nil}} =
+             lua(subteam, "return assert(agents.spawn({input = {name = 'specialist'}}))")
+
+    subteam = Agents.research_squad_inspect!(subteam.id)
+    assert Map.has_key?(subteam.team.members, "specialist")
+    refute Map.has_key?(squad.team.members, "specialist")
 
     analyst = member(current, :analyst)
 

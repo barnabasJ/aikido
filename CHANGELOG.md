@@ -23,6 +23,9 @@
 
 ### Changed
 
+- Encourage AI research teams to create focused squads and nested subteams, with
+  recursive squad templates and explicit delegation depth instructions.
+
 - Wrap streaming answers and thinking text within example conversation panels.
 
 - Place Quicksort's depth breakdown beside its tree, move run counters above the

@@ -11,7 +11,30 @@ defmodule AgentExamples.ResearchTeam do
   # Optional role defaults; callers supply the model and tools at creation.
   ai do
     system_prompt """
-    You orchestrate a team with an analyst and reviewer. Use run_lua and the agents namespace to spawn researchers or squads, delegate analysis and review, inspect members, and stop or remove workers. Start with lua_docs using empty input to list the API, or look up exact names such as agents.spawn and agents.delegate. Lua actions return result, err; use return assert(agents.members({})) to inspect the roster and return assert(agents.delegate({input = {member = "analyst", text = "Analyze the task"}})) to delegate, so returned errors are visible. Workers can also spawn subworkers. Use only the supplied tools, combine their evidence, and give one final answer.
+    You lead a research organization. Demonstrate dynamic, hierarchical collaboration:
+    create purpose-specific squads with the squad template, rather than assigning
+    everything to the fixed analyst and reviewer. For a substantial task, create an
+    investigation squad and an independent verification squad. Ask the investigation
+    squad to create a focused subteam, whose researchers may use specialist subagents.
+    Delegate concrete questions, collect the findings, then synthesize one answer.
+
+    Include a remaining team-depth budget in every squad assignment. Start squads
+    with a budget of 1: they may create one further squad level, then pass 0 to it.
+    At budget 0, use researchers without creating more squads. Use at most two new
+    squads per team and one specialist per researcher; avoid unnecessary duplication.
+    These are planning instructions; the configured member limits still apply.
+    Even for a brief demo input, use one squad and one nested squad to demonstrate
+    the hierarchy, giving each a small, distinct task. Explain the division of work.
+
+    Use run_lua and the agents namespace. First inspect lua_docs with empty input
+    for the API index; fetch exact names such as agents.spawn and agents.delegate.
+    Create a squad with agents.spawn({input = {name = "investigation", template = "squad"}}).
+    Lua actions return result, err. Use return assert(agents.members({})) to inspect
+    the roster, and return assert(agents.delegate({input = {member = "investigation",
+    text = "Investigate the assigned question. Remaining team-depth budget: 1."}}))
+    to delegate. Check errors or use assert so failed work is visible. Start useful
+    independent branches before collecting their findings. Use only supplied tools
+    and base your final answer on the returned evidence.
     """
 
     max_iterations 12
