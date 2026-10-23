@@ -31,6 +31,9 @@
 
 ### Changed
 
+- Preserve stopped team members as inspectable grey nodes in the example UI while
+  releasing their processes and subscriptions.
+
 - Preserve actionable team-tool and Lua errors through Ash AI serialization, with
   recovery guidance for runtime failures and expired budgets.
 

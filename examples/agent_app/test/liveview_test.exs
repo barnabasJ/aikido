@@ -497,6 +497,11 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert_receive {:DOWN, ^squad_ref, :process, ^squad_pid, _}, 5_000
     for {pid, ref} <- monitors, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 5_000)
 
+    assert has_element?(view, "#team-tree [data-node=squad-1][aria-label='squad-1: Stopped']")
+    view |> element("#team-tree [data-agent='Team / squad-1 / counter']") |> render_click()
+    assert has_element?(view, "#agent-details", "count: 11")
+    assert has_element?(view, "#agent-details", "Stopped")
+
     assert Playground.get(owner, "nested-teams").snapshot.children["home"].children["counter"].own.count ==
              11
   end
@@ -530,7 +535,11 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert length(retired) == 4
 
     assert :ok = Playground.command(owner, "nested-teams", :remove_member, %{member: "again"})
-    await(owner, "nested-teams", fn run -> not Map.has_key?(run.snapshot.children, "again") end)
+
+    await(owner, "nested-teams", fn run ->
+      run.snapshot.recorded_members["again"].alive == false
+    end)
+
     assert map_size(playground_subscriptions(key)) == map_size(baseline)
 
     spawn_squad.()

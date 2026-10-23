@@ -316,3 +316,8 @@ to recover from invalid member names, duplicate spawns, limits and deadlines.
 Lua error tables are normalized before JSON serialization, including scripts
 that return `nil, err` instead of raising with `assert`. Unexpected internal
 failures provide recovery guidance without returning raw exception data.
+
+Team diagrams retain stopped members as grey nodes for the current run. Select
+one to inspect its last recorded task, result and state. This is UI history;
+retired processes and their subscriptions are still released. Starting a new run
+creates a new tree.

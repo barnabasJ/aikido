@@ -365,7 +365,11 @@ defmodule AgentExamples.Playground do
         if is_nil(previous) || run.status == :stopped || snapshot_pid(run, member || []) != pid do
           {:noreply, state}
         else
-          snapshot = Map.put(snapshot, :children, previous.children)
+          snapshot =
+            snapshot
+            |> Map.put(:children, previous.children)
+            |> Map.put(:recorded_members, Map.get(previous, :recorded_members, %{}))
+
           snapshot = if path == [], do: snapshot, else: put_in(run.snapshot, path, snapshot)
           {snapshot, state} = watch_children(key, snapshot, [], state)
           state = reconcile_subscriptions(key, snapshot, state)
@@ -501,10 +505,15 @@ defmodule AgentExamples.Playground do
   defp close_replaced_sort_history(_, _), do: :ok
 
   defp watch_children(key, snapshot, path, state) do
-    snapshot = %{
+    live = Map.new(snapshot.members, &{&1.name, &1})
+
+    recorded =
       snapshot
-      | children: Map.take(snapshot.children, Enum.map(snapshot.members, & &1.name))
-    }
+      |> Map.get(:recorded_members, %{})
+      |> Map.new(fn {name, member} -> {name, %{member | alive: false}} end)
+      |> Map.merge(live)
+
+    snapshot = Map.put(snapshot, :recorded_members, recorded)
 
     Enum.reduce(snapshot.members, {snapshot, state}, fn member, {snapshot, state} ->
       child_path = path ++ [member.name]
@@ -532,7 +541,7 @@ defmodule AgentExamples.Playground do
         {child, state} = watch_children(key, child, child_path, state)
         {put_in(snapshot.children[member.name], child), state}
       else
-        {%{snapshot | children: Map.delete(snapshot.children, member.name)}, state}
+        {snapshot, state}
       end
     end)
   end

@@ -20,8 +20,14 @@ defmodule AgentExamplesWeb.TeamTreeLayout do
       alive?: is_nil(member) || member.alive
     }
 
+    members =
+      Map.values(snapshot[:recorded_members] || Map.new(snapshot[:members] || [], &{&1.name, &1}))
+
     children =
-      Enum.flat_map(snapshot[:members] || [], fn member ->
+      Enum.flat_map(members, fn child_member ->
+        member =
+          if member && !member.alive, do: %{child_member | alive: false}, else: child_member
+
         case snapshot.children[member.name] do
           nil ->
             []
