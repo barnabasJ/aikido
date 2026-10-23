@@ -24,6 +24,15 @@ defmodule AikidoTest.TelemetryTest do
     end
   end
 
+  test "event counters produce a datapoint without a count measurement" do
+    counters = Enum.filter(Aikido.Telemetry.metrics(), &match?(%Telemetry.Metrics.Counter{}, &1))
+    assert length(counters) == 2
+
+    for metric <- counters do
+      assert metric.measurement.(%{duration: 0}) == 1
+    end
+  end
+
   describe("setup/0") do
     test "attaches telemetry handlers idempotently" do
       assert :ok = Aikido.Telemetry.setup()

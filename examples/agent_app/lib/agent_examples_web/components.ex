@@ -13,6 +13,9 @@ defmodule AgentExamplesWeb.Components do
       <aside class="sidebar">
         <.link navigate="/" class="brand"><span class="brand-icon">A</span>
         Aikido <span class="brand-tag">playground</span></.link>
+        <.link href="/dashboard" class="nav-link" id="telemetry-dashboard-link">
+          <span class="nav-dot"></span>Telemetry dashboard ↗
+        </.link>
         <p class="nav-heading">EXPLORE THE EXAMPLES</p>
         <nav aria-label="Examples">
           <.link

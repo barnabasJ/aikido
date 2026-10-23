@@ -322,6 +322,32 @@ one to inspect its last recorded task, result and state. This is UI history;
 retired processes and their subscriptions are still released. Starting a new run
 creates a new tree.
 
+### Telemetry dashboard
+
+Open **Telemetry dashboard** in the sidebar, or visit `/dashboard`. This uses
+Phoenix LiveDashboard with native Aikido, Ash and ReqLLM metrics:
+
+- **Agents**: readiness/activation counts and recurring schedule events.
+- **Signals**: processed and rejected signals, raised failures and reducer latency.
+- **Directives**: dispatch counts, latency and raised failures. Dispatch timing
+  excludes work that a directive starts in another task.
+- **AI**: provider request latency, HTTP outcomes, transport retries, exceptions,
+  input/output/reasoning tokens and cost estimates when reported. Offline scripts
+  do not generate provider requests. Missing usage or prices stay absent.
+- **Ash**: native command, reducer and tool action counts and durations.
+- **BEAM**: memory and scheduler run queues from the standard telemetry poller.
+
+Keep a metrics tab open while exercising an example in another tab. Charts collect
+only events observed while their page is open; they are not persisted history or
+current-agent counts. Native Processes and Applications pages show process and
+supervision information. Agent state is still inspected through the example's
+agent detail popup. No agent completion is polled to produce these charts.
+
+The local dashboard does not enable request logging, environment-variable display
+or destructive process controls. Metric tags contain operation/resource names,
+not credentials, prompts, actor data or individual request IDs. The example server
+binds to loopback; add your own access control before exposing it remotely.
+
 The Delegated work sidebar aggregates tasks from the entire recorded team tree,
 including retained stopped subteams. Each task identifies its dispatching team
 and the full member path, so same-named researchers remain distinguishable.

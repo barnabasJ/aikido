@@ -120,6 +120,7 @@ defmodule Aikido.Telemetry do
     [
       Telemetry.Metrics.counter("aikido.agent_server.signal.stop.count",
         event_name: [:aikido, :agent_server, :signal, :stop],
+        measurement: fn _ -> 1 end,
         tags: [:aikido_instance, :signal_type],
         tag_values: tag_values,
         description: "Total signals processed"
@@ -132,6 +133,7 @@ defmodule Aikido.Telemetry do
       ),
       Telemetry.Metrics.counter("aikido.agent_server.directive.stop.count",
         event_name: [:aikido, :agent_server, :directive, :stop],
+        measurement: fn _ -> 1 end,
         tags: [:aikido_instance, :directive_type],
         tag_values: tag_values,
         description: "Total directives executed"

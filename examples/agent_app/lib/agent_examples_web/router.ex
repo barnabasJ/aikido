@@ -2,6 +2,7 @@ defmodule AgentExamplesWeb.Router do
   use Phoenix.Router
   import Phoenix.Controller
   import Phoenix.LiveView.Router
+  import Phoenix.LiveDashboard.Router
 
   pipeline :browser do
     plug(:accepts, ["html"])
@@ -15,6 +16,13 @@ defmodule AgentExamplesWeb.Router do
 
   scope "/", AgentExamplesWeb do
     pipe_through :browser
+
+    live_dashboard("/dashboard",
+      metrics: AgentExamples.Telemetry,
+      home_app: {"Aikido", :agent_examples},
+      request_logger: false,
+      ecto_repos: []
+    )
 
     live_session :examples, session: {__MODULE__, :live_session, []} do
       live("/", IndexLive)

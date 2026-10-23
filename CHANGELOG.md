@@ -6,6 +6,9 @@
 
 ### Added
 
+- Add a native Phoenix LiveDashboard to the example app with Aikido signal and
+  directive metrics, Ash action timings, ReqLLM provider usage and BEAM metrics.
+
 - Show delegated tasks across the full recorded team tree with their owning paths.
 
 - Allow team assignments to stop an idle worker after its result is recorded,
@@ -32,6 +35,9 @@
   100,000 agents, verified every sorted value and deleted every agent afterward.
 
 ### Changed
+
+- Make Aikido event counters explicitly produce measurements for native telemetry
+  reporters such as LiveDashboard.
 
 - Surface unknown Lua action inputs with their accepted keys instead of an opaque
   error reference, preserving every validation error in the response.
