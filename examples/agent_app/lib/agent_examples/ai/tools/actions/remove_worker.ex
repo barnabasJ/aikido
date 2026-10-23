@@ -21,6 +21,8 @@ defmodule AgentExamples.AI.Tools.Actions.RemoveWorker do
            )
            |> Ash.run_action(ash_opts) do
       {:ok, %{member: input.arguments.member, status: "removed"}}
+    else
+      {:error, reason} -> {:error, AgentExamples.AI.Tools.ToolFailure.from_reason(reason)}
     end
   end
 end

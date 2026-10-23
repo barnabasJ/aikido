@@ -31,6 +31,9 @@
 
 ### Changed
 
+- Preserve actionable team-tool and Lua errors through Ash AI serialization, with
+  recovery guidance for runtime failures and expired budgets.
+
 - Give live playground requests a one-hour shared deadline while keeping each
   model attempt bounded to three minutes; nested teams inherit the remaining time.
 

@@ -159,4 +159,43 @@ defmodule Aikido.AiReact.Directives.ToolExecTest do
     assert signal.type == "ai.react.tool.completed"
     assert Jason.decode!(signal.data.content) == %{"error" => "tool not found: ghost"}
   end
+
+  test "runtime exceptions provide recovery guidance without exposing exception data", %{
+    aikido: aikido
+  } do
+    agent = spawn_agent_stub(self())
+    task = %{directive() | registry: %{"test_add" => fn _, _ -> raise "secret-api-key" end}}
+
+    assert :ok =
+             run_in(agent, fn ->
+               Aikido.Directive.exec(task, Aikido.Signal.new!("input", %{}), fake_state(aikido))
+             end)
+
+    assert_receive {:cast, signal}, @receive_timeout
+    assert signal.data.error?
+    content = Jason.decode!(signal.data.content)
+    assert content["code"] == "tool_runtime_failure"
+    assert content["error"] =~ "Inspect the target state before retrying"
+    assert content["reference"]
+    refute signal.data.content =~ "secret-api-key"
+  end
+
+  test "opaque native errors identify the tool and discourage blind retries", %{aikido: aikido} do
+    agent = spawn_agent_stub(self())
+
+    task = %{
+      directive()
+      | registry: %{"test_add" => fn _, _ -> {:error, "unexpected error occurred"} end}
+    }
+
+    assert :ok =
+             run_in(agent, fn ->
+               Aikido.Directive.exec(task, Aikido.Signal.new!("input", %{}), fake_state(aikido))
+             end)
+
+    assert_receive {:cast, signal}, @receive_timeout
+    assert signal.data.error?
+    assert signal.data.content =~ "test_add"
+    assert signal.data.content =~ "Do not repeat the same call unchanged"
+  end
 end

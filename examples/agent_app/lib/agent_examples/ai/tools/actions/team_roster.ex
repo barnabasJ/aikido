@@ -15,6 +15,8 @@ defmodule AgentExamples.AI.Tools.Actions.TeamRoster do
         |> Enum.sort()
 
       {:ok, %{members: members, templates: templates}}
+    else
+      {:error, reason} -> {:error, AgentExamples.AI.Tools.ToolFailure.from_reason(reason)}
     end
   end
 end

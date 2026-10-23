@@ -15,6 +15,7 @@ defmodule Aikido.AiReact.Directives.ToolExec do
 
   use Aikido.Directive
   require Ash.Tracer
+  require Logger
 
   typed_struct do
     field :deadline_at, :integer do
@@ -150,11 +151,26 @@ defmodule Aikido.AiReact.Directives.ToolExec do
   defp send_tool_result_to_agent(d, result, agent_pid, source, context) do
     content =
       case result do
-        {:ok, content} -> content
-        {:tool_error, content} -> content
-        {:error, :timeout} -> Jason.encode!(%{error: "tool timeout"})
-        {:error, :cancelled} -> Jason.encode!(%{error: "tool cancelled"})
-        {:error, reason} -> Jason.encode!(%{error: AshAi.Tool.Errors.format(reason)})
+        {:ok, content} ->
+          content
+
+        {:tool_error, content} ->
+          explain_opaque_tool_failure(content, d.tool_call.name)
+
+        {:error, :timeout} ->
+          Jason.encode!(%{
+            error:
+              "Tool timeout: #{d.tool_call.name} exceeded its remaining execution budget. Inspect whether its effect completed before retrying; request a new run if the shared deadline has expired."
+          })
+
+        {:error, :cancelled} ->
+          Jason.encode!(%{
+            error:
+              "Tool #{d.tool_call.name} was cancelled. Do not retry automatically; wait for a new assignment."
+          })
+
+        {:error, reason} ->
+          explain_runtime_failure(reason, d.tool_call.name)
       end
 
     data = %{
@@ -175,6 +191,31 @@ defmodule Aikido.AiReact.Directives.ToolExec do
           Map.new(Ash.Scope.to_opts(context, context: context[:context] || %{}))
         )
       )
+  end
+
+  defp explain_opaque_tool_failure(content, name) do
+    if is_binary(content) && String.contains?(content, "unexpected error occurred") do
+      String.replace(
+        content,
+        "unexpected error occurred",
+        "Tool #{name} failed internally without exposing a typed error. Do not repeat the same call unchanged. Use another available tool or report the failure to the user so its implementation can be investigated."
+      )
+    else
+      content
+    end
+  end
+
+  defp explain_runtime_failure(reason, name) do
+    reference = Ash.UUIDv7.generate()
+    kind = if is_exception(reason), do: inspect(reason.__struct__), else: "runtime failure"
+    Logger.error("Tool #{name} failed (#{kind}); reference #{reference}")
+
+    Jason.encode!(%{
+      error:
+        "Tool #{name} could not finish because of an internal #{kind}. Its side effects may be incomplete. Inspect the target state before retrying, or report this reference to the operator: #{reference}.",
+      code: "tool_runtime_failure",
+      reference: reference
+    })
   end
 
   defp execute_registered_tool_call(%{name: name, arguments: args}, registry, context) do

@@ -181,6 +181,81 @@ defmodule AgentExamples.AITest do
     refute inspect(result) =~ "unknown_error"
   end
 
+  test "Lua returned and raised errors survive the actual Ash AI callback as actionable JSON" do
+    team =
+      track(
+        snapshot_result(Agents.research_team_start!(AI.offline(%{tools: AI.Tools.for_lua()})))
+      )
+
+    analyst = member(team, :analyst)
+    {:ok, pid} = Aikido.Durable.lookup(Aikido.durable_supervisor_name(Aikido.Default), analyst.id)
+
+    {:ok, caller} =
+      Aikido.AgentServer.state(
+        pid,
+        &{:ok,
+         %{
+           agent_id: &1.id,
+           agent_resource: analyst.__struct__,
+           parent: &1.parent,
+           aikido: Aikido.Default
+         }}
+      )
+
+    {_, registry} =
+      AshAi.build_tools_and_registry(otp_app: :agent_examples, tools: AI.Tools.for_lua())
+
+    scripts = [
+      "return agents.delegate({input = {member = 'analyst', text = 'Test'}})",
+      "return assert(agents.delegate({input = {member = 'analyst', text = 'Test'}}))",
+      "return agents.spawn({name = 'bad-shape'})"
+    ]
+
+    for script <- scripts do
+      assert {:ok, content, _raw} =
+               registry["run_lua"].(%{"input" => %{"script" => script}}, %{
+                 context: %{aikido: caller}
+               })
+
+      assert %{"error" => %{"errors" => [error | _]}} = Jason.decode!(content)
+      assert is_binary(error["message"])
+      refute error["code"] == "unknown_error"
+
+      if script =~ "delegate" do
+        assert error["code"] == "self_delegation"
+        assert error["message"] =~ "Perform this task directly"
+      else
+        assert error["code"] == "invalid_input_shape"
+        assert error["message"] =~ "input"
+      end
+    end
+  end
+
+  test "Lua spawn failures explain duplicate names and template limits" do
+    team =
+      track(
+        snapshot_result(Agents.research_team_start!(AI.offline(%{tools: AI.Tools.for_lua()})))
+      )
+
+    assert {:ok, %{error: nil}} =
+             lua(team, "return agents.spawn({input = {name = 'one', template = 'squad'}})")
+
+    assert {:ok, %{error: %{"errors" => [error]}}} =
+             lua(team, "return agents.spawn({input = {name = 'one', template = 'squad'}})")
+
+    assert error["code"] == "invalid_argument"
+    assert error["message"] =~ "reuse"
+
+    assert {:ok, %{error: nil}} =
+             lua(team, "return agents.spawn({input = {name = 'two', template = 'squad'}})")
+
+    assert {:ok, %{error: %{"errors" => [error]}}} =
+             lua(team, "return agents.spawn({input = {name = 'three', template = 'squad'}})")
+
+    assert error["code"] == "invalid_argument"
+    assert error["message"] =~ "Reuse an existing worker"
+  end
+
   test "an agent and a team expose the same runtime tools and ask interface" do
     assistant =
       track(

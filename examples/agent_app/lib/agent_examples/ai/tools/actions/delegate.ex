@@ -7,7 +7,14 @@ defmodule AgentExamples.AI.Tools.Actions.Delegate do
   def run(input, _opts, context) do
     with {:ok, team, caller, _record} <- TeamAccess.resolve_caller_team(input, context),
          {:ok, member} <- resolve_member(team, input.arguments.member),
-         true <- member != caller || {:error, "Cannot delegate to yourself"},
+         true <-
+           member != caller ||
+             {:error,
+              AgentExamples.AI.Tools.ToolFailure.failure(
+                "self_delegation",
+                "You cannot delegate to yourself.",
+                "Perform this task directly, or spawn a differently named researcher and delegate to it."
+              )},
          {:ok, result} <-
            AgentExamples.AI.delegate(team, member, input.arguments.text,
              worker_lifecycle: input.arguments.worker_lifecycle,
@@ -16,14 +23,8 @@ defmodule AgentExamples.AI.Tools.Actions.Delegate do
            ) do
       {:ok, %{member: input.arguments.member, result: result}}
     else
-      {:error, reason} when is_binary(reason) or is_atom(reason) ->
-        {:error,
-         AgentExamples.AI.Tools.DelegationFailed.exception(
-           message: "Delegation failed: #{reason}"
-         )}
-
-      error ->
-        error
+      {:error, reason} ->
+        {:error, AgentExamples.AI.Tools.ToolFailure.from_reason(reason)}
     end
   end
 

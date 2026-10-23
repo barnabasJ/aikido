@@ -310,3 +310,9 @@ Agents use periodic DurableServer checkpoints by default (30 seconds). Their sta
 action accepts `sync` policy overrides, inherited by children. Overlapping team
 spawns queue behind the active topology operation rather than failing with an
 operation-in-progress error. This keeps parallel Lua tool calls usable.
+
+Team tool failures use native Ash AI and AshLua error protocols to explain how
+to recover from invalid member names, duplicate spawns, limits and deadlines.
+Lua error tables are normalized before JSON serialization, including scripts
+that return `nil, err` instead of raising with `assert`. Unexpected internal
+failures provide recovery guidance without returning raw exception data.

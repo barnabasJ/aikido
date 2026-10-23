@@ -24,6 +24,8 @@ defmodule AgentExamples.AI.Tools.Actions.SpawnWorker do
            )
            |> Ash.run_action(ash_opts) do
       {:ok, %{member: input.arguments.name, status: "started", owner: owner}}
+    else
+      {:error, reason} -> {:error, AgentExamples.AI.Tools.ToolFailure.from_reason(reason)}
     end
   end
 

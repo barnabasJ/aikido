@@ -21,6 +21,8 @@ defmodule AgentExamples.AI.Tools.Actions.StopWorker do
            )
            |> Ash.run_action(ash_opts) do
       {:ok, %{member: input.arguments.member, status: "stopped"}}
+    else
+      {:error, reason} -> {:error, AgentExamples.AI.Tools.ToolFailure.from_reason(reason)}
     end
   end
 end

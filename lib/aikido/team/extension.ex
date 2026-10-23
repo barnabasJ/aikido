@@ -95,5 +95,45 @@ defmodule Aikido.Team.Extension do
     Aikido.AgentServer.call_until(pid, signal, "aikido.ash.team.**", selector,
       timeout: Aikido.Agent.Info.team_config(resource).timeout + 1_000
     )
+    |> expose_operation_failure()
   end
+
+  defp expose_operation_failure({:ok, _} = result), do: result
+
+  defp expose_operation_failure({:error, reason}) do
+    {:error,
+     Ash.Error.Action.InvalidArgument.exception(
+       field: :member,
+       message: operation_failure_message(reason)
+     )}
+  end
+
+  defp operation_failure_message({:member_exists, name}),
+    do:
+      "Member #{name} already exists. Inspect the roster and reuse it, or choose a different name."
+
+  defp operation_failure_message({:worker_limit, template}),
+    do:
+      "The #{template} worker limit has been reached. Reuse an existing worker or remove an owned worker before spawning another."
+
+  defp operation_failure_message(:member_limit),
+    do:
+      "The team member limit has been reached. Reuse an existing member or remove an owned member."
+
+  defp operation_failure_message({:unknown_member, name}),
+    do: "Member #{name} is not in this team. Inspect the roster and choose an existing member."
+
+  defp operation_failure_message({:unknown_worker_template, template}),
+    do: "Template #{template} is unavailable. Inspect the team's available worker templates."
+
+  defp operation_failure_message({:invalid_member_name, name}),
+    do: "Member name #{inspect(name)} is invalid. Use a nonempty name without path separators."
+
+  defp operation_failure_message(:timeout),
+    do:
+      "Team activation timed out. Inspect the roster before retrying; a member may already have started."
+
+  defp operation_failure_message(_reason),
+    do:
+      "The team lifecycle operation failed. Inspect member status and runtime logs before retrying; do not assume the requested member was started or stopped."
 end
