@@ -10,8 +10,15 @@ defmodule Aikido.Team.TopologyOperation do
   alias Aikido.Directives
   alias Aikido.Signal
 
-  def begin_topology_change(_signal, %{operation: %{status: :running}}, _context, _config, _plan),
-    do: {:error, :operation_in_progress}
+  def begin_topology_change(
+        signal,
+        %{operation: %{status: :running}} = state,
+        _context,
+        _config,
+        _plan
+      ) do
+    {:ok, Map.update(state, :queued_operations, [signal], &(&1 ++ [signal])), []}
+  end
 
   def begin_topology_change(signal, state, context, config, plan) do
     with {:ok, topology, stop, requested, paused} <- plan.(),
@@ -22,6 +29,23 @@ defmodule Aikido.Team.TopologyOperation do
       |> begin_operation(signal.id, steps)
       |> advance_member_lifecycle(context, config)
       |> append_operation_deadline(signal.id, config.timeout)
+    else
+      {:error, reason} ->
+        operation = %{state.operation | id: signal.id, status: :failed, error: reason}
+        {state, directives} = release_queued_operations(%{state | operation: operation}, context)
+        {:ok, state, directives}
+    end
+  end
+
+  @doc "Release scoped topology commands after the current lifecycle operation settles."
+  def release_queued_operations(state, context) do
+    case Map.get(state, :queued_operations, []) do
+      [_ | _] = signals ->
+        {Map.put(state, :queued_operations, []),
+         Enum.map(signals, &Directives.emit_to_pid(&1, context.agent_pid))}
+
+      [] ->
+        {state, Aikido.Team.TaskWorkerLifecycle.retirement_directives(state, context)}
     end
   end
 
@@ -255,7 +279,8 @@ defmodule Aikido.Team.TopologyOperation do
         &TaskDelivery.task_result_delivery_directives(state.tasks[&1], state, context)
       )
 
-    {:ok, state, directives}
+    {state, queued} = release_queued_operations(state, context)
+    {:ok, state, directives ++ queued}
   end
 
   def awaited?(state, id, step),

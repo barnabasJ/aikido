@@ -9,7 +9,8 @@ defmodule Aikido.Team.Actions.StopMember do
     ActionAdapter.to_action_result(pause_member_and_descendants(signal, state, context, config))
   end
 
-  defp pause_member_and_descendants(signal, state, context, config) do
+  @doc "Plan a paused member subtree and request its process stops. Performs no I/O."
+  def pause_member_and_descendants(signal, state, context, config) do
     TopologyOperation.begin_topology_change(signal, state, context, config, fn ->
       plan_member_stop(signal.data, state, config)
     end)

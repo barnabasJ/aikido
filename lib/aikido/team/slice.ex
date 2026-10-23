@@ -58,6 +58,12 @@ defmodule Aikido.Team.Slice do
       default %{}
     end
 
+    attribute :queued_operations, {:array, Aikido.Signal} do
+      description "Transient scoped topology commands waiting for the current member lifecycle operation."
+      default []
+      allow_nil? false
+    end
+
     attribute :operation, :map do
       description "Current lifecycle plan, awaited member step and completion or failure outcome."
       public? true
@@ -92,6 +98,7 @@ defmodule Aikido.Team.Slice do
     route "aikido.ash.team.failed", :failed
     route "aikido.ash.team.timeout", :timeout
     route "aikido.ash.team.operation.completed", :operation_completed
+    route "aikido.ash.team.retire_worker", :retire_worker
     route "aikido.ash.team.task.completed", :task_completed
     route "aikido.ash.team.task.failed", :task_failed
     route "aikido.ash.team.task.timeout", :task_timeout
@@ -174,6 +181,7 @@ defmodule Aikido.Team.Slice do
       argument :type, :string, default: "harness.task"
       argument :payload, :map, default: %{}
       argument :timeout_ms, :integer, default: 30_000, constraints: [min: 1]
+      argument :worker_lifecycle, Aikido.Team.Types.WorkerLifecycle, default: :keep
       argument :notify, :term
       argument :metadata, :map, default: %{}
       run Aikido.Team.Actions.AssignTask
@@ -212,6 +220,13 @@ defmodule Aikido.Team.Slice do
       argument :state, :term, allow_nil?: false
       argument :data, :map, default: %{}
       run Aikido.Team.Actions.Timeout
+    end
+
+    action :retire_worker, Aikido.Types.ActionResult do
+      public? false
+      argument :state, :term, allow_nil?: false
+      argument :data, :map, default: %{}
+      run Aikido.Team.Actions.RetireWorker
     end
 
     action :operation_completed, Aikido.Types.ActionResult do
@@ -258,10 +273,11 @@ defmodule Aikido.Team.Slice do
   end
 
   @doc false
-  def externalize(state), do: state
+  def externalize(state), do: Map.put(state, :queued_operations, [])
   @doc false
   def reinstate(state) do
     state
+    |> Map.put(:queued_operations, [])
     |> restore_pending_tasks()
     |> fail_interrupted_tasks()
   end

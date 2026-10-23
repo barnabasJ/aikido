@@ -39,7 +39,10 @@ defmodule Aikido.Team.Actions.TaskTimeout do
               ]
           end
 
-        {:ok, state, cancel ++ TaskDelivery.task_result_delivery_directives(task, state, context)}
+        {:ok, state,
+         cancel ++
+           TaskDelivery.task_result_delivery_directives(task, state, context) ++
+           Aikido.Team.TaskWorkerLifecycle.retirement_directives(state, context)}
 
       _ ->
         {:ok, state, []}

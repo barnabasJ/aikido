@@ -4,6 +4,9 @@ defmodule Aikido.Team.Actions.OperationCompleted do
 
   @impl true
   def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(state: input.arguments.state)
+    {_signal, state, context, _config} = Aikido.Team.ActionAdapter.unpack_team_action(input)
+
+    {state, directives} = Aikido.Team.TopologyOperation.release_queued_operations(state, context)
+    Aikido.Types.ActionResult.new(state: state, directives: directives)
   end
 end

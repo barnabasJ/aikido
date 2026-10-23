@@ -104,6 +104,56 @@ defmodule AikidoTest.AshTeamTest do
     assert {:ok, 0} = Aikido.AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)})
   end
 
+  test "team children inherit synchronization policy unless their start config overrides it" do
+    team =
+      Domain.dynamic_start!(%{
+        id: "sync-inheritance",
+        sync: %{mode: :automatic, interval_ms: 777}
+      })
+
+    Domain.dynamic_add_member!(team, %{member: "inherited", template: :counter})
+
+    Domain.dynamic_add_member!(team, %{
+      member: "overridden",
+      template: :counter,
+      initial_state: %{sync: %{mode: :periodic, interval_ms: 2_000}}
+    })
+
+    current = Domain.dynamic_inspect!(team)
+    inherited = :sys.get_state(current.team.members["inherited"])
+    overridden = :sys.get_state(current.team.members["overridden"])
+    assert inherited.auto_sync
+    assert inherited.sync_every_ms == 777
+    refute overridden.auto_sync
+    assert overridden.sync_every_ms == 2_000
+  end
+
+  test "parallel topology commands queue until each member activation settles" do
+    team = Domain.dynamic_start!(%{id: "parallel-workers"})
+    observer = self()
+
+    tasks =
+      for name <- ["one", "two"] do
+        Task.async(fn ->
+          send(observer, {:ready_to_spawn, self()})
+
+          receive do
+            :spawn -> Domain.dynamic_add_member(team, %{member: name, template: :counter})
+          end
+        end)
+      end
+
+    for _ <- tasks do
+      assert_receive {:ready_to_spawn, pid}
+      send(pid, :spawn)
+    end
+
+    for task <- tasks, do: assert({:ok, _} = Task.await(task, 10_000))
+    current = Domain.dynamic_inspect!(team)
+    assert Map.keys(current.team.members) |> Enum.sort() == ["one", "two"]
+    assert current.team.queued_operations == []
+  end
+
   test "dynamic worker templates can add, stop, ensure, and remove string-named workers" do
     team = snapshot_result(Domain.dynamic_start!(%{id: "dynamic"}))
     assert team.team.members == %{}

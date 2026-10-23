@@ -62,6 +62,7 @@ defmodule Aikido.Team.Actions.AssignTask do
       status: :dispatched,
       result: nil,
       notify: data[:notify],
+      worker_lifecycle: Map.get(data, :worker_lifecycle, :keep),
       metadata: data[:metadata] || %{},
       attempt: attempt
     }
