@@ -14,17 +14,25 @@ defmodule Aikido.Directives.Emit do
       allow_nil? false
     end
 
+    field :inherit_scope?, :boolean do
+      description "Fill missing scope and tracing from the triggering signal; disable when replaying an already scoped command."
+      default true
+      allow_nil? false
+    end
+
     field :target, :term do
       description "Destination PID; defaults to the current agent"
     end
   end
 
   @impl true
-  def exec(%{signal: signal, target: target}, input_signal, _runtime) do
+  def exec(%{signal: signal, target: target} = directive, input_signal, _runtime) do
+    signal = Aikido.Directive.materialize_signal(signal)
+
     signal =
-      signal
-      |> Aikido.Directive.materialize_signal()
-      |> Aikido.Signal.inherit(input_signal)
+      if Map.get(directive, :inherit_scope?, true),
+        do: Aikido.Signal.inherit(signal, input_signal),
+        else: signal
 
     send(target || self(), {:signal, signal})
     :ok

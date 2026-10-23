@@ -35,6 +35,7 @@
   `sync: %{mode: :periodic | :automatic | :explicit, interval_ms: ...}`. Children
   inherit the parent policy unless explicitly configured otherwise.
 - Queue overlapping team topology commands instead of rejecting parallel spawns.
+  Replayed commands retain their original scope without inheriting the preceding caller.
   Convert owner-subscription exits into tool results so pending calls can settle.
 
 - Use compact, named live trees across team examples, with status colors, branch

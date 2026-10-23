@@ -42,7 +42,10 @@ defmodule Aikido.Team.TopologyOperation do
     case Map.get(state, :queued_operations, []) do
       [_ | _] = signals ->
         {Map.put(state, :queued_operations, []),
-         Enum.map(signals, &Directives.emit_to_pid(&1, context.agent_pid))}
+         Enum.map(
+           signals,
+           &%Aikido.Directives.Emit{signal: &1, target: context.agent_pid, inherit_scope?: false}
+         )}
 
       [] ->
         {state, Aikido.Team.TaskWorkerLifecycle.retirement_directives(state, context)}
