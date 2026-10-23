@@ -67,6 +67,7 @@ defmodule Aikido.AiReact.RunState do
       model: state.model,
       context: state.context,
       request_id: state.request_id,
+      deadline_at: Map.get(state, :deadline_at),
       llm_opts: state.llm_opts,
       options: state.options,
       iteration: state.iteration + 1
@@ -138,6 +139,7 @@ defmodule Aikido.AiReact.RunState do
       todo_verification_pending: false,
       request_id: data.request_id,
       run_metadata: data[:metadata] || %{},
+      deadline_at: get_in(data, [:metadata, :aikido_deadline_at]),
       prepared_tools: nil,
       tool_refresh_pending: false,
       tools_resume: nil,
@@ -179,6 +181,7 @@ defmodule Aikido.AiReact.RunState do
       })
 
     directive = %Aikido.AiReact.Directives.PrepareTools{
+      deadline_at: Map.get(state, :deadline_at),
       options: state.options,
       generation: generation,
       metadata: state.run_metadata,

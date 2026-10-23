@@ -33,6 +33,11 @@ defmodule Aikido.AiReact.Directives.LLMCall do
       description "Identifier correlating a summary response with the pending context handoff."
     end
 
+    field :deadline_at, :integer do
+      description "Absolute Unix-millisecond deadline; this effect cannot extend the owning run's remaining budget."
+      constraints min: 1
+    end
+
     field :options, Aikido.AiReact.Options do
       description "Execution policy controlling model-call attempts, deadlines and streaming."
       default %Aikido.AiReact.Options{}
@@ -157,6 +162,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
     [
       tracer: scope[:tracer],
       timeout: d.options.model_timeout_ms,
+      deadline_at: d.deadline_at,
       progress_timeout:
         if(streaming?(d), do: d.options.progress_timeout_ms, else: d.options.model_timeout_ms),
       retries: d.options.model_max_retries,

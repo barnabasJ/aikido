@@ -21,6 +21,11 @@ defmodule Aikido.AiReact.Directives.PrepareTools do
       allow_nil? false
     end
 
+    field :deadline_at, :integer do
+      description "Absolute Unix-millisecond deadline; this effect cannot extend the owning run's remaining budget."
+      constraints min: 1
+    end
+
     field :options, Aikido.AiReact.Options do
       description "Execution policy used to supervise preparation of the run's native Ash AI tools."
       default %Aikido.AiReact.Options{}
@@ -70,7 +75,8 @@ defmodule Aikido.AiReact.Directives.PrepareTools do
              fn _, _ -> build_native_tools_and_registry(directive, scope) end,
              tracer: scope[:tracer],
              generation: directive.generation,
-             timeout: directive.options.model_timeout_ms
+             timeout: directive.options.model_timeout_ms,
+             deadline_at: directive.deadline_at
            ) do
       Aikido.Signal.new!("ai.react.tools.ready", %{
         request_id: directive.request_id,

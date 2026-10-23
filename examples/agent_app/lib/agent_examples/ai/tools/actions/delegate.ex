@@ -10,9 +10,20 @@ defmodule AgentExamples.AI.Tools.Actions.Delegate do
          true <- member != caller || {:error, "Cannot delegate to yourself"},
          {:ok, result} <-
            AgentExamples.AI.delegate(team, member, input.arguments.text,
+             worker_lifecycle: input.arguments.worker_lifecycle,
+             deadline_at: get_in(input.context, [:aikido, :deadline_at]),
              ash: Ash.Scope.to_opts(context, context: input.context)
            ) do
       {:ok, %{member: input.arguments.member, result: result}}
+    else
+      {:error, reason} when is_binary(reason) or is_atom(reason) ->
+        {:error,
+         AgentExamples.AI.Tools.DelegationFailed.exception(
+           message: "Delegation failed: #{reason}"
+         )}
+
+      error ->
+        error
     end
   end
 

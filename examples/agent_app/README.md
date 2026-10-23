@@ -295,3 +295,17 @@ compatible with existing example stores. Both configurations checkpoint agents;
 this setting does not disable persistence. Browser progress renders at most ten
 times per second, with terminal root events flushed immediately. Every node's
 status is retained independently of that rendering rate.
+
+The live research demo defaults to 40 model turns, three minutes per model call,
+and fifteen minutes per tool call and top-level request. Transient model failures
+get up to four retries with bounded backoff, still inside the shared run deadline. Nested assignments inherit
+the parent's remaining absolute deadline instead of receiving fresh budgets.
+`agents.delegate` accepts `worker_lifecycle = "stop"` for one-off workers; omitted
+or `"keep"` retains reusable teammates. Select a tree node for its activity/state.
+Single-agent examples instead offer **View current agent state** in Under the hood,
+using the existing subscribed, credential-free display projection.
+
+Agents use periodic DurableServer checkpoints by default (30 seconds). Their start
+action accepts `sync` policy overrides, inherited by children. Overlapping team
+spawns queue behind the active topology operation rather than failing with an
+operation-in-progress error. This keeps parallel Lua tool calls usable.

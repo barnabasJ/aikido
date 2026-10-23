@@ -20,6 +20,36 @@ defmodule AgentExamples.ProviderTest do
     refute inspect(:sys.get_status(Playground), limit: :infinity) =~ "local-test-key"
   end
 
+  test "live examples and their workers share larger bounded request budgets" do
+    owner = Ash.UUIDv7.generate()
+
+    assert {:ok, _} =
+             Playground.configure_provider(owner, %{
+               "mode" => "live",
+               "provider" => "zai_coder",
+               "model" => "glm-5.3-flash",
+               "api_key" => "budget-test-key"
+             })
+
+    on_exit(fn -> Playground.stop(owner, "research-team") end)
+    assert {:ok, run} = Playground.start(owner, "research-team", %{"lua" => "true"})
+
+    assert {:ok, {options, workers}} =
+             Aikido.AgentServer.state(
+               run.record.pid,
+               &{:ok, {&1.agent.state.ai.options, &1.agent.state.team.members}}
+             )
+
+    assert options.model_timeout_ms == 180_000
+    assert options.tool_timeout_ms == 900_000
+    assert options.model_max_retries == 4
+    assert options.retry_backoff_ms == 10_000
+
+    for {_name, pid} <- workers do
+      assert {:ok, ^options} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.options})
+    end
+  end
+
   test "the live client uses the native z.ai request with the session key, without a network call" do
     owner = Ash.UUIDv7.generate()
 

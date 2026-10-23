@@ -525,7 +525,8 @@ native tools; Lua's inner Ash actions still perform their own authorization.
 
 `model_timeout_ms` and `tool_timeout_ms` bound each individual attempt. Retrying
 creates a fresh deadline after the cancellation-aware backoff. The retry count
-bounds the number of attempts; these options do not impose an overall run limit.
+bounds the number of attempts. An optional absolute run deadline further caps
+all attempts and backoff; without it these options do not impose an overall run limit.
 Streaming progress requires nonempty text, thinking, tool-call content or a
 multimodal content part. Metadata and empty chunks do not extend the progress
 clock. Cancellation interrupts attempts and retry backoff and releases cleanup.
@@ -590,3 +591,42 @@ to nil, preserving model recovery and the existing repeated-call warning.
 
 See the example app's [Makewright scenario checklist](../examples/agent_app/MAKEWRIGHT.md)
 for isolated browser flows and the tests that cover each integration boundary.
+
+### Nested work budgets and task-scoped workers
+
+A ReAct ask can supply `metadata: %{aikido_deadline_at: deadline}` where `deadline`
+is an absolute Unix timestamp in milliseconds. Supervised setup, model and tool
+attempts respect the earlier of this deadline and their configured timeout.
+Retries and backoff consume the same remaining run budget. Without this metadata,
+existing per-attempt timeouts still apply. Reducers carry the deadline without
+reading a clock. Tool actions receive the effective deadline in
+`input.context.aikido.deadline_at`; applications can propagate it to delegated work.
+The research example does so for every nested assignment.
+
+Team `assign_task` accepts `worker_lifecycle: :keep | :stop` (default `:keep`).
+`:stop` requests retirement after the team records the terminal result and all
+assignments in that worker's owned subtree settle. A subsequent signal rechecks
+idleness before planning the stop. Other topology operations finish first. The
+member's topology remains paused and can be explicitly activated again; persistence
+retention still independently controls saved snapshots. This is not self-termination
+from an action or a directive waiting on its own mailbox.
+
+### Synchronization policy
+
+Start an agent with `sync: %{mode: :periodic, interval_ms: 30_000}`. This is the
+default: DurableServer periodically saves dirty state. A successful command
+acknowledges processing, not a storage commit; a crash can lose changes since the
+last checkpoint. Parent-binding lifecycle changes and graceful stop still synchronize; temporary retention still
+deletes the saved identity on stop.
+
+`:automatic` enables native DurableServer synchronization after callbacks.
+`:explicit` preserves strict adapter-requested sync after persistent state changes;
+streaming deltas remain transient until the completed model turn. Both modes still
+use the native periodic interval. Explicit here means the adapter returns
+`sync: true`; application reducers never call storage themselves.
+
+Children inherit the effective runtime policy. Set `sync` in a child start input,
+team member `initial_state`, or SpawnAgent `opts` to override it. Synchronization
+settings are saved with boot options and restored with the agent. Concurrent team
+topology commands wait in a transient scoped queue and resume after lifecycle
+completion; queued continuations are not recovered after a process restart.

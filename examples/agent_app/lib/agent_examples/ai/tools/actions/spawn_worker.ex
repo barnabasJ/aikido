@@ -36,6 +36,7 @@ defmodule AgentExamples.AI.Tools.Actions.SpawnWorker do
       :model,
       :client,
       :max_iterations,
+      :options,
       :llm_opts
     ])
     |> Map.put(:specialty, specialty)

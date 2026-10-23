@@ -17,6 +17,11 @@ defmodule Aikido.AiReact.Directives.ToolExec do
   require Ash.Tracer
 
   typed_struct do
+    field :deadline_at, :integer do
+      description "Absolute Unix-millisecond deadline; this effect cannot extend the owning run's remaining budget."
+      constraints min: 1
+    end
+
     field :options, Aikido.AiReact.Options do
       description "Execution policy controlling the supervised tool attempt and its deadline."
       default %Aikido.AiReact.Options{}
@@ -85,6 +90,8 @@ defmodule Aikido.AiReact.Directives.ToolExec do
 
   defp tool_execution_context(directive, input_signal, state) do
     agent_module = Map.get(state, :agent_module)
+    attempt_deadline = System.system_time(:millisecond) + directive.options.tool_timeout_ms
+    deadline = min(directive.deadline_at || attempt_deadline, attempt_deadline)
 
     inherited =
       if match?(%Aikido.Signal{}, input_signal), do: Aikido.Signal.ctx(input_signal), else: %{}
@@ -94,6 +101,7 @@ defmodule Aikido.AiReact.Directives.ToolExec do
         agent_id: state.id,
         request_id: directive.request_id,
         tool_call_id: directive.tool_call.id,
+        deadline_at: deadline,
         agent_resource:
           if(
             Spark.Dsl.is?(agent_module, Ash.Resource) &&
@@ -131,6 +139,7 @@ defmodule Aikido.AiReact.Directives.ToolExec do
         end,
         tracer: context[:tracer],
         timeout: options.tool_timeout_ms,
+        deadline_at: context[:deadline_at],
         retries: options.tool_max_retries,
         backoff: options.retry_backoff_ms
       )

@@ -41,10 +41,22 @@ defmodule Aikido.AiReact.CancellableTask do
         if Process.alive?(owner), do: Aikido.AgentServer.unsubscribe(owner, subscription)
       end
     end
+  catch
+    :exit, reason -> {:error, {:owner_unavailable, reason}}
   end
 
   defp execute_attempt(owner, supervisor, work, opts, sub, monitor, number) do
-    deadline = now() + Keyword.fetch!(opts, :timeout)
+    case remaining_timeout(opts) do
+      0 ->
+        {:error, :timeout}
+
+      timeout ->
+        execute_live_attempt(owner, supervisor, work, opts, sub, monitor, number, timeout)
+    end
+  end
+
+  defp execute_live_attempt(owner, supervisor, work, opts, sub, monitor, number, timeout) do
+    deadline = now() + timeout
     parent = self()
     key = make_ref()
 
@@ -69,7 +81,7 @@ defmodule Aikido.AiReact.CancellableTask do
       end
 
     if retry_allowed?(result, number, opts) do
-      delay = retry_delay(number, opts)
+      delay = min(retry_delay(number, opts), remaining_timeout(opts))
 
       receive do
         {:aikido_subscription, ^sub, _} -> {:error, :cancelled}
@@ -83,8 +95,18 @@ defmodule Aikido.AiReact.CancellableTask do
     end
   end
 
+  defp remaining_timeout(opts) do
+    timeout = Keyword.fetch!(opts, :timeout)
+
+    case opts[:deadline_at] do
+      nil -> timeout
+      deadline -> max(0, min(timeout, deadline - System.system_time(:millisecond)))
+    end
+  end
+
   defp retry_allowed?(result, number, opts) do
-    number < Keyword.get(opts, :retries, 0) && Aikido.Error.retryable?(result) &&
+    remaining_timeout(opts) > 0 && number < Keyword.get(opts, :retries, 0) &&
+      Aikido.Error.retryable?(result) &&
       match?({:error, _}, result) && result != {:error, :cancelled}
   end
 

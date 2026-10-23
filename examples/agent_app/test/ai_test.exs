@@ -19,6 +19,12 @@ defmodule AgentExamples.AITest do
     end
   end
 
+  defmodule RejectedClient do
+    @behaviour Aikido.AiReact.Client
+    def generate_text(_model, _messages, _options),
+      do: {:error, "Provider rejected request (429)"}
+  end
+
   defp track(%{resource: resource} = reference),
     do:
       track(
@@ -118,6 +124,61 @@ defmodule AgentExamples.AITest do
     assert worker.tools == tools
     assert {:ok, answer} = AI.ask(team, "Signals carry results")
     assert answer =~ "Words: 3"
+  end
+
+  test "delegation preserves the caller deadline and expired work is not dispatched" do
+    team = track(Agents.research_team_start!(AI.offline(%{tools: []})))
+    deadline = System.system_time(:millisecond) + 10_000
+
+    assert {:ok, _} = AI.delegate(team, :analyst, "Check the workflow", deadline_at: deadline)
+    {:ok, worker} = Aikido.AgentServer.state(team.team.members.analyst, &{:ok, &1.agent.state.ai})
+    assert worker.deadline_at == deadline
+    assert worker.run_metadata.aikido_deadline_at == deadline
+
+    before = Agents.research_team_inspect!(team.id).team.tasks
+
+    assert {:error, :timeout} =
+             AI.delegate(team, "analyst", "Must not dispatch", deadline_at: 1)
+
+    assert Agents.research_team_inspect!(team.id).team.tasks == before
+  end
+
+  test "task-scoped workers stop only after their result reaches the team" do
+    team = track(Agents.research_team_start!(AI.offline(%{tools: []})))
+    pid = team.team.members.analyst
+    monitor = Process.monitor(pid)
+
+    assert {:ok, _answer} =
+             AI.delegate(team, :analyst, "One-off analysis", worker_lifecycle: :stop)
+
+    assert_receive {:DOWN, ^monitor, :process, ^pid, _}, 5_000
+    current = Agents.research_team_inspect!(team.id)
+    assert current.team.paused.analyst
+
+    assert Enum.any?(current.team.tasks, fn {_, task} ->
+             task.member == :analyst && task.status == :completed &&
+               task.worker_lifecycle == :stop
+           end)
+
+    assert Process.alive?(current.team.members.reviewer)
+  end
+
+  test "Lua delegation exposes known provider failures instead of an opaque unknown error" do
+    team =
+      track(
+        Agents.research_team_start!(
+          AI.offline(%{client: RejectedClient, tools: AI.Tools.for_lua()})
+        )
+      )
+
+    assert {:ok, result} =
+             lua(
+               team,
+               "return assert(agents.delegate({input = {member = 'analyst', text = 'Test failure'}}))"
+             )
+
+    assert inspect(result) =~ "Provider rejected request (429)"
+    refute inspect(result) =~ "unknown_error"
   end
 
   test "an agent and a team expose the same runtime tools and ask interface" do

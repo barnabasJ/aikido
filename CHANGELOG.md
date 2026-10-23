@@ -6,6 +6,14 @@
 
 ### Added
 
+- Allow team assignments to stop an idle worker after its result is recorded,
+  while retaining reusable workers by default.
+- Preserve known delegated provider failures in native Ash AI and Lua error
+  responses instead of hiding them behind opaque unknown-error identifiers.
+- Carry an optional absolute ReAct run deadline through setup, model calls, tools
+  and retries; the research example propagates the remaining budget to subteams.
+- Inspect subscribed single-agent example state directly from Under the hood.
+
 - Record full-size quicksort lifecycle measurements and existing-store recovery
   checks, distinguishing agent cleanup from retained native EKV metadata.
 
@@ -22,6 +30,12 @@
   100,000 agents, verified every sorted value and deleted every agent afterward.
 
 ### Changed
+
+- Default agents to native periodic synchronization, configurable at start through
+  `sync: %{mode: :periodic | :automatic | :explicit, interval_ms: ...}`. Children
+  inherit the parent policy unless explicitly configured otherwise.
+- Queue overlapping team topology commands instead of rejecting parallel spawns.
+  Convert owner-subscription exits into tool results so pending calls can settle.
 
 - Use compact, named live trees across team examples, with status colors, branch
   navigation and continuously updated agent detail dialogs instead of card grids.

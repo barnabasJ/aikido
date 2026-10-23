@@ -18,6 +18,7 @@ defmodule Aikido.AiReact.Actions.ToolsReady do
         |> Map.put(:prepared_tools, input.arguments.prepared_tools)
 
       directive = %LLMCall{
+        deadline_at: Map.get(state, :deadline_at),
         options: state.options,
         iteration: state.iteration + 1,
         client: state.client,

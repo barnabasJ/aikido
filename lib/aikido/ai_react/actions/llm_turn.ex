@@ -121,6 +121,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
           tool_call: call,
           registry: registry,
           tool_context: Map.get(state, :tool_context, %{}),
+          deadline_at: Map.get(state, :deadline_at),
           request_id: state.request_id
         }
       end)

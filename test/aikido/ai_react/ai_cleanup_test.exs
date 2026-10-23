@@ -72,6 +72,72 @@ defmodule Aikido.AICleanupTest do
              )
   end
 
+  test "an expired run deadline starts no work", context do
+    owner = start_server(context, __MODULE__.Owner, initial_state: %{request_id: "expired"})
+    supervisor = start_supervised!(Task.Supervisor)
+    observer = self()
+
+    assert {:error, :timeout} =
+             Aikido.AiReact.CancellableTask.run_cancellable_attempts(
+               owner,
+               "expired",
+               supervisor,
+               fn _, _ -> send(observer, :unexpected_attempt) end,
+               timeout: 5_000,
+               deadline_at: System.system_time(:millisecond) - 1
+             )
+
+    refute_received :unexpected_attempt
+  end
+
+  test "retry backoff cannot renew the enclosing run deadline", context do
+    owner = start_server(context, __MODULE__.Owner, initial_state: %{request_id: "bounded"})
+    supervisor = start_supervised!(Task.Supervisor)
+    observer = self()
+
+    assert {:error, :timeout} =
+             Aikido.AiReact.CancellableTask.run_cancellable_attempts(
+               owner,
+               "bounded",
+               supervisor,
+               fn _, attempt ->
+                 send(observer, {:attempt, attempt})
+                 {:error, :timeout}
+               end,
+               timeout: 5_000,
+               deadline_at: System.system_time(:millisecond) + 200,
+               retries: 2,
+               backoff: 1_000
+             )
+
+    assert_received {:attempt, 0}
+    refute_received {:attempt, 1}
+    assert Task.Supervisor.children(supervisor) == []
+  end
+
+  test "owner exit while subscribing returns an error instead of crashing the tool owner" do
+    pid =
+      spawn(fn ->
+        receive do
+          :finish -> :ok
+        end
+      end)
+
+    ref = Process.monitor(pid)
+    send(pid, :finish)
+    assert_receive {:DOWN, ^ref, :process, ^pid, _}
+    supervisor = start_supervised!(Task.Supervisor)
+
+    assert {:error, {:owner_unavailable, _}} =
+             Aikido.AiReact.CancellableTask.run_cancellable_attempts(
+               pid,
+               "gone",
+               supervisor,
+               fn _, _ -> flunk("work must not start") end,
+               timeout: 1_000
+             )
+  end
+
   test "only nonempty generation chunks reset streaming progress" do
     alias Aikido.AiReact.ModelStream
     alias ReqLLM.StreamChunk

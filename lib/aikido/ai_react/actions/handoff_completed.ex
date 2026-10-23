@@ -105,6 +105,7 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
     {tools, _registry} = state.prepared_tools
 
     directive = %LLMCall{
+      deadline_at: Map.get(state, :deadline_at),
       mode: :resume,
       tools: tools,
       options: state.options,

@@ -104,6 +104,11 @@ defmodule Aikido.AiReact.Slice do
         default %{}
       end
 
+      attribute :deadline_at, :integer do
+        description "Absolute Unix-millisecond deadline inherited by every step and delegated task in this run."
+        constraints min: 1
+      end
+
       attribute :run_metadata, :map do
         description "Application metadata attached to the request and its completion."
         public? true

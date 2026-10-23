@@ -28,7 +28,7 @@ defmodule AgentExamples.ResearchSquad do
 
   team do
     max_members 8
-    inherit [:tools, :tool_options, :tool_context, :model, :client, :max_iterations]
+    inherit [:tools, :tool_options, :tool_context, :model, :client, :max_iterations, :options]
     member :analyst, AgentExamples.Researcher
     worker :researcher, AgentExamples.Researcher, max_members: 6
     worker :squad, __MODULE__, max_members: 2

@@ -40,6 +40,12 @@ defmodule AgentExamples.AI.Tools do
       description "Assign a bounded task to a running worker and wait for its answer. Cannot target yourself or the orchestrator."
 
       argument :member, :string, allow_nil?: false
+
+      argument :worker_lifecycle, Aikido.Team.Types.WorkerLifecycle do
+        description "Keep a reusable teammate, or stop a one-off worker and its descendants after its result is recorded."
+        default :keep
+      end
+
       argument :text, :string, allow_nil?: false
       run AgentExamples.AI.Tools.Actions.Delegate
     end

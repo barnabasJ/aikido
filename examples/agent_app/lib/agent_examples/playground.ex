@@ -644,8 +644,10 @@ defmodule AgentExamples.Playground do
     options =
       defaults
       |> Aikido.AiReact.Options.new!()
-      |> Map.put(:model_timeout_ms, 120_000)
-      |> Map.put(:tool_timeout_ms, 300_000)
+      |> Map.put(:model_timeout_ms, 180_000)
+      |> Map.put(:tool_timeout_ms, 900_000)
+      |> Map.put(:model_max_retries, 4)
+      |> Map.put(:retry_backoff_ms, 10_000)
 
     Map.put(attributes, :options, options)
   end

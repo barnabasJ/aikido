@@ -22,6 +22,9 @@ defmodule AgentExamples.ResearchTeam do
     with a budget of 1: they may create one further squad level, then pass 0 to it.
     At budget 0, use researchers without creating more squads. Use at most two new
     squads per team and one specialist per researcher; avoid unnecessary duplication.
+    Keep squads that you will reuse. For one-off researcher assignments, set
+    worker_lifecycle = "stop" in the delegate input so the worker stops after its
+    result is recorded; the default "keep" leaves it available.
     These are planning instructions; the configured member limits still apply.
     Even for a brief demo input, use one squad and one nested squad to demonstrate
     the hierarchy, giving each a small, distinct task. Explain the division of work.
@@ -37,12 +40,12 @@ defmodule AgentExamples.ResearchTeam do
     and base your final answer on the returned evidence.
     """
 
-    max_iterations 12
+    max_iterations 40
   end
 
   team do
     max_members 8
-    inherit [:tools, :tool_options, :tool_context, :model, :client, :max_iterations]
+    inherit [:tools, :tool_options, :tool_context, :model, :client, :max_iterations, :options]
     member :analyst, AgentExamples.Researcher
     member :reviewer, AgentExamples.Reviewer
     worker :researcher, AgentExamples.Researcher, max_members: 6

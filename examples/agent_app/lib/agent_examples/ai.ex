@@ -16,6 +16,7 @@ defmodule AgentExamples.AI do
   def ask(record, query, opts \\ []) do
     request_id = Ash.UUIDv7.generate()
     timeout = Keyword.get(opts, :timeout, 30_000)
+    deadline_at = System.system_time(:millisecond) + timeout
     resource = Map.get(record, :resource) || record.__struct__
     ash_opts = Keyword.get(opts, :ash, [])
 
@@ -32,7 +33,7 @@ defmodule AgentExamples.AI do
             agent: record.id,
             query: query,
             request_id: request_id,
-            metadata: Keyword.get(opts, :metadata, %{})
+            metadata: Map.put(Keyword.get(opts, :metadata, %{}), :aikido_deadline_at, deadline_at)
           },
           ash_opts
         )
@@ -47,7 +48,27 @@ defmodule AgentExamples.AI do
   @doc "Assign work from an external caller or a tool task, then await its correlated result."
   def delegate(team, member, text, opts \\ []) do
     task_id = Ash.UUIDv7.generate()
-    timeout = Keyword.get(opts, :timeout, 240_000)
+    now = System.system_time(:millisecond)
+    parent_deadline = opts[:deadline_at]
+
+    timeout =
+      Keyword.get(
+        opts,
+        :timeout,
+        if(parent_deadline, do: max(0, parent_deadline - now), else: 240_000)
+      )
+
+    deadline_at = min(parent_deadline || now + timeout, now + timeout)
+    remaining = max(0, deadline_at - now)
+
+    if remaining == 0 do
+      {:error, :timeout}
+    else
+      delegate_before_deadline(team, member, text, task_id, deadline_at, remaining, opts)
+    end
+  end
+
+  defp delegate_before_deadline(team, member, text, task_id, deadline_at, timeout, opts) do
     resource = Map.get(team, :resource) || team.__struct__
     ash_opts = Keyword.get(opts, :ash, [])
 
@@ -65,7 +86,9 @@ defmodule AgentExamples.AI do
             member: member,
             task_id: task_id,
             payload: %{text: text},
-            timeout_ms: timeout
+            timeout_ms: timeout,
+            worker_lifecycle: Keyword.get(opts, :worker_lifecycle, :keep),
+            metadata: %{aikido_deadline_at: deadline_at}
           },
           ash_opts
         )
