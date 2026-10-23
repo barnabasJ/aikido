@@ -321,3 +321,7 @@ Team diagrams retain stopped members as grey nodes for the current run. Select
 one to inspect its last recorded task, result and state. This is UI history;
 retired processes and their subscriptions are still released. Starting a new run
 creates a new tree.
+
+The Delegated work sidebar aggregates tasks from the entire recorded team tree,
+including retained stopped subteams. Each task identifies its dispatching team
+and the full member path, so same-named researchers remain distinguishable.

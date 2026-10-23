@@ -6,6 +6,8 @@
 
 ### Added
 
+- Show delegated tasks across the full recorded team tree with their owning paths.
+
 - Allow team assignments to stop an idle worker after its result is recorded,
   while retaining reusable workers by default.
 - Preserve known delegated provider failures in native Ash AI and Lua error

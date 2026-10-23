@@ -197,24 +197,44 @@ defmodule AgentExamplesWeb.ExampleComponents do
   attr :run, :any, required: true
 
   def delegated_work(assigns) do
+    tasks = if assigns.run, do: collect_delegated_tasks(assigns.run.snapshot, []), else: []
+    assigns = assign(assigns, :tasks, Enum.sort_by(tasks, & &1.id, :desc))
+
     ~H"""
-    <section :if={@run && @run.snapshot.tasks != []} class="panel delegated-work" id="tasks">
+    <section :if={@tasks != []} class="panel delegated-work" id="tasks">
       <div class="section-heading">
-        <h2>Delegated work</h2><span>{length(@run.snapshot.tasks)} tasks</span>
+        <h2>Delegated work</h2><span>{length(@tasks)} tasks across the tree</span>
       </div>
       <div class="delegated-work-scroll">
-        <details :for={task <- Enum.sort_by(@run.snapshot.tasks, & &1.id, :desc)}>
+        <details :for={task <- @tasks} data-owner={task.owner_path}>
           <summary>
-            <strong>{task.member}</strong><span class="status-pill">{if task.result == :timeout,
+            <strong>{task.member_path}</strong><span class="status-pill">{if task.result == :timeout,
               do: "Timed out",
               else: task.status}</span>
           </summary>
-          <p class="muted">Task ID: {task.id}</p>
+          <p class="muted">Dispatched by {task.owner_path} · Task ID: {task.id}</p>
           <pre>{if task.result == :timeout, do: "The delegated task exceeded its deadline.", else: result_text(task.result)}</pre>
         </details>
       </div>
     </section>
     """
+  end
+
+  defp collect_delegated_tasks(snapshot, path) do
+    own_tasks =
+      Enum.map(snapshot[:tasks] || [], fn task ->
+        Map.merge(task, %{
+          owner_path: if(path == [], do: "Root team", else: Enum.join(path, " / ")),
+          member_path: Enum.join(path ++ [to_string(task.member)], " / ")
+        })
+      end)
+
+    child_tasks =
+      Enum.flat_map(snapshot[:children] || %{}, fn {name, child} ->
+        collect_delegated_tasks(child, path ++ [name])
+      end)
+
+    own_tasks ++ child_tasks
   end
 
   attr :run, :any, required: true
