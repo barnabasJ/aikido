@@ -151,7 +151,7 @@ defmodule Aikido.CronScopeTest do
   test "snapshots exclude implicit caller credentials and recovery starts without that scope",
        ctx do
     id = unique_id("cron-scope")
-    pid = start_server(ctx, __MODULE__.Resource, id: id)
+    pid = start_server(ctx, __MODULE__.Resource, id: id, sync: %{mode: :explicit})
     parent = make_ref()
     TestTracer.set_span_context(parent)
     on_exit(fn -> TestTracer.set_span_context(nil) end)

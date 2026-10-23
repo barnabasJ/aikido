@@ -142,13 +142,19 @@ defmodule AikidoTest.DurableRelationshipTest do
     instance: instance,
     durable: durable
   } do
-    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "parent")
+    {:ok, parent} =
+      AikidoTest.Case.start_test_agent(instance, Minimal,
+        id: "parent",
+        sync: %{mode: :automatic, interval_ms: 1_234}
+      )
+
     {:ok, runtime} = AgentServer.state(parent, &{:ok, &1})
     signal = Aikido.Signal.new!("spawn.test", %{})
     directive = Aikido.Directives.spawn_agent(Minimal, :worker, opts: %{id: "child"})
     assert :ok = Aikido.Directive.exec(directive, signal, runtime)
     assert {:ok, child} = AgentServer.await_child(parent, :worker)
     assert {:ok, ^child} = Aikido.Durable.lookup(durable, "child")
+    assert %DurableServer{auto_sync: true, sync_every_ms: 1_234} = :sys.get_state(child)
     restored = AikidoTest.LifecycleWait.crash_and_await_replacement(child)
 
     assert {:ok, %{id: "parent", pid: ^parent}} = AgentServer.state(restored, &{:ok, &1.parent})

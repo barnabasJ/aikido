@@ -30,7 +30,15 @@ defmodule Aikido.Agent.Commands.Start do
     runtime_options =
       input.context
       |> Map.get(:aikido_runtime_options, [])
-      |> Keyword.take([:parent, :partition, :on_parent_death, :restart?])
+      |> Keyword.take([:parent, :partition, :on_parent_death, :restart?, :sync])
+
+    runtime_options =
+      Keyword.put(
+        runtime_options,
+        :sync,
+        input.arguments[:sync] || runtime_options[:sync] ||
+          inherited_sync(runtime_options[:parent])
+      )
 
     options = activation_options(resource, input, context, runtime_options)
 
@@ -53,6 +61,15 @@ defmodule Aikido.Agent.Commands.Start do
           error
       end
     end)
+  end
+
+  defp inherited_sync(nil), do: %Aikido.Durable.SyncPolicy{}
+
+  defp inherited_sync(%{pid: parent}) do
+    case Aikido.AgentServer.state(parent, &{:ok, &1.sync}) do
+      {:ok, sync} -> sync
+      {:error, reason} -> raise "Cannot inherit parent synchronization policy: #{inspect(reason)}"
+    end
   end
 
   defp activation_options(resource, input, context, runtime_options) do
@@ -100,7 +117,7 @@ defmodule Aikido.Agent.Commands.Start do
 
   defp initial_state(resource, attributes) do
     {own, slices} =
-      attributes |> Map.delete(:id) |> Map.split(Aikido.Agent.Info.state_fields(resource))
+      attributes |> Map.drop([:id, :sync]) |> Map.split(Aikido.Agent.Info.state_fields(resource))
 
     slices
     |> put_ai_configuration(own, resource)

@@ -337,7 +337,14 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
   end
 
   defp add_lifecycle_actions(dsl) do
-    arguments = startup_arguments(dsl)
+    arguments =
+      startup_arguments(dsl) ++
+        [
+          build_argument!(:sync, Aikido.Durable.SyncPolicy,
+            description:
+              "Synchronization policy; omitted children inherit their parent's policy and roots default to periodic sync."
+          )
+        ]
 
     Enum.reduce_while(
       [

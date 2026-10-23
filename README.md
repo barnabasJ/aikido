@@ -161,7 +161,11 @@ same disk to remain available.
 
 With `persistence :permanent` (the default), `stop` retains the snapshot and
 starting the same ID restores it. `persistence :temporary` deletes it on stop.
-Both checkpoint while running. The separate `delete` action stops an agent and
+Both checkpoint while running. Synchronization defaults to periodic dirty-state saves
+every 30 seconds. Configure `sync: %{mode: :periodic, interval_ms: 5_000}` at start;
+`:automatic` enables native callback sync and `:explicit` requests strict sync on
+persistent transitions. Children inherit this policy unless overridden. Processing
+receipts in periodic mode do not promise a storage commit. The separate `delete` action stops an agent and
 removes its snapshot regardless of retention, including by ID after stop.
 Recovery does not replay in-flight tools or resume a waiting Lua VM.
 

@@ -17,6 +17,12 @@ defmodule Aikido.AgentServer.Options do
   use Ash.TypedStruct
 
   typed_struct do
+    field :sync, Aikido.Durable.SyncPolicy do
+      description "DurableServer synchronization policy used by this agent and inherited by spawned children."
+      default %Aikido.Durable.SyncPolicy{}
+      allow_nil? false
+    end
+
     field :agent_module, :module do
       allow_nil? false
       constraints behaviour: Aikido.Agent

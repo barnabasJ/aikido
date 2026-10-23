@@ -63,7 +63,8 @@ defmodule Aikido.Durable.AgentServer do
       :on_parent_death,
       :skip_schedules,
       :debug,
-      :middleware
+      :middleware,
+      :sync
     ])
   end
 
@@ -115,6 +116,8 @@ defmodule Aikido.Durable.AgentServer do
            unresolved_parent: unresolved_parent
          },
          permanent: saved.permanent,
+         auto_sync: runtime.sync.mode == :automatic,
+         sync_every_ms: runtime.sync.interval_ms,
          meta: %{
            key: runtime.durable_key,
            partition: runtime.partition,
@@ -173,17 +176,19 @@ defmodule Aikido.Durable.AgentServer do
   defp wrap_runtime_reply({:reply, reply, runtime}, state) do
     next = %{state | runtime: runtime}
 
-    if durable_changed?(state.runtime, runtime),
-      do: {:reply, reply, next, sync: true},
-      else: {:reply, reply, next}
+    if state.runtime.parent != runtime.parent ||
+         (runtime.sync.mode == :explicit && durable_changed?(state.runtime, runtime)),
+       do: {:reply, reply, next, sync: true},
+       else: {:reply, reply, next}
   end
 
   defp wrap_runtime_reply({:noreply, runtime}, state) do
     next = %{state | runtime: runtime}
 
-    if durable_changed?(state.runtime, runtime),
-      do: {:noreply, next, sync: true},
-      else: {:noreply, next}
+    if state.runtime.parent != runtime.parent ||
+         (runtime.sync.mode == :explicit && durable_changed?(state.runtime, runtime)),
+       do: {:noreply, next, sync: true},
+       else: {:noreply, next}
   end
 
   defp wrap_runtime_reply({:stop, reason, runtime}, state),

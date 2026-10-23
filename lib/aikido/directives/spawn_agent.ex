@@ -122,7 +122,7 @@ defmodule Aikido.Directives.SpawnAgent do
       )
 
     directive = %{directive | opts: opts}
-    runtime = Map.take(state, [:id, :partition, :aikido])
+    runtime = Map.take(state, [:id, :partition, :aikido, :sync])
 
     task = %Aikido.Directives.AsyncTask{
       work: fn ->
@@ -234,6 +234,7 @@ defmodule Aikido.Directives.SpawnAgent do
   defp child_options(opts, state, parent_ref, agent, child_id, child_partition) do
     opts
     |> Map.drop(@reserved_child_opts)
+    |> Map.put_new(:sync, state.sync)
     |> Map.put(:agent_module, agent)
     |> Map.put(:id, child_id)
     |> Map.put(:partition, child_partition)

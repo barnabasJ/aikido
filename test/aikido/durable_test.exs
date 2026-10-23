@@ -92,6 +92,7 @@ defmodule AikidoTest.DurableTest do
     opts = [
       name: AikidoTest.DurableSupervisor,
       agent: AikidoTest.TestAgents.Counter,
+      agent_opts: [sync: %{mode: :explicit}],
       aikido: instance,
       data_dir: directory,
       durable_options: [discovery_interval_ms: 100, initial_discovery_delay_ms: 0]
@@ -106,6 +107,22 @@ defmodule AikidoTest.DurableTest do
       directory: directory,
       instance: instance
     }
+  end
+
+  test "native synchronization policy defaults to periodic and supports explicit overrides", %{
+    durable: durable
+  } do
+    for {mode, automatic} <- [periodic: false, automatic: true, explicit: false] do
+      {:ok, pid} =
+        Aikido.Durable.start(durable, "sync-#{mode}",
+          agent_opts: [sync: %{mode: mode, interval_ms: 1_234}]
+        )
+
+      native = :sys.get_state(pid)
+      assert native.auto_sync == automatic
+      assert native.sync_every_ms == 1_234
+      assert native.user_state.runtime.sync.mode == mode
+    end
   end
 
   test "local storage forwards native EKV shard configuration", %{
@@ -410,7 +427,7 @@ defmodule AikidoTest.DurableTest do
                id: "default-counter"
              )
 
-    assert %DurableServer{} = :sys.get_state(pid)
+    assert %DurableServer{auto_sync: false, sync_every_ms: 30_000} = :sys.get_state(pid)
     assert AikidoTest.Case.agent_pid(instance, "default-counter") == pid
     assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), pid)
   end
@@ -427,7 +444,13 @@ defmodule AikidoTest.DurableTest do
        ]}
     )
 
-    team = snapshot_result(AikidoTest.AshFixtures.Domain.dynamic_start!(%{id: "durable-team"}))
+    team =
+      snapshot_result(
+        AikidoTest.AshFixtures.Domain.dynamic_start!(%{
+          id: "durable-team",
+          sync: %{mode: :explicit}
+        })
+      )
 
     team =
       snapshot_result(
