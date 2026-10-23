@@ -141,6 +141,7 @@ defmodule AgentExamplesWeb.ExampleComponents do
               </dd>
             </dl><button :if={active?(@run)} id="stop-example" phx-click="stop" class="button danger">Stop example</button>
           </section>
+          <.delegated_work run={@run} />
           <.signal_activity :if={@show_signal_activity} run={@run} />
         </aside>
       </div>
@@ -166,6 +167,29 @@ defmodule AgentExamplesWeb.ExampleComponents do
         Instances stay available while the server runs. Stop an example to release its processes.
       </footer>
     </.shell>
+    """
+  end
+
+  attr :run, :any, required: true
+
+  def delegated_work(assigns) do
+    ~H"""
+    <section :if={@run && @run.snapshot.tasks != []} class="panel delegated-work" id="tasks">
+      <div class="section-heading">
+        <h2>Delegated work</h2><span>{length(@run.snapshot.tasks)} tasks</span>
+      </div>
+      <div class="delegated-work-scroll">
+        <details :for={task <- Enum.sort_by(@run.snapshot.tasks, & &1.id, :desc)}>
+          <summary>
+            <strong>{task.member}</strong><span class="status-pill">{if task.result == :timeout,
+              do: "Timed out",
+              else: task.status}</span>
+          </summary>
+          <p class="muted">Task ID: {task.id}</p>
+          <pre>{if task.result == :timeout, do: "The delegated task exceeded its deadline.", else: result_text(task.result)}</pre>
+        </details>
+      </div>
+    </section>
     """
   end
 
@@ -262,108 +286,15 @@ defmodule AgentExamplesWeb.ExampleComponents do
       <div class="section-heading">
         <h2>Live topology</h2><span id="member-count">{length(members(@run))} members</span>
       </div>
-      <.topology
-        members={members(@run)}
-        children={if @run, do: @run.snapshot.children, else: %{}}
-        orchestrator={@orchestrator}
-        compact={@compact}
+      <.live_component
+        module={AgentExamplesWeb.TeamTree}
+        id="team-tree"
+        run={@run}
+        root_name={if @orchestrator, do: "Orchestrator", else: "Team"}
       />
       {render_slot(@inner_block)}
-      <div :if={@run && @run.snapshot.tasks != []} class="task-list" id="tasks">
-        <h3>Delegated work</h3><div :for={task <- @run.snapshot.tasks}>
-          <strong>{task.member}</strong><span class="status-pill">{task.status}</span><p>
-            {result_text(task.result)}
-          </p>
-        </div>
-      </div>
     </section>
     """
-  end
-
-  attr :run, :any, required: true
-
-  def team_activity(assigns) do
-    assigns =
-      assign(
-        assigns,
-        :agents,
-        if(assigns.run, do: agent_activities(assigns.run.snapshot), else: [])
-      )
-
-    ~H"""
-    <section :if={@run} class="panel team-activity" id="team-activity">
-      <div class="section-heading">
-        <h2>What the team is doing</h2>
-        <span>{Enum.count(
-          @agents,
-          &(active?(@run) && &1.activity.status in [:setup, :running, :waiting])
-        )} active · {length(@agents)} agents</span>
-      </div>
-      <div class="agent-activity-grid">
-        <article
-          :for={agent <- @agents}
-          class="agent-activity"
-          data-agent={agent.path}
-          data-status={if active?(@run), do: agent.activity.status, else: :stopped}
-        >
-          <div class="agent-activity-heading">
-            <strong>{agent.path}</strong><span class="status-pill">{if active?(@run),
-              do: agent.activity.stage,
-              else: "Stopped"}</span>
-          </div>
-          <p class="muted">Model turns: {agent.activity.iteration}</p>
-          <p :if={agent.activity.task} class="agent-task">{agent.activity.task}</p>
-          <div :if={agent.activity.tools != []} class="agent-tools">
-            <p class="muted">Tools used for this task · latest first</p>
-            <details
-              :for={tool <- Enum.reverse(agent.activity.tools)}
-              id={
-                if tool[:id],
-                  do: "tool-#{Base.url_encode64(agent.path <> ":" <> tool.id, padding: false)}"
-              }
-              data-tool-status={tool.status}
-            >
-              <summary>
-                {tool.label}<span>{case tool.status do
-                  :pending -> "Pending result"
-                  :completed -> "Succeeded"
-                  :failed -> "Failed"
-                  :unfinished -> "Run ended without result"
-                end}</span>
-              </summary>
-              <small>Tool: {tool.name}</small>
-              <pre>{tool.input}</pre>
-              <details :if={tool.result}>
-                <summary>Tool result</summary><pre>{tool.result}</pre>
-              </details>
-            </details>
-          </div>
-          <details
-            :if={agent.activity.output not in [nil, ""]}
-            open={agent.activity.status == :running}
-          >
-            <summary>
-              {if agent.activity.status == :completed, do: "Answer", else: "Latest output"}
-            </summary>
-            <pre>{agent.activity.output}</pre>
-          </details>
-          <p :if={agent.activity.error} class="error-banner">{result_text(agent.activity.error)}</p>
-        </article>
-      </div>
-    </section>
-    """
-  end
-
-  defp agent_activities(snapshot, path \\ ["Orchestrator"]) do
-    own =
-      if snapshot.activity,
-        do: [%{path: Enum.join(path, " / "), activity: snapshot.activity}],
-        else: []
-
-    own ++
-      Enum.flat_map(Enum.sort_by(snapshot.children, &elem(&1, 0)), fn {name, child} ->
-        agent_activities(child, path ++ [name])
-      end)
   end
 
   def active?(nil), do: false

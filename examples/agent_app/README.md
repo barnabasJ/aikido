@@ -235,11 +235,15 @@ The default runtime uses DurableServer with a local EKV store under
 for a stable directory, or supply a shared DurableServer backend. Agent and
 slice serialization callbacks remain supported.
 
-The research-team page shows live activity cards for the orchestrator and every
-AI descendant, including dynamically spawned workers and nested teams. Existing
-AgentServer subscriptions update each card's task, model-turn count, pending tool
-results and answer. “Tool calls pending” includes time spent in gates or delegated
-work; it does not claim that a tool is executing CPU work. This view does not poll.
+The signal-team, nested-teams and research-team pages share a live ownership
+tree. Nodes show names and status colors; teams have larger nodes. Select a node
+to open its current state, task, model-turn count, tool inputs/results and answer.
+Existing AgentServer subscriptions update the diagram and open popup without
+polling. Enter opens a focused node, Escape closes the popup, and branch focus
+with parent/root navigation explores deeper teams. Each diagram shows at most
+80 nodes across four levels; the underlying team is not limited by that view.
+“Tool calls pending” includes time spent in gates or delegated work; it does not
+claim that a tool is executing CPU work.
 
 In the team example, **Run Lua script** is the model-facing `run_lua` tool. AshLua
 exposes the domain's `agents` namespace: `members`, `spawn`, `delegate`, `stop`

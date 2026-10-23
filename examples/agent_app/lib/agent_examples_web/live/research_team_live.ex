@@ -8,12 +8,18 @@ defmodule AgentExamplesWeb.ResearchTeamLive do
   def handle_event("ask", %{"query" => query}, socket),
     do: ExamplePage.command(socket, :ask, %{query: query})
 
+  defp default_task do
+    "Design a reliable order-processing workflow using agents. Split architecture, failure recovery, and verification across specialist teams; have them delegate focused subproblems, then combine their findings into a concrete proposal with trade-offs."
+  end
+
   def render(assigns) do
     ~H"""
     <.page {assigns}>
-      <.team_activity run={@run} />
-      <.conversation run={@run} prompt="orchestrate: Signals carry results" />
       <.team_topology run={@run} orchestrator />
+      <.conversation
+        run={@run}
+        prompt={if @mode == "offline", do: "orchestrate: " <> default_task(), else: default_task()}
+      />
     </.page>
     """
   end

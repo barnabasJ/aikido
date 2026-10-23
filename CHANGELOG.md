@@ -23,6 +23,10 @@
 
 ### Changed
 
+- Use compact, named live trees across team examples, with status colors, branch
+  navigation and continuously updated agent detail dialogs instead of card grids.
+  Keep delegated work in a bounded sidebar above signal activity.
+
 - Encourage AI research teams to create focused squads and nested subteams, with
   recursive squad templates and explicit delegation depth instructions.
 

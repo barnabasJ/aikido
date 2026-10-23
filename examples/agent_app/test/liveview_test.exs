@@ -255,7 +255,10 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert has_element?(view, "#member-count", "3 members")
     view |> element("#team-add") |> render_click()
     await(owner, "team", &(&1.snapshot.children["counter"].own.count == 11))
-    assert has_element?(view, ".member-state", "count: 11")
+    view |> element("#team-tree [data-node=counter]") |> render_click()
+    assert has_element?(view, "#agent-details", "count: 11")
+    view |> element("#agent-details button", "Close") |> render_click()
+    refute has_element?(view, "#agent-details")
   end
 
   test "the AI team page runs orchestration, Lua, and dynamic helpers", %{conn: conn} do
@@ -270,19 +273,17 @@ defmodule AgentExamplesWeb.LiveViewTest do
     await(owner, "research-team", &(&1.status == :completed), 30_000)
     assert has_element?(view, "#messages", "Words: 3")
     assert has_element?(view, "#messages", "Lua:")
-    assert has_element?(view, ".subworker", "analyst-helper")
+    assert has_element?(view, "#team-tree [data-node=analyst-helper]")
     assert has_element?(view, "#member-count", "4 members")
-    assert has_element?(view, "#tasks", "completed")
-    assert has_element?(view, "#team-activity [data-agent=Orchestrator]", "Completed")
-
-    assert has_element?(
-             view,
-             "#team-activity [data-agent='Orchestrator / analyst']",
-             "Model turns:"
-           )
-
-    assert has_element?(view, "#team-activity [data-agent='Orchestrator / analyst-helper']")
-    assert has_element?(view, "#team-activity", "Succeeded")
+    assert has_element?(view, ".inspector #tasks", "completed")
+    assert has_element?(view, ".inspector #tasks + #signal-activity")
+    assert has_element?(view, "#team-tree [data-agent=Orchestrator]", "Completed")
+    view |> element("#team-tree [data-agent='Orchestrator / analyst']") |> render_click()
+    assert has_element?(view, "#agent-details", "Model turns:")
+    assert has_element?(view, "#agent-details", "Succeeded")
+    view |> element("#agent-details button", "Focus on this branch") |> render_click()
+    assert has_element?(view, "#team-tree [data-node=analyst-helper]")
+    view |> element("#team-tree button", "Up one parent") |> render_click()
 
     {:ok, reloaded, _} = live(conn, "/examples/research-team")
     assert has_element?(reloaded, "#member-count", "4 members")
@@ -301,7 +302,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     )
 
     assert has_element?(view, "#member-count", "4 members")
-    refute has_element?(view, "#team-activity [data-tool-status=failed]")
+    refute has_element?(view, "#agent-details [data-tool-status=failed]")
     refute has_element?(view, "#messages", "Tool error:")
   end
 
@@ -483,7 +484,10 @@ defmodule AgentExamplesWeb.LiveViewTest do
       &(&1.snapshot.children["squad-1"].children["counter"].own.count == 11)
     )
 
-    assert has_element?(view, ".member-state", "count: 11")
+    view |> element("#team-tree [data-agent='Team / squad-1 / counter']") |> render_click()
+    assert has_element?(view, "#agent-details", "count: 11")
+    view |> element("#agent-details button", "Close") |> render_click()
+    refute has_element?(view, "#agent-details")
 
     view |> element("button[phx-click=remove_squad]") |> render_click()
     await(owner, "nested-teams", &(length(&1.snapshot.members) == 2))
@@ -587,10 +591,11 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert Enum.find(snapshot.children["home"].members, &(&1.name == "counter-helper")).owner ==
              "counter"
 
-    assert has_element?(
-             view,
-             "[data-node=lead] [data-node=helper] [data-node=branch] [data-node=inner] [data-node=deeper]"
-           )
+    assert has_element?(view, "#team-tree [data-node=inner]")
+    refute has_element?(view, "#team-tree [data-node=deeper]")
+    view |> element("#team-tree [data-node=branch]") |> render_click()
+    view |> element("#agent-details button", "Focus on this branch") |> render_click()
+    assert has_element?(view, "#team-tree [data-node=deeper]")
 
     refs = Enum.map(tree_pids(snapshot), &{&1, Process.monitor(&1)})
     view |> element("#stop-example") |> render_click()
