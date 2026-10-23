@@ -23,6 +23,8 @@
 
 ### Changed
 
+- Wrap streaming answers and thinking text within example conversation panels.
+
 - Place Quicksort's depth breakdown beside its tree, move run counters above the
   tree, add navigation up one parent, and place signal activity below depth
   without stretching the controls panel.

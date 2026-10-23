@@ -18,3 +18,5 @@
 #sort-depth-breakdown>h2{font-size:15px}#sort-depth-breakdown>p{font-size:12px;line-height:1.6;color:var(--muted)}
 
 .workspace:has(.sort-visualization){align-items:start}.workspace:has(.sort-visualization)>.primary-column>.panel{margin-bottom:0}.sort-sidebar{min-width:0}.sort-sidebar .events code{overflow-wrap:anywhere}
+
+.conversation pre{max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere}
