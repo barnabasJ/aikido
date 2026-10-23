@@ -193,9 +193,12 @@ defmodule AgentExamplesWeb.LiveViewTest do
     checklist |> form("#checklist-form", %{item: "Try LiveView"}) |> render_submit()
     await(owner, "checklist", &(&1.snapshot.own.items == ["Try LiveView"]))
     assert has_element?(checklist, "#checklist", "Try LiveView")
+    assert has_element?(checklist, "#agent-state", ~s(items: ["Try LiveView"]))
     checklist |> element("button[phx-click=complete]") |> render_click()
     await(owner, "checklist", &(&1.snapshot.own.completed == 1))
     assert has_element?(checklist, "#completed-count", "1 completed")
+    assert has_element?(checklist, "#agent-state", "completed: 1")
+    refute has_element?(checklist, "#agent-state", "Try LiveView")
 
     {:ok, notebook, _} = live(conn, "/examples/notebook")
     owner = start(notebook, "notebook")

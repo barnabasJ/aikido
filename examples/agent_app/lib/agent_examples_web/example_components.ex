@@ -126,7 +126,7 @@ defmodule AgentExamplesWeb.ExampleComponents do
             <div class="section-heading">
               <h2>Under the hood</h2><span class="live-dot"></span>
             </div><dl>
-              <dt>Runtime</dt><dd>Aikido.Default</dd><dt>State</dt><dd>Ash resource attributes</dd><dt>
+              <dt>Runtime</dt><dd>Aikido.Default</dd><dt>
                 Instance
               </dt><dd class="instance-id">{if @run, do: @run.record.id, else: "Not started"}</dd><dt :if={
                 Catalog.ai?(@example)
@@ -139,7 +139,21 @@ defmodule AgentExamplesWeb.ExampleComponents do
               <dd :if={Catalog.ai?(@example) && @run} id="active-model">
                 {Map.get(@run.snapshot.ai, :model_label, "Not configured")}
               </dd>
-            </dl><button :if={active?(@run)} id="stop-example" phx-click="stop" class="button danger">Stop example</button>
+            </dl>
+            <details :if={@run && !@run.snapshot.team?} id="agent-state" class="agent-state">
+              <summary>View current agent state</summary>
+              <p class="muted">
+                {inspect(@run.snapshot.resource)} · updates as signals are processed{if @run.status ==
+                                                                                          :stopped,
+                                                                                        do:
+                                                                                          " · last recorded state"}
+              </p>
+              <pre>{inspect(display_state(@run.snapshot), pretty: true, limit: :infinity)}</pre>
+            </details>
+            <p :if={@run && @run.snapshot.team?} class="muted">
+              Select an agent in the team tree to inspect its state and activity.
+            </p>
+            <button :if={active?(@run)} id="stop-example" phx-click="stop" class="button danger">Stop example</button>
           </section>
           <.delegated_work run={@run} />
           <.signal_activity :if={@show_signal_activity} run={@run} />
@@ -169,6 +183,16 @@ defmodule AgentExamplesWeb.ExampleComponents do
     </.shell>
     """
   end
+
+  defp display_state(snapshot) do
+    %{state: snapshot.own}
+    |> include_slice(:ai, if(snapshot.activity, do: snapshot.ai, else: %{}))
+    |> include_slice(:todos, snapshot.todos)
+    |> include_slice(:journal, snapshot.journal)
+  end
+
+  defp include_slice(state, _name, value) when value in [%{}, []], do: state
+  defp include_slice(state, name, value), do: Map.put(state, name, value)
 
   attr :run, :any, required: true
 
