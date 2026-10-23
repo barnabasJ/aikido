@@ -31,6 +31,9 @@
 
 ### Changed
 
+- Surface unknown Lua action inputs with their accepted keys instead of an opaque
+  error reference, preserving every validation error in the response.
+
 - Preserve stopped team members as inspectable grey nodes in the example UI while
   releasing their processes and subscriptions.
 

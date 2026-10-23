@@ -208,7 +208,8 @@ defmodule AgentExamples.AITest do
     scripts = [
       "return agents.delegate({input = {member = 'analyst', text = 'Test'}})",
       "return assert(agents.delegate({input = {member = 'analyst', text = 'Test'}}))",
-      "return agents.spawn({name = 'bad-shape'})"
+      "return agents.spawn({name = 'bad-shape'})",
+      "return agents.remove({input = {name = 'analyst'}})"
     ]
 
     for script <- scripts do
@@ -217,16 +218,25 @@ defmodule AgentExamples.AITest do
                  context: %{aikido: caller}
                })
 
-      assert %{"error" => %{"errors" => [error | _]}} = Jason.decode!(content)
+      assert %{"error" => %{"errors" => [error | _] = errors}} = Jason.decode!(content)
       assert is_binary(error["message"])
-      refute error["code"] == "unknown_error"
+      refute Enum.any?(errors, &(&1["code"] == "unknown_error"))
 
-      if script =~ "delegate" do
-        assert error["code"] == "self_delegation"
-        assert error["message"] =~ "Perform this task directly"
-      else
-        assert error["code"] == "invalid_input_shape"
-        assert error["message"] =~ "input"
+      cond do
+        script =~ "delegate" ->
+          assert error["code"] == "self_delegation"
+          assert error["message"] =~ "Perform this task directly"
+
+        script =~ "remove" ->
+          error = Enum.find(errors, &(&1["code"] == "no_such_input"))
+          assert error
+          assert error["code"] == "no_such_input"
+          assert error["message"] =~ "member"
+          assert error["fields"] == ["name"]
+
+        true ->
+          assert error["code"] == "invalid_input_shape"
+          assert error["message"] =~ "input"
       end
     end
   end
