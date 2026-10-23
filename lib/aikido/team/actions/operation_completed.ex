@@ -1,5 +1,5 @@
 defmodule Aikido.Team.Actions.OperationCompleted do
-  @moduledoc "Acknowledges lifecycle completion while preserving the completed team state."
+  @moduledoc "Releases queued topology commands after lifecycle completion, then retires idle task-scoped workers."
   use Ash.Resource.Actions.Implementation
 
   @impl true

@@ -198,7 +198,7 @@ defmodule Aikido.Durable.AgentServer do
     do: {:stop, stop_reason(reason, runtime), reply, %{state | runtime: runtime}}
 
   # Runtime observations, subscriber bookkeeping and debug reads do not change
-  # the saved projection. Strict synchronization remains the command boundary.
+  # the saved projection. Explicit mode requests sync only for persistent changes.
   defp durable_changed?(previous, next) do
     previous.agent != next.agent or previous.parent != next.parent or
       previous.cron_specs != next.cron_specs

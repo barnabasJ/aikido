@@ -395,7 +395,8 @@ omitted or nil `:function` request callback correctly.
 A per-request options value
 replaces the configured options. Retry defaults are zero. Tool retries must be
 explicitly enabled and are appropriate only when repeating the tool is safe.
-All attempts and backoff share one overall deadline. Cancellation and owner
+When an absolute run deadline is supplied, all attempts and backoff share it.
+Otherwise each attempt receives its configured timeout. Cancellation and owner
 termination stop active model/tool attempts; streaming cancellation also closes
 the ReqLLM stream. A custom client can wrap provider-specific concurrency limits.
 Applications still own cancellation and deadlines inside their Lua request callback.
