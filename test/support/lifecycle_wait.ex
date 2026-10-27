@@ -13,7 +13,7 @@ defmodule AikidoTest.LifecycleWait do
     end
   end
 
-  def restart(pid, timeout \\ 10_000) do
+  def crash_and_await_replacement(pid, timeout \\ 10_000) do
     {:ok, {instance, id, partition}} =
       Aikido.AgentServer.state(pid, &{:ok, {&1.aikido, &1.id, &1.partition}})
 

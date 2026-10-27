@@ -86,7 +86,7 @@ defmodule Aikido.Directives.AsyncTask do
       {:error, reason} ->
         directive
         |> error_signal(reason, state)
-        |> dispatch_signals(input_signal, reply_target(directive, self()), state)
+        |> send_result_signals_to_target(input_signal, result_recipient(directive, self()), state)
     end
 
     :ok
@@ -103,18 +103,18 @@ defmodule Aikido.Directives.AsyncTask do
       Ash.ProcessHelpers.transfer_context(transfer)
 
       Ash.Tracer.span {:custom, :aikido_async_task}, "aikido.async_task", tracers do
-        run_and_dispatch(directive, input_signal, state, agent_pid)
+        run_work_and_send_result_signals(directive, input_signal, state, agent_pid)
       end
     end)
   end
 
-  @spec run_and_dispatch(
+  @spec run_work_and_send_result_signals(
           directive :: AsyncTask.t(),
           input_signal :: Signal.t(),
           state :: State.t(),
           agent_pid :: pid()
         ) :: :ok
-  defp run_and_dispatch(
+  defp run_work_and_send_result_signals(
          %AsyncTask{} = directive,
          %Signal{} = input_signal,
          %State{} = state,
@@ -123,9 +123,14 @@ defmodule Aikido.Directives.AsyncTask do
     signals =
       directive
       |> run_work(input_signal, state)
-      |> normalize_result(directive, state)
+      |> result_signals(directive, state)
 
-    dispatch_signals(signals, input_signal, reply_target(directive, agent_pid), state)
+    send_result_signals_to_target(
+      signals,
+      input_signal,
+      result_recipient(directive, agent_pid),
+      state
+    )
   end
 
   @spec run_work(directive :: AsyncTask.t(), input_signal :: Signal.t(), state :: State.t()) ::
@@ -160,21 +165,21 @@ defmodule Aikido.Directives.AsyncTask do
     }
   end
 
-  @spec normalize_result(result :: term(), directive :: AsyncTask.t(), state :: State.t()) :: [
+  @spec result_signals(result :: term(), directive :: AsyncTask.t(), state :: State.t()) :: [
           Signal.t()
         ]
-  defp normalize_result(%Signal{} = signal, _directive, _state), do: [signal]
-  defp normalize_result({:ok, %Signal{} = signal}, _directive, _state), do: [signal]
-  defp normalize_result({:signals, signals}, _directive, _state), do: valid_signals(signals)
+  defp result_signals(%Signal{} = signal, _directive, _state), do: [signal]
+  defp result_signals({:ok, %Signal{} = signal}, _directive, _state), do: [signal]
+  defp result_signals({:signals, signals}, _directive, _state), do: filter_signal_structs(signals)
 
-  defp normalize_result({:ok, {:signals, signals}}, _directive, _state),
-    do: valid_signals(signals)
+  defp result_signals({:ok, {:signals, signals}}, _directive, _state),
+    do: filter_signal_structs(signals)
 
-  defp normalize_result({:ok, result}, %AsyncTask{} = directive, %State{} = state) do
+  defp result_signals({:ok, result}, %AsyncTask{} = directive, %State{} = state) do
     [success_signal(directive, result, state)]
   end
 
-  defp normalize_result(
+  defp result_signals(
          {:error, %{kind: kind, reason: reason}},
          %AsyncTask{} = directive,
          %State{} = state
@@ -182,20 +187,20 @@ defmodule Aikido.Directives.AsyncTask do
     [error_signal(directive, reason, state, %{kind: kind})]
   end
 
-  defp normalize_result({:error, reason}, %AsyncTask{} = directive, %State{} = state) do
+  defp result_signals({:error, reason}, %AsyncTask{} = directive, %State{} = state) do
     [error_signal(directive, reason, state)]
   end
 
-  defp normalize_result(result, %AsyncTask{} = directive, %State{} = state) do
+  defp result_signals(result, %AsyncTask{} = directive, %State{} = state) do
     [success_signal(directive, result, state)]
   end
 
-  @spec valid_signals(signals :: term()) :: [Signal.t()]
-  defp valid_signals(signals) when is_list(signals) do
+  @spec filter_signal_structs(signals :: term()) :: [Signal.t()]
+  defp filter_signal_structs(signals) when is_list(signals) do
     Enum.filter(signals, &match?(%Signal{}, &1))
   end
 
-  defp valid_signals(_signals), do: []
+  defp filter_signal_structs(_signals), do: []
 
   @spec success_signal(directive :: AsyncTask.t(), result :: term(), state :: State.t()) ::
           Signal.t()
@@ -223,31 +228,40 @@ defmodule Aikido.Directives.AsyncTask do
   defp signal_source(%AsyncTask{source: source}, _state) when is_binary(source), do: source
   defp signal_source(_directive, %State{} = state), do: "/agent/#{state.id}/async_task"
 
-  @spec reply_target(directive :: AsyncTask.t(), agent_pid :: pid()) :: GenServer.server()
-  defp reply_target(%AsyncTask{target: nil}, agent_pid), do: agent_pid
-  defp reply_target(%AsyncTask{target: target}, _agent_pid), do: target
+  @spec result_recipient(directive :: AsyncTask.t(), agent_pid :: pid()) :: GenServer.server()
+  defp result_recipient(%AsyncTask{target: nil}, agent_pid), do: agent_pid
+  defp result_recipient(%AsyncTask{target: target}, _agent_pid), do: target
 
-  @spec dispatch_signals(
+  @spec send_result_signals_to_target(
           signals :: [Signal.t()] | Signal.t(),
           input_signal :: Signal.t(),
           target :: GenServer.server(),
           state :: State.t()
         ) :: :ok
-  defp dispatch_signals(%Signal{} = signal, %Signal{} = input_signal, target, %State{} = state) do
-    dispatch_signals([signal], input_signal, target, state)
+  defp send_result_signals_to_target(
+         %Signal{} = signal,
+         %Signal{} = input_signal,
+         target,
+         %State{} = state
+       ) do
+    send_result_signals_to_target([signal], input_signal, target, state)
   end
 
-  defp dispatch_signals(signals, %Signal{} = input_signal, target, %State{} = state)
+  defp send_result_signals_to_target(signals, %Signal{} = input_signal, target, %State{} = state)
        when is_list(signals) do
     Enum.each(signals, fn signal ->
-      safe_cast(target, Aikido.Signal.inherit(signal, input_signal), state)
+      send_signal_or_log_failure(target, Aikido.Signal.inherit(signal, input_signal), state)
     end)
 
     :ok
   end
 
-  @spec safe_cast(target :: GenServer.server(), signal :: Signal.t(), state :: State.t()) :: :ok
-  defp safe_cast(target, %Signal{} = signal, %State{} = state) do
+  @spec send_signal_or_log_failure(
+          target :: GenServer.server(),
+          signal :: Signal.t(),
+          state :: State.t()
+        ) :: :ok
+  defp send_signal_or_log_failure(target, %Signal{} = signal, %State{} = state) do
     _ = AgentServer.cast(target, signal)
     :ok
   rescue

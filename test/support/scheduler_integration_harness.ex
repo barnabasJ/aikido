@@ -1,3 +1,47 @@
+defmodule AikidoTest.Support.SchedulerIntegrationHarness.Signals.RegisterCron do
+  @moduledoc false
+  use Aikido.Signal
+
+  signal do
+    type "register_cron"
+
+    schema do
+      attribute :cron, :string do
+        description "Cron expression used to schedule delivery."
+        allow_nil? false
+      end
+
+      attribute :job_id, :term do
+        description "Identity of the recurring job."
+      end
+
+      attribute :timezone, :string do
+        description "Timezone used to interpret the cron expression."
+      end
+
+      attribute :message, :term do
+        description "Signal delivered when the job fires."
+      end
+    end
+  end
+end
+
+defmodule AikidoTest.Support.SchedulerIntegrationHarness.Signals.CancelCron do
+  @moduledoc false
+  use Aikido.Signal
+
+  signal do
+    type "cancel_cron"
+
+    schema do
+      attribute :job_id, :term do
+        description "Identity of the recurring job."
+        allow_nil? false
+      end
+    end
+  end
+end
+
 defmodule AikidoTest.Support.SchedulerIntegrationHarness.Actions.RecordTick do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
@@ -73,40 +117,23 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.CronAgent do
       end
     end
 
-    route "register_cron",
-          {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :register_cron},
+    route AikidoTest.Support.SchedulerIntegrationHarness.Signals.RegisterCron,
+          AikidoTest.Support.SchedulerIntegrationHarness.Actions.RegisterCron,
           public?: false
 
-    route "cancel_cron", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cancel_cron},
-      public?: false
+    route AikidoTest.Support.SchedulerIntegrationHarness.Signals.CancelCron,
+          AikidoTest.Support.SchedulerIntegrationHarness.Actions.CancelCron,
+          public?: false
 
-    route "cron.tick", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cron_count},
-      public?: false
+    route "cron.tick", :record_tick, public?: false
   end
 
   actions do
-    action :cron_count, Aikido.Types.ActionResult do
-      argument :state, :term
+    action :record_tick, Aikido.Types.ActionResult do
+      public? false
+      argument :state, :map, allow_nil?: false
       argument :data, :map, default: %{}
-
       run AikidoTest.Support.SchedulerIntegrationHarness.Actions.RecordTick
-    end
-
-    action :register_cron, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :cron, :string, allow_nil?: false
-      argument :job_id, :term
-      argument :timezone, :string
-      argument :message, :term
-
-      run AikidoTest.Support.SchedulerIntegrationHarness.Actions.RegisterCron
-    end
-
-    action :cancel_cron, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :job_id, :term, allow_nil?: false
-
-      run AikidoTest.Support.SchedulerIntegrationHarness.Actions.CancelCron
     end
   end
 end
@@ -131,12 +158,20 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.ScheduledCronAgent do
       end
     end
 
-    route "cron.tick", {AikidoTest.Support.SchedulerIntegrationHarness.CronAgent, :cron_count},
-      public?: false
+    route "cron.tick", :record_tick, public?: false
   end
 
   schedules do
     schedule "* * * * * * *", "cron.tick", job_id: :scheduled_heartbeat
+  end
+
+  actions do
+    action :record_tick, Aikido.Types.ActionResult do
+      public? false
+      argument :state, :map, allow_nil?: false
+      argument :data, :map, default: %{}
+      run AikidoTest.Support.SchedulerIntegrationHarness.Actions.RecordTick
+    end
   end
 end
 
@@ -192,7 +227,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
   end
 
   @doc """
-  Wait for `job_id` to be registered (and alive) in `state.cron_jobs`.
+  Wait for `job_id` to be registered (and alive) in `state.agent.state.cron.jobs`.
 
   Uses subscriptions; see `AikidoTest.AgentWait.await_state_value/3`.
   """
@@ -200,7 +235,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness do
     AikidoTest.AgentWait.await_state_value(
       pid,
       fn s ->
-        case Map.get(s.cron_jobs, job_id) do
+        case Map.get(s.agent.state.cron.jobs, job_id) do
           job_pid when is_pid(job_pid) ->
             if Process.alive?(job_pid) do
               job_pid

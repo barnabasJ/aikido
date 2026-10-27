@@ -2,7 +2,7 @@ defmodule Aikido.Agent do
   @moduledoc """
   Immutable agent identity and typed state.
 
-  Declare agents as Ash resources with `Aikido.Ash.Agent`. The convenience
+  Declare agents as Ash resources with `Aikido.Agent.Extension`. The convenience
   `use Aikido.Agent` merges that extension into native `Ash.Resource` options.
   Pass `domain: MyApp.Agents` for your application's domain. The shared runtime
   domain is the default; ordinary Ash domain-inclusion validation stays enabled.
@@ -15,7 +15,7 @@ defmodule Aikido.Agent do
     opts =
       opts
       |> Keyword.put_new(:domain, Aikido.RuntimeDomain)
-      |> Keyword.update(:extensions, [Aikido.Ash.Agent], &[Aikido.Ash.Agent | &1])
+      |> Keyword.update(:extensions, [Aikido.Agent.Extension], &[Aikido.Agent.Extension | &1])
 
     quote do
       use Ash.Resource, unquote(opts)
@@ -50,6 +50,49 @@ defmodule Aikido.Agent do
   end
 
   @type t :: %__MODULE__{}
+
+  @doc """
+  Derives a deterministic child ID from its parent's stable ID and child name.
+
+  Names are escaped as one path component, so a child named `"a/b"` does not
+  collide with child `"b"` beneath child `"a"`. Reuse a root ID to recover the
+  same workflow execution; give a new execution its own root ID.
+  """
+  @spec child_id(String.t(), term()) :: String.t()
+  def child_id(parent_id, name) when is_binary(parent_id),
+    do: parent_id <> "/" <> child_name_component(name)
+
+  defp child_name_component(name) do
+    name |> to_string() |> URI.encode(&URI.char_unreserved?/1)
+  rescue
+    _error in [Protocol.UndefinedError, ArgumentError] ->
+      "term:" <>
+        (name |> :erlang.term_to_binary([:deterministic]) |> Base.url_encode64(padding: false))
+  end
+
+  @doc "Project an agent's domain state onto its declared resource attributes."
+  def resource_attributes(%__MODULE__{agent_module: resource} = agent) do
+    fields = Aikido.Agent.Info.state_fields(resource)
+    own_state = Map.get(agent.state, Aikido.Agent.Info.agent_path!(resource), %{})
+
+    Map.new(Ash.Resource.Info.attributes(resource), fn attribute ->
+      value =
+        cond do
+          attribute.name == :id -> agent.id
+          attribute.name in fields -> Map.get(own_state, attribute.name)
+          true -> Map.get(agent.state, attribute.name)
+        end
+
+      {attribute.name, value}
+    end)
+  end
+
+  @doc "Restore routed state paths from a natively cast agent resource record."
+  def state_from_resource(%{__struct__: resource} = record) do
+    mounts = Map.take(record, Aikido.Agent.Info.slice_paths(resource))
+    own = Map.take(record, Aikido.Agent.Info.state_fields(resource))
+    Map.put(mounts, Aikido.Agent.Info.agent_path!(resource), own)
+  end
 
   @doc "Optional durable checkpoint serialization."
   @callback checkpoint(agent :: t(), ctx :: map()) :: {:ok, map()} | {:error, term()}

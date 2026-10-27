@@ -5,17 +5,15 @@ defmodule AgentExamples.Source do
            [
              "examples/agent_app/lib/agent_examples/**/*.ex",
              "lib/aikido/ai.ex",
-             "lib/aikido/slices/ai_react.ex",
-             "lib/aikido/slices/ai_react/**/*.ex",
-             "lib/aikido/slices/ai_worker.ex",
-             "lib/aikido/slices/ai_worker/**/*.ex",
-             "lib/aikido/slices/todo.ex",
-             "lib/aikido/slices/todo/**/*.ex",
-             "lib/aikido/ash/ai.ex",
-             "lib/aikido/ash/team.ex",
-             "lib/aikido/ash/team/*.ex",
-             "lib/aikido/ash/team/actions/*.ex",
-             "lib/aikido/ash/team/types/*.ex"
+             "lib/aikido/ai_react/**/*.ex",
+             "lib/aikido/ai_worker/**/*.ex",
+             "lib/aikido/todo/**/*.ex",
+             "lib/aikido/cron/**/*.ex",
+             "lib/aikido/ai/extension.ex",
+             "lib/aikido/team/extension.ex",
+             "lib/aikido/team/*.ex",
+             "lib/aikido/team/actions/*.ex",
+             "lib/aikido/team/types/*.ex"
            ],
            &Path.wildcard(Path.join(@root, &1))
          )
@@ -64,13 +62,34 @@ defmodule AgentExamples.Source do
 
                      category =
                        cond do
-                         Aikido.Signal in contracts -> :signal
-                         Aikido.Ash.Agent in contracts || Aikido.Agent in contracts -> :agent
-                         Aikido.Ash.Slice in contracts || Aikido.Slice in contracts -> :slice
-                         Aikido.Directive in contracts -> :directive
-                         Ash.Resource.Actions.Implementation in contracts -> :action
-                         Ash.Domain in contracts -> :domain
-                         true -> :support
+                         Aikido.Signal in contracts ->
+                           :signal
+
+                         Aikido.Agent.Extension in contracts || Aikido.Agent in contracts ->
+                           :agent
+
+                         Aikido.Slice.Extension in contracts || Aikido.Slice in contracts ->
+                           :slice
+
+                         Aikido.Directive in contracts ->
+                           :directive
+
+                         Ash.Resource.Actions.Implementation in contracts and
+                             "Tools" in Module.split(module) ->
+                           :tool
+
+                         Ash.Resource.Actions.Implementation in contracts and
+                             "Commands" in Module.split(module) ->
+                           :command
+
+                         Ash.Resource.Actions.Implementation in contracts ->
+                           :action
+
+                         Ash.Domain in contracts ->
+                           :domain
+
+                         true ->
+                           :support
                        end
 
                      [
@@ -94,14 +113,14 @@ defmodule AgentExamples.Source do
   @ai_owners [
     AgentExamples.AI,
     Aikido.AI,
-    Aikido.Ash.AI,
-    Aikido.Slices.AiReact,
-    Aikido.Slices.AiWorker
+    Aikido.AI.Extension,
+    Aikido.AiReact,
+    Aikido.AiWorker
   ]
 
   def for_example(example) do
     modules =
-      modules(example.slug) ++
+      supporting_modules(example.slug) ++
         [
           example.resource,
           AgentExamples.Agents
@@ -116,7 +135,8 @@ defmodule AgentExamples.Source do
            end))
     end)
     |> Enum.sort_by(fn entry ->
-      {if(entry.module == example.resource, do: 0, else: rank(entry.category)), entry.name}
+      {if(entry.module == example.resource, do: 0, else: source_kind_rank(entry.category)),
+       entry.name}
     end)
     |> Enum.map(
       &Map.merge(&1, %{
@@ -126,41 +146,50 @@ defmodule AgentExamples.Source do
     )
   end
 
-  defp modules("hook-requests"), do: [AgentExamples.Playground]
+  defp supporting_modules(slug) when slug in ["adaptive-tools", "verified-work", "resilience"],
+    do: [AgentExamples.Scenarios, Aikido.Todo]
 
-  defp modules("conversation"), do: [Aikido.Slices.Todo]
+  defp supporting_modules("hook-requests"), do: [AgentExamples.Playground]
 
-  defp modules("counter"), do: []
-  defp modules("checklist"), do: []
-  defp modules("notebook"), do: [AgentExamples.Journal]
-  defp modules("worker"), do: []
+  defp supporting_modules("verified-team"), do: [Aikido.Team, Aikido.Todo]
 
-  defp modules("team"),
+  defp supporting_modules("conversation"), do: [Aikido.Todo]
+
+  defp supporting_modules("cron"), do: [Aikido.Cron]
+  defp supporting_modules("counter"), do: []
+  defp supporting_modules("checkpoint"), do: [AgentExamples.Counter.Actions.Increment]
+  defp supporting_modules("checklist"), do: []
+  defp supporting_modules("notebook"), do: [AgentExamples.Journal]
+  defp supporting_modules("worker"), do: []
+
+  defp supporting_modules("team"),
     do: [
-      Aikido.Ash.Team,
+      Aikido.Team,
       AgentExamples.Counter,
       AgentExamples.Notebook,
       AgentExamples.Worker,
       AgentExamples.Journal
     ]
 
-  defp modules("research-team"),
+  defp supporting_modules("research-team"),
     do: [
       AgentExamples.Researcher,
       AgentExamples.Reviewer,
       AgentExamples.ResearchSquad,
-      Aikido.Ash.Team
+      Aikido.Team
     ]
 
-  defp modules("nested-teams"),
-    do: [AgentExamples.Team | modules("team")]
+  defp supporting_modules("nested-teams"),
+    do: [AgentExamples.Team | supporting_modules("team")]
 
-  defp modules(_), do: []
-  defp rank(:agent), do: 1
-  defp rank(:slice), do: 2
-  defp rank(:signal), do: 3
-  defp rank(:action), do: 4
-  defp rank(:directive), do: 5
-  defp rank(:domain), do: 6
-  defp rank(_), do: 7
+  defp supporting_modules(_), do: []
+  defp source_kind_rank(:agent), do: 1
+  defp source_kind_rank(:slice), do: 2
+  defp source_kind_rank(:signal), do: 3
+  defp source_kind_rank(:action), do: 4
+  defp source_kind_rank(:tool), do: 4
+  defp source_kind_rank(:command), do: 4
+  defp source_kind_rank(:directive), do: 5
+  defp source_kind_rank(:domain), do: 6
+  defp source_kind_rank(_), do: 7
 end

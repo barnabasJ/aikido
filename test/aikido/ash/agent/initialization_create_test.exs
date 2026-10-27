@@ -2,7 +2,7 @@ defmodule Aikido.InitializationCreateTest.Hooks do
   use Ash.Resource.Change
 
   @impl true
-  def change(changeset, _opts, context) do
+  def change(changeset, opts, context) do
     changeset
     |> Ash.Changeset.before_action(fn changeset ->
       Ash.Changeset.force_change_attribute(changeset, :observed, %{
@@ -16,7 +16,7 @@ defmodule Aikido.InitializationCreateTest.Hooks do
         {:error,
          Ash.Error.Changes.InvalidAttribute.exception(field: :count, message: "hook rejected")}
       else
-        {:ok, %{record | count: record.count + 1}}
+        {:ok, %{record | count: record.count + Keyword.get(opts, :increment, 1)}}
       end
     end)
   end
@@ -27,6 +27,7 @@ defmodule Aikido.InitializationCreateTest.Slice do
 
   slice do
     name "initialization_create_slice"
+    initialize {Aikido.InitializationCreateTest.Hooks, increment: 2}
 
     schema do
       attribute :count, :integer do
@@ -40,10 +41,6 @@ defmodule Aikido.InitializationCreateTest.Slice do
         default %{}
       end
     end
-  end
-
-  changes do
-    change Aikido.InitializationCreateTest.Hooks, on: [:create]
   end
 
   policies do
@@ -113,7 +110,7 @@ defmodule Aikido.InitializationCreateTest do
              )
 
     assert agent.state.state.count == 3
-    assert agent.state.mounted.count == 8
+    assert agent.state.mounted.count == 9
     observed = %{actor: actor, tenant: "tenant", marker: "application context"}
     assert agent.state.state.observed == observed
     assert agent.state.mounted.observed == observed
@@ -122,11 +119,21 @@ defmodule Aikido.InitializationCreateTest do
     assert {:ok, []} = Ash.DataLayer.run_query(query, Resource)
 
     create_names =
-      for {:metadata, _, :action, %{action: action}} <- TestTracer.get_spans(),
+      for {:metadata, _, :action, %{resource: resource, action: action}} <- TestTracer.get_spans(),
           action in [:__aikido_initialize_state__, :create],
-          do: action
+          do: {resource, action}
 
-    assert length(create_names) == 2
+    assert {Resource, :__aikido_initialize_state__} in create_names
+    assert {Slice, :create} in create_names
+    assert {Aikido.Cron.Slice, :create} in create_names
+  end
+
+  test "configured initialization applies to creation without changing update behavior" do
+    actor = %{slice_allowed: true}
+    record = Ash.create!(Slice, %{}, actor: actor)
+    assert record.count == 6
+    updated = Ash.update!(record, %{count: "11"}, actor: actor)
+    assert updated.count == 11
   end
 
   test "own-state and mounted create actions retain their separate authorization boundaries" do
@@ -155,7 +162,7 @@ defmodule Aikido.InitializationCreateTest do
              Resource.initialize(%{state: %{count: "9", ignored: true}}, authorize?: false)
 
     assert agent.state.state.count == 10
-    assert agent.state.mounted.count == 5
+    assert agent.state.mounted.count == 6
 
     for {state, path} <- [
           {%{state: %{count: "invalid"}}, :state},

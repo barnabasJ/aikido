@@ -1,3 +1,11 @@
+defmodule Aikido.RuntimeNativeContractTest.Signals.Invalid do
+  use Aikido.Signal
+
+  signal do
+    type "invalid.directive"
+  end
+end
+
 defmodule Aikido.RuntimeNativeContractTest.RawResult do
   use Ash.Resource.Actions.Implementation
 
@@ -23,14 +31,8 @@ defmodule Aikido.RuntimeNativeContractTest.InvalidDirectiveAgent do
       end
     end
 
-    route "invalid.directive", :invalid
-  end
-
-  actions do
-    action :invalid, Aikido.Types.ActionResult do
-      argument :state, :term
-      run Aikido.RuntimeNativeContractTest.RawResult
-    end
+    route Aikido.RuntimeNativeContractTest.Signals.Invalid,
+          Aikido.RuntimeNativeContractTest.RawResult
   end
 end
 
@@ -38,7 +40,7 @@ defmodule Aikido.RuntimeNativeContractTest.ScopedWorker do
   use Ash.Resource,
     domain: Aikido.RuntimeDomain,
     validate_domain_inclusion?: false,
-    extensions: [Aikido.Ash.Agent],
+    extensions: [Aikido.Agent.Extension],
     authorizers: [Ash.Policy.Authorizer]
 
   agent do
@@ -56,7 +58,7 @@ defmodule Aikido.RuntimeNativeContractTest.ScopedTeam do
   use Ash.Resource,
     domain: Aikido.RuntimeDomain,
     validate_domain_inclusion?: false,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
 
   agent do
     name "scoped_team"
@@ -87,10 +89,37 @@ defmodule Aikido.RuntimeNativeContractTest do
     assert {:ok, 0} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.state.count})
   end
 
+  test "periodic synchronization writes changed state on the native interval", %{aikido: instance} do
+    {:ok, pid} =
+      AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Counter,
+        sync: %{mode: :periodic, interval_ms: 1_000}
+      )
+
+    :ok = Aikido.AgentServer.await_ready(pid)
+    function = {Aikido.Durable.AgentServer, :dump_state, 1}
+    :erlang.trace_pattern(function, true, [])
+    :erlang.trace(pid, true, [:call])
+    on_exit(fn -> :erlang.trace_pattern(function, false, []) end)
+
+    assert {:ok, 1} =
+             Aikido.AgentServer.call(
+               pid,
+               Aikido.Signal.new!("increment", %{amount: 1}),
+               &{:ok, &1.agent.state.domain.counter}
+             )
+
+    assert_receive {:trace, ^pid, :call, {Aikido.Durable.AgentServer, :dump_state, _}}, 3_000
+    refute :sys.get_state(pid).auto_sync
+  end
+
   test "runtime reads and subscriptions do not dump snapshots, while state changes sync", %{
     aikido: instance
   } do
-    {:ok, pid} = AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Counter)
+    {:ok, pid} =
+      AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Counter,
+        sync: %{mode: :explicit}
+      )
+
     :ok = Aikido.AgentServer.await_ready(pid)
 
     function = {Aikido.Durable.AgentServer, :dump_state, 1}
@@ -117,7 +146,10 @@ defmodule Aikido.RuntimeNativeContractTest do
   end
 
   test "callback dispatch subscribes before an immediately completed command", %{aikido: instance} do
-    {:ok, pid} = AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Counter)
+    {:ok, pid} =
+      AikidoTest.Case.start_test_agent(instance, AikidoTest.TestAgents.Counter,
+        sync: %{mode: :explicit}
+      )
 
     dispatch = fn ->
       Aikido.AgentServer.call(pid, Aikido.Signal.new!("increment", %{amount: 3}), fn _ ->

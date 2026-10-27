@@ -149,8 +149,9 @@ defmodule Aikido.Telemetry.Config do
   defp instance_telemetry(instance, key), do: instance_option(instance, :telemetry, key)
   defp instance_observability(instance, key), do: instance_option(instance, :observability, key)
 
-  defp instance_option(instance, section, key) do
-    if Spark.Dsl.is?(instance, Aikido.Instance.Host) do
+  defp instance_option(instance, section, key) when is_atom(instance) do
+    if function_exported?(instance, :spark_is, 0) and
+         Spark.Dsl.is?(instance, Aikido.Instance.Host) do
       instance
       |> Aikido.config()
       |> Keyword.get(section, [])

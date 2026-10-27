@@ -17,6 +17,7 @@ defmodule Aikido.Durable do
     partition: [type: :any],
     permanent: [type: :boolean, default: true],
     data_dir: [type: :string],
+    ekv_options: [type: :keyword_list, default: []],
     prefix: [type: :string],
     backend: [type: :any],
     durable_options: [type: :keyword_list, default: []]
@@ -39,6 +40,19 @@ defmodule Aikido.Durable do
   @impl true
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
+    {stores, backend} = storage_children(opts, name)
+    durable_opts = durable_supervisor_options(opts, name, backend)
+    Supervisor.init(stores ++ [{DurableServer.Supervisor, durable_opts}], strategy: :rest_for_one)
+  end
+
+  defp storage_children(opts, name) do
+    case Keyword.fetch(opts, :backend) do
+      {:ok, backend} -> {[], backend}
+      :error -> local_ekv_storage(opts, name)
+    end
+  end
+
+  defp local_ekv_storage(opts, name) do
     ekv = Module.concat(name, Store)
 
     directory =
@@ -46,17 +60,28 @@ defmodule Aikido.Durable do
         Path.join([File.cwd!(), "_build", "aikido_durable", Atom.to_string(name)])
       end)
 
-    {stores, backend} =
-      case Keyword.fetch(opts, :backend) do
-        {:ok, backend} ->
-          {[], backend}
+    store_options =
+      [cluster_size: 1, node_id: "local", shards: 1]
+      |> Keyword.merge(opts[:ekv_options])
+      |> Keyword.merge(name: ekv, data_dir: directory)
 
-        :error ->
-          {[{EKV, name: ekv, data_dir: directory, cluster_size: 1, node_id: "local", shards: 1}],
-           {DurableServer.Backends.EKVStore, name: ekv}}
-      end
+    {[{EKV, store_options}], {DurableServer.Backends.EKVStore, name: ekv}}
+  end
 
-    config = %{
+  defp durable_supervisor_options(opts, name, backend) do
+    durable = Keyword.get(opts, :durable_options, [])
+    info = Map.put(durable[:init_info] || %{}, :aikido_config, activation_defaults(opts))
+
+    Keyword.merge(durable,
+      name: name,
+      prefix: Keyword.get(opts, :prefix, "aikido/#{name}/"),
+      backend: backend,
+      init_info: info
+    )
+  end
+
+  defp activation_defaults(opts) do
+    %{
       agent: opts[:agent],
       agent_opts: Keyword.get(opts, :agent_opts, []),
       aikido:
@@ -68,29 +93,16 @@ defmodule Aikido.Durable do
       partition: opts[:partition],
       permanent: Keyword.get(opts, :permanent, true)
     }
-
-    durable_opts =
-      Keyword.get(opts, :durable_options, [])
-      |> Keyword.merge(
-        name: name,
-        prefix: Keyword.get(opts, :prefix, "aikido/#{name}/"),
-        backend: backend,
-        init_info:
-          Map.put(
-            Keyword.get(opts, :durable_options, [])[:init_info] || %{},
-            :aikido_config,
-            config
-          )
-      )
-
-    Supervisor.init(stores ++ [{DurableServer.Supervisor, durable_opts}], strategy: :rest_for_one)
   end
 
-  def start(name, key, opts \\ []), do: activate(name, key, opts, :start_child)
+  @doc "Activates an identity with native DurableServer caller/placement options as the final argument."
+  def start(name, key, opts \\ [], start_options \\ []),
+    do: activate(name, key, opts, start_options, :start_child)
 
-  def ensure_started(name, key, opts \\ []), do: activate(name, key, opts, :ensure_started_child)
+  def ensure_started(name, key, opts \\ [], start_options \\ []),
+    do: activate(name, key, opts, start_options, :ensure_started_child)
 
-  defp activate(name, key, opts, operation) do
+  defp activate(name, key, opts, start_options, operation) do
     config = config(name)
     partition = Keyword.get(opts, :partition, config.partition)
     agent = Keyword.get(opts, :agent, config.agent)
@@ -112,7 +124,7 @@ defmodule Aikido.Durable do
 
     spec = {Aikido.Durable.AgentServer, key: key(key, partition), initial_state: initial}
 
-    case apply(DurableServer.Supervisor, operation, [name, spec]) do
+    case apply(DurableServer.Supervisor, operation, [name, spec, start_options]) do
       {:ok, {pid, _}} -> {:ok, pid}
       {:error, {:already_started, {pid, _}}} -> {:error, {:already_started, pid}}
       {:error, _} = error -> error
@@ -147,7 +159,8 @@ defmodule Aikido.Durable do
              {:ok,
               {runtime.durable_server, runtime.durable_key, runtime.partition,
                keep_snapshot?(runtime.agent_module)}}
-           end) do
+           end),
+         :ok <- Aikido.AgentServer.prepare_stop(pid) do
       if keep_snapshot?,
         do: DurableServer.Supervisor.terminate_child_permanent(supervisor, pid),
         else: delete(supervisor, key, partition: partition)

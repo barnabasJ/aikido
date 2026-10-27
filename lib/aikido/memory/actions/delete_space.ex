@@ -1,0 +1,21 @@
+defmodule Aikido.Memory.Actions.DeleteSpace do
+  @moduledoc "Deletes a named memory space using the input signal timestamp."
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _opts, _context) do
+    name = input.arguments.space
+
+    if name in [:world, :tasks] do
+      Aikido.Memory.Spaces.invalid_space_argument(
+        input,
+        "cannot delete reserved space #{inspect(name)}"
+      )
+    else
+      Aikido.Memory.Spaces.replace_spaces_and_advance_revision(
+        input,
+        Map.delete(input.arguments.state.spaces, name)
+      )
+    end
+  end
+end

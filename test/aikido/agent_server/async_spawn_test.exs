@@ -1,3 +1,35 @@
+defmodule AikidoTest.AgentServer.AsyncSpawnTest.Signals.Observe do
+  use Aikido.Signal
+
+  signal do
+    type "test.noop"
+  end
+end
+
+defmodule AikidoTest.AgentServer.AsyncSpawnTest.Actions.PreserveCount do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _opts, _context) do
+    Aikido.Types.ActionResult.new(state: input.arguments.state)
+  end
+end
+
+defmodule AikidoTest.AgentServer.AsyncSpawnTest.Signals.Spawn do
+  use Aikido.Signal
+
+  signal do
+    type "test.spawn"
+
+    schema do
+      attribute :directive, Aikido.Types.Directive do
+        description "Effect submitted to the supervised spawn pipeline."
+        allow_nil? false
+      end
+    end
+  end
+end
+
 defmodule AikidoTest.AgentServer.AsyncSpawnTest.Emit do
   use Ash.Resource.Actions.Implementation
 
@@ -33,16 +65,11 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest.Harness do
       end
     end
 
-    route "test.spawn", :emit
-    route "test.noop", {Aikido.AgentServer.RuntimeActions, :noop}
-  end
+    route AikidoTest.AgentServer.AsyncSpawnTest.Signals.Spawn,
+          AikidoTest.AgentServer.AsyncSpawnTest.Emit
 
-  actions do
-    action :emit, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :directive, :term, allow_nil?: false
-      run AikidoTest.AgentServer.AsyncSpawnTest.Emit
-    end
+    route AikidoTest.AgentServer.AsyncSpawnTest.Signals.Observe,
+          AikidoTest.AgentServer.AsyncSpawnTest.Actions.PreserveCount
   end
 end
 
@@ -68,14 +95,8 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest.SlowAgent do
       end
     end
 
-    route "aikido.agent.orphaned", :orphaned
-  end
-
-  actions do
-    action :orphaned, Aikido.Types.ActionResult do
-      argument :state, :term
-      run AikidoTest.AgentServer.AsyncSpawnTest.Orphaned
-    end
+    route Aikido.Ownership.Signals.Orphaned, AikidoTest.AgentServer.AsyncSpawnTest.Orphaned,
+      public?: false
   end
 
   def externalize(%{block?: true, observer: observer} = state) do
@@ -122,6 +143,42 @@ end
 defmodule AikidoTest.AgentServer.AsyncSpawnTest do
   use AikidoTest.Case, async: true
 
+  test "failed activation returns its child identity and tag as a scoped signal", context do
+    parent = start_server(context, __MODULE__.Harness)
+    {:ok, runtime} = Aikido.AgentServer.state(parent, &{:ok, &1})
+    signal = Aikido.Signal.put(signal("test.spawn"), :tenant, "tenant-a")
+
+    directive = %Aikido.Directives.SpawnAgent{
+      agent: __MODULE__.Harness,
+      tag: "retryable",
+      opts: %{id: runtime.id}
+    }
+
+    assert :ok = Aikido.Directives.SpawnAgent.exec(directive, signal, runtime)
+    assert_receive {:"$gen_cast", {:signal, failure}}, 5_000
+    assert failure.type == "aikido.agent.child.start_failed"
+    assert failure.data.child_id == runtime.id
+    assert failure.data.tag == "retryable"
+    assert failure.data.reason == {:already_started, runtime.id}
+    assert Aikido.Signal.get(failure, :tenant) == "tenant-a"
+  end
+
+  test "native activation options reach DurableServer validation", context do
+    parent = start_server(context, __MODULE__.Harness)
+    {:ok, runtime} = Aikido.AgentServer.state(parent, &{:ok, &1})
+
+    directive = %Aikido.Directives.SpawnAgent{
+      agent: __MODULE__.Harness,
+      tag: :invalid_deadline,
+      start_options: [timeout: 0]
+    }
+
+    assert :ok = Aikido.Directives.SpawnAgent.exec(directive, signal("test.spawn"), runtime)
+    assert_receive {:"$gen_cast", {:signal, failure}}, 5_000
+    assert failure.data.reason.__struct__ == ArgumentError
+    assert failure.data.reason.message =~ ":timeout must be a positive integer"
+  end
+
   test "generic child startup cannot block the owning agent and supports native :ignore",
        context do
     parent = start_server(context, __MODULE__.Harness)
@@ -167,7 +224,10 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest do
       assert {:ok, child} = Aikido.AgentServer.await_child(parent, tag)
 
       assert {:ok, {child_id, ^tag, ^parent}} =
-               Aikido.AgentServer.state(child, &{:ok, {&1.id, &1.parent.tag, &1.parent.pid}})
+               Aikido.AgentServer.state(
+                 child,
+                 &{:ok, {&1.id, Aikido.Ownership.parent(&1).tag, Aikido.Ownership.parent(&1).pid}}
+               )
 
       if tag in [:named, "text"] do
         assert child_id == "#{parent_id}/#{tag}"
@@ -200,7 +260,9 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest do
 
     send(starter, :release_activation)
     assert {:ok, child} = Aikido.AgentServer.await_child(parent, :slow)
-    assert {:ok, ^parent} = Aikido.AgentServer.state(child, &{:ok, &1.parent.pid})
+
+    assert {:ok, ^parent} =
+             Aikido.AgentServer.state(child, &{:ok, Aikido.Ownership.parent(&1).pid})
   end
 
   for policy <- [:stop, :continue, :emit_orphan] do
@@ -219,15 +281,15 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest do
         assert_receive {:DOWN, ^monitor, :process, ^child, _}, 5_000
       else
         await_state_value(child, fn runtime ->
-          if runtime.orphaned_from, do: runtime, else: nil
+          if Aikido.Ownership.orphaned_from(runtime), do: runtime, else: nil
         end)
 
         assert {:ok, %{parent: nil, orphaned_from: former, count: count}} =
                  Aikido.AgentServer.state(child, fn runtime ->
                    {:ok,
                     %{
-                      parent: runtime.parent,
-                      orphaned_from: runtime.orphaned_from,
+                      parent: Aikido.Ownership.parent(runtime),
+                      orphaned_from: Aikido.Ownership.orphaned_from(runtime),
                       count: runtime.agent.state.state.orphan_count
                     }}
                  end)
@@ -273,7 +335,19 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest do
       end)
 
     assert log =~ "Failed to start spawn task: :max_children"
-    assert log =~ "Failed to start agent spawn task: :max_children"
+    {:ok, runtime} = Aikido.AgentServer.state(parent, &{:ok, &1})
+
+    assert :ok =
+             Aikido.Directives.SpawnAgent.exec(
+               slow_directive(:stop),
+               signal("test.spawn"),
+               runtime
+             )
+
+    assert_receive {:"$gen_cast", {:signal, failure}}
+    assert failure.type == "aikido.agent.child.start_failed"
+    assert failure.data.reason == :max_children
+    assert failure.data.tag == :slow
     refute_received :generic_ignored
     refute_received {:activation_waiting, _}
 

@@ -23,15 +23,19 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Use AgentServer/runtime modules for process concerns, not agent module internals.
 
 ## Public API and Persistence
-- External domain command implementations live under `Aikido.Ash.Commands` in `ash/commands/` and perform runtime I/O. Agent/slice `actions/` contain pure state reducers returning `Aikido.Types.ActionResult`.
-- Declare agents as `Ash.Resource`s with `Aikido.Ash.Agent`, and register them in an `Ash.Domain` with `Aikido.Ash.Domain`. `use Aikido.Agent` forwards native resource options and supplies `Aikido.RuntimeDomain` only when no domain is provided.
+- External domain command implementations live under `Aikido.Agent.Commands` in `agent/commands/` and perform runtime I/O. Agent/slice `actions/` contain pure state reducers returning `Aikido.Types.ActionResult`.
+- Declare agents as `Ash.Resource`s with `Aikido.Agent.Extension`, and register them in an `Ash.Domain` with `Aikido.Domain.Extension`. `use Aikido.Agent` forwards native resource options and supplies `Aikido.RuntimeDomain` only when no domain is provided.
 - Declare `route SignalDefinition, Implementation` with a native `Ash.Resource.Actions.Implementation` module. Aikido generates native reducers with state typed from the owning resource and payload arguments from the signal. Signal lists receive a native `Ash.Union`; wildcard observers receive generic `data`. Explicit native action references remain available for application-owned contracts.
 - Use generated `<agent>_<action>` domain interfaces. `start` returns a reference; signal commands return processing receipts. Read live state explicitly with `inspect` or `list`; observe asynchronous completion with subscriptions or `Aikido.AgentServer.call_until/5` from an external caller.
 - `Aikido` sets up runtime supervision and configuration; it does not expose agent lifecycle shortcuts. Domain action implementations use `Aikido.Durable` directly.
+- Use an explicit stable root ID for recovery of the same workflow execution; use a different root ID for a new execution. `Aikido.Agent.child_id(parent_id, name)` derives escaped hierarchical names. SpawnAgent and team ownership use that derivation. Deterministic names do not replace lifecycle cleanup.
 - DurableServer owns activation, snapshots and recovery. `persistence :permanent` retains a snapshot on stop; `:temporary` deletes it on stop. Both checkpoint while running. The separate `delete` action removes the durable identity regardless of retention.
+- Synchronization defaults to native periodic saves (30 seconds). Start with `sync: %{mode: :periodic | :automatic | :explicit, interval_ms: ...}` to configure it; spawned children inherit unless overridden. Periodic processing receipts do not acknowledge a storage commit. Parent-binding lifecycle changes and graceful stops still synchronize.
 - Use slice/agent `externalize/1` and `reinstate/1`, or agent-wide `checkpoint/2` and `restore/2`, to control snapshot content. Keep credentials and runtime-only functions out of persistent configuration. A different Ash data layer does not persist the live process state.
 - Pass native Ash actor, tenant, context and tracer options at command boundaries. Authorization of a public command does not replace authorization of its reducer or tools. Use Ash tracing APIs to transfer context into custom asynchronous work.
 - Supply AI tools as Ash AI tool names plus native `tool_options`. Setup builds the tool descriptions and registry once per run; callers do not wrap executable callbacks.
+- Tool-loop warnings and optional cycle limits compare successful batches by sorted `{name, arguments, content}` entries. Join content to calls by call ID, but exclude IDs from the fingerprint. Keep duplicate entries. A failed or mixed batch affects only the consecutive-error streak and leaves successful-cycle history and its prior signature unchanged. Store only bounded SHA-256 fingerprints in that history.
+- Tool execution timeouts return an `ai.react.tool.completed` envelope with the current request and call IDs. A reducer accepts it only while that call ID is pending and has not already supplied a result. A later timeout for a completed call leaves a distinct pending call in the same request unchanged; reused provider call IDs across turns are outside this guarantee.
 
 ## Library Author Patterns
 - Give every `field` and `attribute` a purpose-specific `description` inside its `do … end` block, including in examples and fixtures.
@@ -39,6 +43,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Use `Aikido.Directives.SpawnAgent` / `Aikido.Directives.StopChild` for hierarchy, not ad-hoc child tracking.
 - Use signals for cross-agent communication instead of direct process coupling.
 - Keep slice state and actions isolated and composable.
+- Structure multi-step functions as named operations: pipe pure transformations and use `with` for fallible native calls. Apply this to helpers, runtime code, DSL expansion, tests and examples. Expose smaller documented operations when an umbrella function mixes concerns; retain cohesive declarations and required callback names.
 
 ## QA Patterns
 - Start with pure Ash action tests, then add AgentServer integration tests.
@@ -48,7 +53,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 ## Avoid
 - Embedding runtime side effects directly in core state transition code.
 - Using directives as a hidden state-mutation mechanism — they perform I/O only.
-- Mutating `%AgentServer.State{}` runtime fields (`children`, `cron_*`, etc.) from inside a directive's `exec/3` body. Runtime bookkeeping belongs in the GenServer callbacks and signal-cascade callbacks invoked by `process_signal/2`.
+- Mutating domain or runtime state inside a directive's `exec/3` body. Ownership and cron transitions belong in their slice actions; runtime-only bookkeeping belongs in GenServer callbacks.
 - Tight coupling between unrelated agent modules.
 
 ## References

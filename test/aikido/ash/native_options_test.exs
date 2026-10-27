@@ -39,7 +39,7 @@ defmodule AikidoTest.AshNativeOptionsTest do
     assert input.arguments.llm_opts == options
 
     assert {:ok, directive} =
-             Aikido.Slices.AiReact.Directives.PrepareTools.new(
+             Aikido.AiReact.Directives.PrepareTools.new(
                request_id: "options",
                tool_options: options
              )
@@ -61,39 +61,31 @@ defmodule AikidoTest.AshNativeOptionsTest do
   end
 
   test "recovery flags use native Ash types" do
-    for {action, argument, allowed, arguments} <- [
-          {:spawn_child, :restart?, [true, false],
-           %{agent_module: AikidoTest.TestAgents.Counter, tag: :worker}}
-        ] do
-      for value <- allowed do
-        input =
-          Ash.ActionInput.for_action(
-            Aikido.AgentServer.RuntimeActions,
-            action,
-            Map.put(arguments, argument, value)
-          )
+    for value <- [true, false] do
+      assert {:ok, directive} =
+               Aikido.Directives.SpawnAgent.new(
+                 agent: AikidoTest.TestAgents.Counter,
+                 tag: :worker,
+                 restart?: value
+               )
 
-        assert input.valid?, inspect(input.errors)
-        assert input.arguments[argument] == value
-      end
-
-      input =
-        Ash.ActionInput.for_action(
-          Aikido.AgentServer.RuntimeActions,
-          action,
-          Map.put(arguments, argument, :unsupported)
-        )
-
-      refute input.valid?
+      assert directive.restart? == value
     end
+
+    assert {:error, _} =
+             Aikido.Directives.SpawnAgent.new(
+               agent: AikidoTest.TestAgents.Counter,
+               tag: :worker,
+               restart?: :unsupported
+             )
   end
 
   defp ask_input(arguments) do
     state =
-      Aikido.Slices.AiReact
+      Aikido.AiReact.Slice
       |> Ash.Changeset.for_create(:create, %{})
       |> Ash.create!()
 
-    Ash.ActionInput.for_action(Aikido.Slices.AiReact, :ask, Map.put(arguments, :state, state))
+    Ash.ActionInput.for_action(Aikido.AiReact.Slice, :ask, Map.put(arguments, :state, state))
   end
 end

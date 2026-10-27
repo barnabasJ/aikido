@@ -1,10 +1,12 @@
 defmodule AgentExamples.ConversationAssistant do
   @moduledoc "Conversation history, streaming, model-written handoff and optional todo completion in one agent."
-  use Ash.Resource, domain: AgentExamples.Agents, extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+  use Ash.Resource,
+    domain: AgentExamples.Agents,
+    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
 
   agent do
     name "conversation_assistant"
-    slice :todos, Aikido.Slices.Todo
+    slice :todos, Aikido.Todo.Slice
   end
 
   ai do

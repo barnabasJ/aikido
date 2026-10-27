@@ -86,7 +86,7 @@ defmodule AikidoTest.Case do
   ## Examples
 
       signal("increment")
-      signal("record", %{message: "hello"})
+      signal("record", %{data: %{message: "hello"}})
       signal("test", %{}, source: "/custom")
   """
   def signal(type, data \\ %{}, opts \\ []) do

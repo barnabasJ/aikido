@@ -1,13 +1,24 @@
 defmodule AgentExamples.Agents do
   @moduledoc "The public interface to all example agents."
-  use Ash.Domain, otp_app: :agent_examples, extensions: [Aikido.Ash.Domain, AshAi, AshLua.Domain]
+  use Ash.Domain,
+    otp_app: :agent_examples,
+    extensions: [Aikido.Domain.Extension, AshAi, AshLua.Domain]
 
   resources do
+    resource AgentExamples.LuaAssistant.Tools
+    resource AgentExamples.AdaptiveAssistant.ToolPreparation
+    resource AgentExamples.VerifiedAssistant.Verification
+    resource AgentExamples.VerifiedTeam.Tools
+    resource AgentExamples.ResilientAssistant.Failures
     resource AgentExamples.AI.Tools
     resource AgentExamples.AI.LuaSurface
   end
 
   lua do
+    namespace "session" do
+      action :whoami, AgentExamples.LuaAssistant.Tools, :whoami
+    end
+
     namespace "analysis" do
       action :text_stats, AgentExamples.AI.Tools, :text_stats, labels: [:analysis]
     end
@@ -22,6 +33,12 @@ defmodule AgentExamples.Agents do
   end
 
   tools do
+    tool :scoped_lua, AgentExamples.LuaAssistant.Tools, :eval
+    tool :scoped_lua_docs, AgentExamples.LuaAssistant.Tools, :docs
+    tool :record_evidence, AgentExamples.VerifiedAssistant.Verification, :record_evidence
+    tool :request_team_evidence, AgentExamples.VerifiedTeam.Tools, :request_evidence
+    tool :complete_team_evidence, AgentExamples.VerifiedTeam.Tools, :complete_evidence
+    tool :fail_example, AgentExamples.ResilientAssistant.Failures, :fail
     tool :team_roster, AgentExamples.AI.Tools, :team_roster
     tool :spawn_worker, AgentExamples.AI.Tools, :spawn_worker
     tool :delegate, AgentExamples.AI.Tools, :delegate
@@ -29,11 +46,37 @@ defmodule AgentExamples.Agents do
     tool :remove_worker, AgentExamples.AI.Tools, :remove_worker
     tool :text_stats, AgentExamples.AI.Tools, :text_stats
     tool :stamp, AgentExamples.AI.Tools, :stamp
-    tool :run_lua, AgentExamples.AI.LuaSurface, :eval
-    tool :lua_docs, AgentExamples.AI.LuaSurface, :docs
+
+    tool :run_lua, AgentExamples.AI.LuaSurface, :run_script do
+      description """
+      Execute Lua against the exposed Ash actions. Calls return result, err; a failure
+      returns nil, err rather than raising. Use return assert(agents.members({})) to
+      inspect teammates, or return assert(agents.delegate({input = {member = "analyst",
+      text = "Review the evidence"}})) to delegate. Check errors or use assert; pcall
+      alone does not detect returned errors. Read lua_docs for available functions.
+      """
+    end
+
+    tool :lua_docs, AgentExamples.AI.LuaSurface, :docs do
+      description """
+      Discover the exposed Lua API. Pass input = {} for the callable/topic index,
+      input = {name = "full"} for full documentation, or an exact indexed name such
+      as agents.spawn, agents.delegate, agents.members, transactions or error-handling.
+      Bare namespaces such as agents are not callable names. Search accepts a short
+      term such as spawn; use a returned exact name to fetch its contract.
+      """
+    end
   end
 
   agents do
+    agent :quicksort, AgentExamples.Quicksort
+    agent :lua_assistant, AgentExamples.LuaAssistant
+    agent :adaptive, AgentExamples.AdaptiveAssistant
+    agent :verified, AgentExamples.VerifiedAssistant
+    agent :verified_team, AgentExamples.VerifiedTeam
+    agent :evidence_worker, AgentExamples.VerifiedTeam.EvidenceWorker
+    agent :resilient, AgentExamples.ResilientAssistant
+    agent :recoverable, AgentExamples.RecoverableAssistant
     agent :conversation, AgentExamples.ConversationAssistant
     agent :assistant, AgentExamples.Assistant
     agent :hooked_assistant, AgentExamples.HookedAssistant
@@ -43,6 +86,8 @@ defmodule AgentExamples.Agents do
     agent :research_team, AgentExamples.ResearchTeam
     agent :research_squad, AgentExamples.ResearchSquad
     agent :counter, AgentExamples.Counter
+    agent :cron_clock, AgentExamples.CronClock
+    agent :checkpoint_counter, AgentExamples.CheckpointCounter
     agent :checklist, AgentExamples.Checklist
     agent :notebook, AgentExamples.Notebook
     agent :worker, AgentExamples.Worker

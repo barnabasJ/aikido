@@ -28,7 +28,7 @@ end
 defmodule Aikido.TeamDeliveryTest.Worker do
   use Ash.Resource,
     domain: Aikido.TeamDeliveryTest.Domain,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
 
   agent do
     name "delivery_worker"
@@ -43,7 +43,7 @@ end
 defmodule Aikido.TeamDeliveryTest.Team do
   use Ash.Resource,
     domain: Aikido.TeamDeliveryTest.Domain,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team, Aikido.Ash.AI]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension, Aikido.AI.Extension]
 
   agent do
     name "delivery_team"
@@ -60,7 +60,7 @@ defmodule Aikido.TeamDeliveryTest.Team do
 end
 
 defmodule Aikido.TeamDeliveryTest.Domain do
-  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Ash.Domain]
+  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Domain.Extension]
 
   agents do
     agent :delivery, Aikido.TeamDeliveryTest.Team
@@ -75,6 +75,20 @@ defmodule Aikido.TeamDeliveryTest do
   setup do
     start_supervised!({Aikido, name: Aikido.Default, durable: AikidoTest.Case.durable_options()})
     :ok
+  end
+
+  test "background failures without a public error protocol omit private exception contents" do
+    signal =
+      Aikido.Team.TaskDelivery.conversation_message_for_task_result(%{
+        id: "failed-task",
+        member: :worker,
+        status: :failed,
+        result: RuntimeError.exception("private-provider-key")
+      })
+
+    assert signal.data.text =~ "RuntimeError"
+    assert signal.data.text =~ "Inspect the worker's state"
+    refute signal.data.text =~ "private-provider-key"
   end
 
   test "delegation activates a lazy worker and its result wakes the team through its AI interface" do
@@ -150,9 +164,60 @@ defmodule Aikido.TeamDeliveryTest do
     assert_receive {:aikido_subscription, ^failed, %{result: {:ok, task}}}, 5_000
     assert task.result == :member_exited
     assert task.member == :worker
+    failure = Aikido.Team.TaskDelivery.conversation_message_for_task_result(task)
+    assert failure.data.text =~ "worker process exited"
+    assert failure.data.text =~ "ensure a replacement is ready"
     assert_receive {:aikido_subscription, ^replaced, %{result: {:ok, second}}}, 5_000
     refute first == second
     AikidoTest.LifecycleWait.await_down(model)
+  end
+
+  test "a truncated worker response delivers recovery guidance to a background requester" do
+    team = Domain.delivery_start!(%{})
+
+    {:ok, done} =
+      Aikido.AgentServer.subscribe(
+        team.pid,
+        "**",
+        fn runtime ->
+          if runtime.agent.state.ai.status == :completed,
+            do: {:ok, runtime.agent.state},
+            else: :skip
+        end,
+        once: true
+      )
+
+    Domain.delivery_assign_task!(team, %{
+      member: :worker,
+      task_id: "limited-job",
+      payload: %{text: "wait", llm_opts: [observer: self(), max_tokens: 32]},
+      mode: :background,
+      notify: :self
+    })
+
+    assert_receive {:team_model, model, _}, 5_000
+
+    send(
+      model,
+      {:answer,
+       %ReqLLM.Response{
+         id: "limited-report",
+         model: "offline",
+         context: ReqLLM.Context.new(),
+         message: ReqLLM.Context.assistant("unfinished report"),
+         finish_reason: :length
+       }}
+    )
+
+    assert_receive {:aikido_subscription, ^done, %{result: {:ok, state}}}, 5_000
+    assert state.team.tasks["limited-job"].status == :failed
+
+    assert %Aikido.AiReact.Errors.OutputTruncated{max_tokens: 32} =
+             state.team.tasks["limited-job"].result
+
+    assert state.ai.result =~ "Increase max_tokens"
+    assert state.ai.result =~ "reasoning may share this budget"
+    refute state.ai.result =~ "unfinished report"
   end
 
   test "queued worker jobs preserve each caller scope", _ctx do
@@ -220,10 +285,21 @@ defmodule Aikido.TeamDeliveryTest do
     Domain.delivery_ensure_member!(team, %{member: :worker})
     payload = %{text: "wait", llm_opts: [observer: self()]}
 
+    {:ok, delivered} =
+      Aikido.AgentServer.subscribe(
+        team.pid,
+        "ai.react.deliver",
+        fn _runtime, event ->
+          {:ok, event.signal.data.text}
+        end,
+        once: true
+      )
+
     Domain.delivery_assign_task!(team, %{
       member: :worker,
       task_id: "slow",
       payload: payload,
+      notify: :self,
       timeout_ms: 250
     })
 
@@ -239,6 +315,9 @@ defmodule Aikido.TeamDeliveryTest do
 
     assert_receive {:DOWN, ^monitor, :process, ^slow, _}, 2_000
     assert_receive {:team_model, next, _}, 2_000
+    assert_receive {:aikido_subscription, ^delivered, %{result: {:ok, message}}}, 2_000
+    assert message =~ "remaining deadline expired"
+    assert message =~ "do not retry with the expired deadline"
 
     send(
       next,
@@ -320,21 +399,22 @@ defmodule Aikido.TeamDeliveryTest do
   end
 
   test "restoration marks interrupted tasks explicitly instead of replaying effects" do
-    state = %Aikido.Ash.Team.State{
-      tasks: %{
-        "job" => %{
-          id: "job",
-          member: :worker,
-          status: :dispatched,
-          result: nil,
-          attempt: "old",
-          notify: :self,
-          metadata: %{}
+    state =
+      Ash.create!(Aikido.Team.Slice, %{
+        tasks: %{
+          "job" => %{
+            id: "job",
+            member: :worker,
+            status: :dispatched,
+            result: nil,
+            attempt: "old",
+            notify: :self,
+            metadata: %{}
+          }
         }
-      }
-    }
+      })
 
-    restored = Aikido.Ash.Team.State.reinstate(state)
+    restored = Aikido.Team.Slice.reinstate(state)
     assert restored.tasks["job"].status == :failed
     assert restored.tasks["job"].result == :interrupted
     assert restored.recovered_tasks == ["job"]

@@ -5,7 +5,7 @@ defmodule Aikido.AITest.MathAgent do
   agent do
     name "math"
 
-    slice :ai, Aikido.Slices.AiReact,
+    slice :ai, Aikido.AiReact.Slice,
       options: [
         model: "anthropic:claude-haiku-4-5-20251001",
         tools: [:test_add],
@@ -23,7 +23,7 @@ defmodule Aikido.AITest.FailingAgent do
   agent do
     name "failing"
 
-    slice :ai, Aikido.Slices.AiReact,
+    slice :ai, Aikido.AiReact.Slice,
       options: [
         model: "anthropic:claude-haiku-4-5-20251001",
         tools: [:test_fails],
@@ -40,7 +40,7 @@ defmodule Aikido.AITest.TightAgent do
   agent do
     name "tight"
 
-    slice :ai, Aikido.Slices.AiReact,
+    slice :ai, Aikido.AiReact.Slice,
       options: [
         model: "anthropic:claude-haiku-4-5-20251001",
         tools: [:test_add],
@@ -56,13 +56,14 @@ defmodule Aikido.AITest.NoModelAgent do
 
   agent do
     name "no_model"
-    slice :ai, Aikido.Slices.AiReact, options: [tools: [:test_add], max_iterations: 2]
+    slice :ai, Aikido.AiReact.Slice, options: [tools: [:test_add], max_iterations: 2]
   end
 end
 
 defmodule Aikido.AITest do
   use AikidoTest.Case, async: false
   use Mimic
+
   import Aikido.AI.Test.ResponseFixtures
 
   setup :set_mimic_global
@@ -197,7 +198,7 @@ defmodule Aikido.AITest do
           text
         end
 
-      assert Enum.any?(texts, &(&1 == Aikido.Slices.AiReact.cycle_warning()))
+      assert Enum.any?(texts, &String.contains?(&1, "Do NOT repeat the same calls"))
     end
 
     test("tool errors are returned as JSON in tool.completed (not as :failed)", ctx) do
@@ -217,17 +218,20 @@ defmodule Aikido.AITest do
   end
 
   describe("max iterations") do
-    test("settles :completed without a result when the cap is hit", ctx) do
+    test("fails unfinished tool work when the cap is hit", ctx) do
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
         {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 2}}}])}
       end)
 
       pid = start_test_server(ctx, Aikido.AITest.TightAgent)
-      assert {:ok, nil} = Aikido.AI.ask_sync(pid, "loop", timeout: 1000)
+      assert {:error, :max_iterations} = Aikido.AI.ask_sync(pid, "loop", timeout: 1000)
       ai = read_ai(pid)
-      assert ai.status == :completed
+      assert ai.status == :failed
+      assert ai.error == :max_iterations
       assert ai.result == nil
       assert ai.iteration == 1
+      assert List.last(ai.context.messages).tool_calls != []
+      assert ai.pending_tool_calls == []
     end
   end
 
@@ -386,7 +390,7 @@ defmodule Aikido.AITest do
         agent do
           name "slice_key"
 
-          slice :ai, Aikido.Slices.AiReact,
+          slice :ai, Aikido.AiReact.Slice,
             options: [
               model: "anthropic:claude-haiku-4-5-20251001",
               tools: [],
@@ -415,7 +419,7 @@ defmodule Aikido.AITest do
         agent do
           name "slice_key_override"
 
-          slice :ai, Aikido.Slices.AiReact,
+          slice :ai, Aikido.AiReact.Slice,
             options: [
               model: "anthropic:claude-haiku-4-5-20251001",
               tools: [],

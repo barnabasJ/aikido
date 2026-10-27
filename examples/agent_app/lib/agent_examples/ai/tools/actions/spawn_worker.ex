@@ -1,13 +1,13 @@
 defmodule AgentExamples.AI.Tools.Actions.SpawnWorker do
   @moduledoc "Starts an owned worker from a team template with the caller's model and tool configuration."
   use Ash.Resource.Actions.Implementation
-  alias AgentExamples.AI.Tools.Context
+  alias AgentExamples.AI.Tools.TeamAccess
 
   @impl true
   def run(input, _opts, context) do
     ash_opts = Ash.Scope.to_opts(context, context: input.context)
 
-    with {:ok, team, owner, caller} <- Context.scope(input, context),
+    with {:ok, team, owner, caller} <- TeamAccess.resolve_caller_team(input, context),
          {:ok, template, resource} <- resolve_template(team, input.arguments.template),
          {:ok, _started} <-
            team.__struct__
@@ -24,6 +24,8 @@ defmodule AgentExamples.AI.Tools.Actions.SpawnWorker do
            )
            |> Ash.run_action(ash_opts) do
       {:ok, %{member: input.arguments.name, status: "started", owner: owner}}
+    else
+      {:error, reason} -> {:error, AgentExamples.AI.Tools.ToolFailure.from_reason(reason)}
     end
   end
 
@@ -36,6 +38,7 @@ defmodule AgentExamples.AI.Tools.Actions.SpawnWorker do
       :model,
       :client,
       :max_iterations,
+      :options,
       :llm_opts
     ])
     |> Map.put(:specialty, specialty)
@@ -43,7 +46,7 @@ defmodule AgentExamples.AI.Tools.Actions.SpawnWorker do
   end
 
   defp resolve_template(team, name) do
-    case Enum.find(Aikido.Ash.Agent.Info.team_config(team.__struct__).workers, fn {key, _} ->
+    case Enum.find(Aikido.Agent.Info.team_config(team.__struct__).workers, fn {key, _} ->
            to_string(key) == name
          end) do
       {key, %{resource: resource}} -> {:ok, key, resource}

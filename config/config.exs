@@ -4,12 +4,17 @@ config :ash, default_string_length_count: :codepoints
 
 config :spark, :formatter,
   remove_parens?: true,
-  "Aikido.Agent": [type: Ash.Resource, extensions: [Aikido.Ash.Agent]],
-  "Aikido.Slice": [type: Ash.Resource, extensions: [Aikido.Ash.Slice]],
+  "Aikido.Agent": [type: Ash.Resource, extensions: [Aikido.Agent.Extension]],
+  "Aikido.Slice": [type: Ash.Resource, extensions: [Aikido.Slice.Extension]],
   "Ash.Resource": [
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Slice, Aikido.Ash.Team, Aikido.Ash.AI]
+    extensions: [
+      Aikido.Agent.Extension,
+      Aikido.Slice.Extension,
+      Aikido.Team.Extension,
+      Aikido.AI.Extension
+    ]
   ],
-  "Ash.Domain": [extensions: [Aikido.Ash.Domain]],
+  "Ash.Domain": [extensions: [Aikido.Domain.Extension]],
   "Aikido.Directive": [],
   "Aikido.Signal": [type: Aikido.Signal.Definition, extensions: [Aikido.Signal.Dsl]],
   "Aikido.Signal.Definition": [],

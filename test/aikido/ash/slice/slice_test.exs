@@ -12,7 +12,14 @@ defmodule AikidoTest.SliceTest.MinimalSlice do
       end
     end
 
-    route "minimal.noop", {AikidoTest.TestActions, :noop}
+    route "minimal.noop", :noop, public?: false
+  end
+
+  actions do
+    action :noop, Aikido.Types.ActionResult do
+      argument :state, :struct, allow_nil?: false, constraints: [instance_of: __MODULE__]
+      run AikidoTest.TestActions.Actions.PreserveState
+    end
   end
 end
 
@@ -40,7 +47,14 @@ defmodule AikidoTest.SliceTest.FullSlice do
       end
     end
 
-    route "send", {AikidoTest.TestActions, :noop}
+    route "send", :noop, public?: false
+  end
+
+  actions do
+    action :noop, Aikido.Types.ActionResult do
+      argument :state, :struct, allow_nil?: false, constraints: [instance_of: __MODULE__]
+      run AikidoTest.TestActions.Actions.PreserveState
+    end
   end
 end
 
@@ -59,7 +73,14 @@ defmodule AikidoTest.SliceTest.SchemaSlice do
       end
     end
 
-    route "schema.noop", {AikidoTest.TestActions, :noop}
+    route "schema.noop", :noop, public?: false
+  end
+
+  actions do
+    action :noop, Aikido.Types.ActionResult do
+      argument :state, :struct, allow_nil?: false, constraints: [instance_of: __MODULE__]
+      run AikidoTest.TestActions.Actions.PreserveState
+    end
   end
 end
 
@@ -123,36 +144,36 @@ defmodule AikidoTest.SliceTest do
   describe("accessors") do
     test "minimal slice exposes its name, actions and routes via Info" do
       assert Map.get(
-               Aikido.Ash.Slice.Info.slice_options(AikidoTest.SliceTest.MinimalSlice),
+               Aikido.Slice.Info.slice_options(AikidoTest.SliceTest.MinimalSlice),
                :name
              ) == "minimal"
 
-      assert Aikido.Ash.Slice.Info.actions(AikidoTest.SliceTest.MinimalSlice) == [
-               {AikidoTest.TestActions, :noop}
+      assert Aikido.Slice.Info.actions(AikidoTest.SliceTest.MinimalSlice) == [
+               {AikidoTest.SliceTest.MinimalSlice, :noop}
              ]
 
-      assert Aikido.Ash.Slice.Info.signal_routes(AikidoTest.SliceTest.MinimalSlice) == [
-               {"minimal.noop", {AikidoTest.TestActions, :noop}}
+      assert Aikido.Slice.Info.signal_routes(AikidoTest.SliceTest.MinimalSlice) == [
+               {"minimal.noop", {AikidoTest.SliceTest.MinimalSlice, :noop}}
              ]
     end
 
     test "full slice exposes every metadata field via Info" do
-      assert Map.get(Aikido.Ash.Slice.Info.slice_options(AikidoTest.SliceTest.FullSlice), :name) ==
+      assert Map.get(Aikido.Slice.Info.slice_options(AikidoTest.SliceTest.FullSlice), :name) ==
                "full"
 
       assert Map.get(
-               Aikido.Ash.Slice.Info.slice_options(AikidoTest.SliceTest.FullSlice),
+               Aikido.Slice.Info.slice_options(AikidoTest.SliceTest.FullSlice),
                :description
              ) == "A test slice"
 
-      assert Aikido.Ash.Slice.Info.signal_routes(AikidoTest.SliceTest.FullSlice) == [
-               {"send", {AikidoTest.TestActions, :noop}}
+      assert Aikido.Slice.Info.signal_routes(AikidoTest.SliceTest.FullSlice) == [
+               {"send", {AikidoTest.SliceTest.FullSlice, :noop}}
              ]
 
       assert Ash.Type.ash_type?(AikidoTest.SliceTest.FullSlice)
 
       assert [%Ash.Resource.Attribute{name: :enabled}] =
-               Aikido.Ash.Slice.Info.config_schema(AikidoTest.SliceTest.FullSlice)
+               Aikido.Slice.Info.config_schema(AikidoTest.SliceTest.FullSlice)
 
       refute Ash.Resource.Info.action(AikidoTest.SliceTest.FullSlice, :__aikido_config__)
     end
@@ -161,39 +182,39 @@ defmodule AikidoTest.SliceTest do
   describe "configuration casting" do
     test "applies defaults without executing an action" do
       assert {:ok, %{enabled: true}} =
-               Aikido.Ash.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice)
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice)
     end
 
     test "casts supplied values and rejects explicitly forbidden nil" do
       assert {:ok, %{enabled: false}} =
-               Aikido.Ash.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{
                  "enabled" => "false"
                })
 
       assert {:error, %Ash.Error.Changes.InvalidAttribute{field: :enabled}} =
-               Aikido.Ash.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{
                  enabled: nil
                })
     end
 
     test "rejects invalid typed values" do
       assert {:error, _error} =
-               Aikido.Ash.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.FullSlice, %{
                  enabled: "not-a-boolean"
                })
     end
 
     test "enforces required fields and Ash constraints" do
       assert {:error, %Ash.Error.Changes.InvalidAttribute{field: :attempts}} =
-               Aikido.Ash.Slice.Config.resolve_config(AikidoTest.SliceTest.RequiredConfigSlice)
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.RequiredConfigSlice)
 
       assert {:error, %Ash.Error.Changes.InvalidAttribute{field: :attempts}} =
-               Aikido.Ash.Slice.Config.resolve_config(AikidoTest.SliceTest.RequiredConfigSlice, %{
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.RequiredConfigSlice, %{
                  attempts: 0
                })
 
       assert {:ok, %{attempts: 2, label: "worker", optional: nil}} =
-               Aikido.Ash.Slice.Config.resolve_config(AikidoTest.SliceTest.RequiredConfigSlice, %{
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.RequiredConfigSlice, %{
                  attempts: "2"
                })
     end
@@ -211,15 +232,15 @@ defmodule AikidoTest.SliceTest do
       end)
 
       assert {:ok, %{attempts: 3, label: "application"}} =
-               Aikido.Ash.Slice.Config.resolve_config(resource)
+               Aikido.Slice.Config.resolve_config(resource)
 
       assert {:ok, %{attempts: 5, label: "application"}} =
-               Aikido.Ash.Slice.Config.resolve_config(resource, %{attempts: 5})
+               Aikido.Slice.Config.resolve_config(resource, %{attempts: 5})
     end
 
     test "preserves unstructured configuration for a slice without a config schema" do
       assert {:ok, %{custom: "value"}} =
-               Aikido.Ash.Slice.Config.resolve_config(AikidoTest.SliceTest.MinimalSlice, %{
+               Aikido.Slice.Config.resolve_config(AikidoTest.SliceTest.MinimalSlice, %{
                  custom: "value"
                })
     end

@@ -24,15 +24,9 @@ defmodule AikidoTest.AgentServer.StopChildTest.ParentAgent do
       end
     end
 
-    route "aikido.agent.child.exit", :record_exit
-  end
-
-  actions do
-    action :record_exit, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :tag, :term, allow_nil?: false
-      run AikidoTest.AgentServer.StopChildTest.RecordExit
-    end
+    route Aikido.Ownership.Signals.ChildExit,
+          AikidoTest.AgentServer.StopChildTest.RecordExit,
+          public?: false
   end
 end
 
@@ -48,6 +42,23 @@ end
 defmodule AikidoTest.AgentServer.StopChildTest do
   use AikidoTest.Case, async: false
 
+  test "stop requests pass through the ownership route even for a missing child", %{
+    aikido: aikido
+  } do
+    {:ok, parent} =
+      AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServer.StopChildTest.ParentAgent,
+        id: unique_id("parent")
+      )
+
+    assert {:ok, %{}} =
+             Aikido.AgentServer.call_until(
+               parent,
+               fn -> Aikido.AgentServer.stop_child(parent, :missing) end,
+               "aikido.ownership.child.stop_requested",
+               &{:ok, Aikido.Ownership.children(&1)}
+             )
+  end
+
   test "false child tags deliver exit events to reducers and subscribers", %{aikido: aikido} do
     {:ok, parent} =
       AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServer.StopChildTest.ParentAgent,
@@ -60,6 +71,16 @@ defmodule AikidoTest.AgentServer.StopChildTest do
       )
 
     assert {:ok, ^child} = Aikido.AgentServer.adopt_child(parent, child, false)
+    assert {:ok, child_id} = Aikido.AgentServer.state(child, &{:ok, &1.id})
+
+    assert {:ok, exit_ref} =
+             Aikido.AgentServer.subscribe(
+               parent,
+               "aikido.agent.child.exit",
+               fn _, event -> {:ok, event.signal.data.child_id} end,
+               once: true
+             )
+
     monitor = Process.monitor(child)
 
     assert {:ok, {[false], %{}}} =
@@ -67,8 +88,10 @@ defmodule AikidoTest.AgentServer.StopChildTest do
                parent,
                fn -> Aikido.AgentServer.stop_child(parent, false) end,
                "aikido.agent.child.exit",
-               &{:ok, {&1.agent.state.domain.exit_tags, &1.children}}
+               &{:ok, {&1.agent.state.domain.exit_tags, Aikido.Ownership.children(&1)}}
              )
+
+    assert_receive {:aikido_subscription, ^exit_ref, %{result: {:ok, ^child_id}}}
 
     assert_receive {:DOWN, ^monitor, :process, ^child, _}
 
@@ -94,7 +117,7 @@ defmodule AikidoTest.AgentServer.StopChildTest do
     AikidoTest.LifecycleWait.await_down(child_pid)
 
     await_state_value(parent_pid, fn s ->
-      if map_size(s.children) == 0 do
+      if map_size(Aikido.Ownership.children(s)) == 0 do
         true
       end
     end)
@@ -116,7 +139,7 @@ defmodule AikidoTest.AgentServer.StopChildTest do
     AikidoTest.LifecycleWait.await_down(child_pid)
 
     await_state_value(parent_pid, fn s ->
-      if map_size(s.children) == 0 do
+      if map_size(Aikido.Ownership.children(s)) == 0 do
         true
       end
     end)

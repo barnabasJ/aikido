@@ -4,6 +4,5 @@ defmodule Aikido.RuntimeDomain do
 
   resources do
     allow_unregistered? true
-    resource Aikido.AgentServer.RuntimeActions
   end
 end

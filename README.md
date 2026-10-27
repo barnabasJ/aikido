@@ -79,7 +79,7 @@ end
 defmodule MyApp.Counter do
   use Ash.Resource,
     domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "counter"
@@ -100,7 +100,7 @@ defmodule MyApp.Counter do
 end
 
 defmodule MyApp.Agents do
-  use Ash.Domain, otp_app: :my_app, extensions: [Aikido.Ash.Domain]
+  use Ash.Domain, otp_app: :my_app, extensions: [Aikido.Domain.Extension]
 
   agents do
     agent :counter, MyApp.Counter
@@ -141,14 +141,34 @@ resource extensions.
 
 ## Teams, AI, and persistence
 
-Add `Aikido.Ash.Team` for fixed members, dynamic workers, ownership, dependencies,
+Add `Aikido.Team.Extension` for fixed members, dynamic workers, ownership, dependencies,
 and nested teams. A team can accept its initial `topology` in the start call.
-Add `Aikido.Ash.AI` for model turns; pass the model, tools, and optional prompt and
+Add `Aikido.AI.Extension` for model turns; pass the model, tools, and optional prompt and
 iteration settings at runtime. AshAI and AshLua tools can expose management and
 delegation capabilities to AI agents. Supply Ash AI tool names in `tools` and
 native builder options in `tool_options`. Each request enters `:setup`, prepares
 tools once, then runs model/tool turns through actions, directives and result
 signals. Messages can queue during setup; cancellation stops pending work.
+
+The optional tool-loop guards compare successful batches by each call's tool
+name, complete arguments, and returned content. Call IDs correlate results to
+calls but do not affect the comparison. Call order and result arrival order do
+not affect it; duplicate calls remain distinct entries. Equal consecutive
+successful batches add a warning, and `max_repeated_tool_cycles` bounds repeated
+one-to-four-batch patterns. Failed or mixed batches increment the independent
+`max_consecutive_tool_errors` streak without changing successful-cycle history
+or adding a repeat warning. The history stores bounded SHA-256 fingerprints,
+not tool output. A changed result does not count as an identical repeated batch.
+
+Configure `ai.client` with a non-nil module. After compilation, Spark validates
+that configured value through native Ash module casting and rejects explicit
+`nil` with an `[:ai, :client]` diagnostic; `nil` does not select the default.
+Sibling clients and safe cyclic references do not require forced compilation
+dependencies. The attribute remains `:module`; explicit runtime overrides use ordinary Ash casting.
+Its default is a native lazy MFA. A raw resource struct therefore has a nil
+client until an actual Ash create or native initialization resolves defaults.
+Inspect initialized state rather than treating attribute metadata as a literal
+client value. No additional client `@behaviour` declaration is required.
 
 The default runtime uses DurableServer. Configure a persistent data directory or
 backend for the deployment. Snapshot recovery preserves logical agent state and
@@ -161,16 +181,20 @@ same disk to remain available.
 
 With `persistence :permanent` (the default), `stop` retains the snapshot and
 starting the same ID restores it. `persistence :temporary` deletes it on stop.
-Both checkpoint while running. The separate `delete` action stops an agent and
+Both checkpoint while running. Synchronization defaults to periodic dirty-state saves
+every 30 seconds. Configure `sync: %{mode: :periodic, interval_ms: 5_000}` at start;
+`:automatic` enables native callback sync and `:explicit` requests strict sync on
+persistent transitions. Children inherit this policy unless overridden. Processing
+receipts in periodic mode do not promise a storage commit. The separate `delete` action stops an agent and
 removes its snapshot regardless of retention, including by ID after stop.
 Recovery does not replay in-flight tools or resume a waiting Lua VM.
 
-`Aikido.Ash.Agent` is a resource extension. Choosing a separate Ash data layer does
+`Aikido.Agent.Extension` is a resource extension. Choosing a separate Ash data layer does
 not automatically persist live agent state or make process effects transactional.
 
 ## State and effects
 
-External domain commands run through `Aikido.Ash.Commands` in `ash/commands/`.
+External domain commands run through `Aikido.Agent.Commands` in `agent/commands/`.
 They perform runtime I/O such as starting agents and delivering signals. Inside
 the agent pipeline, reducer implementations live in their owning `actions/` folders.
 
@@ -202,7 +226,8 @@ mix docs
 ```
 
 `mix q` includes all Argus BEAM analyses alongside formatting, compilation,
-Credo and Dialyzer. Run `mix argus --all` separately to inspect its findings.
+Credo and Dialyzer, with no suppressed Argus findings. Run `mix argus --all`
+separately to inspect its findings. Missing analysis engines fail the check.
 The first run downloads verified analysis engines; subsequent runs reuse the
 local cache. CI caches these engines with the build dependencies.
 

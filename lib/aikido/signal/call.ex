@@ -52,7 +52,6 @@ defmodule Aikido.Signal.Call do
 
   alias Aikido.AgentServer
   alias Aikido.Directives.Emit
-  alias Aikido.Directives.Reply
   alias Aikido.Signal
 
   @default_timeout 5_000
@@ -79,24 +78,26 @@ defmodule Aikido.Signal.Call do
           {:ok, Signal.t()} | {:error, term()}
   def call(server, %Signal{} = signal, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, default_timeout())
-    signal = Aikido.Directive.materialize_signal(signal)
-    correlation_id = signal.id
-
-    query =
-      case signal.reply_to do
-        nil -> %{signal | reply_to: self()}
-        _existing -> signal
-      end
+    query = signal |> Aikido.Directive.materialize_signal() |> attach_reply_destination()
 
     with {:ok, pid} <- AgentServer.resolve(server) do
-      ref = Process.monitor(pid)
-      :ok = AgentServer.cast(pid, query)
+      send_query_and_await_reply(pid, query, timeout)
+    end
+  end
 
-      try do
-        await_reply(correlation_id, ref, timeout)
-      after
-        Process.demonitor(ref, [:flush])
-      end
+  defp attach_reply_destination(%Signal{reply_to: nil} = signal),
+    do: %{signal | reply_to: self()}
+
+  defp attach_reply_destination(signal), do: signal
+
+  defp send_query_and_await_reply(pid, query, timeout) do
+    ref = Process.monitor(pid)
+    :ok = AgentServer.cast(pid, query)
+
+    try do
+      await_reply(query.id, ref, timeout)
+    after
+      Process.demonitor(ref, [:flush])
     end
   end
 
@@ -140,61 +141,5 @@ defmodule Aikido.Signal.Call do
       %Signal{id: nil, type: reply_type, data: data, source: "/aikido", subject: req_id}
 
     %Emit{signal: reply_signal, target: target}
-  end
-
-  @doc """
-  Builds a `%Aikido.Directives.Reply{}` directive that will construct
-  the reply *at directive execution time* by calling `{m, f, extra_args}`
-  with the full `%AgentServer.State{}`.
-
-  Use this when the action knows a query came in but doesn't itself have
-  the server-level information needed to answer it — e.g. the current child-process map. The directive executor has access to
-  `%State{}` through its callback, so introspection code belongs there.
-
-  `build_mfa` must resolve to `apply(m, f, [state | extra_args]) -> {:ok, map} | {:error, term}`.
-
-  On success the reply has `type: reply_type` and `data: the returned map`.
-  On error the reply has `type: error_type` and `data: %{reason: reason}`.
-
-  Returns `nil` if the input signal has no `reply_to` (fire-and-forget).
-
-  ## Example
-
-      # Action
-      def run(input, _opts, _context) do
-        directive =
-          Call.reply_from_state(
-            input.context.aikido.signal,
-            "aikido.agent.query.children.reply",
-            "aikido.agent.query.children.error",
-            {Aikido.AgentServer.Actions.QueryChildren, :build_reply, []}
-          )
-
-        Aikido.Types.ActionResult.new(state: input.arguments.state, directives: List.wrap(directive))
-      end
-
-      # Builder — sees the full %State{}
-      def build_children_reply(%Aikido.AgentServer.State{children: children}) do
-        {:ok, %{children: Map.new(children, fn {tag, child} -> {tag, child.pid} end)}}
-      end
-  """
-  @spec reply_from_state(
-          Signal.t() | nil,
-          String.t(),
-          String.t(),
-          Reply.builder()
-        ) :: Reply.t() | nil
-  def reply_from_state(nil, _reply_type, _error_type, _build_mfa), do: nil
-  def reply_from_state(%Signal{reply_to: nil}, _r, _e, _b), do: nil
-
-  def reply_from_state(%Signal{} = input, reply_type, error_type, {m, f, a})
-      when is_binary(reply_type) and is_binary(error_type) and is_atom(m) and is_atom(f) and
-             is_list(a) do
-    %Reply{
-      input_signal: input,
-      reply_type: reply_type,
-      error_type: error_type,
-      build: {m, f, a}
-    }
   end
 end

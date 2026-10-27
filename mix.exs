@@ -1,7 +1,7 @@
 defmodule Aikido.MixProject do
   use Mix.Project
 
-  @version "2.2.0"
+  @version "0.1.0"
 
   def vsn do
     @version
@@ -39,27 +39,7 @@ defmodule Aikido.MixProject do
       dialyzer: [
         plt_add_apps: [:mix]
       ],
-      argus: [
-        ignore: [
-          findings: [
-            # DurableServer owns the process, traps exits and delegates termination.
-            {:shutdown, {Aikido.AgentServer, :terminate, 2}},
-            # Each durable identity has its own PID; this is not one shared server.
-            {:blocking, {Aikido.AgentServer, :handle_call, 3}},
-            # These finite names come from compiled Spark declarations, not runtime input.
-            # Exact generated anchors fail closed if compiler output changes.
-            {:unsafe_input,
-             {Aikido.Ash.Agent.Transformers.Build, :"-resolve_local_actions/3-fun-1-", 3}},
-            {:unsafe_input, {Aikido.Ash.Domain.Transformers.Build, :"-register/2-fun-1-", 2}},
-            # Reads our trusted, compressed backend snapshots, including native callbacks.
-            {:unsafe_input, {Aikido.Durable.AgentServer, :load_state, 2}},
-            # Task-capacity fallback kills only the already retired scheduler PID.
-            {:failure, {Aikido.Directives.CronCancel, :shutdown_io, 3}},
-            # Flushes only a queued worker EXIT after unlink, with a zero timeout.
-            {:blocking, {Aikido.Scheduler.Job, :handle_info, 2}}
-          ]
-        ]
-      ]
+      argus: [analyses: [:all], engine: :require]
     ]
   end
 
@@ -104,7 +84,11 @@ defmodule Aikido.MixProject do
           "guides/runtime-patterns.md",
           "guides/multi-tenancy.md"
         ],
-        Examples: ["examples/agent_app/README.md", "examples/agent_app/AI.md"],
+        Examples: [
+          "examples/agent_app/README.md",
+          "examples/agent_app/AI.md",
+          "examples/agent_app/MAKEWRIGHT.md"
+        ],
         Project: ["CONTRIBUTING.md", "CHANGELOG.md", "LICENSE"]
       ],
       extras: [
@@ -115,6 +99,8 @@ defmodule Aikido.MixProject do
         {"guides/multi-tenancy.md", title: "Multi-Tenancy"},
         {"examples/agent_app/README.md", title: "Example Application", filename: "example-app"},
         {"examples/agent_app/AI.md", title: "AI Examples", filename: "ai-examples"},
+        {"examples/agent_app/MAKEWRIGHT.md",
+         title: "Makewright Scenarios", filename: "makewright-scenarios"},
         {"CONTRIBUTING.md", title: "Contributing"},
         {"CHANGELOG.md", title: "Changelog"},
         {"LICENSE", title: "Apache 2.0 License"}
@@ -123,10 +109,12 @@ defmodule Aikido.MixProject do
       formatters: ["html"],
       skip_undefined_reference_warnings_on: ["CHANGELOG.md", "LICENSE"],
       groups_for_modules: [
-        "Ash Integration": [~r/^Aikido\.Ash(?:\.|$)/],
+        "Resource Extensions": [~r/^Aikido\.(?:Agent|Slice|Domain)\.Extension(?:\.|$)/],
         Durability: [~r/^Aikido\.Durable(?:\.|$)/],
         "Actions and Effects": [~r/^Aikido\.(?:Actions|Directives)(?:\.|$)/],
-        Slices: [~r/^Aikido\.(?:Slice|Slices)(?:\.|$)/],
+        Features: [
+          ~r/^Aikido\.(?:Cron|FSM|AiReact|AiWorker|AI|Memory|Thread|Todo|Team)(?:\.|$)/
+        ],
         Runtime: [Aikido, Aikido.Agent, Aikido.AgentServer, ~r/^Aikido\.AgentServer\./],
         "Types and DSL": [~r/^Aikido\.(?:Types|Dsl)(?:\.|$)/],
         Observability: [~r/^Aikido\.(?:Observe|Debug|Telemetry|Tracing)(?:\.|$)/]
@@ -136,7 +124,7 @@ defmodule Aikido.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE", "NOTICE", "usage-rules.md"],
+      files: ["lib", "priv", "mix.exs", "README.md", "LICENSE", "NOTICE", "usage-rules.md"],
       maintainers: ["barnabasJ"],
       licenses: ["Apache-2.0"],
       links: %{
@@ -155,13 +143,10 @@ defmodule Aikido.MixProject do
       {:ash, "~> 3.36"},
       {:ash_ai, "~> 1.3"},
       {:lua, "~> 1.0.2"},
-      {:ash_lua,
-       git: "https://github.com/ash-project/ash_lua.git",
-       ref: "5388cbbcd176e3f879a713d948733d9f0e281cf6"},
+      {:ash_lua, "~> 0.2.3"},
       {:simple_sat, "~> 0.1"},
       {:deep_merge, "~> 1.0"},
       {:jason, "~> 1.4"},
-      {:phoenix_pubsub, "~> 2.1"},
       {:req_llm, "~> 1.24"},
       {:spark, "~> 2.2"},
       {:splode, "~> 0.3.0"},
@@ -169,6 +154,8 @@ defmodule Aikido.MixProject do
       {:telemetry_metrics, "~> 1.1"},
       {:crontab, "~> 1.2"},
       {:time_zone_info, "~> 0.7"},
+      {:phoenix_live_view, "~> 1.1", optional: true},
+      {:makeup_json, "~> 1.0"},
 
       # Development & Test Dependencies
       {:benchee, "~> 1.5", only: :dev, runtime: false},
@@ -184,7 +171,6 @@ defmodule Aikido.MixProject do
       {:expublish, "~> 2.7", only: [:dev], runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:mimic, "~> 2.0", only: :test},
-      {:stream_data, "~> 1.0"},
       {:mix_test_interactive, "~> 5.1", only: :dev, runtime: false}
     ]
   end
@@ -192,8 +178,8 @@ defmodule Aikido.MixProject do
   defp aliases do
     dsl_extensions =
       Enum.join(
-        ~w(Aikido.Instance.Dsl Aikido.Ash.Agent Aikido.Ash.Slice
-           Aikido.Ash.Team Aikido.Ash.AI Aikido.Ash.Domain
+        ~w(Aikido.Instance.Dsl Aikido.Agent.Extension Aikido.Slice.Extension
+           Aikido.Team.Extension Aikido.AI.Extension Aikido.Domain.Extension
            Ash.TypedStruct.Dsl Aikido.Signal.Dsl),
         ","
       )

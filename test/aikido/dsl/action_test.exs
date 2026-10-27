@@ -11,7 +11,7 @@ defmodule Aikido.NativeActionTest.CustomDirective do
   def exec(_directive, _signal, _runtime), do: :ok
 end
 
-defmodule Aikido.NativeActionTest.Actions.Increment do
+defmodule Aikido.NativeActionTest.Counter.Actions.Increment do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
 
@@ -23,7 +23,7 @@ defmodule Aikido.NativeActionTest.Actions.Increment do
   end
 end
 
-defmodule Aikido.NativeActionTest.Actions.Emit do
+defmodule Aikido.NativeActionTest.Counter.Actions.Emit do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
 
@@ -33,7 +33,7 @@ defmodule Aikido.NativeActionTest.Actions.Emit do
   end
 end
 
-defmodule Aikido.NativeActionTest.Actions.Prepared do
+defmodule Aikido.NativeActionTest.Counter.Actions.Prepared do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
 
@@ -43,7 +43,7 @@ defmodule Aikido.NativeActionTest.Actions.Prepared do
   end
 end
 
-defmodule Aikido.NativeActionTest.Actions.Runtime do
+defmodule Aikido.NativeActionTest.Counter.Actions.Runtime do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
 
@@ -55,7 +55,7 @@ defmodule Aikido.NativeActionTest.Actions.Runtime do
   end
 end
 
-defmodule Aikido.NativeActionTest.Actions.InvalidResult do
+defmodule Aikido.NativeActionTest.Counter.Actions.InvalidResult do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
 
@@ -65,21 +65,54 @@ defmodule Aikido.NativeActionTest.Actions.InvalidResult do
   end
 end
 
-defmodule Aikido.NativeActionTest.Actions do
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+defmodule Aikido.NativeActionTest.Counter.Slice do
+  use Aikido.Slice
+
+  slice do
+    name "native_action_counter"
+
+    schema do
+      attribute :count, :integer do
+        description "Counter changed by the native action."
+        default 0
+      end
+
+      attribute :prepared, :boolean do
+        description "Whether the native preparation ran."
+      end
+
+      attribute :agent_id, :string do
+        description "Agent identity observed by the reducer."
+      end
+
+      attribute :signal, :term do
+        description "Signal observed by the reducer."
+      end
+
+      attribute :slice_config, :map do
+        description "Mount configuration observed by the reducer."
+      end
+    end
+
+    route "native.increment", :increment
+    route "native.emit", :emit
+    route "native.prepared", :prepared
+    route "native.runtime", :runtime
+    route "native.invalid_result", :invalid_result
+  end
 
   actions do
     action :increment, Aikido.Types.ActionResult do
       description "Increment typed state."
       argument :state, :map, allow_nil?: false
       argument :amount, :integer, allow_nil?: false, default: 1, constraints: [min: 1]
-      run Aikido.NativeActionTest.Actions.Increment
+      run Aikido.NativeActionTest.Counter.Actions.Increment
     end
 
     action :emit, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
       argument :directive, :term, allow_nil?: false
-      run Aikido.NativeActionTest.Actions.Emit
+      run Aikido.NativeActionTest.Counter.Actions.Emit
     end
 
     action :prepared, Aikido.Types.ActionResult do
@@ -91,23 +124,42 @@ defmodule Aikido.NativeActionTest.Actions do
         end)
       end
 
-      run Aikido.NativeActionTest.Actions.Prepared
+      run Aikido.NativeActionTest.Counter.Actions.Prepared
     end
 
     action :runtime, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
-      run Aikido.NativeActionTest.Actions.Runtime
+      run Aikido.NativeActionTest.Counter.Actions.Runtime
     end
 
     action :invalid_result, Aikido.Types.ActionResult do
       argument :state, :map, allow_nil?: false
-      run Aikido.NativeActionTest.Actions.InvalidResult
+      run Aikido.NativeActionTest.Counter.Actions.InvalidResult
     end
   end
 end
 
+defmodule Aikido.NativeActionTest.Counter do
+  use Aikido.Agent
+
+  agent do
+    name "native_action_counter"
+    slice :counter, Aikido.NativeActionTest.Counter.Slice
+  end
+end
+
 defmodule Aikido.NativeActionTest do
-  use ExUnit.Case, async: true
+  use AikidoTest.Case, async: true
+
+  test "native actions run through a mounted slice on a real agent", context do
+    pid =
+      start_server(context, Aikido.NativeActionTest.Counter,
+        initial_state: %{counter: %{count: 2}}
+      )
+
+    signal = Aikido.Signal.new!("native.increment", %{amount: "3"})
+    assert {:ok, 5} = Aikido.AgentServer.call(pid, signal, &{:ok, &1.agent.state.counter.count})
+  end
 
   defp run(action, params \\ %{}, context \\ %{state: %{count: 2}}) do
     signal =
@@ -118,7 +170,7 @@ defmodule Aikido.NativeActionTest do
     runtime = Map.merge(Aikido.Signal.ctx(signal), Map.get(context, :ctx, %{}))
 
     then(signal, fn signal ->
-      Aikido.NativeActionTest.Actions
+      Aikido.NativeActionTest.Counter.Slice
       |> Ash.ActionInput.for_action(
         action,
         Map.put(signal.data || %{}, :state, Map.get(context, :state, %{})),
@@ -130,27 +182,29 @@ defmodule Aikido.NativeActionTest do
   end
 
   test "actions are native Ash definitions" do
-    assert Spark.Dsl.is?(Aikido.NativeActionTest.Actions, Ash.Resource)
-    assert Ash.Resource.Info.action(Aikido.NativeActionTest.Actions, :increment).type == :action
+    assert Spark.Dsl.is?(Aikido.NativeActionTest.Counter.Slice, Ash.Resource)
+
+    assert Ash.Resource.Info.action(Aikido.NativeActionTest.Counter.Slice, :increment).type ==
+             :action
   end
 
   test "actions have descriptive native names" do
-    assert Ash.Resource.Info.action(Aikido.NativeActionTest.Actions, :increment).name ==
+    assert Ash.Resource.Info.action(Aikido.NativeActionTest.Counter.Slice, :increment).name ==
              :increment
   end
 
   test "descriptions are native Ash metadata" do
-    assert Ash.Resource.Info.action(Aikido.NativeActionTest.Actions, :increment).description ==
+    assert Ash.Resource.Info.action(Aikido.NativeActionTest.Counter.Slice, :increment).description ==
              "Increment typed state."
   end
 
   test "actions declare the shared result type" do
-    assert Ash.Resource.Info.action(Aikido.NativeActionTest.Actions, :increment).returns ==
+    assert Ash.Resource.Info.action(Aikido.NativeActionTest.Counter.Slice, :increment).returns ==
              Aikido.Types.ActionResult
   end
 
   test "arguments retain native defaults" do
-    assert Ash.Resource.Info.action(Aikido.NativeActionTest.Actions, :increment).arguments
+    assert Ash.Resource.Info.action(Aikido.NativeActionTest.Counter.Slice, :increment).arguments
            |> Enum.find(&(&1.name == :amount))
            |> Map.fetch!(:default) == 1
   end
@@ -220,7 +274,7 @@ defmodule Aikido.NativeActionTest do
 
   test "direct Ash callers can construct validated results" do
     input =
-      Ash.ActionInput.for_action(Aikido.NativeActionTest.Actions, :increment, %{
+      Ash.ActionInput.for_action(Aikido.NativeActionTest.Counter.Slice, :increment, %{
         state: %{count: 2},
         amount: 4
       })

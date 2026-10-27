@@ -14,13 +14,22 @@ end
 
 defmodule AikidoTest.SignalCtxTest.ContextProbe do
   @moduledoc false
-  use Ash.Resource, data_layer: :embedded, validate_domain_inclusion?: false
+  use Aikido.Agent
 
-  actions do
-    action :context_probe, Aikido.Types.ActionResult do
-      argument :state, :term
-      run AikidoTest.SignalCtxTest.Actions.CaptureContext
+  agent do
+    name "context_probe"
+
+    schema do
+      attribute :workflow_id, :string do
+        description "Workflow identifier received through the signal's context."
+      end
+
+      attribute :user, :string do
+        description "User label received through the signal's context."
+      end
     end
+
+    route "context_probe", AikidoTest.SignalCtxTest.Actions.CaptureContext
   end
 end
 
@@ -29,7 +38,7 @@ defmodule AikidoTest.SignalCtxTest do
   Tests for `Aikido.Signal` helpers and end-to-end ctx delivery into the
   native Ash action implementation.
   """
-  use ExUnit.Case, async: true
+  use AikidoTest.Case, async: true
 
   describe("put/3 + get/3 + ctx/1") do
     test "writes and reads a single key" do
@@ -81,7 +90,8 @@ defmodule AikidoTest.SignalCtxTest do
   end
 
   describe("context delivery into native actions") do
-    test "native action receives the signal context" do
+    test "native action receives the signal context", context do
+      pid = start_server(context, AikidoTest.SignalCtxTest.ContextProbe)
       {:ok, sig} = Aikido.Signal.new("context_probe", %{}, source: "/test")
 
       sig =
@@ -89,36 +99,16 @@ defmodule AikidoTest.SignalCtxTest do
         |> Aikido.Signal.put(:workflow_id, "abc-123")
         |> Aikido.Signal.put(:user, "alice")
 
-      assert {:ok,
-              %Aikido.Types.ActionResult{
-                state: %{workflow_id: "abc-123", user: "alice"},
-                directives: []
-              }} =
-               then(sig, fn signal ->
-                 AikidoTest.SignalCtxTest.ContextProbe
-                 |> Ash.ActionInput.for_action(
-                   :context_probe,
-                   Map.put(signal.data || %{}, :state, %{}),
-                   context: %{aikido: Map.put(Aikido.Signal.ctx(sig), :signal, signal)},
-                   skip_unknown_inputs: [:*]
-                 )
-                 |> Ash.run_action()
-               end)
+      assert {:ok, %{workflow_id: "abc-123", user: "alice"}} =
+               Aikido.AgentServer.call(pid, sig, &{:ok, &1.agent.state.state})
     end
 
-    test "without an explicit signal, ctx defaults to %{}" do
-      assert {:ok,
-              %Aikido.Types.ActionResult{state: %{workflow_id: nil, user: nil}, directives: []}} =
-               then(%Aikido.Signal{id: nil, type: "test", source: "/test"}, fn signal ->
-                 AikidoTest.SignalCtxTest.ContextProbe
-                 |> Ash.ActionInput.for_action(
-                   :context_probe,
-                   Map.put(signal.data || %{}, :state, %{}),
-                   context: %{aikido: Map.put(%{}, :signal, signal)},
-                   skip_unknown_inputs: [:*]
-                 )
-                 |> Ash.run_action()
-               end)
+    test "an unscoped signal does not invent caller context", context do
+      pid = start_server(context, AikidoTest.SignalCtxTest.ContextProbe)
+      signal = Aikido.Signal.new!("context_probe", %{})
+
+      assert {:ok, %{workflow_id: nil, user: nil}} =
+               Aikido.AgentServer.call(pid, signal, &{:ok, &1.agent.state.state})
     end
   end
 end

@@ -1,12 +1,13 @@
 defmodule AikidoTest.SliceState do
-  @moduledoc "Build native embedded state before overlaying a reducer test's scenario."
+  @moduledoc "Build a reducer scenario through its embedded resource's create action."
 
   def new(resource, overrides \\ %{}) do
-    {:ok, state} =
-      resource
-      |> Ash.Changeset.for_create(:create, %{})
-      |> Ash.Changeset.apply_attributes()
+    Ash.create!(resource, overrides, action: :create)
+  end
 
-    Map.merge(state, overrides)
+  @doc "Return declared state attributes, excluding Ash's internal selection metadata."
+  def attributes(%resource{} = state) do
+    names = Enum.map(Ash.Resource.Info.attributes(resource), & &1.name)
+    Map.take(state, names)
   end
 end

@@ -1,3 +1,56 @@
+defmodule AikidoTest.TracePropagation.Pipeline.Signals.BeginWork do
+  use Aikido.Signal
+
+  signal do
+    type "trace.start"
+
+    schema do
+      attribute :amount, :integer do
+        description "Amount doubled by supervised work."
+        allow_nil? false
+      end
+    end
+  end
+end
+
+defmodule AikidoTest.TracePropagation.Pipeline.Signals.Fail do
+  use Aikido.Signal
+
+  signal do
+    type "trace.fail"
+  end
+end
+
+defmodule AikidoTest.TracePropagation.Pipeline.Signals.AcceptResult do
+  use Aikido.Signal
+
+  signal do
+    type "trace.completed"
+
+    schema do
+      attribute :result, :map do
+        description "Value returned by the supervised task."
+        allow_nil? false
+      end
+    end
+  end
+end
+
+defmodule AikidoTest.TracePropagation.Pipeline.Signals.Finish do
+  use Aikido.Signal
+
+  signal do
+    type "trace.finished"
+
+    schema do
+      attribute :value, :integer do
+        description "Final value adopted by the agent."
+        allow_nil? false
+      end
+    end
+  end
+end
+
 defmodule AikidoTest.TracePropagation.Work do
   require Ash.Tracer
 
@@ -76,7 +129,7 @@ end
 defmodule AikidoTest.TracePropagation.Pipeline do
   use Ash.Resource,
     domain: AikidoTest.TracePropagation.Domain,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "trace_pipeline"
@@ -94,40 +147,22 @@ defmodule AikidoTest.TracePropagation.Pipeline do
       end
     end
 
-    route "trace.start", :begin_work, name: :work
-    route "trace.fail", :fail, name: :fail_work
-    route "trace.completed", :accept_result, public?: false
-    route "trace.finished", :finish, public?: false
-  end
+    route AikidoTest.TracePropagation.Pipeline.Signals.BeginWork,
+          AikidoTest.TracePropagation.Pipeline.Actions.BeginWork, name: :work
 
-  actions do
-    action :begin_work, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :amount, :integer, allow_nil?: false
-      run AikidoTest.TracePropagation.Pipeline.Actions.BeginWork
-    end
+    route AikidoTest.TracePropagation.Pipeline.Signals.Fail,
+          AikidoTest.TracePropagation.Pipeline.Actions.Fail, name: :fail_work
 
-    action :accept_result, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :result, :map, allow_nil?: false
-      run AikidoTest.TracePropagation.Pipeline.Actions.AcceptResult
-    end
+    route AikidoTest.TracePropagation.Pipeline.Signals.AcceptResult,
+          AikidoTest.TracePropagation.Pipeline.Actions.AcceptResult, public?: false
 
-    action :finish, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :value, :integer, allow_nil?: false
-      run AikidoTest.TracePropagation.Pipeline.Actions.Finish
-    end
-
-    action :fail, Aikido.Types.ActionResult do
-      argument :state, :term
-      run AikidoTest.TracePropagation.Pipeline.Actions.Fail
-    end
+    route AikidoTest.TracePropagation.Pipeline.Signals.Finish,
+          AikidoTest.TracePropagation.Pipeline.Actions.Finish, public?: false
   end
 end
 
 defmodule AikidoTest.TracePropagation.Domain do
-  use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+  use Ash.Domain, extensions: [Aikido.Domain.Extension], validate_config_inclusion?: false
 
   agents do
     agent :pipeline, AikidoTest.TracePropagation.Pipeline

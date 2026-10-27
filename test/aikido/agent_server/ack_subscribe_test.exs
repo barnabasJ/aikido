@@ -61,6 +61,51 @@ end
 defmodule AikidoTest.AgentServer.AckSubscribeTest do
   use AikidoTest.Case, async: false
 
+  test "execution-aware subscriptions project state, signal, returned effects and failures", %{
+    aikido: aikido
+  } do
+    pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.TestAgent)
+    :ok = Aikido.AgentServer.await_ready(pid)
+
+    {:ok, ref} =
+      Aikido.AgentServer.subscribe(pid, "**", fn runtime, event ->
+        {:ok, {runtime.agent.state.app.value, event.signal.data, event.directives, event.error}}
+      end)
+
+    assert {:ok, _} =
+             Aikido.AgentServer.call(
+               pid,
+               signal("write", %{value: 9}),
+               &{:ok, &1.agent.state.app.value}
+             )
+
+    assert_receive {:aikido_subscription, ^ref, %{result: {:ok, {9, %{value: 9}, [], nil}}}}
+
+    assert {:error, _} =
+             Aikido.AgentServer.call(pid, signal("fail", %{}), &{:ok, &1.agent.state.app.value})
+
+    assert_receive {:aikido_subscription, ^ref, %{result: {:ok, {9, %{}, [], error}}}}
+    refute is_nil(error)
+    assert :ok = Aikido.AgentServer.unsubscribe(pid, ref)
+
+    {:ok, raising} =
+      Aikido.AgentServer.subscribe(pid, "write", fn _, _ -> raise "observer failed" end,
+        once: true
+      )
+
+    assert {:ok, 10} =
+             Aikido.AgentServer.call(
+               pid,
+               signal("write", %{value: 10}),
+               &{:ok, &1.agent.state.app.value}
+             )
+
+    assert_receive {:aikido_subscription, ^raising,
+                    %{result: {:error, {:selector_raised, %RuntimeError{}, _}}}}
+
+    assert Process.alive?(pid)
+  end
+
   describe("call_until/5") do
     test("subscribes before a command that completes in the same turn", %{aikido: aikido}) do
       pid = start_server(%{aikido: aikido}, AikidoTest.AgentServer.AckSubscribeTest.TestAgent)

@@ -9,21 +9,31 @@ defmodule AgentExamples.MixProject do
       consolidate_protocols: Mix.env() != :test,
       deps: [
         {:aikido, path: "../.."},
+        {:benchee, "~> 1.5", only: :dev, runtime: false},
         {:ash, "~> 3.36"},
+        {:ash_sqlite, "~> 0.2.19"},
+        {:ash_cloak, "~> 0.4"},
+        {:cloak, "~> 1.1"},
         {:phoenix, "~> 1.8"},
         {:phoenix_live_view, "~> 1.1"},
+        {:phoenix_live_dashboard, "~> 0.9.1"},
+        {:telemetry_metrics, "~> 1.1"},
+        {:telemetry_poller, "~> 1.1"},
         {:phoenix_html, "~> 4.3"},
+        {:makeup_elixir, "~> 1.0"},
+        {:makeup_json, "~> 1.0"},
+        {:mdex, "~> 0.14.1"},
         {:bandit, "~> 1.6"},
         {:lazy_html, ">= 0.1.0", only: :test},
         {:ash_ai, "~> 1.3"},
-        {:ash_lua,
-         git: "https://github.com/ash-project/ash_lua.git",
-         ref: "5388cbbcd176e3f879a713d948733d9f0e281cf6"},
+        {:ash_lua, "~> 0.2.3"},
         {:sourceror, "~> 1.7", only: [:dev, :test]}
       ],
       aliases: [
         demo: "run -e AgentExamples.Demo.run()",
-        "spark.formatter": "spark.formatter --extensions AshAi,AshLua.Domain,AshLua.EvalActions",
+        "bench.quicksort": "run --no-start bench/quicksort.exs",
+        "spark.formatter":
+          "spark.formatter --extensions AshAi,AshLua.Domain,AshLua.EvalActions,AshSqlite.DataLayer,AshCloak",
         "ai.demo": "run -e AgentExamples.AI.Demo.run()",
         "ai.live": "run -e AgentExamples.AI.Demo.live()"
       ]

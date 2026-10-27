@@ -15,8 +15,7 @@ defmodule Aikido.AI.TestActions.TestAdd do
   @moduledoc false
   use Ash.Resource,
     domain: Aikido.AI.TestToolDomain,
-    data_layer: Ash.DataLayer.Simple,
-    validate_domain_inclusion?: false
+    data_layer: Ash.DataLayer.Simple
 
   actions do
     action :test_add, :map do
@@ -45,8 +44,7 @@ defmodule Aikido.AI.TestActions.TestMultiply do
   @moduledoc false
   use Ash.Resource,
     domain: Aikido.AI.TestToolDomain,
-    data_layer: Ash.DataLayer.Simple,
-    validate_domain_inclusion?: false
+    data_layer: Ash.DataLayer.Simple
 
   actions do
     action :test_multiply, :map do
@@ -73,8 +71,7 @@ defmodule Aikido.AI.TestActions.TestFails do
   @moduledoc false
   use Ash.Resource,
     domain: Aikido.AI.TestToolDomain,
-    data_layer: Ash.DataLayer.Simple,
-    validate_domain_inclusion?: false
+    data_layer: Ash.DataLayer.Simple
 
   actions do
     action :test_fails, :map do

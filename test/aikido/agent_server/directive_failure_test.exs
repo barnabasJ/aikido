@@ -79,7 +79,7 @@ defmodule AikidoTest.DirectiveFailureTest do
 
   for delivery <- [:call, :cast] do
     test "#{delivery} retains and checkpoints adopted state after an effect fails", context do
-      pid = start_server(context, AikidoTest.DirectiveFailure.Agent)
+      pid = start_server(context, AikidoTest.DirectiveFailure.Agent, sync: %{mode: :explicit})
 
       {:ok, ref} =
         Aikido.AgentServer.subscribe(
@@ -105,7 +105,7 @@ defmodule AikidoTest.DirectiveFailureTest do
       assert_receive {:aikido_subscription, ^ref, %{result: {:ok, 1}}}
       refute_received {:signal, %{type: "test.effect", data: %{label: :after}}}
 
-      replacement = AikidoTest.LifecycleWait.restart(pid)
+      replacement = AikidoTest.LifecycleWait.crash_and_await_replacement(pid)
       assert {:ok, 1} = Aikido.AgentServer.state(replacement, &{:ok, &1.agent.state.state.count})
 
       assert :ok =

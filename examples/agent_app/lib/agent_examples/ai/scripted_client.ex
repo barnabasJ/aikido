@@ -2,119 +2,141 @@ defmodule AgentExamples.AI.ScriptedClient do
   @moduledoc """
   A deterministic model substitute that exercises real tools and signal flows.
 
-  An `orchestrate:` request starts a team specialist, delegates to the fixed
-  analyst (which starts and delegates to its own helper), then asks the fixed
-  reviewer and the specialist. Ordinary requests use text_stats and team_roster.
+  An `orchestrate:` request creates an analyst, reviewer and specialist, delegates
+  to the analyst (which creates its own helper), then asks the reviewer and specialist. Ordinary requests use text_stats and team_roster.
   """
-  @behaviour Aikido.Slices.AiReact.Client
+  @behaviour Aikido.AiReact.Client
 
   @impl true
   def generate_text(_model, messages, options) do
-    current =
-      messages
-      |> Enum.with_index()
-      |> Enum.reverse()
-      |> Enum.find(fn {message, _} ->
-        message.role == :user && !String.starts_with?(text(message), "[Hook context:")
-      end)
-
-    messages = Enum.drop(messages, if(current, do: elem(current, 1), else: 0))
-    query = messages |> Enum.find(&(&1.role == :user)) |> text()
+    messages = current_request_messages(messages)
+    query = messages |> Enum.find(&(&1.role == :user)) |> message_text()
     results = Enum.filter(messages, &(&1.role == :tool))
     tools = Keyword.fetch!(options, :tools) |> Enum.map(& &1.name)
 
     cond do
       tools == [] && String.starts_with?(query, "This conversation is about to be replaced") ->
-        {:ok,
-         %ReqLLM.Response{
-           id: "scripted",
-           model: "offline",
-           context: ReqLLM.Context.new(),
-           message:
-             ReqLLM.Context.assistant(
-               "Offline handoff demonstration. Follow the system instructions and continue the conversation with the supplied tools. Next action: process the latest user instruction and report the result.",
-               tool_calls: []
-             ),
-           finish_reason: :stop
-         }}
+        handoff_response()
 
       String.starts_with?(query, "orchestrate:") &&
           ("spawn_worker" in tools || "run_lua" in tools) ->
-        orchestrate(results, query, "run_lua" in tools)
+        plan_team_delegation(results, query, "run_lua" in tools)
 
       String.starts_with?(query, "expand:") && ("spawn_worker" in tools || "run_lua" in tools) ->
-        expand(results, query, "run_lua" in tools)
+        plan_worker_delegation(results, query, "run_lua" in tools)
 
       results == [] ->
-        calls =
-          for name <- tools,
-              name in ["text_stats", "team_roster", "stamp", "run_lua"],
-              do: call(name, arguments(name, query))
-
-        {:ok,
-         %ReqLLM.Response{
-           id: "scripted",
-           model: "offline",
-           context: ReqLLM.Context.new(),
-           message: ReqLLM.Context.assistant("", tool_calls: calls),
-           finish_reason: :tool_calls
-         }}
+        initial_tool_response(tools, query)
 
       true ->
-        final(results)
+        respond_with_tool_results(results)
     end
   end
 
-  defp arguments(name, query) when name in ["text_stats", "stamp"],
+  defp current_request_messages(messages) do
+    current =
+      messages
+      |> Enum.with_index()
+      |> Enum.reverse()
+      |> Enum.find(fn {message, _} ->
+        message.role == :user && !String.starts_with?(message_text(message), "[Hook context:")
+      end)
+
+    Enum.drop(messages, if(current, do: elem(current, 1), else: 0))
+  end
+
+  defp handoff_response do
+    {:ok,
+     %ReqLLM.Response{
+       id: "scripted",
+       model: "offline",
+       context: ReqLLM.Context.new(),
+       message:
+         ReqLLM.Context.assistant(
+           "Offline handoff demonstration. Follow the system instructions and continue the conversation with the supplied tools. Next action: process the latest user instruction and report the result.",
+           tool_calls: []
+         ),
+       finish_reason: :stop
+     }}
+  end
+
+  defp initial_tool_response(tools, query) do
+    calls =
+      for name <- tools,
+          name in ["text_stats", "team_roster", "stamp", "run_lua"],
+          do: new_tool_call(name, tool_arguments(name, query))
+
+    {:ok,
+     %ReqLLM.Response{
+       id: "scripted",
+       model: "offline",
+       context: ReqLLM.Context.new(),
+       message: ReqLLM.Context.assistant("", tool_calls: calls),
+       finish_reason: :tool_calls
+     }}
+  end
+
+  defp tool_arguments(name, query) when name in ["text_stats", "stamp"],
     do: %{"input" => %{"text" => query}}
 
-  defp arguments("run_lua", _query),
+  defp tool_arguments("run_lua", _query),
     do: %{
       "input" => %{"script" => "return analysis.text_stats({input = {text = 'Lua calls Ash'}})"}
     }
 
-  defp arguments(_, _), do: %{}
+  defp tool_arguments(_, _), do: %{}
 
-  defp orchestrate(results, query, lua?) do
+  defp plan_team_delegation(results, query, lua?) do
     task = String.trim_leading(query, "orchestrate:") |> String.trim()
 
-    case length(results) do
-      0 ->
-        team_tool(
-          "spawn_worker",
-          %{name: "specialist", specialty: "independent verification"},
-          lua?
-        )
+    operations = [
+      {"spawn_worker", %{name: "analyst", specialty: "analysis"}},
+      {"spawn_worker", %{name: "reviewer", specialty: "review"}},
+      {"spawn_worker", %{name: "specialist", specialty: "independent verification"}},
+      {"delegate", %{member: "analyst", text: "expand: #{task}"}},
+      {"delegate", %{member: "reviewer", text: task}},
+      {"delegate", %{member: "specialist", text: task}}
+    ]
 
-      1 ->
-        team_tool("delegate", %{member: "analyst", text: "expand: #{task}"}, lua?)
-
-      2 ->
-        team_tool("delegate", %{member: "reviewer", text: task}, lua?)
-
-      3 ->
-        team_tool("delegate", %{member: "specialist", text: task}, lua?)
-
-      _ ->
-        final(results)
-    end
+    request_next_team_operation(results, operations, lua?)
   end
 
-  defp expand(results, query, lua?) do
+  defp plan_worker_delegation(results, query, lua?) do
     task = String.trim_leading(query, "expand:") |> String.trim()
 
-    case length(results) do
-      0 -> team_tool("spawn_worker", %{name: "analyst-helper", specialty: "word counting"}, lua?)
-      1 -> team_tool("delegate", %{member: "analyst-helper", text: task}, lua?)
-      _ -> final(results)
+    operations = [
+      {"spawn_worker", %{name: "analyst-helper", specialty: "word counting"}},
+      {"delegate", %{member: "analyst-helper", text: task}}
+    ]
+
+    request_next_team_operation(results, operations, lua?)
+  end
+
+  defp request_next_team_operation([], _operations, lua?),
+    do: respond_with_team_tool("team_roster", %{}, lua?)
+
+  defp request_next_team_operation([roster | _] = results, operations, lua?) do
+    roster = roster |> message_text() |> Jason.decode!()
+    members = Map.get(roster["result"] || roster, "members", [])
+
+    operations =
+      Enum.reject(operations, fn
+        {"spawn_worker", %{name: name}} -> name in members
+        _ -> false
+      end)
+
+    case Enum.at(operations, length(results) - 1) do
+      {name, arguments} -> respond_with_team_tool(name, arguments, lua?)
+      nil -> respond_with_tool_results(results)
     end
   end
 
-  defp team_tool(name, arguments, false), do: tool(name, arguments)
+  defp respond_with_team_tool(name, arguments, false), do: respond_with_tool_call(name, arguments)
 
-  defp team_tool(name, arguments, true) do
+  defp respond_with_team_tool(name, arguments, true) do
     action =
       case name do
+        "team_roster" -> "members"
         "spawn_worker" -> "spawn"
         "delegate" -> "delegate"
       end
@@ -122,7 +144,9 @@ defmodule AgentExamples.AI.ScriptedClient do
     fields =
       Enum.map_join(arguments, ", ", fn {key, value} -> "#{key} = #{lua_string(value)}" end)
 
-    tool("run_lua", %{script: "return assert(agents.#{action}({input = {#{fields}}}))"})
+    respond_with_tool_call("run_lua", %{
+      script: "return assert(agents.#{action}({input = {#{fields}}}))"
+    })
   end
 
   # Long strings avoid interpreting prompts as Lua source, including embedded quotes.
@@ -137,7 +161,7 @@ defmodule AgentExamples.AI.ScriptedClient do
     "string.sub([#{separator}[_#{value}]#{separator}], 2)"
   end
 
-  defp tool(name, arguments),
+  defp respond_with_tool_call(name, arguments),
     do:
       {:ok,
        %ReqLLM.Response{
@@ -147,7 +171,7 @@ defmodule AgentExamples.AI.ScriptedClient do
          message:
            ReqLLM.Context.assistant("",
              tool_calls: [
-               call(name, %{
+               new_tool_call(name, %{
                  "input" => Map.new(arguments, fn {key, value} -> {to_string(key), value} end)
                })
              ]
@@ -155,7 +179,7 @@ defmodule AgentExamples.AI.ScriptedClient do
          finish_reason: :tool_calls
        }}
 
-  defp call(name, arguments),
+  defp new_tool_call(name, arguments),
     do: %{id: Ash.UUIDv7.generate(), name: name, arguments: arguments}
 
   defp format_lua_result(%{"words" => words, "characters" => characters}),
@@ -169,10 +193,10 @@ defmodule AgentExamples.AI.ScriptedClient do
 
   defp format_lua_result(result), do: Jason.encode!(result)
 
-  defp final(results) do
+  defp respond_with_tool_results(results) do
     output =
       Enum.map_join(results, "\n", fn message ->
-        result = message |> text() |> Jason.decode!()
+        result = message |> message_text() |> Jason.decode!()
 
         case result do
           %{"words" => words, "characters" => characters} ->
@@ -208,5 +232,5 @@ defmodule AgentExamples.AI.ScriptedClient do
      }}
   end
 
-  defp text(message), do: Enum.map_join(message.content, "", &(&1.text || ""))
+  defp message_text(message), do: Enum.map_join(message.content, "", &(&1.text || ""))
 end

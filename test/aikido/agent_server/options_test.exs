@@ -225,7 +225,7 @@ defmodule AikidoTest.AgentServer.OptionsTest do
     end
 
     test "accepts ParentRef struct" do
-      parent = Aikido.AgentServer.ParentRef.new!(%{pid: self(), id: "parent-1", tag: :worker})
+      parent = Aikido.Ownership.ParentRef.new!(%{pid: self(), id: "parent-1", tag: :worker})
 
       {:ok, opts} =
         Aikido.AgentServer.Options.new(
@@ -246,7 +246,7 @@ defmodule AikidoTest.AgentServer.OptionsTest do
             ]
         )
 
-      assert %Aikido.AgentServer.ParentRef{} = opts.parent
+      assert %Aikido.Ownership.ParentRef{} = opts.parent
       assert opts.parent.id == "parent-2"
       assert opts.parent.tag == :child
     end

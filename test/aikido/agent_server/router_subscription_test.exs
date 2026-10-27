@@ -22,14 +22,7 @@ defmodule Aikido.RouterSubscriptionTest.Agent do
       end
     end
 
-    route "event.**", :increment
-  end
-
-  actions do
-    action :increment, Aikido.Types.ActionResult do
-      argument :state, :term
-      run Aikido.RouterSubscriptionTest.Reducer
-    end
+    route "event.**", Aikido.RouterSubscriptionTest.Reducer
   end
 end
 

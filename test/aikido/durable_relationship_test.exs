@@ -50,7 +50,7 @@ defmodule AikidoTest.DurableRelationshipTest do
     {:ok, restored} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "child")
 
     assert {:ok, %{id: "parent", pid: ^parent, tag: :worker}} =
-             AgentServer.state(restored, &{:ok, &1.parent})
+             AgentServer.state(restored, &{:ok, Aikido.Ownership.parent(&1)})
   end
 
   test "detachment is authoritative after recovery and cannot resurrect the startup parent", %{
@@ -68,7 +68,9 @@ defmodule AikidoTest.DurableRelationshipTest do
     assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), parent)
 
     assert :orphan =
-             await_state_value(child, fn runtime -> if is_nil(runtime.parent), do: :orphan end)
+             await_state_value(child, fn runtime ->
+               if is_nil(Aikido.Ownership.parent(runtime)), do: :orphan
+             end)
 
     assert :error =
              Aikido.Durable.parent_binding(Aikido.durable_supervisor_name(instance), "child")
@@ -76,7 +78,40 @@ defmodule AikidoTest.DurableRelationshipTest do
     assert :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), child)
     {:ok, _parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "parent")
     {:ok, restored} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "child")
-    assert {:ok, nil} = AgentServer.state(restored, &{:ok, &1.parent})
+    assert {:ok, nil} = AgentServer.state(restored, &{:ok, Aikido.Ownership.parent(&1)})
+  end
+
+  test "restoring a child without its parent honors stop policy and retains the logical binding",
+       %{
+         instance: instance,
+         durable: durable
+       } do
+    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "missing-parent")
+
+    {:ok, child} =
+      AikidoTest.Case.start_test_agent(instance, Minimal,
+        id: "missing-parent/worker",
+        on_parent_death: :stop,
+        parent: %{pid: parent, id: "missing-parent", tag: :worker}
+      )
+
+    assert :ok = Aikido.Durable.stop(durable, child)
+    assert :ok = Aikido.Durable.stop(durable, parent)
+
+    {:ok, restored} = Aikido.Durable.start(durable, "missing-parent/worker", agent: Minimal)
+    ref = Process.monitor(restored)
+    assert_receive {:DOWN, ^ref, :process, ^restored, _}, 5000
+    assert :error = Aikido.Durable.lookup(durable, "missing-parent/worker")
+
+    assert {:ok, %{parent_id: "missing-parent"}} =
+             Aikido.Durable.parent_binding(durable, "missing-parent/worker")
+
+    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "missing-parent")
+
+    {:ok, child} =
+      AikidoTest.Case.start_test_agent(instance, Minimal, id: "missing-parent/worker")
+
+    assert {:ok, %{pid: ^parent}} = AgentServer.state(child, &{:ok, Aikido.Ownership.parent(&1)})
   end
 
   test "parent bindings survive a complete instance restart", %{
@@ -102,23 +137,30 @@ defmodule AikidoTest.DurableRelationshipTest do
     refute restored_child == child
 
     assert {:ok, %{id: "parent", pid: ^restored_parent, tag: :worker}} =
-             AgentServer.state(restored_child, &{:ok, &1.parent})
+             AgentServer.state(restored_child, &{:ok, Aikido.Ownership.parent(&1)})
   end
 
   test "SpawnAgent children use DurableServer and recover their relationship after a crash", %{
     instance: instance,
     durable: durable
   } do
-    {:ok, parent} = AikidoTest.Case.start_test_agent(instance, Minimal, id: "parent")
+    {:ok, parent} =
+      AikidoTest.Case.start_test_agent(instance, Minimal,
+        id: "parent",
+        sync: %{mode: :automatic, interval_ms: 1_234}
+      )
+
     {:ok, runtime} = AgentServer.state(parent, &{:ok, &1})
     signal = Aikido.Signal.new!("spawn.test", %{})
     directive = Aikido.Directives.spawn_agent(Minimal, :worker, opts: %{id: "child"})
     assert :ok = Aikido.Directive.exec(directive, signal, runtime)
     assert {:ok, child} = AgentServer.await_child(parent, :worker)
     assert {:ok, ^child} = Aikido.Durable.lookup(durable, "child")
-    restored = AikidoTest.LifecycleWait.restart(child)
+    assert %DurableServer{auto_sync: true, sync_every_ms: 1_234} = :sys.get_state(child)
+    restored = AikidoTest.LifecycleWait.crash_and_await_replacement(child)
 
-    assert {:ok, %{id: "parent", pid: ^parent}} = AgentServer.state(restored, &{:ok, &1.parent})
+    assert {:ok, %{id: "parent", pid: ^parent}} =
+             AgentServer.state(restored, &{:ok, Aikido.Ownership.parent(&1)})
 
     assert {:ok, %{parent_id: "parent"}} =
              Aikido.Durable.parent_binding(Aikido.durable_supervisor_name(instance), "child")
@@ -155,7 +197,7 @@ defmodule AikidoTest.DurableRelationshipTest do
       AikidoTest.Case.start_test_agent(instance, Minimal, id: "member", partition: :blue)
 
     assert {:ok, %{pid: ^parent, meta: %{team_pid: ^blue_team}}} =
-             AgentServer.state(restored, &{:ok, &1.parent})
+             AgentServer.state(restored, &{:ok, Aikido.Ownership.parent(&1)})
 
     refute blue_team == default_team
   end

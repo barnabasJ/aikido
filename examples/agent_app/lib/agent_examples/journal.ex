@@ -1,6 +1,6 @@
 defmodule AgentExamples.Journal do
   @moduledoc "An embedded resource whose Ash action returns the next slice state."
-  use Ash.Resource, data_layer: :embedded, extensions: [Aikido.Ash.Slice]
+  use Ash.Resource, data_layer: :embedded, extensions: [Aikido.Slice.Extension]
 
   attributes do
     attribute :entries, {:array, :string} do

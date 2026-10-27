@@ -1,11 +1,21 @@
 defmodule AgentExamples.Playground do
   @moduledoc "In-memory browser runs, shared across the example LiveViews."
   use GenServer
-  alias AgentExamples.{AI, Catalog}
+  alias AgentExamples.{AI, Catalog, Settings}
   @topic "playground"
 
   def start_link(_), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   def subscribe, do: Phoenix.PubSub.subscribe(AgentExamples.PubSub, @topic)
+  def subscribe(owner), do: Phoenix.PubSub.subscribe(AgentExamples.PubSub, @topic <> ":" <> owner)
+  def provider_settings(owner), do: GenServer.call(__MODULE__, {:provider_settings, owner})
+
+  def configure_provider(owner, params),
+    do: GenServer.call(__MODULE__, {:configure_provider, owner, params})
+
+  @doc false
+  def provider_key(owner, provider),
+    do: GenServer.call(__MODULE__, {:provider_key, owner, provider})
+
   def get(owner, slug), do: GenServer.call(__MODULE__, {:get, owner, slug})
 
   def start(owner, slug, options),
@@ -21,9 +31,51 @@ defmodule AgentExamples.Playground do
   def stop(owner, slug), do: GenServer.call(__MODULE__, {:stop, owner, slug}, 15_000)
 
   @impl true
-  def init(_), do: {:ok, %{runs: %{}, tasks: %{}, subscriptions: %{}, requests: %{}}}
+  def init(_),
+    do:
+      {:ok,
+       %{
+         runs: %{},
+         tasks: %{},
+         subscriptions: %{},
+         requests: %{}
+       }}
 
   @impl true
+  def handle_call({:provider_settings, owner}, _, state),
+    do: {:reply, Settings.provider_settings(owner), state}
+
+  def handle_call({:provider_key, owner, provider}, _, state) do
+    result =
+      case Settings.provider_key(owner, provider) do
+        {:error, :not_configured} ->
+          {:error, "Configure an API key in the example app's provider form."}
+
+        result ->
+          result
+      end
+
+    {:reply, result, state}
+  end
+
+  def handle_call({:configure_provider, owner, params}, _, state) do
+    with {:ok, settings} <- AI.Providers.validate(params),
+         {:ok, key} <- resolve_provider_key(owner, settings, params),
+         {:ok, settings} <- Settings.save_provider(owner, settings, key) do
+      Phoenix.PubSub.broadcast(AgentExamples.PubSub, @topic, {:provider_updated, owner})
+
+      Phoenix.PubSub.broadcast(
+        AgentExamples.PubSub,
+        @topic <> ":" <> owner,
+        {:provider_updated, owner}
+      )
+
+      {:reply, {:ok, settings}, state}
+    else
+      {:error, _} = error -> {:reply, error, state}
+    end
+  end
+
   def handle_call({:get, owner, slug}, _, state), do: {:reply, state.runs[{owner, slug}], state}
 
   def handle_call({:start, owner, slug, options}, _, state) do
@@ -43,16 +95,7 @@ defmodule AgentExamples.Playground do
         if String.trim(query) == "" do
           {:reply, {:error, "Enter a prompt first."}, state}
         else
-          task =
-            Task.Supervisor.async_nolink(
-              AgentExamples.WebTasks,
-              fn ->
-                AI.ask(run.record, query,
-                  timeout: 180_000,
-                  metadata: %{playground: %{owner: owner, slug: slug}}
-                )
-              end
-            )
+          task = start_prompt_task(run.record, query, owner, slug)
 
           run = %{
             run
@@ -62,18 +105,26 @@ defmodule AgentExamples.Playground do
           }
 
           state =
-            %{state | tasks: Map.put(state.tasks, task.ref, {key, task})} |> put_run(key, run)
+            %{state | tasks: Map.put(state.tasks, task.ref, {key, task})}
+            |> broadcast_and_store_run(key, run)
 
           {:reply, :ok, state}
         end
 
-      %{status: :running} = run when slug == "conversation" ->
+      %{status: :running} = run when slug in ["conversation", "adaptive-tools", "recovery"] ->
         case run.record.resource
-             |> Ash.ActionInput.for_action(:message, %{agent: run.record.id, text: query})
+             |> Ash.ActionInput.for_action(
+               :message,
+               %{agent: run.record.id, text: query},
+               run.scope
+             )
              |> Ash.run_action() do
           {:ok, _} ->
             {:reply, :ok,
-             put_run(state, key, %{run | messages: run.messages ++ [%{role: :user, text: query}]})}
+             broadcast_and_store_run(state, key, %{
+               run
+               | messages: run.messages ++ [%{role: :user, text: query}]
+             })}
 
           {:error, error} ->
             {:reply, {:error, error_text(error)}, state}
@@ -81,6 +132,46 @@ defmodule AgentExamples.Playground do
 
       _ ->
         {:reply, {:error, "Start an idle example before sending a prompt."}, state}
+    end
+  end
+
+  def handle_call({:command, owner, slug, :deliver, input}, _, state) do
+    key = {owner, slug}
+
+    case state.runs[key] do
+      %{status: status} = run when status in [:ready, :completed, :failed] ->
+        task =
+          Task.Supervisor.async_nolink(AgentExamples.WebTasks, fn ->
+            Aikido.AgentServer.call_until(
+              run.record.pid,
+              fn -> dispatch_command(run, :deliver, input) end,
+              "ai.react.**",
+              fn runtime ->
+                ai = runtime.agent.state.ai
+
+                cond do
+                  ai.request_id != input.request_id -> :skip
+                  ai.status == :completed -> {:ok, ai.result}
+                  ai.status == :failed -> {:error, ai.error}
+                  true -> :skip
+                end
+              end,
+              timeout: 30_000
+            )
+          end)
+
+        run = %{
+          run
+          | status: :running,
+            error: nil,
+            messages: run.messages ++ [%{role: :user, text: input.text}]
+        }
+
+        state = %{state | tasks: Map.put(state.tasks, task.ref, {key, task})}
+        {:reply, :ok, broadcast_and_store_run(state, key, run)}
+
+      _ ->
+        {:reply, {:error, "Start an idle example before delivering work."}, state}
     end
   end
 
@@ -105,7 +196,7 @@ defmodule AgentExamples.Playground do
         }
 
         state = put_in(state.requests[id], waiter)
-        {:noreply, put_run(state, key, %{run | requests: run.requests ++ [card]})}
+        {:noreply, broadcast_and_store_run(state, key, %{run | requests: run.requests ++ [card]})}
 
       _ ->
         {:reply, {:error, :run_not_active}, state}
@@ -118,10 +209,11 @@ defmodule AgentExamples.Playground do
     case state.requests[input.interaction_id] do
       %{key: ^key, deadline: deadline} ->
         if System.monotonic_time(:millisecond) < deadline do
-          {:reply, :ok, finish_request(state, input.interaction_id, {:ok, input.response})}
+          {:reply, :ok,
+           reply_and_remove_request(state, input.interaction_id, {:ok, input.response})}
         else
           {:reply, {:error, :request_expired},
-           finish_request(state, input.interaction_id, {:error, :timeout})}
+           reply_and_remove_request(state, input.interaction_id, {:error, :timeout})}
         end
 
       _ ->
@@ -168,8 +260,11 @@ defmodule AgentExamples.Playground do
       end
 
     case result do
-      {:ok, _} -> {:reply, :ok, put_run(state, {owner, slug}, %{run | error: nil})}
-      {:error, reason} -> {:reply, {:error, error_text(reason)}, state}
+      {:ok, _} ->
+        {:reply, :ok, broadcast_and_store_run(state, {owner, slug}, %{run | error: nil})}
+
+      {:error, reason} ->
+        {:reply, {:error, error_text(reason)}, state}
     end
   end
 
@@ -186,11 +281,11 @@ defmodule AgentExamples.Playground do
 
             state =
               if action == :cancel,
-                do: finish_requests(state, key, {:error, :cancelled}),
+                do: reply_to_run_requests(state, key, {:error, :cancelled}),
                 else: state
 
             run = %{run | requests: state.runs[key].requests}
-            {:reply, :ok, put_run(state, key, run)}
+            {:reply, :ok, broadcast_and_store_run(state, key, run)}
 
           {:error, reason} ->
             {:reply, {:error, Exception.message(Ash.Error.to_ash_error(reason))}, state}
@@ -205,12 +300,10 @@ defmodule AgentExamples.Playground do
     key = {owner, slug}
 
     case state.runs[key] do
-      %{status: status} = run when status != :stopped ->
-        case (Map.get(run.record, :resource) || run.record.__struct__)
-             |> Ash.ActionInput.for_action(:stop, %{agent: run.record})
-             |> Ash.run_action() do
+      %{record: _} = run ->
+        case stop_live_agent(run.record) do
           {:ok, _receipt} ->
-            state = finish_requests(state, key, {:error, :stopped})
+            state = reply_to_run_requests(state, key, {:error, :stopped})
             for {_ref, {^key, task}} <- state.tasks, do: Task.shutdown(task, :brutal_kill)
             tasks = Map.reject(state.tasks, fn {_, {task_key, _}} -> task_key == key end)
 
@@ -220,7 +313,11 @@ defmodule AgentExamples.Playground do
             run = %{run | status: :stopped, requests: []}
 
             {:reply, :ok,
-             put_run(%{state | tasks: tasks, subscriptions: subscriptions}, key, run)}
+             broadcast_and_store_run(
+               %{state | tasks: tasks, subscriptions: subscriptions},
+               key,
+               run
+             )}
 
           {:error, reason} ->
             {:reply, {:error, inspect(reason)}, state}
@@ -231,16 +328,31 @@ defmodule AgentExamples.Playground do
     end
   end
 
+  defp stop_live_agent(record) do
+    resource = Map.get(record, :resource) || record.__struct__
+    pool = Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource))
+
+    case Aikido.Durable.lookup(pool, record.id) do
+      {:ok, _pid} ->
+        resource
+        |> Ash.ActionInput.for_action(:stop, %{agent: record.id})
+        |> Ash.run_action()
+
+      :error ->
+        {:ok, :already_stopped}
+    end
+  end
+
   @impl true
   def handle_info({ref, result}, state) when is_reference(ref) do
     Process.demonitor(ref, [:flush])
-    finish_task(ref, result, state)
+    apply_prompt_task_result(ref, result, state)
   end
 
   def handle_info({:DOWN, ref, :process, _, reason}, state) do
     case Enum.find(state.requests, fn {_, waiter} -> waiter.monitor == ref end) do
-      {id, _} -> {:noreply, finish_request(state, id, {:error, :caller_stopped})}
-      nil -> finish_task(ref, {:error, "Run failed: #{inspect(reason)}"}, state)
+      {id, _} -> {:noreply, reply_and_remove_request(state, id, {:error, :caller_stopped})}
+      nil -> apply_prompt_task_result(ref, {:error, "Run failed: #{inspect(reason)}"}, state)
     end
   end
 
@@ -261,7 +373,15 @@ defmodule AgentExamples.Playground do
         if is_nil(previous) || run.status == :stopped || snapshot_pid(run, member || []) != pid do
           {:noreply, state}
         else
-          snapshot = Map.put(snapshot, :children, previous.children)
+          inspection =
+            Map.get(run, :inspection) || Aikido.Inspector.History.new()
+
+          snapshot =
+            snapshot
+            |> Map.delete(:execution)
+            |> Map.put(:children, previous.children)
+            |> Map.put(:recorded_members, Map.get(previous, :recorded_members, %{}))
+
           snapshot = if path == [], do: snapshot, else: put_in(run.snapshot, path, snapshot)
           {snapshot, state} = watch_children(key, snapshot, [], state)
           state = reconcile_subscriptions(key, snapshot, state)
@@ -275,15 +395,99 @@ defmodule AgentExamples.Playground do
               events: Enum.take([event | run.events], 80)
           }
 
-          {:noreply, put_run(state, key, run)}
+          run = Map.put(run, :inspection, inspection)
+          {:noreply, broadcast_and_store_run(state, key, run)}
         end
     end
   end
 
+  def handle_info({:aikido_inspection, ref, batch}, state) do
+    case Enum.find(state.runs, fn {_, run} -> run[:inspection_ref] == ref end) do
+      nil ->
+        {:noreply, state}
+
+      {key, run} ->
+        inspection =
+          Enum.reduce(batch.entries, run.inspection, fn
+            %{result: {:ok, snapshot}} = entry, history ->
+              prior = Enum.find(history.entries, &(&1.agent_id == entry.agent_id))
+
+              path =
+                if entry.agent_id == run.record.id,
+                  do: [],
+                  else:
+                    entry.agent_id
+                    |> String.replace_prefix(run.record.id <> "/", "")
+                    |> String.split("/")
+
+              Aikido.Inspector.History.record(
+                %{history | sequence: entry.sequence - 1},
+                snapshot,
+                path,
+                snapshot.execution,
+                if(prior,
+                  do: prior.after,
+                  else: Map.get(run.inspection_baselines, entry.agent_id)
+                ),
+                entry.agent_pid
+              )
+
+            _, history ->
+              history
+          end)
+
+        inspection = %{inspection | sequence: batch.sequence}
+        run = %{run | inspection: inspection}
+        {:noreply, broadcast_and_store_run(state, key, run)}
+    end
+  end
+
   def handle_info({:request_expired, id}, state),
-    do: {:noreply, finish_request(state, id, {:error, :timeout})}
+    do: {:noreply, reply_and_remove_request(state, id, {:error, :timeout})}
 
   def handle_info(_, state), do: {:noreply, state}
+
+  defp resolve_provider_key(_owner, %{mode: "offline"}, _params), do: {:ok, nil}
+
+  defp resolve_provider_key(owner, settings, params) do
+    key = String.trim(params["api_key"] || "")
+    provider = Enum.find(ReqLLM.Providers.list(), &(to_string(&1) == settings.provider))
+
+    if key != "" do
+      {:ok, key}
+    else
+      case Settings.provider_key(owner, settings.provider) do
+        {:error, :not_configured} ->
+          case environment_key(provider) do
+            nil -> {:error, "Enter an API key for the selected provider."}
+            key -> {:ok, key}
+          end
+
+        result ->
+          result
+      end
+    end
+  end
+
+  defp environment_key(provider) do
+    case ReqLLM.Keys.get(provider) do
+      {:ok, key, _source} -> key
+      _ -> nil
+    end
+  end
+
+  @impl true
+  def format_status(status), do: Map.put(status, :message, :redacted)
+
+  defp start_prompt_task(record, query, owner, slug) do
+    Task.Supervisor.async_nolink(AgentExamples.WebTasks, fn ->
+      AI.ask(record, query,
+        timeout: 3_600_000,
+        ash: [actor: %{id: owner}, tenant: "playground"],
+        metadata: %{playground: %{owner: owner, slug: slug}}
+      )
+    end)
+  end
 
   defp dispatch_command(%{record: %{resource: AgentExamples.Counter}} = run, action, input)
        when action in [:increase, :decrease] do
@@ -303,22 +507,48 @@ defmodule AgentExamples.Playground do
     Aikido.AgentServer.call(run.record.pid, signal, fn _ -> {:ok, :processed} end)
   end
 
+  defp dispatch_command(run, :background_task, %{task_id: id, team_path: path}) do
+    with {:ok, segments} when is_list(segments) <- Jason.decode(path),
+         snapshot when not is_nil(snapshot) <- subtree(run.snapshot, segments),
+         true <- Enum.any?(snapshot.tasks, &(&1.id == id)) do
+      snapshot.resource
+      |> Ash.ActionInput.for_action(
+        :background_task,
+        %{agent: snapshot.id, task_id: id},
+        run.scope
+      )
+      |> Ash.run_action(run.scope)
+    else
+      _ -> {:error, "Select an existing task in this example's team tree."}
+    end
+  end
+
   defp dispatch_command(run, action, input) do
     run.record.resource
-    |> Ash.ActionInput.for_action(action, Map.put(input, :agent, run.record.id))
-    |> Ash.run_action()
+    |> Ash.ActionInput.for_action(action, Map.put(input, :agent, run.record.id), run.scope)
+    |> Ash.run_action(run.scope)
   end
 
   defp create_run(_key, nil, _, state), do: {:reply, {:error, "Unknown example"}, state}
 
   defp create_run(key, example, options, state) do
+    options = Map.merge(shared_provider_options(key, state), options)
+
     with {:ok, attributes} <- attributes(example, options),
          attributes = with_request_callback(example, attributes, key),
+         attributes = restore_example_identity(example, attributes, state.runs[key]),
+         attributes = checkpoint_identity(example, attributes, key),
          {:ok, record} <-
-           example.resource |> Ash.ActionInput.for_action(:start, attributes) |> Ash.run_action() do
+           example.resource
+           |> Ash.ActionInput.for_action(:start, attributes, startup_options(example))
+           |> Ash.run_action() do
+      close_replaced_sort_history(example, state.runs[key])
       pid = record.pid
 
       {:ok, ref, snapshot} = subscribe_snapshot(pid)
+
+      {:ok, inspection_ref} =
+        Aikido.Inspector.attach(pid, &__MODULE__.snapshot/2, include_children?: true)
 
       state = %{
         state
@@ -329,26 +559,54 @@ defmodule AgentExamples.Playground do
 
       run = %{
         record: record,
+        scope: [actor: %{id: elem(key, 0)}, tenant: "playground"],
         requests: [],
         status: :ready,
         mode: options["mode"] || "offline",
         messages: [],
         snapshot: snapshot,
+        inspection: Aikido.Inspector.History.new(),
+        inspection_ref: inspection_ref,
+        inspection_baselines: %{record.id => snapshot.inspected_state},
         events: [],
         error: nil
       }
 
-      {:reply, {:ok, run}, put_run(state, key, run)}
+      {:reply, {:ok, run}, broadcast_and_store_run(state, key, run)}
     else
       {:error, reason} -> {:reply, {:error, error_text(reason)}, state}
     end
   end
 
+  defp close_replaced_sort_history(%{slug: "quicksort"}, %{snapshot: %{own: %{topic: topic}}}),
+    do: AgentExamples.Quicksort.RunHistory.close(topic)
+
+  defp close_replaced_sort_history(_, _), do: :ok
+
+  defp checkpoint_identity(%{slug: "checkpoint"}, attributes, {owner, _}),
+    do:
+      Map.merge(attributes, %{
+        id: "checkpoint/" <> owner,
+        sync: %{mode: :periodic, interval_ms: 3_600_000}
+      })
+
+  defp checkpoint_identity(_, attributes, _), do: attributes
+
+  defp startup_options(%{slug: "checkpoint"}),
+    do: [context: %{aikido_runtime_options: [restart?: false]}]
+
+  defp startup_options(_), do: []
+
   defp watch_children(key, snapshot, path, state) do
-    snapshot = %{
+    live = Map.new(snapshot.members, &{&1.name, &1})
+
+    recorded =
       snapshot
-      | children: Map.take(snapshot.children, Enum.map(snapshot.members, & &1.name))
-    }
+      |> Map.get(:recorded_members, %{})
+      |> Map.new(fn {name, member} -> {name, %{member | alive: false}} end)
+      |> Map.merge(live)
+
+    snapshot = Map.put(snapshot, :recorded_members, recorded)
 
     Enum.reduce(snapshot.members, {snapshot, state}, fn member, {snapshot, state} ->
       child_path = path ++ [member.name]
@@ -376,15 +634,15 @@ defmodule AgentExamples.Playground do
         {child, state} = watch_children(key, child, child_path, state)
         {put_in(snapshot.children[member.name], child), state}
       else
-        {%{snapshot | children: Map.delete(snapshot.children, member.name)}, state}
+        {snapshot, state}
       end
     end)
   end
 
   defp subscribe_snapshot(pid) do
-    with {:ok, ref} <- Aikido.AgentServer.subscribe(pid, "**", &snapshot/1) do
+    with {:ok, ref} <- Aikido.AgentServer.subscribe(pid, "**", &__MODULE__.snapshot/2) do
       try do
-        case Aikido.AgentServer.state(pid, &snapshot/1) do
+        case Aikido.AgentServer.state(pid, &__MODULE__.snapshot/1) do
           {:ok, snapshot} ->
             {:ok, ref, snapshot}
 
@@ -467,45 +725,13 @@ defmodule AgentExamples.Playground do
 
   defp attributes(example, options) do
     if Catalog.ai?(example) do
-      overrides =
-        Enum.reduce([:system_prompt, :max_iterations], %{}, fn key, attributes ->
-          case Map.fetch(options, Atom.to_string(key)) do
-            {:ok, value} -> Map.put(attributes, key, value)
-            :error -> attributes
-          end
-        end)
-
-      tools = AI.Tools.for_assistant()
-      tools = if options["lua"] == "true", do: tools ++ AI.Tools.for_lua(), else: tools
-
-      tools =
-        if example.kind == :ai_team && options["lua"] != "true" do
-          tools ++ [:team_roster, :spawn_worker, :delegate]
-        else
-          tools
-        end
-
-      if options["mode"] == "live" do
-        with key when is_binary(key) and key != "" <- System.get_env("ZAI_API_KEY"),
-             [provider, id] when id != "" <- String.split(options["model"] || "", ":", parts: 2),
-             true <- provider in ["zai", "zai_coder"] do
-          {:ok,
-           Map.merge(overrides, %{
-             tools: tools,
-             client: ReqLLM.Generation,
-             model: %{provider: if(provider == "zai", do: :zai, else: :zai_coder), id: id}
-           })}
-        else
-          _ ->
-            {:error, "Live mode needs ZAI_API_KEY on the server and a model such as zai:glm-5.3."}
-        end
-      else
-        attributes = AI.offline(Map.put(overrides, :tools, tools))
-
+      with {:ok, model} <- model_attributes(example, options) do
         attributes =
-          if example.slug == "conversation",
-            do: Map.put(attributes, :client, AI.StreamingClient),
-            else: attributes
+          options
+          |> ai_overrides()
+          |> Map.merge(model)
+          |> Map.put(:tools, example_tools(example, options))
+          |> apply_live_scenario_defaults(example, options)
 
         {:ok, attributes}
       end
@@ -514,53 +740,129 @@ defmodule AgentExamples.Playground do
     end
   end
 
-  defp snapshot(state) do
-    resource = state.agent_module
+  defp apply_live_scenario_defaults(attributes, example, %{"mode" => "live"}) do
+    defaults = Ash.Resource.Info.attribute(example.resource, :options).default
 
-    fixed =
-      if resource && !is_nil(Aikido.Ash.Agent.Info.team_config(resource)),
-        do: Map.keys(Aikido.Ash.Agent.Info.team_config(resource).topology.nodes),
-        else: []
+    options =
+      defaults
+      |> Aikido.AiReact.Options.new!()
+      |> Map.update!(:model_timeout_ms, &max(&1, 180_000))
+      |> Map.put(:tool_timeout_ms, 3_600_000)
+      |> Map.put(:model_max_retries, 4)
+      |> Map.put(:retry_backoff_ms, 10_000)
+
+    Map.put(attributes, :options, options)
+  end
+
+  defp apply_live_scenario_defaults(attributes, _example, _options), do: attributes
+
+  defp ai_overrides(options) do
+    Enum.reduce([:system_prompt, :max_iterations], %{}, fn key, attributes ->
+      case Map.fetch(options, Atom.to_string(key)) do
+        {:ok, value} -> Map.put(attributes, key, value)
+        :error -> attributes
+      end
+    end)
+  end
+
+  defp restore_example_identity(%{slug: slug}, attributes, %{record: record})
+       when slug == "recovery",
+       do: Map.put(attributes, :id, record.id)
+
+  defp restore_example_identity(_, attributes, _), do: attributes
+
+  defp example_tools(example, options),
+    do: Catalog.tools(example, options["lua"] == "true")
+
+  defp shared_provider_options({owner, _slug}, _state) do
+    settings = Settings.provider_settings(owner)
+
+    %{
+      "mode" => settings.mode,
+      "provider" => settings.provider,
+      "model" => settings.model,
+      "credential_owner" => owner,
+      "key_configured" => settings.key_configured?
+    }
+  end
+
+  defp model_attributes(_example, %{"mode" => "live"} = options) do
+    with true <-
+           options["key_configured"] ||
+             {:error, "Save an API key in the shared provider form first."},
+         {:ok, settings} <- AI.Providers.validate(options) do
+      provider = Enum.find(ReqLLM.Providers.list(), &(to_string(&1) == settings.provider))
+
+      {:ok,
+       %{
+         client: AI.LiveClient,
+         model: %{
+           provider: provider,
+           id: settings.model,
+           credential_owner: options["credential_owner"]
+         },
+         tool_options: [otp_app: :agent_examples]
+       }}
+    end
+  end
+
+  defp model_attributes(example, _options) do
+    attributes = AI.offline()
+
+    client =
+      case example.slug do
+        slug when slug in ["conversation", "recovery"] -> AI.StreamingClient
+        "lua-permissions" -> AgentExamples.LuaAssistant.Client
+        "adaptive-tools" -> AgentExamples.AdaptiveAssistant.Client
+        "verified-work" -> AgentExamples.VerifiedAssistant.Client
+        "verified-team" -> AgentExamples.VerifiedTeam.Client
+        "resilience" -> AgentExamples.ResilientAssistant.Client
+        _ -> AI.ScriptedClient
+      end
+
+    attributes = Map.put(attributes, :client, client)
+
+    {:ok, attributes}
+  end
+
+  @doc false
+  def snapshot(runtime, event) do
+    with {:ok, snapshot} <- snapshot(runtime) do
+      {:ok,
+       Map.put(
+         snapshot,
+         :execution,
+         Aikido.Inspector.History.project_event(event, runtime.agent_module)
+       )}
+    end
+  end
+
+  @doc false
+  def snapshot(state) do
+    resource = state.agent_module
 
     own = Map.get(state.agent.state, :state, %{})
     ai = Map.get(state.agent.state, :ai, %{})
     team = Map.get(state.agent.state, :team, %{})
 
-    members =
-      for {name, pid} <- Map.get(team, :members, %{}) do
-        nodes = team |> Map.get(:topology, %{}) |> Map.get(:nodes, %{})
-        node = nodes[name]
-
-        %{
-          name: to_string(name),
-          key: name,
-          pid: pid,
-          owner: if(node && node.owner, do: to_string(node.owner), else: nil),
-          dynamic: name not in fixed,
-          alive: Process.alive?(pid)
-        }
-      end
-
-    tasks =
-      team
-      |> Map.get(:tasks, %{})
-      |> Map.values()
-      |> Enum.map(&Map.take(&1, [:id, :member, :status, :result]))
-
     {:ok,
      %{
        id: state.id,
+       inspected_state: Aikido.Inspector.History.project_agent_state(state.agent.state, resource),
        resource: resource,
-       team?: resource && !is_nil(Aikido.Ash.Agent.Info.team_config(resource)),
+       team?: resource && !is_nil(Aikido.Agent.Info.team_config(resource)),
        children: %{},
+       activity: if(map_size(ai) > 0, do: AI.Activity.from_state(ai)),
        own:
          Map.take(own, [
            :count,
+           :enabled,
            :signals_seen,
            :items,
            :completed,
            :title,
            :status,
+           :topic,
            :result,
            :error
          ]),
@@ -574,16 +876,59 @@ defmodule AgentExamples.Playground do
            :hook_errors,
            :streaming_text,
            :streaming_thinking,
-           :usage
+           :usage,
+           :tools_generation,
+           :tool_refresh_pending,
+           :todo_continuations,
+           :todo_verification_pending,
+           :tool_error_streak,
+           :estimated_tokens
          ])
-         |> Map.put(:hook_messages, hook_messages(ai)),
+         |> Map.put(:hook_messages, hook_injected_context_messages(ai))
+         |> Map.put(:model_label, model_label(Map.get(ai, :model))),
        todos: Map.get(Map.get(state.agent.state, :todos, %{}), :items, []),
-       members: Enum.sort_by(members, & &1.name),
-       tasks: tasks
+       members: member_snapshots(team, resource),
+       tasks: task_snapshots(team)
      }}
   end
 
-  defp hook_messages(%{context: %ReqLLM.Context{} = context}) do
+  defp model_label(%{provider: provider, id: id}), do: "#{provider}:#{id}"
+  defp model_label(model) when is_binary(model), do: model
+  defp model_label(_), do: "Not configured"
+
+  defp member_snapshots(team, resource) do
+    fixed =
+      if resource && !is_nil(Aikido.Agent.Info.team_config(resource)),
+        do: Map.keys(Aikido.Agent.Info.team_config(resource).topology.nodes),
+        else: []
+
+    nodes = team |> Map.get(:topology, %{}) |> Map.get(:nodes, %{})
+
+    team
+    |> Map.get(:members, %{})
+    |> Enum.map(fn {name, pid} ->
+      node = nodes[name]
+
+      %{
+        name: to_string(name),
+        key: name,
+        pid: pid,
+        owner: if(node && node.owner, do: to_string(node.owner), else: nil),
+        dynamic: name not in fixed,
+        alive: Process.alive?(pid)
+      }
+    end)
+    |> Enum.sort_by(& &1.name)
+  end
+
+  defp task_snapshots(team) do
+    team
+    |> Map.get(:tasks, %{})
+    |> Map.values()
+    |> Enum.map(&Map.take(&1, [:id, :member, :status, :result, :mode, :requester]))
+  end
+
+  defp hook_injected_context_messages(%{context: %ReqLLM.Context{} = context}) do
     context
     |> ReqLLM.Context.to_list()
     |> Enum.filter(&(&1.role == :user))
@@ -592,7 +937,7 @@ defmodule AgentExamples.Playground do
     |> Enum.filter(&(is_binary(&1) && String.starts_with?(&1, "[Hook context:")))
   end
 
-  defp hook_messages(_), do: []
+  defp hook_injected_context_messages(_), do: []
 
   defp subtree(nil, _), do: nil
   defp subtree(snapshot, []), do: snapshot
@@ -637,13 +982,13 @@ defmodule AgentExamples.Playground do
     end
   end
 
-  defp finish_task(ref, result, state) do
+  defp apply_prompt_task_result(ref, result, state) do
     case Map.pop(state.tasks, ref) do
       {nil, _} ->
         {:noreply, state}
 
       {{key, _task}, tasks} ->
-        state = finish_requests(state, key, {:error, :run_finished})
+        state = reply_to_run_requests(state, key, {:error, :run_finished})
         run = state.runs[key]
 
         run =
@@ -659,17 +1004,17 @@ defmodule AgentExamples.Playground do
               %{run | status: :failed, error: error_text(error)}
           end
 
-        {:noreply, put_run(%{state | tasks: tasks}, key, run)}
+        {:noreply, broadcast_and_store_run(%{state | tasks: tasks}, key, run)}
     end
   end
 
-  defp finish_requests(state, key, result) do
+  defp reply_to_run_requests(state, key, result) do
     Enum.reduce(state.requests, state, fn {id, waiter}, state ->
-      if waiter.key == key, do: finish_request(state, id, result), else: state
+      if waiter.key == key, do: reply_and_remove_request(state, id, result), else: state
     end)
   end
 
-  defp finish_request(state, id, result) do
+  defp reply_and_remove_request(state, id, result) do
     case Map.pop(state.requests, id) do
       {nil, _} ->
         state
@@ -680,14 +1025,24 @@ defmodule AgentExamples.Playground do
         GenServer.reply(waiter.from, result)
         state = %{state | requests: requests}
         run = state.runs[waiter.key]
-        put_run(state, waiter.key, %{run | requests: Enum.reject(run.requests, &(&1.id == id))})
+
+        broadcast_and_store_run(state, waiter.key, %{
+          run
+          | requests: Enum.reject(run.requests, &(&1.id == id))
+        })
     end
   end
 
-  defp put_run(state, key, run) do
+  defp broadcast_and_store_run(state, key, run) do
     Phoenix.PubSub.broadcast(
       AgentExamples.PubSub,
       @topic,
+      {:run_updated, elem(key, 0), elem(key, 1)}
+    )
+
+    Phoenix.PubSub.broadcast(
+      AgentExamples.PubSub,
+      @topic <> ":" <> elem(key, 0),
       {:run_updated, elem(key, 0), elem(key, 1)}
     )
 

@@ -3,10 +3,13 @@ defmodule AgentExamples.InteractiveAssistant do
   Experimental request/response inside Lua. Only Lua interprets the response
   as permission to run a tool. The application supplies the request callback
   at startup; Aikido does not manage UI communication.
+
+  Every new task asks for fresh approval before its first model request. Approval
+  applies only to that task; conversation history never grants later permission.
   """
   use Ash.Resource,
     domain: AgentExamples.Agents,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
 
   agent do
     name "example_interactive_assistant"
@@ -18,17 +21,13 @@ defmodule AgentExamples.InteractiveAssistant do
 
     hooks [
       %{
-        name: "review_stamp",
-        event: :before_tool,
+        name: "review_task",
+        event: :run_started,
         mode: :sync,
         script: """
-        if event.tool_call.name ~= "stamp" then
-          return {decision = "continue"}
-        end
-
-        local answer, err = aikido.request("tool.review", {
-          title = "Allow the stamp tool to run?",
-          details = event.tool_call,
+        local answer, err = aikido.request("task.review", {
+          title = "Allow this task to run?",
+          details = event,
           choices = {"approve", "deny"}
         })
 

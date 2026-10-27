@@ -2,7 +2,7 @@ defmodule AgentExamples.Team do
   @moduledoc "Starts child agents and sends signals through the generated domain interface."
   use Ash.Resource,
     domain: AgentExamples.Agents,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
 
   agent do
     name "example_team"

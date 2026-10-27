@@ -1,7 +1,7 @@
 defmodule AikidoTest.AshPersistence.Permanent do
   use Ash.Resource,
     domain: AikidoTest.AshPersistence.Domain,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "permanent"
@@ -20,7 +20,7 @@ end
 defmodule AikidoTest.AshPersistence.Temporary do
   use Ash.Resource,
     domain: AikidoTest.AshPersistence.Domain,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "temporary"
@@ -38,7 +38,7 @@ defmodule AikidoTest.AshPersistence.Temporary do
 end
 
 defmodule AikidoTest.AshPersistence.Domain do
-  use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+  use Ash.Domain, extensions: [Aikido.Domain.Extension], validate_config_inclusion?: false
 
   agents do
     agent :permanent, AikidoTest.AshPersistence.Permanent
@@ -133,7 +133,7 @@ defmodule AikidoTest.AshPersistenceTest do
 
   test "temporary agents retain crash recovery until explicitly stopped" do
     ref = Domain.temporary_start!(%{id: "recoverable", value: 7})
-    recovered = AikidoTest.LifecycleWait.restart(ref.pid)
+    recovered = AikidoTest.LifecycleWait.crash_and_await_replacement(ref.pid)
 
     assert %{value: 7} = Domain.temporary_inspect!(recovered)
   end
@@ -172,7 +172,7 @@ defmodule AikidoTest.AshPersistenceTest do
   test "deletion clears the saved parent binding", %{instance: instance} do
     parent = Domain.permanent_start!(%{id: "parent"})
     child = Domain.permanent_start!(%{id: "child"})
-    binding = Aikido.AgentServer.ParentRef.new!(%{pid: parent.pid, id: parent.id, tag: :child})
+    binding = Aikido.Ownership.ParentRef.new!(%{pid: parent.pid, id: parent.id, tag: :child})
     assert {:ok, _} = Aikido.AgentServer.adopt_parent(child.pid, binding)
 
     assert {:ok, _} =

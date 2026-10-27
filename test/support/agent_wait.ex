@@ -50,7 +50,7 @@ defmodule AikidoTest.AgentWait do
       child_pid =
         AikidoTest.AgentWait.await_state_value(
           pid,
-          fn s -> Map.get(s.children, :worker) end,
+          fn s -> Map.get(Aikido.Ownership.children(s), :worker) end,
           pattern: "aikido.agent.child.started"
         )
   """

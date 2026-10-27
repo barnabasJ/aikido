@@ -201,24 +201,26 @@ defmodule Aikido do
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
 
-    if otp_app = opts[:otp_app] do
-      Aikido.Debug.maybe_enable_from_config(otp_app, name)
-    end
+    Aikido.Debug.configure_from_application(opts[:otp_app], name)
 
-    base_children = [
+    opts
+    |> runtime_children(name)
+    |> Supervisor.init(strategy: :one_for_one)
+  end
+
+  defp runtime_children(opts, name) do
+    [
       {Task.Supervisor,
        name: Aikido.task_supervisor_name(name), max_children: Keyword.get(opts, :max_tasks, 1000)},
-      {DynamicSupervisor, name: Aikido.process_supervisor_name(name), strategy: :one_for_one}
+      {DynamicSupervisor, name: Aikido.process_supervisor_name(name), strategy: :one_for_one},
+      {Aikido.Durable, durable_options(opts, name)}
     ]
+  end
 
-    durable_opts = Keyword.get(opts, :durable, Application.get_env(:aikido, :durable, []))
-
-    durable_children = [
-      {Aikido.Durable,
-       Keyword.merge(durable_opts, name: Aikido.durable_supervisor_name(name), aikido: name)}
-    ]
-
-    Supervisor.init(base_children ++ durable_children, strategy: :one_for_one)
+  defp durable_options(opts, name) do
+    opts
+    |> Keyword.get(:durable, Application.get_env(:aikido, :durable, []))
+    |> Keyword.merge(name: Aikido.durable_supervisor_name(name), aikido: name)
   end
 
   @doc "Supervisor for generic non-agent processes spawned by I/O directives."

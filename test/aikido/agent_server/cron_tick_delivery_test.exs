@@ -100,7 +100,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest do
       :ok = Aikido.AgentServer.cast(pid, register_signal)
 
       await_state_value(pid, fn s ->
-        if Map.has_key?(s.cron_jobs, :tick_test) do
+        if Map.has_key?(s.agent.state.cron.jobs, :tick_test) do
           true
         end
       end)
@@ -161,7 +161,7 @@ defmodule AikidoTest.AgentServer.CronTickDeliveryTest do
       :ok = Aikido.AgentServer.cast(pid, register_signal)
 
       await_state_value(pid, fn s ->
-        if Map.has_key?(s.cron_jobs, :multi_tick) do
+        if Map.has_key?(s.agent.state.cron.jobs, :multi_tick) do
           true
         end
       end)

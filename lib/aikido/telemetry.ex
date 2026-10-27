@@ -49,6 +49,7 @@ defmodule Aikido.Telemetry do
   ## Events
 
   ### AgentServer Events
+  - `[:aikido, :agent_server, :signal, :sent]` - Public call/cast dispatch attempted after target resolution; not an acknowledgement
   - `[:aikido, :agent_server, :signal, :start]` - Signal processing started
   - `[:aikido, :agent_server, :signal, :stop]` - Signal processing completed
   - `[:aikido, :agent_server, :signal, :exception]` - Signal processing failed
@@ -118,8 +119,15 @@ defmodule Aikido.Telemetry do
     tag_values = &instance_tag_values/1
 
     [
+      Telemetry.Metrics.counter("aikido.agent_server.signal.sent.count",
+        measurement: fn _ -> 1 end,
+        tags: [:aikido_instance, :delivery, :signal_type],
+        tag_values: tag_values,
+        description: "Signals dispatched through call/cast; delivery is not acknowledged"
+      ),
       Telemetry.Metrics.counter("aikido.agent_server.signal.stop.count",
         event_name: [:aikido, :agent_server, :signal, :stop],
+        measurement: fn _ -> 1 end,
         tags: [:aikido_instance, :signal_type],
         tag_values: tag_values,
         description: "Total signals processed"
@@ -132,6 +140,7 @@ defmodule Aikido.Telemetry do
       ),
       Telemetry.Metrics.counter("aikido.agent_server.directive.stop.count",
         event_name: [:aikido, :agent_server, :directive, :stop],
+        measurement: fn _ -> 1 end,
         tags: [:aikido_instance, :directive_type],
         tag_values: tag_values,
         description: "Total directives executed"

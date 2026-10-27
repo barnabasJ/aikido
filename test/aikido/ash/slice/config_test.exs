@@ -38,7 +38,7 @@ end
 defmodule AikidoTest.SliceConfigTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.Ash.Slice.Config
+  alias Aikido.Slice.Config
   alias AikidoTest.SliceConfigTest.ConfiguredSlice
 
   def function_default do

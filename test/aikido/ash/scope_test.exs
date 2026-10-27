@@ -15,7 +15,7 @@ defmodule AikidoTest.ScopeReducer do
 end
 
 defmodule AikidoTest.ScopedAgent do
-  use Ash.Resource, domain: AikidoTest.ScopedDomain, extensions: [Aikido.Ash.Agent]
+  use Ash.Resource, domain: AikidoTest.ScopedDomain, extensions: [Aikido.Agent.Extension]
 
   agent do
     name "scope_test"
@@ -77,7 +77,7 @@ end
 defmodule AikidoTest.ScopedAssistant do
   use Ash.Resource,
     domain: AikidoTest.ScopedDomain,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI]
+    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
 
   agent do
     name "scoped_assistant"
@@ -85,7 +85,7 @@ defmodule AikidoTest.ScopedAssistant do
 end
 
 defmodule AikidoTest.ScopedDomain do
-  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Ash.Domain, AshAi]
+  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Domain.Extension, AshAi]
 
   resources do
     resource AikidoTest.ScopedTool

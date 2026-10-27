@@ -3,52 +3,51 @@ defmodule Aikido.PureActionsTest do
 
   alias Aikido.{Directive, Signal}
   alias Aikido.Directives.{Emit, Schedule}
-  alias Aikido.Slices.{Identity, Memory, Thread, Todo}
 
   test "initialized slice updates replay with the input timestamp and stable IDs" do
     signal = Aikido.Signal.new!("test", %{}, time: "2026-10-19T10:11:12Z")
     timestamp = Signal.timestamp(signal)
 
-    for {resource, params} <- [{Identity, %{profile: %{age: 1}}}, {Memory, %{}}, {Thread, %{}}] do
+    for {resource, params} <- [
+          {Aikido.Memory.Slice, %{}},
+          {Aikido.Thread.Slice, %{}}
+        ] do
       state = AikidoTest.SliceState.new(resource, params)
-      initialized = replay(resource, :ensure, %{state: state} |> Map.merge(params), signal)
-      assert initialized.state == state
 
       result =
         case resource do
-          Identity ->
-            replay(resource, :evolve, %{state: initialized.state, years: 1}, signal)
-
-          Memory ->
+          Aikido.Memory.Slice ->
             replay(
               resource,
               :put_in_space,
-              %{state: initialized.state, space: :world, key: :hello, value: "world"},
+              %{state: state, space: :world, key: :hello, value: "world"},
               signal
             )
 
-          Thread ->
+          Aikido.Thread.Slice ->
             replay(
               resource,
               :append,
               %{
-                state: initialized.state,
+                state: state,
                 entry: [%{payload: %{text: "one"}}, %{payload: %{text: "two"}}]
               },
               signal
             )
         end
 
-      if resource in [Memory, Thread], do: assert(result.state.id == initialized.state.id)
-      assert result.state.created_at == initialized.state.created_at
+      if resource in [Aikido.Memory.Slice, Aikido.Thread.Slice],
+        do: assert(result.state.id == state.id)
+
+      assert result.state.created_at == state.created_at
       assert result.state.updated_at == timestamp
 
-      if resource == Thread do
+      if resource == Aikido.Thread.Slice do
         assert [first, second] = result.state.entries
         assert first.id != second.id
         assert first.at == timestamp
         assert second.at == timestamp
-        cleared = replay(Thread, :clear, %{state: result.state}, signal)
+        cleared = replay(Aikido.Thread.Slice, :clear, %{state: result.state}, signal)
         assert cleared.state.updated_at == timestamp
       end
     end
@@ -56,9 +55,8 @@ defmodule Aikido.PureActionsTest do
 
   test "initialized updates without a signal still have deterministic metadata" do
     for {resource, action, params} <- [
-          {Identity, :evolve, %{years: 1}},
-          {Memory, :put_in_space, %{space: :world, key: :hello, value: "world"}},
-          {Thread, :append, %{entry: %{payload: %{text: "one"}}}}
+          {Aikido.Memory.Slice, :put_in_space, %{space: :world, key: :hello, value: "world"}},
+          {Aikido.Thread.Slice, :append, %{entry: %{payload: %{text: "one"}}}}
         ] do
       state = AikidoTest.SliceState.new(resource)
       result = replay(resource, action, Map.put(params, :state, state), nil)
@@ -69,10 +67,15 @@ defmodule Aikido.PureActionsTest do
 
   test "actions return identical emission descriptors without delivering anything" do
     signal = Aikido.Signal.new!("aikido.todo.add", %{})
-    state = AikidoTest.SliceState.new(Todo)
+    state = AikidoTest.SliceState.new(Aikido.Todo.Slice)
 
     result =
-      replay(Todo, :todo_add, %{state: state, id: "todo", text: "work", timeout_ms: 100}, signal)
+      replay(
+        Aikido.Todo.Slice,
+        :todo_add,
+        %{state: state, id: "todo", text: "work", timeout_ms: 100},
+        signal
+      )
 
     assert [
              %Emit{signal: %{id: nil, time: nil}, target: target},
@@ -138,32 +141,31 @@ defmodule Aikido.PureActionsTest do
     example_paths =
       "examples/agent_app/lib/agent_examples/**/*.ex"
       |> Path.wildcard()
-      |> Enum.reject(&String.starts_with?(&1, "examples/agent_app/lib/agent_examples/ai/tools/"))
+      |> Enum.reject(&(String.contains?(&1, "/tools/") || String.contains?(&1, "/commands/")))
+
+    shared_reducer_paths = [
+      "lib/aikido/team/action_adapter.ex",
+      "lib/aikido/team/topology_operation.ex",
+      "lib/aikido/team/task_delivery.ex",
+      "lib/aikido/ai_react/conversation.ex",
+      "lib/aikido/ai_react/conversation_handoff.ex",
+      "lib/aikido/ai_react/hook_queue.ex",
+      "lib/aikido/ai_react/run_caller.ex",
+      "lib/aikido/ai_react/run_state.ex",
+      "lib/aikido/ai_react/todo_requirements.ex",
+      "lib/aikido/ai_react/tool_loop_guard.ex"
+    ]
 
     paths =
       Path.wildcard("lib/aikido/actions/**/*.ex") ++
-        Path.wildcard("lib/aikido/slices/**/*.ex") ++
-        Path.wildcard("lib/aikido/ash/team/actions/*.ex") ++
-        example_paths ++
-        [
-          "lib/aikido/ash/team/inputs.ex",
-          "lib/aikido/ash/team/operation.ex",
-          "lib/aikido/ash/team/tasks.ex",
-          "lib/aikido/slices/ai_react/handoff.ex",
-          "lib/aikido/slices/ai_react/hooks.ex"
-        ]
+        Path.wildcard("lib/aikido/*/actions/**/*.ex") ++
+        Path.wildcard("lib/aikido/team/actions/*.ex") ++
+        example_paths ++ shared_reducer_paths
 
     violations =
       for path <- paths,
           ast = path |> File.read!() |> Code.string_to_quoted!(),
-          reducer?(ast) ||
-            path in [
-              "lib/aikido/ash/team/inputs.ex",
-              "lib/aikido/ash/team/operation.ex",
-              "lib/aikido/ash/team/tasks.ex",
-              "lib/aikido/slices/ai_react/handoff.ex",
-              "lib/aikido/slices/ai_react/hooks.ex"
-            ],
+          reducer?(ast) || path in shared_reducer_paths,
           violation <- effect_calls(ast),
           do: {path, violation}
 

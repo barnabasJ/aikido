@@ -99,8 +99,8 @@ defmodule AikidoTest.Agent.NativeContractsTest do
   end
 
   test "runtime structs can be cast through the Ash type API" do
-    assert {:ok, %Aikido.Slices.Memory{}} =
-             Ash.Type.cast_input(Aikido.Slices.Memory, %{
+    assert {:ok, %Aikido.Memory.Slice{}} =
+             Ash.Type.cast_input(Aikido.Memory.Slice, %{
                id: "memory",
                created_at: 1,
                updated_at: 1

@@ -1,0 +1,51 @@
+defmodule Aikido.Team.Actions.TaskTimeout do
+  @moduledoc "Fails a correlated task on timeout and returns cancellation and notification directives."
+  use Ash.Resource.Actions.Implementation
+  alias Aikido.Team.{ActionAdapter, TaskDelivery}
+  alias Aikido.Directives
+  alias Aikido.Signal
+
+  @impl true
+  def run(input, _opts, _context) do
+    {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
+
+    ActionAdapter.to_action_result(
+      expire_task_and_request_cancellation(signal.data, state, context, config)
+    )
+  end
+
+  defp expire_task_and_request_cancellation(data, state, context, _config) do
+    case Map.get(state.tasks, data.task_id) do
+      %{status: :dispatched, attempt: attempt} = task when attempt == data.attempt ->
+        task = %{task | status: :failed, result: :timeout}
+        state = put_in(state.tasks[data.task_id], task)
+
+        cancel =
+          case state.members[task.member] do
+            nil ->
+              []
+
+            pid ->
+              [
+                Directives.emit_to_pid(
+                  %Signal{
+                    id: nil,
+                    type: "harness.cancel_task",
+                    data: %{task_id: task.id},
+                    source: "/aikido"
+                  },
+                  pid
+                )
+              ]
+          end
+
+        {:ok, state,
+         cancel ++
+           TaskDelivery.task_result_delivery_directives(task, state, context) ++
+           Aikido.Team.TaskWorkerLifecycle.retirement_directives(state, context)}
+
+      _ ->
+        {:ok, state, []}
+    end
+  end
+end

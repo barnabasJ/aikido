@@ -2,19 +2,52 @@ defmodule AgentExamples.ResearchSquad do
   @moduledoc "A dynamically spawned AI team whose members use the same Lua management tools."
   use Ash.Resource,
     domain: AgentExamples.Agents,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.AI, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension, Aikido.Team.Extension]
 
   agent do
     name "example_research_squad"
   end
 
   ai do
-    system_prompt "Coordinate research through the supplied Lua tools. Spawn researchers in your own team when useful, delegate work, and combine their findings."
+    options %{completion: :tasks, model_timeout_ms: 600_000}
+    llm_opts max_tokens: 16_384, receive_timeout: 600_000, temperature: 0.2
+
+    system_prompt """
+    You coordinate a focused research squad inside a larger organization. Discover
+    the agents API with lua_docs, inspect your roster, and create researchers or a
+    focused nested squad when the assignment benefits from another division of work.
+    Use template = "squad" for a subteam and template = "researcher" for an individual.
+    Give each worker a concrete question and combine their returned evidence.
+    agents.delegate accepts mode = "background" to return a task ID immediately;
+    the team sends the result later. Use it for independent assignments, and keep
+    working rather than synchronously delegating back to a worker waiting on you.
+
+    Respect the remaining team-depth budget in your assignment. If it is positive,
+    you may create a focused squad and delegate with a budget decreased by 1.
+    Start with an empty roster and create workers only for concrete assignments.
+    At budget 0, or when no budget is supplied, create no further squads: spawn
+    at most two specialist researchers. Create at most two squads
+    at your level. Do not delegate to yourself or your parent. Check the result, err
+    returned by every Lua action with assert or explicit error handling. Return
+    findings, uncertainties and supporting evidence to your assigning orchestrator.
+    """
   end
 
   team do
-    inherit [:tools, :tool_options, :tool_context, :model, :client, :max_iterations]
-    member :analyst, AgentExamples.Researcher
+    max_members 8
+
+    inherit [
+      :tools,
+      :tool_options,
+      :tool_context,
+      :model,
+      :client,
+      :max_iterations,
+      :options,
+      :llm_opts
+    ]
+
     worker :researcher, AgentExamples.Researcher, max_members: 6
+    worker :squad, __MODULE__, max_members: 2
   end
 end

@@ -1,0 +1,64 @@
+defmodule Aikido.Slice.Info do
+  @moduledoc "Native slice configuration, routes and schedules."
+  use Spark.InfoGenerator, extension: Aikido.Slice.Extension, sections: [:slice]
+  alias Spark.Dsl.Extension
+
+  def config_schema(resource), do: Extension.get_entities(resource, [:slice, :config_schema])
+
+  def signal_routes(resource) do
+    resource
+    |> Extension.get_entities([:slice])
+    |> Enum.map(fn route ->
+      target = action_reference(resource, route.action)
+
+      cond do
+        is_function(route.match, 1) ->
+          {route.type, route.match, target,
+           if(route.priority == 0, do: -10, else: route.priority)}
+
+        route.priority != 0 ->
+          {route.type, target, [priority: route.priority]}
+
+        true ->
+          {route.type, target}
+      end
+    end)
+  end
+
+  def schedules(resource) do
+    resource
+    |> Extension.get_entities([:schedules])
+    |> Enum.map(fn schedule ->
+      options = [data: schedule.data]
+
+      options =
+        if schedule.timezone,
+          do: Keyword.put(options, :timezone, schedule.timezone),
+          else: options
+
+      options =
+        if schedule.signal_type,
+          do: Keyword.put(options, :signal_type, schedule.signal_type),
+          else: options
+
+      {schedule.cron, action_reference(resource, schedule.action), options}
+    end)
+  end
+
+  def actions(resource) do
+    routes =
+      Enum.map(Extension.get_entities(resource, [:slice]), &action_reference(resource, &1.action))
+
+    schedules =
+      Enum.map(
+        Extension.get_entities(resource, [:schedules]),
+        &action_reference(resource, &1.action)
+      )
+
+    Enum.uniq(routes ++ schedules)
+  end
+
+  @doc "Qualify a local action name with its resource, preserving explicit action references."
+  def action_reference(resource, action) when is_atom(action), do: {resource, action}
+  def action_reference(_resource, {resource, action}), do: {resource, action}
+end

@@ -57,7 +57,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest.Counter do
 end
 
 defmodule Aikido.Dsl.ContractRegressionsTest.NodesTeam do
-  use Aikido.Agent, extensions: [Aikido.Ash.Team]
+  use Aikido.Agent, extensions: [Aikido.Team.Extension]
 
   agent do
     name "nodes_team"
@@ -116,12 +116,12 @@ defmodule Aikido.Dsl.ContractRegressionsTest.ScheduleVariants do
 
   schedules do
     schedule "@yearly", :tick
-    schedule "@yearly", :tick, tz: "Etc/UTC"
-    schedule "@yearly", :tick, tz: ""
+    schedule "@yearly", :tick, timezone: "Etc/UTC"
+    schedule "@yearly", :tick, timezone: ""
     schedule "@monthly", :tick
-    schedule "@yearly", :tick, tz: "America/New_York"
+    schedule "@yearly", :tick, timezone: "America/New_York"
     schedule "@yearly", :tick, data: %{amount: 2}
-    schedule "@yearly", :tick, signal: "custom.tick"
+    schedule "@yearly", :tick, signal_type: "custom.tick"
   end
 end
 
@@ -150,8 +150,17 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
 
   test "local alternate routes and earlier shared signals keep the reducer alias" do
     resource = Aikido.Dsl.ContractRegressionsTest.Counter
-    routes = Aikido.Ash.Agent.Info.signal_routes(resource)
-    targets = for {type, target, _priority} <- routes, type != "contract.remote", do: target
+    routes = Aikido.Agent.Info.signal_routes(resource)
+
+    targets =
+      for {type, target, _priority} <- routes,
+          type in [
+            "contract.increase",
+            "contract.increment",
+            "contract.internal",
+            "contract.tuple"
+          ],
+          do: target
 
     assert {"contract.remote", {Aikido.Dsl.ContractRegressionsTest.RemoteSlice, :increment}, 0} in routes
 
@@ -194,7 +203,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
     resource = Aikido.Dsl.ContractRegressionsTest.Counter
 
     assert {:ok, topology} =
-             Aikido.Ash.Team.Topology.build(
+             Aikido.Team.Topology.build(
                %{nodes: %{resource: resource}, sibling: %{resource: resource}},
                Aikido.Dsl.ContractRegressionsTest.Runtime
              )
@@ -214,14 +223,16 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
 
   test "distinct schedules for one slice action own separate jobs and dispatch once per occurrence" do
     resource = Aikido.Dsl.ContractRegressionsTest.ScheduledAgent
-    specs = Aikido.Ash.Agent.Info.schedules(resource)
+    specs = Aikido.Agent.Info.schedules(resource)
     assert length(specs) == 2
     assert length(Enum.uniq_by(specs, & &1.job_id)) == 2
 
-    routes = Aikido.Ash.Agent.Info.routes(resource)
+    routes =
+      Enum.filter(Aikido.Agent.Info.routes(resource), &(elem(&1, 0) == "clock.__schedule__.tick"))
+
     assert [{"clock.__schedule__.tick", _, _}] = routes
     reference = resource |> Ash.ActionInput.for_action(:start, %{}) |> Ash.run_action!()
-    assert {:ok, jobs} = Aikido.AgentServer.state(reference.pid, &{:ok, &1.cron_jobs})
+    assert {:ok, jobs} = Aikido.AgentServer.state(reference.pid, &{:ok, &1.agent.state.cron.jobs})
     assert map_size(jobs) == 2
 
     for {job, expected} <- Enum.with_index(Map.values(jobs), 1) do
@@ -244,14 +255,14 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
 
   test "slice schedule identity includes every normalized behavior field" do
     target = {Aikido.Dsl.ContractRegressionsTest.ScheduledSlice, :tick}
-    instance = %Aikido.Ash.Slice.Instance{module: elem(target, 0), path: :clock}
-    [base | _] = Aikido.Ash.Slice.Schedules.expand_schedules(instance)
+    instance = %Aikido.Slice.Instance{module: elem(target, 0), path: :clock}
+    [base | _] = Aikido.Cron.Declarations.slice_schedules(instance)
 
     assert base.job_id ==
              {:slice_schedule, :clock, {target, "@yearly", "Etc/UTC", base.signal_type, %{}}}
 
     variants =
-      Aikido.Ash.Slice.Schedules.expand_schedules(%Aikido.Ash.Slice.Instance{
+      Aikido.Cron.Declarations.slice_schedules(%Aikido.Slice.Instance{
         module: Aikido.Dsl.ContractRegressionsTest.ScheduleVariants,
         path: :clock
       })
@@ -311,7 +322,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
     end
     """)
 
-    assert Enum.map(Aikido.Ash.Agent.Info.schedules(module), & &1.job_id) == [
+    assert Enum.map(Aikido.Agent.Info.schedules(module), & &1.job_id) == [
              {:agent_schedule, "distinct_schedules", :first},
              {:agent_schedule, "distinct_schedules", :second},
              {:agent_schedule, "distinct_schedules", false},
@@ -319,7 +330,7 @@ defmodule Aikido.Dsl.ContractRegressionsTest do
            ]
 
     reference = module |> Ash.ActionInput.for_action(:start, %{}) |> Ash.run_action!()
-    assert {:ok, jobs} = Aikido.AgentServer.state(reference.pid, &{:ok, &1.cron_jobs})
+    assert {:ok, jobs} = Aikido.AgentServer.state(reference.pid, &{:ok, &1.agent.state.cron.jobs})
     assert map_size(jobs) == 4
     assert Enum.all?(Map.values(jobs), &Process.alive?/1)
   end

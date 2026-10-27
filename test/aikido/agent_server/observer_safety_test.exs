@@ -1,3 +1,18 @@
+defmodule AikidoTest.ObserverSafety.Signals.Increment do
+  use Aikido.Signal
+
+  signal do
+    type "observer.increment"
+
+    schema do
+      attribute :target, :term do
+        description "Process receiving emitted observer effects."
+        allow_nil? false
+      end
+    end
+  end
+end
+
 defmodule AikidoTest.ObserverSafety.Reducer do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
@@ -38,15 +53,7 @@ defmodule AikidoTest.ObserverSafety.Agent do
       end
     end
 
-    route "observer.increment", :increment
-  end
-
-  actions do
-    action :increment, Aikido.Types.ActionResult do
-      argument :state, :term, allow_nil?: false
-      argument :target, :term, allow_nil?: false
-      run AikidoTest.ObserverSafety.Reducer
-    end
+    route AikidoTest.ObserverSafety.Signals.Increment, AikidoTest.ObserverSafety.Reducer
   end
 end
 

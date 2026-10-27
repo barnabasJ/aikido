@@ -44,7 +44,7 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter do
   use Ash.Resource,
     domain: AikidoTest.AshFixtures.Domain,
     data_layer: Ash.DataLayer.Ets,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "generated_counter"
@@ -91,7 +91,7 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter do
 end
 
 defmodule AikidoTest.AshFixtures.Counter do
-  use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Ash.Agent]
+  use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Agent.Extension]
 
   agent do
     name "ash_counter"
@@ -154,7 +154,7 @@ defmodule AikidoTest.AshFixtures.CounterSlice.Actions.Tick do
 end
 
 defmodule AikidoTest.AshFixtures.CounterSlice do
-  use Ash.Resource, data_layer: :embedded, extensions: [Aikido.Ash.Slice]
+  use Ash.Resource, data_layer: :embedded, extensions: [Aikido.Slice.Extension]
 
   attributes do
     attribute :count, :integer do
@@ -197,7 +197,7 @@ defmodule AikidoTest.AshFixtures.CounterSlice do
 end
 
 defmodule AikidoTest.AshFixtures.Composed do
-  use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Ash.Agent]
+  use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Agent.Extension]
 
   agent do
     name "ash_composed"
@@ -209,7 +209,7 @@ end
 defmodule AikidoTest.AshFixtures.Team do
   use Ash.Resource,
     domain: AikidoTest.AshFixtures.Domain,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
 
   agent do
     name "ash_team"
@@ -252,7 +252,7 @@ defmodule AikidoTest.AshFixtures.TaskWorker.Actions.Uppercase do
 end
 
 defmodule AikidoTest.AshFixtures.TaskWorker do
-  use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Ash.Agent]
+  use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Agent.Extension]
 
   agent do
     name "task_worker"
@@ -284,7 +284,7 @@ end
 defmodule AikidoTest.AshFixtures.DynamicTeam do
   use Ash.Resource,
     domain: AikidoTest.AshFixtures.Domain,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
 
   agent do
     name "dynamic_team"
@@ -301,7 +301,7 @@ end
 defmodule AikidoTest.AshFixtures.NestedTeam do
   use Ash.Resource,
     domain: AikidoTest.AshFixtures.Domain,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
 
   agent do
     name "nested_team"
@@ -321,7 +321,7 @@ end
 defmodule AikidoTest.AshFixtures.Protected do
   use Ash.Resource,
     domain: AikidoTest.AshFixtures.Domain,
-    extensions: [Aikido.Ash.Agent],
+    extensions: [Aikido.Agent.Extension],
     authorizers: [Ash.Policy.Authorizer]
 
   agent do
@@ -337,7 +337,7 @@ defmodule AikidoTest.AshFixtures.Protected do
 end
 
 defmodule AikidoTest.AshFixtures.DefaultCounter do
-  use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Ash.Agent]
+  use Ash.Resource, domain: AikidoTest.AshFixtures.Domain, extensions: [Aikido.Agent.Extension]
 
   agent do
     name "default_runtime_counter"
@@ -362,7 +362,7 @@ defmodule AikidoTest.AshFixtures.DefaultCounter do
 end
 
 defmodule AikidoTest.AshFixtures.Domain do
-  use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+  use Ash.Domain, otp_app: :aikido, extensions: [Aikido.Domain.Extension]
 
   agents do
     agent :generated_counter, AikidoTest.AshFixtures.GeneratedCounter

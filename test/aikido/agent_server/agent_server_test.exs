@@ -30,11 +30,13 @@ defmodule AikidoTest.AgentServerTest.TestAgent do
       end
     end
 
-    route "increment", {AikidoTest.TestActions, :increment}
-    route "decrement", {AikidoTest.TestActions, :decrement}
-    route "record", {AikidoTest.TestActions, :record}
+    route AikidoTest.TestSignals.Increment, AikidoTest.TestActions.Actions.IncrementCounter
+    route AikidoTest.TestSignals.Decrement, AikidoTest.TestActions.Actions.DecrementCounter
+    route AikidoTest.TestSignals.Record, AikidoTest.TestActions.Actions.RecordMessage
     route "stop_test", {AikidoTest.AgentServerTest.TestAgent, :stop_test}
-    route "noop", {AikidoTest.TestActions, :optional_input}
+
+    route AikidoTest.TestSignals.OptionalInput,
+          AikidoTest.TestActions.Actions.ResolveOptionalValue
   end
 
   actions do
@@ -167,7 +169,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent, id: id)
 
-      restarted_pid = AikidoTest.LifecycleWait.restart(pid)
+      restarted_pid = AikidoTest.LifecycleWait.crash_and_await_replacement(pid)
       assert is_pid(restarted_pid)
       refute restarted_pid == pid
       Aikido.Durable.stop(Aikido.durable_supervisor_name(aikido), restarted_pid)
@@ -205,7 +207,7 @@ defmodule AikidoTest.AgentServerTest do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
-      signal = Aikido.Signal.new!("record", %{message: "hello"}, source: "/test")
+      signal = Aikido.Signal.new!("record", %{data: %{message: "hello"}}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.messages == ["hello"]
       GenServer.stop(pid)
@@ -217,7 +219,7 @@ defmodule AikidoTest.AgentServerTest do
         use Ash.Resource.Actions.Implementation
         @impl true
         def run(_input, _opts, _context) do
-          AikidoTest.TestActions.Actions.ComputeSlowResult.work(80)
+          AikidoTest.CpuWork.sum_steps(80)
           Aikido.Types.ActionResult.new(state: %{slow_done: true}, directives: [])
         end
       end
@@ -243,7 +245,7 @@ defmodule AikidoTest.AgentServerTest do
           end
 
           route "slow", {AikidoTest.AgentServerTest.InlineAgent, :inline_slow}
-          route "increment", {AikidoTest.TestActions, :increment}
+          route AikidoTest.TestSignals.Increment, AikidoTest.TestActions.Actions.IncrementCounter
         end
 
         actions do
@@ -290,7 +292,7 @@ defmodule AikidoTest.AgentServerTest do
         @impl true
         def run(input, _opts, _context) do
           slice = input.arguments.state
-          AikidoTest.TestActions.Actions.ComputeSlowResult.work(120)
+          AikidoTest.CpuWork.sum_steps(120)
           Aikido.Types.ActionResult.new(state: Map.put(slice, :slow_done, true), directives: [])
         end
       end
@@ -549,7 +551,7 @@ defmodule AikidoTest.AgentServerTest do
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.AgentServerTest.TestAgent)
 
       for i <- 1..10 do
-        signal = Aikido.Signal.new!("record", %{index: i}, source: "/test")
+        signal = Aikido.Signal.new!("record", %{data: %{index: i}}, source: "/test")
         Aikido.AgentServer.cast(pid, signal)
       end
 
@@ -980,7 +982,7 @@ defmodule AikidoTest.AgentServerTest do
         use Ash.Resource.Actions.Implementation
         @impl true
         def run(_input, _opts, _context) do
-          AikidoTest.TestActions.Actions.ComputeSlowResult.work(20)
+          AikidoTest.CpuWork.sum_steps(20)
           Aikido.Types.ActionResult.new(state: %{processed: true}, directives: [])
         end
       end
@@ -1034,10 +1036,18 @@ defmodule AikidoTest.AgentServerTest do
           AikidoTest.AgentServerTest.AgentWithScheduledSlice
         )
 
-      {:ok, cron_jobs} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs} end)
+      cron_jobs =
+        AikidoTest.AgentWait.await_state_value(
+          pid,
+          fn s ->
+            if map_size(s.agent.state.cron.jobs) > 0, do: s.agent.state.cron.jobs
+          end,
+          pattern: "aikido.agent.cron.registered"
+        )
+
       assert map_size(cron_jobs) == 1
 
-      [spec] = Aikido.Ash.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+      [spec] = Aikido.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
       job_id = spec.job_id
 
       assert Map.has_key?(cron_jobs, job_id)
@@ -1055,7 +1065,7 @@ defmodule AikidoTest.AgentServerTest do
           skip_schedules: true
         )
 
-      {:ok, cron_jobs} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs} end)
+      {:ok, cron_jobs} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.agent.state.cron.jobs} end)
       assert map_size(cron_jobs) == 0
       GenServer.stop(pid)
     end
@@ -1067,9 +1077,16 @@ defmodule AikidoTest.AgentServerTest do
           AikidoTest.AgentServerTest.AgentWithScheduledSlice
         )
 
-      {:ok, cron_jobs} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs} end)
+      cron_jobs =
+        AikidoTest.AgentWait.await_state_value(
+          pid,
+          fn s ->
+            if map_size(s.agent.state.cron.jobs) > 0, do: s.agent.state.cron.jobs
+          end,
+          pattern: "aikido.agent.cron.registered"
+        )
 
-      [spec] = Aikido.Ash.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+      [spec] = Aikido.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
       job_id = spec.job_id
 
       cron_pid = Map.get(cron_jobs, job_id)
@@ -1082,7 +1099,7 @@ defmodule AikidoTest.AgentServerTest do
 
     test "Info.schedules/1 exposes mounted slice schedules" do
       schedules =
-        Aikido.Ash.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+        Aikido.Agent.Info.schedules(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
 
       assert length(schedules) == 1
       [spec] = schedules
@@ -1098,7 +1115,7 @@ defmodule AikidoTest.AgentServerTest do
     end
 
     test "schedule routes are included in Info.routes/1" do
-      routes = Aikido.Ash.Agent.Info.routes(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
+      routes = Aikido.Agent.Info.routes(AikidoTest.AgentServerTest.AgentWithScheduledSlice)
 
       schedule_route =
         Enum.find(routes, fn {signal_type, _, _} ->

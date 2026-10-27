@@ -52,9 +52,9 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
   1. Apply the directive **inside the agent process** via a `state/3`
      selector, capturing pre/post state. Asserts byte-equality — the
      directive's `exec/3` does not mutate.
-  2. Separately, assert that the natural cascade
-     (`maybe_track_child_started` or `maybe_track_cron_*`) populates the
-     relevant field via subscription-based `await_state_value/3`.
+  2. Separately, assert that the resulting lifecycle signals update the
+     ownership or cron slice through routed actions, using subscription-based
+     `await_state_value/3`.
 
   """
   use AikidoTest.Case, async: true
@@ -64,7 +64,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
   end
 
   describe("SpawnAgent") do
-    test("directive does not write state.children; cascade does", %{aikido: aikido}) do
+    test("directive does not write the ownership slice; routed actions do", %{aikido: aikido}) do
       pid =
         start_server(
           %{aikido: aikido},
@@ -79,12 +79,12 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
         meta: %{}
       }
 
-      assert_no_runtime_mutation(pid, directive, fn s -> s.children end)
+      assert_no_runtime_mutation(pid, directive, &Aikido.Ownership.children/1)
 
       child_info =
         await_state_value(
           pid,
-          fn s -> Map.get(s.children, :worker) end,
+          fn s -> Map.get(Aikido.Ownership.children(s), :worker) end,
           pattern: "aikido.agent.child.started"
         )
 
@@ -94,7 +94,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
   end
 
   describe("AdoptChild") do
-    test("directive does not write state.children; cascade does", %{aikido: aikido}) do
+    test("directive does not write the ownership slice; routed actions do", %{aikido: aikido}) do
       parent_pid =
         start_server(
           %{aikido: aikido},
@@ -110,12 +110,12 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
         )
 
       directive = %Aikido.Directives.AdoptChild{child: orphan_pid, tag: :adopted, meta: %{}}
-      assert_no_runtime_mutation(parent_pid, directive, fn s -> s.children end)
+      assert_no_runtime_mutation(parent_pid, directive, &Aikido.Ownership.children/1)
 
       child_info =
         await_state_value(
           parent_pid,
-          fn s -> Map.get(s.children, :adopted) end,
+          fn s -> Map.get(Aikido.Ownership.children(s), :adopted) end,
           pattern: "aikido.agent.child.started"
         )
 
@@ -125,7 +125,9 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
   end
 
   describe("Cron") do
-    test("directive does not write state.cron_*; cascade does", %{aikido: aikido}) do
+    test("directive leaves cron state unchanged; the registration action adopts the result", %{
+      aikido: aikido
+    }) do
       pid =
         start_server(
           %{aikido: aikido},
@@ -133,7 +135,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
           id: "strict-cron"
         )
 
-      directive = %Aikido.Directives.Cron{
+      directive = %Aikido.Cron.Directives.Register{
         cron: "@hourly",
         message: :tick,
         job_id: :strict_cron,
@@ -142,18 +144,17 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
 
       assert_no_runtime_mutation(pid, directive, fn s ->
         %{
-          specs: s.cron_specs,
-          jobs: s.cron_jobs,
-          monitors: s.cron_monitors,
-          monitor_refs: s.cron_monitor_refs,
-          runtime_specs: s.cron_runtime_specs
+          specs: s.agent.state.cron.specs,
+          jobs: s.agent.state.cron.jobs,
+          monitors: s.agent.state.cron.monitors,
+          runtime_specs: s.agent.state.cron.runtime_specs
         }
       end)
 
       cron_pid =
         await_state_value(
           pid,
-          fn s -> Map.get(s.cron_jobs, :strict_cron) end,
+          fn s -> Map.get(s.agent.state.cron.jobs, :strict_cron) end,
           pattern: "aikido.agent.cron.registered"
         )
 
@@ -163,10 +164,10 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
         Aikido.AgentServer.state(pid, fn s ->
           {:ok,
            %{
-             specs: Map.has_key?(s.cron_specs, :strict_cron),
-             jobs: Map.has_key?(s.cron_jobs, :strict_cron),
-             monitors: Map.has_key?(s.cron_monitors, :strict_cron),
-             runtime_specs: Map.has_key?(s.cron_runtime_specs, :strict_cron)
+             specs: Map.has_key?(s.agent.state.cron.specs, :strict_cron),
+             jobs: Map.has_key?(s.agent.state.cron.jobs, :strict_cron),
+             monitors: Map.has_key?(s.agent.state.cron.monitors, :strict_cron),
+             runtime_specs: Map.has_key?(s.agent.state.cron.runtime_specs, :strict_cron)
            }}
         end)
 
@@ -177,7 +178,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
 
       Aikido.AgentServer.cast(
         pid,
-        signal_carrying_directive(%Aikido.Directives.CronCancel{job_id: :strict_cron})
+        signal_carrying_directive(%Aikido.Cron.Directives.Cancel{job_id: :strict_cron})
       )
     end
   end
@@ -195,7 +196,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
 
       Aikido.AgentServer.cast(
         pid,
-        signal_carrying_directive(%Aikido.Directives.Cron{
+        signal_carrying_directive(%Aikido.Cron.Directives.Register{
           cron: "@hourly",
           message: :tick,
           job_id: :cancel_target,
@@ -206,22 +207,22 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
       _cron_pid =
         await_state_value(
           pid,
-          fn s -> Map.get(s.cron_jobs, :cancel_target) end,
+          fn s -> Map.get(s.agent.state.cron.jobs, :cancel_target) end,
           pattern: "aikido.agent.cron.registered"
         )
 
-      directive = %Aikido.Directives.CronCancel{job_id: :cancel_target}
+      directive = %Aikido.Cron.Directives.Cancel{job_id: :cancel_target}
 
       assert {:ok, _} =
                Aikido.AgentServer.call(pid, signal_carrying_directive(directive), fn runtime ->
-                 {:ok, runtime.cron_jobs}
+                 {:ok, runtime.agent.state.cron.jobs}
                end)
 
       true =
         await_state_value(
           pid,
           fn s ->
-            if not Map.has_key?(s.cron_jobs, :cancel_target) do
+            if not Map.has_key?(s.agent.state.cron.jobs, :cancel_target) do
               true
             end
           end,
@@ -232,10 +233,10 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest do
         Aikido.AgentServer.state(pid, fn s ->
           {:ok,
            %{
-             specs: Map.has_key?(s.cron_specs, :cancel_target),
-             jobs: Map.has_key?(s.cron_jobs, :cancel_target),
-             monitors: Map.has_key?(s.cron_monitors, :cancel_target),
-             runtime_specs: Map.has_key?(s.cron_runtime_specs, :cancel_target)
+             specs: Map.has_key?(s.agent.state.cron.specs, :cancel_target),
+             jobs: Map.has_key?(s.agent.state.cron.jobs, :cancel_target),
+             monitors: Map.has_key?(s.agent.state.cron.monitors, :cancel_target),
+             runtime_specs: Map.has_key?(s.agent.state.cron.runtime_specs, :cancel_target)
            }}
         end)
 

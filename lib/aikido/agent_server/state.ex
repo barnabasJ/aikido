@@ -8,19 +8,26 @@ defmodule Aikido.AgentServer.State do
   > to retrieve a projection of state.
 
   This struct holds all runtime state for an agent instance including
-  the agent itself, hierarchy tracking, and configuration.
+  the agent itself, subscriptions, and configuration.
+  Parent and child bindings live in the mounted ownership slice.
 
   Signal processing runs inline within the triggering handler; the Erlang
   mailbox is the only queue.
   """
 
-  alias Aikido.AgentServer.{ChildInfo, Options, ParentRef}
+  alias Aikido.AgentServer.Options
 
   @type status :: Aikido.AgentServer.Types.Status.t()
 
   use Ash.TypedStruct
 
   typed_struct do
+    field :sync, Aikido.Durable.SyncPolicy do
+      description "DurableServer synchronization policy used by this agent and inherited by spawned children."
+      default %Aikido.Durable.SyncPolicy{}
+      allow_nil? false
+    end
+
     field :id, :string do
       allow_nil? false
       description "Stable agent identity used for runtime addressing and durable persistence."
@@ -41,76 +48,6 @@ defmodule Aikido.AgentServer.State do
       allow_nil? false
       default :initializing
       description "Current server status"
-    end
-
-    field :parent, :term do
-      allow_nil? true
-      description "Parent reference"
-    end
-
-    field :orphaned_from, :term do
-      allow_nil? true
-      description "Former parent reference after orphaning"
-    end
-
-    field :children, :map do
-      allow_nil? false
-      default %{}
-      description "Map of tag => ChildInfo"
-    end
-
-    field :on_parent_death, Aikido.AgentServer.Types.ParentDeathPolicy do
-      allow_nil? false
-      default :stop
-      description "Behavior on parent death"
-    end
-
-    field :cron_jobs, :map do
-      allow_nil? false
-      default %{}
-      description "Map of job_id => scheduler job name"
-    end
-
-    field :cron_monitors, :map do
-      allow_nil? false
-      default %{}
-      description "Map of job_id => monitor_ref for cron jobs"
-    end
-
-    field :cron_monitor_refs, :map do
-      allow_nil? false
-      default %{}
-      description "Map of monitor_ref => job_id for cron jobs"
-    end
-
-    field :cron_restart_attempts, :map do
-      allow_nil? false
-      default %{}
-      description "Map of job_id => restart attempt count for cron jobs"
-    end
-
-    field :cron_restart_timers, :map do
-      allow_nil? false
-      default %{}
-      description "Map of job_id => timer_ref for cron restarts"
-    end
-
-    field :cron_restart_timer_refs, :map do
-      allow_nil? false
-      default %{}
-      description "Map of timer_ref => job_id for cron restarts"
-    end
-
-    field :cron_specs, :map do
-      allow_nil? false
-      default %{}
-      description "Map of job_id => durable cron registration spec"
-    end
-
-    field :cron_runtime_specs, :map do
-      allow_nil? false
-      default %{}
-      description "Map of job_id => runtime cron restart spec"
     end
 
     field :skip_schedules, :boolean do
@@ -184,8 +121,8 @@ defmodule Aikido.AgentServer.State do
   @doc """
   Creates a new State from validated Options, agent module, and agent struct.
 
-  Runtime identity (`partition`, `parent`, `orphaned_from`) lives only on the
-  returned `%State{}`; nothing is mirrored into `agent.state`.
+  Partition remains runtime configuration. Parent options are applied through
+  the ownership slice's startup action after the signal router is built.
 
   ## Options
 
@@ -198,6 +135,7 @@ defmodule Aikido.AgentServer.State do
   def from_options(%Options{} = opts, agent_module, agent, extra \\ []) do
     opts
     |> Map.from_struct()
+    |> Map.drop([:parent, :on_parent_death])
     |> Map.merge(%{
       agent_module: agent_module,
       agent: agent,
@@ -205,52 +143,6 @@ defmodule Aikido.AgentServer.State do
       debug_max_events: Aikido.Telemetry.Config.debug_max_events(opts.aikido)
     })
     |> new()
-  end
-
-  @doc """
-  Attaches a parent reference to the runtime.
-
-  Runtime identity lives only on `%State{}`; the agent struct is left
-  untouched.
-  """
-  @spec attach_parent(t(), ParentRef.t()) :: t()
-  def attach_parent(%__MODULE__{} = state, %ParentRef{} = parent) do
-    %{state | parent: parent, orphaned_from: nil}
-  end
-
-  @doc """
-  Transitions the runtime into an orphaned state, preserving the former
-  parent on `%State{}`.
-  """
-  @spec orphan_parent(t()) :: t()
-  def orphan_parent(%__MODULE__{parent: %ParentRef{} = parent} = state) do
-    %{state | parent: nil, orphaned_from: parent}
-  end
-
-  def orphan_parent(%__MODULE__{} = state) do
-    %{state | parent: nil, orphaned_from: nil}
-  end
-
-  @doc """
-  Adds a child to the children map.
-  """
-  @spec add_child(t(), term(), ChildInfo.t()) :: t()
-  def add_child(%__MODULE__{children: children} = state, tag, %ChildInfo{} = child) do
-    %{state | children: Map.put(children, tag, child)}
-  end
-
-  @doc """
-  Removes a child by PID.
-  """
-  @spec remove_child_by_pid(t(), pid()) :: {term() | nil, t()}
-  def remove_child_by_pid(%__MODULE__{children: children} = state, pid) do
-    case Enum.find(children, fn {_tag, child} -> child.pid == pid end) do
-      {tag, _child} ->
-        {tag, %{state | children: Map.delete(children, tag)}}
-
-      nil ->
-        {nil, state}
-    end
   end
 
   @doc """

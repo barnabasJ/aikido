@@ -1,7 +1,7 @@
 defmodule AikidoTest.AshTeamTest do
   use AikidoTest.Case, async: false
   alias AikidoTest.AshFixtures.{Counter, Domain, DynamicTeam}
-  alias Aikido.Ash.Team.Topology
+  alias Aikido.Team.Topology
 
   setup do
     start_supervised!(
@@ -14,15 +14,15 @@ defmodule AikidoTest.AshTeamTest do
   test "team commands derive their public arguments from the owning reducer" do
     for name <- [:add_member, :send] do
       public = Ash.Resource.Info.action(DynamicTeam, name)
-      reducer = Ash.Resource.Info.action(Aikido.Ash.Team.State, name)
+      reducer = Ash.Resource.Info.action(Aikido.Team.Slice, name)
 
       assert Enum.map(public.arguments, & &1.name) -- [:agent] ==
                Enum.map(reducer.arguments, & &1.name) -- [:state]
     end
 
     input =
-      Ash.ActionInput.for_action(Aikido.Ash.Team.State, :add_member, %{
-        state: %{},
+      Ash.ActionInput.for_action(Aikido.Team.Slice, :add_member, %{
+        state: Ash.create!(Aikido.Team.Slice, %{}),
         member: "worker",
         activation: "lazy"
       })
@@ -33,9 +33,9 @@ defmodule AikidoTest.AshTeamTest do
     assert input.arguments.depends_on == []
 
     assert {:error, %Ash.Error.Invalid{}} =
-             Aikido.Ash.Team.State
+             Aikido.Team.Slice
              |> Ash.ActionInput.for_action(:add_member, %{
-               state: %{},
+               state: Ash.create!(Aikido.Team.Slice, %{}),
                member: "worker",
                activation: :unknown
              })
@@ -89,7 +89,12 @@ defmodule AikidoTest.AshTeamTest do
 
     assert {:ok, _} = Domain.team_send(team, %{member: :worker, type: "counter.increment"})
     assert_receive {:aikido_subscription, ^ref, %{result: {:ok, 3}}}
-    assert {:error, _} = Domain.team_send(team, %{member: :missing, type: "counter.increment"})
+
+    assert {:error, %{errors: [%Ash.Error.Action.InvalidArgument{} = error]}} =
+             Domain.team_send(team, %{member: :missing, type: "counter.increment"})
+
+    assert AshAi.ToToolError.to_tool_error(error) =~ "ensure_member"
+    assert AshLua.Error.to_error(error).code == "invalid_argument"
   end
 
   test "lifecycle commands return even when they complete immediately and release their subscriptions" do
@@ -102,6 +107,56 @@ defmodule AikidoTest.AshTeamTest do
 
     pid = AikidoTest.Case.agent_pid(AikidoTest.AshFixtures.Instance, team.id)
     assert {:ok, 0} = Aikido.AgentServer.state(pid, &{:ok, map_size(&1.signal_subscribers)})
+  end
+
+  test "team children inherit synchronization policy unless their start config overrides it" do
+    team =
+      Domain.dynamic_start!(%{
+        id: "sync-inheritance",
+        sync: %{mode: :automatic, interval_ms: 777}
+      })
+
+    Domain.dynamic_add_member!(team, %{member: "inherited", template: :counter})
+
+    Domain.dynamic_add_member!(team, %{
+      member: "overridden",
+      template: :counter,
+      initial_state: %{sync: %{mode: :periodic, interval_ms: 2_000}}
+    })
+
+    current = Domain.dynamic_inspect!(team)
+    inherited = :sys.get_state(current.team.members["inherited"])
+    overridden = :sys.get_state(current.team.members["overridden"])
+    assert inherited.auto_sync
+    assert inherited.sync_every_ms == 777
+    refute overridden.auto_sync
+    assert overridden.sync_every_ms == 2_000
+  end
+
+  test "parallel topology commands queue until each member activation settles" do
+    team = Domain.dynamic_start!(%{id: "parallel-workers"})
+    observer = self()
+
+    tasks =
+      for name <- ["one", "two"] do
+        Task.async(fn ->
+          send(observer, {:ready_to_spawn, self()})
+
+          receive do
+            :spawn -> Domain.dynamic_add_member(team, %{member: name, template: :counter})
+          end
+        end)
+      end
+
+    for _ <- tasks do
+      assert_receive {:ready_to_spawn, pid}
+      send(pid, :spawn)
+    end
+
+    for task <- tasks, do: assert({:ok, _} = Task.await(task, 10_000))
+    current = Domain.dynamic_inspect!(team)
+    assert Map.keys(current.team.members) |> Enum.sort() == ["one", "two"]
+    assert current.team.queued_operations == []
   end
 
   test "dynamic worker templates can add, stop, ensure, and remove string-named workers" do
@@ -154,7 +209,13 @@ defmodule AikidoTest.AshTeamTest do
     state = team.team
     assert state.operation.status == :completed
     assert state.operation.started == ["lead", "worker"]
-    assert {:ok, parent} = Aikido.AgentServer.state(state.members["worker"], &{:ok, &1.parent})
+
+    assert {:ok, parent} =
+             Aikido.AgentServer.state(
+               state.members["worker"],
+               &{:ok, Aikido.Ownership.parent(&1)}
+             )
+
     assert parent.pid == state.members["lead"]
     assert parent.meta.team_id == "graph"
     assert parent.meta.team_resource == DynamicTeam
@@ -349,7 +410,7 @@ defmodule AikidoTest.AshTeamTest do
     assert {:error, _} =
              Topology.build(%{"missing" => %{resource: String}}, AikidoTest.AshFixtures.Instance)
 
-    config = Aikido.Ash.Agent.Info.team_config(DynamicTeam)
+    config = Aikido.Agent.Info.team_config(DynamicTeam)
     assert config.max_members == 5
     assert config.workers.counter.max_members == 2
   end
@@ -389,7 +450,10 @@ defmodule AikidoTest.AshTeamTest do
     assert_receive {:aikido_subscription, ^subscription, %{result: {:ok, replacements}}}, 5_000
 
     assert {:ok, %{pid: parent}} =
-             Aikido.AgentServer.state(replacements["grandchild"], &{:ok, &1.parent})
+             Aikido.AgentServer.state(
+               replacements["grandchild"],
+               &{:ok, Aikido.Ownership.parent(&1)}
+             )
 
     assert parent == replacements["child"]
   end

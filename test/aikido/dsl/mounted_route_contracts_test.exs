@@ -152,7 +152,7 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
           end
         end
         defmodule #{inspect(domain)} do
-          use Ash.Domain, extensions: [Aikido.Ash.Domain], validate_config_inclusion?: false
+          use Ash.Domain, extensions: [Aikido.Domain.Extension], validate_config_inclusion?: false
           agents do
             agent :counter, #{inspect(resource)}
           end
@@ -182,18 +182,22 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
       assert_counts(reference, expected)
     end
 
-    assert Aikido.Ash.Agent.Info.slice_paths_for_action(resource)[{Remote, :remote}] ==
+    assert Aikido.Agent.Info.slice_paths_for_action(resource)[{Remote, :remote}] ==
              [:counter, :other]
   end
 
   test "matched public commands preserve predicates, priority and mount ownership", context do
     %{resource: resource, domain: domain, reference: reference} = context
-    assert Aikido.Ash.Agent.Info.signal_routes(resource) == []
 
-    assert Aikido.Ash.Agent.Info.slice_paths_for_action(resource)[{Counter, :matched}] ==
+    assert Aikido.Agent.Info.signal_routes(resource) == [
+             {"aikido.agent.stop", {resource, :__aikido_stop_self__}, -20},
+             {"aikido.agent.query.children", {resource, :__aikido_query_children__}, -20}
+           ]
+
+    assert Aikido.Agent.Info.slice_paths_for_action(resource)[{Counter, :matched}] ==
              [:counter, :other]
 
-    assert Enum.any?(Aikido.Ash.Agent.Info.routes(resource), fn
+    assert Enum.any?(Aikido.Agent.Info.routes(resource), fn
              {"mounted.matched", predicate, {Counter, :matched}, -15} ->
                is_function(predicate, 1)
 
@@ -238,7 +242,7 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
     assert [%{type: "mounted.first", action: {Counter, :multiple}}] =
              resource
              |> Spark.Dsl.Extension.get_entities([:agent])
-             |> Enum.filter(&match?(%Aikido.Ash.Agent.Route{name: :multiple}, &1))
+             |> Enum.filter(&match?(%Aikido.Agent.Route{name: :multiple}, &1))
 
     assert {:ok, _} = apply(domain, :counter_multiple, [reference, %{amount: "2"}])
     assert_counts(reference, 2)
@@ -257,7 +261,7 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
 
   test "normalization removes repeated mount routes and retains every routing distinction",
        context do
-    routes = Aikido.Ash.Agent.Info.routes(context.resource)
+    routes = Aikido.Agent.Info.routes(context.resource)
     assert Enum.count(routes, &match?({"mounted.local", {Counter, :local}, -10}, &1)) == 1
     assert Enum.count(routes, &match?({"mounted.remote", {Remote, :remote}, -10}, &1)) == 1
     assert Enum.count(routes, &match?({"mounted.matched", _, {Counter, :matched}, -15}, &1)) == 1
@@ -317,7 +321,7 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
         assert [%{action: {Counter, :local}}] =
                  resource
                  |> Spark.Dsl.Extension.get_entities([:agent])
-                 |> Enum.filter(&match?(%Aikido.Ash.Agent.Route{name: :local}, &1))
+                 |> Enum.filter(&match?(%Aikido.Agent.Route{name: :local}, &1))
       else
         assert output =~ "Public route names must be unique: :local"
       end

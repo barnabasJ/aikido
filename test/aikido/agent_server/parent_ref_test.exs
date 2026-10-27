@@ -1,7 +1,7 @@
 defmodule AikidoTest.AgentServer.ParentRefTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.AgentServer.ParentRef
+  alias Aikido.Ownership.ParentRef
 
   @valid_attrs %{
     pid: self(),

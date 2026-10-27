@@ -73,6 +73,13 @@ defmodule Aikido.Directives.SpawnAgent do
       description "Options for child AgentServer"
     end
 
+    field :start_options, {:array, :tuple} do
+      description "Native DurableServer start options, including the caller deadline and placement policy."
+      constraints items: [fields: [key: [type: :atom], value: [type: :term]]]
+      allow_nil? false
+      default []
+    end
+
     field :meta, :map do
       allow_nil? false
       default %{}
@@ -89,23 +96,21 @@ defmodule Aikido.Directives.SpawnAgent do
   @doc """
   Pure I/O directive: starts the child in supervised work through DurableServer
   with its logical parent binding. The
-  child's own `notify_parent_of_startup/1` then casts
+  child's own `Aikido.Ownership.Actions.AnnounceChild` then emits
   `aikido.agent.child.started` back to this agent, where
-  `maybe_track_child_started/2` records the `%ChildInfo{}` and creates
-  the parent-side monitor.
+  `Aikido.Ownership.Actions.TrackChild` records the child and requests
+  the parent-side monitor through a directive.
 
   Async window: between the directive returning and the natural
-  `child.started` arriving, `state.children[tag]` is `nil`. Tests should
-  use `AgentServer.await_child/3` rather than peeking at `state.children`
+  `child.started` arriving, `Aikido.Ownership.children(runtime)[tag]` is `nil`. Tests should
+  use `AgentServer.await_child/3` rather than reading the ownership slice
   immediately.
   """
-
-  require Logger
 
   @reserved_child_opts [:agent, :agent_module, :id, :aikido, :parent, :partition]
 
   @impl true
-  def exec(%{agent: agent, tag: tag, opts: opts, meta: meta, restart?: restart?}, signal, state) do
+  def exec(%{tag: tag, opts: opts} = directive, signal, state) do
     parent_pid = self()
     scope = Aikido.Signal.ctx(signal)
 
@@ -116,23 +121,77 @@ defmodule Aikido.Directives.SpawnAgent do
         Ash.Scope.to_opts(scope, context: Map.get(scope, :context) || %{})
       )
 
+    directive = %{directive | opts: opts}
+    runtime = Map.take(state, [:id, :partition, :aikido, :sync])
+
     task = %Aikido.Directives.AsyncTask{
       work: fn ->
-        spawn_child(state, parent_pid, agent, tag, opts, meta, restart?)
+        start_child_or_report_failure(runtime, parent_pid, directive, signal)
         {:signals, []}
       end
     }
 
     case Aikido.Directives.AsyncTask.start(task, signal, state) do
-      {:ok, _pid} -> :ok
-      {:error, reason} -> Logger.error("Failed to start agent spawn task: #{inspect(reason)}")
+      {:ok, _pid} ->
+        :ok
+
+      {:error, reason} ->
+        report_failure(
+          parent_pid,
+          opts[:id] || Aikido.Agent.child_id(state.id, tag),
+          tag,
+          reason,
+          signal
+        )
     end
 
     :ok
   end
 
-  defp spawn_child(state, parent_pid, agent, tag, opts, meta, restart?) do
-    child_id = opts[:id] || "#{state.id}/#{tag_component(tag)}"
+  defp start_child_or_report_failure(
+         state,
+         parent_pid,
+         %{tag: tag, opts: opts} = directive,
+         signal
+       ) do
+    child_id = opts[:id] || Aikido.Agent.child_id(state.id, tag)
+
+    try do
+      case spawn_child(state, parent_pid, directive) do
+        :ok -> :ok
+        {:error, reason} -> report_failure(parent_pid, child_id, tag, reason, signal)
+      end
+    rescue
+      error -> report_failure(parent_pid, child_id, tag, error, signal)
+    catch
+      kind, reason -> report_failure(parent_pid, child_id, tag, {kind, reason}, signal)
+    end
+  end
+
+  defp report_failure(parent, child_id, tag, reason, signal) do
+    reason =
+      case reason do
+        {:already_started, _pid} -> {:already_started, child_id}
+        other -> other
+      end
+
+    failure =
+      Aikido.AgentServer.Signals.ChildStartFailed.new!(%{
+        child_id: child_id,
+        tag: tag,
+        reason: reason
+      })
+
+    Aikido.AgentServer.cast(parent, Aikido.Signal.inherit(failure, signal))
+    :ok
+  end
+
+  defp spawn_child(
+         state,
+         parent_pid,
+         %{agent: agent, tag: tag, opts: opts, meta: meta, restart?: restart?} = directive
+       ) do
+    child_id = opts[:id] || Aikido.Agent.child_id(state.id, tag)
     child_partition = Map.get(opts, :partition, state.partition)
 
     parent_ref = %{
@@ -143,51 +202,44 @@ defmodule Aikido.Directives.SpawnAgent do
       meta: meta
     }
 
-    child_opts =
-      opts
-      |> Map.drop(@reserved_child_opts)
-      |> Map.put(:agent_module, agent)
-      |> Map.put(:id, child_id)
-      |> Map.put(:partition, child_partition)
-      |> Map.put(:parent, parent_ref)
-      |> Map.put(:aikido, state.aikido)
-      |> Map.to_list()
+    child_opts = child_options(opts, state, parent_ref, agent, child_id, child_partition)
 
     case Aikido.Durable.start(
            Aikido.durable_supervisor_name(state.aikido),
            child_id,
-           agent: agent,
-           initial_state: Keyword.get(child_opts, :initial_state, %{}),
-           partition: child_partition,
-           agent_opts: child_opts,
-           permanent: restart?
+           [
+             agent: agent,
+             initial_state: Keyword.get(child_opts, :initial_state, %{}),
+             partition: child_partition,
+             agent_opts: child_opts,
+             permanent: restart?
+           ],
+           Map.get(directive, :start_options, [])
          ) do
       {:ok, pid} ->
         if !Process.alive?(parent_pid) do
           GenServer.cast(
             pid,
-            {:ensure_initial_parent, Aikido.AgentServer.ParentRef.new!(parent_ref)}
+            {:ensure_initial_parent, Aikido.Ownership.ParentRef.new!(parent_ref)}
           )
         end
 
         :ok
 
       {:error, reason} ->
-        Logger.error(
-          "AgentServer #{state.id} failed to spawn child #{child_id}: #{inspect(reason)}"
-        )
-
-        :ok
+        {:error, reason}
     end
   end
 
-  defp tag_component(tag) do
-    to_string(tag)
-  rescue
-    _error in [Protocol.UndefinedError, ArgumentError] ->
-      encoded =
-        tag |> :erlang.term_to_binary([:deterministic]) |> Base.url_encode64(padding: false)
-
-      "term:" <> encoded
+  defp child_options(opts, state, parent_ref, agent, child_id, child_partition) do
+    opts
+    |> Map.drop(@reserved_child_opts)
+    |> Map.put_new(:sync, state.sync)
+    |> Map.put(:agent_module, agent)
+    |> Map.put(:id, child_id)
+    |> Map.put(:partition, child_partition)
+    |> Map.put(:parent, parent_ref)
+    |> Map.put(:aikido, state.aikido)
+    |> Map.to_list()
   end
 end

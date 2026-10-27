@@ -2,6 +2,7 @@ defmodule AgentExamplesWeb.Router do
   use Phoenix.Router
   import Phoenix.Controller
   import Phoenix.LiveView.Router
+  import Phoenix.LiveDashboard.Router
 
   pipeline :browser do
     plug(:accepts, ["html"])
@@ -16,12 +17,29 @@ defmodule AgentExamplesWeb.Router do
   scope "/", AgentExamplesWeb do
     pipe_through :browser
 
+    live_dashboard("/dashboard",
+      metrics: AgentExamples.Telemetry,
+      home_app: {"Aikido", :agent_examples},
+      additional_pages: [aikido: AgentExamplesWeb.TelemetryPage],
+      request_logger: false,
+      ecto_repos: []
+    )
+
     live_session :examples, session: {__MODULE__, :live_session, []} do
       live("/", IndexLive)
+      live("/examples/lua-permissions", LuaPermissionsLive)
+      live("/examples/adaptive-tools", AdaptiveToolsLive)
+      live("/examples/verified-work", VerifiedWorkLive)
+      live("/examples/verified-team", VerifiedTeamLive)
+      live("/examples/resilience", ResilienceLive)
+      live("/examples/recovery", RecoveryLive)
       live("/examples/counter", CounterLive)
+      live("/examples/cron", CronLive)
+      live("/examples/checkpoint", CheckpointLive)
       live("/examples/checklist", ChecklistLive)
       live("/examples/notebook", NotebookLive)
       live("/examples/worker", WorkerLive)
+      live("/examples/quicksort", QuicksortLive)
       live("/examples/team", TeamLive)
       live("/examples/nested-teams", NestedTeamsLive)
       live("/examples/assistant", AssistantLive)
@@ -35,9 +53,7 @@ defmodule AgentExamplesWeb.Router do
   end
 
   defp browser_identity(conn, _) do
-    if get_session(conn, :browser_id),
-      do: conn,
-      else: put_session(conn, :browser_id, Ash.UUIDv7.generate())
+    put_session(conn, :browser_id, get_session(conn, :browser_id) || Ash.UUIDv7.generate())
   end
 
   def live_session(conn), do: %{"browser_id" => get_session(conn, :browser_id)}

@@ -170,7 +170,7 @@ defmodule AikidoTest.Agent.DirectiveTest do
   describe "cron/3" do
     test "creates Cron directive with defaults" do
       directive = Directives.cron("* * * * *", :tick)
-      assert %Directives.Cron{} = directive
+      assert %Aikido.Cron.Directives.Register{} = directive
       assert directive.cron == "* * * * *"
       assert directive.message == :tick
       assert directive.job_id == nil
@@ -199,7 +199,7 @@ defmodule AikidoTest.Agent.DirectiveTest do
   describe "cron_cancel/1" do
     test "creates CronCancel directive" do
       directive = Directives.cron_cancel(:heartbeat)
-      assert %Directives.CronCancel{} = directive
+      assert %Aikido.Cron.Directives.Cancel{} = directive
       assert directive.job_id == :heartbeat
     end
   end
