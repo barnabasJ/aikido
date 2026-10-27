@@ -26,7 +26,9 @@ defmodule AgentExamples.MixProject do
         {:bandit, "~> 1.6"},
         {:lazy_html, ">= 0.1.0", only: :test},
         {:ash_ai, "~> 1.3"},
-        {:ash_lua, "~> 0.2.3"},
+        {:ash_lua,
+         git: "https://github.com/barnabasJ/ash_lua.git",
+         ref: "53fe11b883b7f8c8f6b85d07630bf78727a1efed"},
         {:sourceror, "~> 1.7", only: [:dev, :test]}
       ],
       aliases: [
