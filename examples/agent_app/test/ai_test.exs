@@ -232,7 +232,7 @@ defmodule AgentExamples.AITest do
 
   defp track(record) do
     on_exit(fn ->
-      (Map.get(record, :resource) || record.__struct__)
+      record.__struct__
       |> Ash.ActionInput.for_action(:stop, %{agent: record})
       |> Ash.run_action()
     end)

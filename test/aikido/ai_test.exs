@@ -170,7 +170,11 @@ defmodule Aikido.AITest do
       assert ai.tool_results_received == []
     end
 
-    test("appends a cycle warning when consecutive tool batches are identical", ctx) do
+    test("appends a cycle warning after three identical successful batches", ctx) do
+      expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
+        {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 1}}}])}
+      end)
+
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
         {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 1}}}])}
       end)
@@ -182,13 +186,13 @@ defmodule Aikido.AITest do
       test_pid = self()
 
       expect(ReqLLM.Generation, :generate_text, fn _model, messages, _opts ->
-        send(test_pid, {:third_call_messages, messages})
+        send(test_pid, {:fourth_call_messages, messages})
         {:ok, final_answer_response("done")}
       end)
 
       pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       assert {:ok, "done"} = Aikido.AI.ask_sync(pid, "loop", timeout: 1000)
-      assert_receive {:third_call_messages, messages}, 1000
+      assert_receive {:fourth_call_messages, messages}, 1000
 
       texts =
         for msg <- messages,

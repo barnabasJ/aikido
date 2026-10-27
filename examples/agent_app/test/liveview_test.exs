@@ -1026,23 +1026,43 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert has_element?(view, "#tool-refresh")
   end
 
-  test "background evidence completes its required todo through a normal scoped tool", %{conn: conn} do
+  test "background evidence completes its required todo through a normal scoped tool", %{
+    conn: conn
+  } do
     {:ok, view, _} = live(conn, "/examples/verified-team")
     owner = start(view, "verified-team")
-    assert :ok = Playground.command(owner, "verified-team", :ask, %{query: "Check background result delivery"})
+
+    assert :ok =
+             Playground.command(owner, "verified-team", :ask, %{
+               query: "Check background result delivery"
+             })
+
     await(owner, "verified-team", &(&1.snapshot.ai.status == :waiting))
     waiting = Playground.get(owner, "verified-team")
     refute waiting.snapshot.ai.todo_verification_pending
     assert waiting.snapshot.ai.todo_continuations == 0
-    assert {:ok, waiting_ai} = Aikido.AgentServer.state(waiting.record.pid, &{:ok, &1.agent.state.ai})
+
+    assert {:ok, waiting_ai} =
+             Aikido.AgentServer.state(waiting.record.pid, &{:ok, &1.agent.state.ai})
+
     request_id = waiting_ai.request_id
     await(owner, "verified-team", &(&1.status == :completed))
     completed = Playground.get(owner, "verified-team")
-    assert {:ok, completed_ai} = Aikido.AgentServer.state(completed.record.pid, &{:ok, &1.agent.state.ai})
+
+    assert {:ok, completed_ai} =
+             Aikido.AgentServer.state(completed.record.pid, &{:ok, &1.agent.state.ai})
+
     assert completed_ai.request_id == request_id
     assert List.last(completed.messages).text =~ "worker's evidence"
-    assert Enum.any?(completed_ai.run_metadata.deliveries, &(get_in(&1, [:metadata, :task, :status]) == :completed))
-    assert [%{status: :completed, result: %{task_id: task_id, member: :evidence, result: result}}] = completed.snapshot.todos
+
+    assert Enum.any?(
+             completed_ai.run_metadata.deliveries,
+             &(get_in(&1, [:metadata, :task, :status]) == :completed)
+           )
+
+    assert [%{status: :completed, result: %{task_id: task_id, member: :evidence, result: result}}] =
+             completed.snapshot.todos
+
     assert is_binary(task_id)
     assert result =~ "Evidence checked:"
     refute Enum.any?(completed.events, &(&1.type == "ai.react.todos.verified"))
@@ -1069,7 +1089,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     owner = start(view, "resilience")
 
     for {query, error} <- [
-          {"cycle", {:tool_cycle_limit, 2, 2}},
+          {"cycle", {:tool_cycle_limit, 2, 5}},
           {"errors", {:tool_error_limit, 2}}
         ] do
       view |> element("#scenario-#{query}") |> render_click()

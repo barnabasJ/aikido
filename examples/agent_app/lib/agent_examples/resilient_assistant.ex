@@ -17,7 +17,7 @@ defmodule AgentExamples.ResilientAssistant do
       model_timeout_ms: 3_000,
       model_max_retries: 1,
       retry_backoff_ms: 100,
-      max_repeated_tool_cycles: 2,
+      max_repeated_tool_cycles: 5,
       tool_loop_key: {AgentExamples.ResilientAssistant.ToolLoopKey, :compare_inputs, []},
       max_consecutive_tool_errors: 2
     }

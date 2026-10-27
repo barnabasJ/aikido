@@ -70,3 +70,11 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
   `{:error, reason}`. Keep loop history and termination in native Aikido; do not
   build a middleware/stateful policy process for comparison alone. Callback
   failures fail explicitly. Default comparison includes exact inputs and results.
+
+- Tool-cycle warning messages expose `metadata[:aikido_tool_cycle_warning]` using
+  the native `Aikido.AiReact.Types.ToolCycleWarning` embedded type. Validate payloads
+  and actual run/turn correlation when projecting notes; never match English
+  warning text. AI context is not a permanent journal: mirror through existing
+  Thread.Append or application storage before handoff replaces it. No automatic
+  Thread/UI projection is implied. Three complete successful cycles warn; the
+  configured terminal repeat limit stays independent.

@@ -73,9 +73,9 @@ defmodule Aikido.AiReact.Actions.ToolResult do
     else
       with {:ok, signature} <- tool_batch_signature(state) do
         state
-        |> maybe_append_cycle_warning(state.previous_tool_signature, signature)
         |> Map.put(:previous_tool_signature, signature)
         |> Aikido.AiReact.ToolLoopGuard.record_batch(signature)
+        |> maybe_append_cycle_warning(state.tool_batch_history)
       else
         {:error, reason} -> %{state | status: :failed, error: {:tool_loop_key_failed, reason}}
       end
@@ -86,12 +86,30 @@ defmodule Aikido.AiReact.Actions.ToolResult do
     %{state | pending_tool_calls: [], tool_results_received: []}
   end
 
-  defp maybe_append_cycle_warning(state, previous_signature, current_signature)
-       when is_binary(previous_signature) and previous_signature == current_signature do
-    Conversation.append_message(state, ReqLLM.Context.user(@cycle_warning))
-  end
+  defp maybe_append_cycle_warning(state, before_history) do
+    if Aikido.AiReact.ToolLoopGuard.warning_due?(before_history, state.tool_batch_history) do
+      %{period: period, repetitions: repetitions} =
+        Aikido.AiReact.ToolLoopGuard.cycle_progress(state.tool_batch_history, 3)
 
-  defp maybe_append_cycle_warning(state, _previous, _current), do: state
+      warning =
+        Aikido.AiReact.Types.ToolCycleWarning.new!(
+          request_id: state.request_id,
+          iteration: state.iteration,
+          period: period,
+          repetitions: repetitions
+        )
+
+      {:ok, constraints} = Ash.Type.init(Aikido.AiReact.Types.ToolCycleWarning, [])
+
+      {:ok, payload} =
+        Ash.Type.dump_to_embedded(Aikido.AiReact.Types.ToolCycleWarning, warning, constraints)
+
+      message = ReqLLM.Context.user(@cycle_warning, %{aikido_tool_cycle_warning: payload})
+      Conversation.append_message(state, message)
+    else
+      state
+    end
+  end
 
   defp tool_batch_signature(state) do
     batch = completed_tool_batch(state.pending_tool_calls, state.tool_results_received)

@@ -153,8 +153,7 @@ signals. Messages can queue during setup; cancellation stops pending work.
 The optional tool-loop guards compare successful batches by each call's tool
 name, complete arguments, and returned content. Call IDs correlate results to
 calls but do not affect the comparison. Call order and result arrival order do
-not affect it; duplicate calls remain distinct entries. Equal consecutive
-successful batches add a warning, and `max_repeated_tool_cycles` bounds repeated
+not affect it; duplicate calls remain distinct entries. Three complete repetitions of a successful one-to-four-batch cycle add a warning, and `max_repeated_tool_cycles` bounds repeated
 one-to-four-batch patterns. Failed or mixed batches increment the independent
 `max_consecutive_tool_errors` streak without changing successful-cycle history
 or adding a repeat warning. The history stores bounded SHA-256 fingerprints,
@@ -279,3 +278,48 @@ messages. The runtime never silently falls back to a different comparison.
 The playground’s retries and loop guards example supplies an input-only key
 for its controlled repetition experiment. Applications with polling or changing
 observations should retain output in their key.
+
+### Tool-cycle warnings
+
+A warning is added on the third complete repetition of a successful cycle of
+one to four batches. This changes the old period-one warning from its second
+batch to its third; configured terminal limits are unchanged. The playground
+loop experiment uses five cycles so its warning is observable before stopping. A limit of two
+can stop before a warning. Failed and mixed batches retain successful history
+without warning. A phase shift does not repeat the warning. Native history
+keeps at least sixteen signatures (four full period-four cycles), avoiding
+threshold rearming when its bounded window fills. No second warning counter or
+application policy state is kept.
+
+`Aikido.AiReact.ToolLoopGuard.cycle_progress(history, minimum_repetitions)` returns
+`%{period: smallest_qualifying_period, repetitions: complete_suffix_cycles}` or
+`nil`. Periods are tested from one through four; a smaller period below the
+requested minimum does not hide a qualifying larger period. The minimum is
+between two and one hundred. Malformed histories/minimum values raise rather
+than silently disabling detection; native execution options already validate
+terminal limits.
+
+The existing model-visible warning message includes
+`message.metadata[:aikido_tool_cycle_warning]`. Its plain embedded payload uses
+`Aikido.AiReact.Types.ToolCycleWarning`: required `request_id`, nonnegative
+`iteration`, `period` from one through four and `repetitions` exactly three.
+Use `ToolCycleWarning.new/1` on a payload map to validate untrusted fields;
+invalid or missing fields return errors. Native `Ash.Type.dump_to_embedded/2`
+and `cast_from_embedded/2` encode/restore the storage representation; storage
+casting alone is not boundary validation. Reject non-map payloads before the
+constructor. Validation proves shape, not authenticity. Application observers
+must match the actual adopted run and turn and must not treat arbitrary
+caller-supplied replacement history as trusted warning events.
+
+To persist a human-visible system note, observe the adopted conversation before
+its effects run, then use the existing typed Thread append signal/action or an
+application journal. Copy the warning message metadata and request correlation;
+use the run/turn plus native entry identity for idempotent projection. The
+library does not automatically mirror AI messages into Thread or broadcast a
+UI event. Tests exercise ordinary middleware projection through an Emit and
+Thread.Append action, live subscription, native snapshot dump/load and handoff.
+A snapshot retains the metadata. Handoff replaces the model conversation and
+may remove the old warning there, while separately appended Thread entries
+remain. The loop history survives handoff, so warnings are not replayed merely
+because context was replaced. A new request starts fresh loop history; old
+journal entries remain owned by their original request.

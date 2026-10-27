@@ -101,7 +101,7 @@ defmodule Aikido.AiReact.ToolResultTest do
     assert directive.llm_opts == slice.llm_opts
   end
 
-  test "appends the cycle warning when the batch repeats the previous signature" do
+  test "appends the cycle warning on the third completed repetition" do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
 
     first_result =
@@ -115,7 +115,14 @@ defmodule Aikido.AiReact.ToolResultTest do
       })
       |> Ash.run_action!()
 
-    slice = %{first_result.state | pending_tool_calls: calls}
+    second =
+      complete_batch(
+        %{first_result.state | pending_tool_calls: calls},
+        [{"call_1", "{\"result\":3}", false}]
+      )
+
+    assert List.last(Context.to_list(second.context)).role == :tool
+    slice = %{second | pending_tool_calls: calls}
 
     {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [%LLMCall{} = directive]}} =
       then(signal("req_1", "call_1", "test_add", "{\"result\":3}"), fn signal ->
@@ -214,7 +221,7 @@ defmodule Aikido.AiReact.ToolResultTest do
     second = complete_batch(next, [{"second", "same", false}])
     assert second.previous_tool_signature == first.previous_tool_signature
     assert second.error == {:tool_cycle_limit, 1, 2}
-    assert List.last(Context.to_list(second.context)).role == :user
+    assert List.last(Context.to_list(second.context)).role == :tool
   end
 
   test "out-of-order results join their own call IDs before sorting" do
@@ -269,7 +276,15 @@ defmodule Aikido.AiReact.ToolResultTest do
 
     assert repeated.previous_tool_signature == first.previous_tool_signature
     assert repeated.tool_error_streak == 0
-    assert List.last(Context.to_list(repeated.context)).role == :user
+    assert List.last(Context.to_list(repeated.context)).role == :tool
+
+    third =
+      complete_batch(
+        %{repeated | pending_tool_calls: [%{first_call | id: "e"}]},
+        [{"e", "same", false}]
+      )
+
+    assert List.last(Context.to_list(third.context)).role == :user
   end
 
   test "fingerprints compare complete arguments rather than truncated inspected text" do
@@ -461,6 +476,82 @@ defmodule Aikido.AiReact.ToolResultTest do
     end
 
     assert Aikido.AiReact.Options.new!(%{}).tool_loop_key == nil
+  end
+
+  test "periodic warnings carry native typed facts exactly once on the third complete cycle" do
+    assert {:ok, constraints} = Ash.Type.init(Aikido.AiReact.Types.ToolCycleWarning, [])
+
+    for period <- 1..4, callback <- [nil, {Aikido.AiReact.ToolResultTest.Keys, :full, []}] do
+      options =
+        Aikido.AiReact.Options.new!(%{max_repeated_tool_cycles: 5, tool_loop_key: callback})
+
+      initial = %{slice_with_pending([]) | options: options}
+
+      final =
+        Enum.reduce(1..(period * 5), initial, fn index, before ->
+          value = rem(index - 1, period)
+          id = "call-#{index}"
+          call = %{id: id, name: "test_add", arguments: %{value: value}}
+
+          after_batch =
+            complete_batch(%{before | pending_tool_calls: [call]}, [
+              {id, "result-#{value}", false}
+            ])
+
+          warnings =
+            Enum.filter(
+              Context.to_list(after_batch.context),
+              &Map.has_key?(&1.metadata, :aikido_tool_cycle_warning)
+            )
+
+          assert length(warnings) == if(index >= period * 3, do: 1, else: 0)
+          if index < period * 5, do: assert(after_batch.status == :running)
+          after_batch
+        end)
+
+      assert final.error == {:tool_cycle_limit, period, 5}
+
+      [message] =
+        Enum.filter(
+          Context.to_list(final.context),
+          &Map.has_key?(&1.metadata, :aikido_tool_cycle_warning)
+        )
+
+      assert {:ok, warning} =
+               Ash.Type.cast_from_embedded(
+                 Aikido.AiReact.Types.ToolCycleWarning,
+                 message.metadata.aikido_tool_cycle_warning,
+                 constraints
+               )
+
+      assert warning.request_id == final.request_id
+      assert warning.period == period
+      assert warning.repetitions == 3
+      assert Enum.count(Context.to_list(final.context), &(&1.role == :tool)) == period * 5
+    end
+  end
+
+  test "warning metadata round trips through initialized native embedded constraints" do
+    type = Aikido.AiReact.Types.ToolCycleWarning
+    fields = %{request_id: "diagnostic", iteration: 3, period: 1, repetitions: 3}
+    assert {:ok, warning} = type.new(fields)
+    assert {:ok, constraints} = Ash.Type.init(type, [])
+    assert {:ok, payload} = Ash.Type.dump_to_embedded(type, warning, constraints)
+    assert payload == fields
+    assert {:ok, ^warning} = Ash.Type.cast_from_embedded(type, payload, constraints)
+  end
+
+  test "warning metadata validates bounded facts and mandatory run correlation" do
+    type = Aikido.AiReact.Types.ToolCycleWarning
+
+    for fields <- [
+          %{iteration: 1, period: 2, repetitions: 3},
+          %{request_id: "r", iteration: -1, period: 2, repetitions: 3},
+          %{request_id: "r", iteration: 1, period: 5, repetitions: 3},
+          %{request_id: "r", iteration: 1, period: 2, repetitions: 4}
+        ] do
+      assert {:error, _} = type.new(fields)
+    end
   end
 
   defp complete_batch(state, results) do

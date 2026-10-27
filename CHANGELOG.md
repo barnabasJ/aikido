@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Warn on the third completed successful cycle for periods one through four,
+  using the existing bounded history and retaining configured terminal limits.
+  Attach native typed run/turn/period metadata to the model warning so journals
+  can project system notes without matching text. Period-one warnings move from
+  the second identical batch to the third.
+
 - Allow a pure MFA to select completed tool-batch comparison keys while retaining
   native bounded cycle detection, result adoption and exact comparisons by
   default. Fail explicitly when a configured comparison callback fails.
