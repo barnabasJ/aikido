@@ -22,7 +22,7 @@ defmodule AikidoTest.AshTeamTest do
 
     input =
       Ash.ActionInput.for_action(Aikido.Team.Slice, :add_member, %{
-        state: %{},
+        state: Ash.create!(Aikido.Team.Slice, %{}),
         member: "worker",
         activation: "lazy"
       })
@@ -35,7 +35,7 @@ defmodule AikidoTest.AshTeamTest do
     assert {:error, %Ash.Error.Invalid{}} =
              Aikido.Team.Slice
              |> Ash.ActionInput.for_action(:add_member, %{
-               state: %{},
+               state: Ash.create!(Aikido.Team.Slice, %{}),
                member: "worker",
                activation: :unknown
              })
@@ -89,7 +89,12 @@ defmodule AikidoTest.AshTeamTest do
 
     assert {:ok, _} = Domain.team_send(team, %{member: :worker, type: "counter.increment"})
     assert_receive {:aikido_subscription, ^ref, %{result: {:ok, 3}}}
-    assert {:error, _} = Domain.team_send(team, %{member: :missing, type: "counter.increment"})
+
+    assert {:error, %{errors: [%Ash.Error.Action.InvalidArgument{} = error]}} =
+             Domain.team_send(team, %{member: :missing, type: "counter.increment"})
+
+    assert AshAi.ToToolError.to_tool_error(error) =~ "ensure_member"
+    assert AshLua.Error.to_error(error).code == "invalid_argument"
   end
 
   test "lifecycle commands return even when they complete immediately and release their subscriptions" do
@@ -204,7 +209,13 @@ defmodule AikidoTest.AshTeamTest do
     state = team.team
     assert state.operation.status == :completed
     assert state.operation.started == ["lead", "worker"]
-    assert {:ok, parent} = Aikido.AgentServer.state(state.members["worker"], &{:ok, &1.parent})
+
+    assert {:ok, parent} =
+             Aikido.AgentServer.state(
+               state.members["worker"],
+               &{:ok, Aikido.Ownership.parent(&1)}
+             )
+
     assert parent.pid == state.members["lead"]
     assert parent.meta.team_id == "graph"
     assert parent.meta.team_resource == DynamicTeam
@@ -439,7 +450,10 @@ defmodule AikidoTest.AshTeamTest do
     assert_receive {:aikido_subscription, ^subscription, %{result: {:ok, replacements}}}, 5_000
 
     assert {:ok, %{pid: parent}} =
-             Aikido.AgentServer.state(replacements["grandchild"], &{:ok, &1.parent})
+             Aikido.AgentServer.state(
+               replacements["grandchild"],
+               &{:ok, Aikido.Ownership.parent(&1)}
+             )
 
     assert parent == replacements["child"]
   end

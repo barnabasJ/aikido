@@ -119,11 +119,13 @@ defmodule Aikido.InitializationCreateTest do
     assert {:ok, []} = Ash.DataLayer.run_query(query, Resource)
 
     create_names =
-      for {:metadata, _, :action, %{action: action}} <- TestTracer.get_spans(),
+      for {:metadata, _, :action, %{resource: resource, action: action}} <- TestTracer.get_spans(),
           action in [:__aikido_initialize_state__, :create],
-          do: action
+          do: {resource, action}
 
-    assert length(create_names) == 2
+    assert {Resource, :__aikido_initialize_state__} in create_names
+    assert {Slice, :create} in create_names
+    assert {Aikido.Cron.Slice, :create} in create_names
   end
 
   test "configured initialization applies to creation without changing update behavior" do

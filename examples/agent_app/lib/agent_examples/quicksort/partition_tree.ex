@@ -61,7 +61,7 @@ defmodule AgentExamples.Quicksort.PartitionTree do
     })
   end
 
-  defp reply_to_parent(state, %{parent: %Aikido.AgentServer.ParentRef{pid: pid, tag: branch}}) do
+  defp reply_to_parent(state, %{parent: %Aikido.Ownership.ParentRef{pid: pid, tag: branch}}) do
     [
       %Aikido.Directives.Emit{
         target: pid,
@@ -81,12 +81,17 @@ defmodule AgentExamples.Quicksort.PartitionTree do
 
     if state.status == :sorting && Map.has_key?(state.partitions, branch) &&
          !Map.has_key?(state.results, branch) do
-      state = %{state | status: :failed, error: %{branch: branch, reason: data.reason}}
+      state = %{
+        state
+        | status: :failed,
+          error: %{branch: branch, child_id: Map.get(data, :child_id), reason: data.reason}
+      }
+
       notify = AgentExamples.Quicksort.PartitionTree.progress(state, context)
 
       replies =
         case context[:parent] do
-          %Aikido.AgentServer.ParentRef{pid: pid, tag: tag} ->
+          %Aikido.Ownership.ParentRef{pid: pid, tag: tag} ->
             [
               %Aikido.Directives.Emit{
                 target: pid,

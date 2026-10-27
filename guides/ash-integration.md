@@ -72,11 +72,12 @@ helpers contain reusable mechanics rather than selecting another action by name.
 Signal declarations generate the native Ash actions on the existing resource;
 the implementation modules provide their callbacks without creating resources.
 
-Cron scheduling lives under `Aikido.Cron`: `AgentSchedule` and `SliceSchedule`
-are DSL declarations, their `*Schedules` helpers expand them, and `Scheduler`,
-`Job` and `RuntimeSpec` support execution. Its `Actions`, `Directives` and
-`Signals` folders contain the cron-specific pipeline. AgentServer retains its
-state-owning callbacks. One-shot delayed signals use the general `Schedule`
+Cron scheduling lives under `Aikido.Cron`: `Schedule` is the shared DSL
+contract and `Declarations` compiles agent and mounted-slice schedules, and `Scheduler`,
+`Job` and `RuntimeSpec` support execution. Its `Directives` and `Signals` folders
+contain the cron-specific pipeline. `Cron.Slice` owns registrations, cancellation
+and restart decisions through native actions. AgentServer translates monitor
+messages into typed signals and retains no cron state. One-shot delayed signals use the general `Schedule`
 directive rather than the cron scheduler.
 
 The thread feature keeps its resource at `Aikido.Thread.Slice`, reducers in
@@ -86,11 +87,13 @@ read entries and aggregates directly from resource attributes. Append assigns
 sequence numbers, deterministic IDs and signal-derived timestamps before native
 Ash type casting. It preserves supplied entry IDs and timestamps.
 
-Shared reusable implementations such as `Aikido.Actions.Broadcast` and
-`Aikido.Actions.Forward` live directly under `Aikido.Actions`.
+Feature reducers return delivery, notification and scheduling directives directly.
+AgentServer uses `Aikido.Actions.Lifecycle.StopSelf` for its built-in stop route.
 
-Result contracts live under `Aikido.Types`, including `ActionResult`,
-`SliceUpdate` and `Directive`.
+Result contracts live under `Aikido.Types`, including `ActionResult` and
+`Directive`. Each reducer returns the next state for its own mounted path.
+For coordinated updates, route the same signal to each owning slice’s action;
+the reducer batch commits only when all actions succeed.
 
 Finite states and modes use feature-owned `Ash.Type.Enum` modules. For example,
 `Aikido.AiReact.Types.Status` defines `idle`, `setup`, `running`, `waiting`,
@@ -411,6 +414,12 @@ or a map restricted to `fields`. `list` explicitly enumerates live snapshots and
 accepts `filter`, `sort`, `offset` and `limit`. Snapshots are taken independently;
 they do not provide a transaction across processes. Native Ash defaults apply to
 arguments, including defaulted values passed as nil.
+
+Inspect/list materialize snapshots through native Ash argument casting, retaining
+resource types for mounted slices and readonly attributes. They do not run create
+changes or write records to the resource's independent data layer. The public
+command authorizes the read; its private projection retains caller scope without
+introducing another authorization boundary.
 
 The public command runs in the caller's process and sends a signal to the agent.
 The reducer runs as a separate native Ash action inside AgentServer. Each is an

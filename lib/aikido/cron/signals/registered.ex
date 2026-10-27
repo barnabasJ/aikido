@@ -1,25 +1,5 @@
 defmodule Aikido.Cron.Signals.Registered do
-  @moduledoc """
-  Synthesized by the `Aikido.Cron.Directives.Register` impl after the
-  scheduler job spawns, then cast back to the
-  agent so the cascade callback `maybe_track_cron_registered/2` can
-  insert into `state.cron_specs`, `state.cron_jobs`, `state.cron_monitors`,
-  `state.cron_monitor_refs`, and `state.cron_runtime_specs`.
-
-  Directives mutate no state. The directive does the I/O (start the
-  scheduler job + `Process.monitor`); the cascade
-  callback observes this synthetic signal and writes the runtime maps.
-  Subscribers can also observe the registration. DurableServer snapshots the
-  resulting logical specs at the callback synchronization boundary.
-
-  ## Fields
-
-  - `:job_id` - Logical cron job id within the agent
-  - `:pid` - PID of the spawned cron-job process
-  - `:monitor_ref` - Monitor reference returned by `Process.monitor/1`
-  - `:cron_spec` - The validated `%{cron_expression, message, timezone}` spec
-  - `:runtime_spec` - The `%Aikido.Cron.RuntimeSpec{}` carrying scheduler details
-  """
+  @moduledoc "Scheduler startup result adopted by the owning cron slice action."
 
   use Aikido.Signal
 
@@ -27,6 +7,10 @@ defmodule Aikido.Cron.Signals.Registered do
     type "aikido.agent.cron.registered"
 
     schema do
+      attribute :generation, :term do
+        description "Expected retry generation; nil denotes a new registration."
+      end
+
       attribute :job_id, :term do
         allow_nil? false
         description "Logical cron job id within the agent"

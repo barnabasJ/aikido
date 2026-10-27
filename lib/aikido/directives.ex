@@ -12,10 +12,9 @@ defmodule Aikido.Directives do
     (`%AgentServer.State{}`), nothing. They do I/O — emit signals, spawn
     processes, schedule messages, persist to disk — and return immediately.
   - **Results, if any, come back as signals that re-enter the pipeline.**
-    Bookkeeping that logically follows the I/O happens via the cascade
-    callbacks `process_signal/2` invokes (`maybe_track_child_started/2`,
-    `handle_child_down/3`, `maybe_track_cron_registered/2`, …), not inside
-    the directive's `exec/3` body.
+    Feature state transitions are handled by routed actions. Runtime-only process
+    bookkeeping is handled by GenServer callbacks, outside the directive's
+    `exec/3` body.
   - **The type system enforces it.** `Aikido.Directive.exec/3`
     returns `:ok | {:stop, term()}` — there is no state slot in the return
     shape, so a directive author cannot accidentally write one.
@@ -38,7 +37,6 @@ defmodule Aikido.Directives do
   - `Aikido.Directives.Stop` — stop the agent process (self)
   - `Aikido.Cron.Directives.Register` — register a cron schedule
   - `Aikido.Cron.Directives.Cancel` — cancel a cron schedule
-  - `Aikido.Directives.Reply` — reply to a synchronous call
 
   Slice-owned directives live next to their slice (e.g.
   `Aikido.AiReact.Directives.LLMCall`).

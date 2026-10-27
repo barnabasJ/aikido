@@ -1,14 +1,30 @@
+defmodule AikidoTest.Agent.SignalHandlingTest.Signals.EmitTest do
+  @moduledoc false
+  use Aikido.Signal
+
+  signal do
+    type "emit_test"
+
+    schema do
+      attribute :recipient, :term do
+        description "Process that receives the signal emitted by the command."
+        allow_nil? false
+      end
+    end
+  end
+end
+
 defmodule AikidoTest.Agent.SignalHandlingTest.Actions.EmitTestSignal do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(_input, _opts, _context) do
+  def run(input, _opts, _context) do
     signal =
       %Aikido.Signal{id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test"}
 
     Aikido.Types.ActionResult.new(
-      state: %{},
-      directives: [%Aikido.Directives.Emit{signal: signal}]
+      state: input.arguments.state,
+      directives: [%Aikido.Directives.Emit{signal: signal, target: input.arguments.recipient}]
     )
   end
 end
@@ -33,17 +49,12 @@ defmodule AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent do
       end
     end
 
-    route "increment", {AikidoTest.TestActions, :increment}
-    route "decrement", {AikidoTest.TestActions, :decrement}
-    route "record", {AikidoTest.TestActions, :record}
-    route "emit_test", {AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent, :emit_test}
-  end
+    route AikidoTest.TestSignals.Increment, AikidoTest.TestActions.Actions.IncrementCounter
+    route AikidoTest.TestSignals.Decrement, AikidoTest.TestActions.Actions.DecrementCounter
+    route AikidoTest.TestSignals.Record, AikidoTest.TestActions.Actions.RecordMessage
 
-  actions do
-    action :emit_test, Aikido.Types.ActionResult do
-      argument :state, :term
-      run AikidoTest.Agent.SignalHandlingTest.Actions.EmitTestSignal
-    end
+    route AikidoTest.Agent.SignalHandlingTest.Signals.EmitTest,
+          AikidoTest.Agent.SignalHandlingTest.Actions.EmitTestSignal
   end
 end
 
@@ -106,7 +117,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
           id: "signal-data-test"
         )
 
-      signal = Aikido.Signal.new!("record", %{message: "hello"}, source: "/test")
+      signal = Aikido.Signal.new!("record", %{data: %{message: "hello"}}, source: "/test")
       {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
       assert agent.state.domain.messages == ["hello"]
       GenServer.stop(pid)
@@ -117,11 +128,14 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
         AikidoTest.Case.start_test_agent(
           aikido,
           AikidoTest.Agent.SignalHandlingTest.ActionBasedAgent,
-          id: "directive-test"
+          id: "directive-test",
+          initial_state: %{counter: 7}
         )
 
-      signal = Aikido.Signal.new!("emit_test", %{}, source: "/test")
-      {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
+      signal = Aikido.Signal.new!("emit_test", %{recipient: self()}, source: "/test")
+      assert {:ok, agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
+      assert agent.state.domain.counter == 7
+      assert_receive {:signal, %Aikido.Signal{type: "test.emitted", data: %{from: "agent"}}}
       GenServer.stop(pid)
     end
 
@@ -167,7 +181,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
               agent_id: agent.id
             })
           ),
-          [{{AikidoTest.TestActions, :increment}, %{amount: 5}}]
+          [{{AikidoTest.TestAgents.Counter, :increment}, %{amount: 5}}]
         )
 
       assert updated.state.domain.counter == 5

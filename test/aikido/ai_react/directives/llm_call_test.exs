@@ -1,3 +1,113 @@
+defmodule Aikido.AiReact.Directives.LLMCallTest.Signals.RunModel do
+  use Aikido.Signal
+
+  signal do
+    type "test.model.run"
+
+    schema do
+      attribute :directive, Aikido.Types.Directive do
+        description "Prepared model request for this scenario."
+        allow_nil? false
+      end
+    end
+  end
+end
+
+defmodule Aikido.AiReact.Directives.LLMCallTest.Actions.RunModel do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _, _) do
+    Aikido.Types.ActionResult.new(
+      state: %{
+        input.arguments.state
+        | status: :running,
+          request_id: input.arguments.directive.request_id
+      },
+      directives: [input.arguments.directive]
+    )
+  end
+end
+
+defmodule Aikido.AiReact.Directives.LLMCallTest.Actions.RecordTurn do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _, _) do
+    Aikido.Types.ActionResult.new(
+      state: %{
+        input.arguments.state
+        | status: :completed,
+          last_signal: input.context.aikido.signal
+      }
+    )
+  end
+end
+
+defmodule Aikido.AiReact.Directives.LLMCallTest.Actions.RecordFailure do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _, _) do
+    Aikido.Types.ActionResult.new(
+      state: %{input.arguments.state | status: :failed, last_signal: input.context.aikido.signal}
+    )
+  end
+end
+
+defmodule Aikido.AiReact.Directives.LLMCallTest.Actions.RecordHandoff do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _, _) do
+    Aikido.Types.ActionResult.new(
+      state: %{
+        input.arguments.state
+        | status: :completed,
+          last_signal: input.context.aikido.signal
+      }
+    )
+  end
+end
+
+defmodule Aikido.AiReact.Directives.LLMCallTest.Agent do
+  use Aikido.Agent
+
+  agent do
+    name "model_attempt_scenario"
+    path :ai
+    persistence :temporary
+
+    schema do
+      attribute :request_id, :string do
+        description "Correlation of the current model attempt."
+      end
+
+      attribute :status, Aikido.AiReact.Types.Status do
+        description "Whether the model attempt is running, completed or failed."
+        default :idle
+        allow_nil? false
+      end
+
+      attribute :last_signal, :term do
+        description "Outcome received through the agent's routed model action."
+      end
+    end
+
+    route Aikido.AiReact.Directives.LLMCallTest.Signals.RunModel,
+          Aikido.AiReact.Directives.LLMCallTest.Actions.RunModel
+
+    route Aikido.AiReact.Signals.LlmTurn,
+          Aikido.AiReact.Directives.LLMCallTest.Actions.RecordTurn, public?: false
+
+    route Aikido.AiReact.Signals.Failed,
+          Aikido.AiReact.Directives.LLMCallTest.Actions.RecordFailure, public?: false
+
+    route Aikido.AiReact.Signals.HandoffCompleted,
+          Aikido.AiReact.Directives.LLMCallTest.Actions.RecordHandoff, public?: false
+  end
+end
+
 defmodule Aikido.AiReact.Directives.LLMCallTest do
   # async: false because the directive's executor spawns a Task that
   # calls `ReqLLM.Generation.generate_text/3`. The Mimic stub on that
@@ -33,49 +143,17 @@ defmodule Aikido.AiReact.Directives.LLMCallTest do
     )
   end
 
-  defp fake_state(aikido), do: %{id: "stub-agent", aikido: aikido}
+  defp run_model(context, directive) do
+    agent = start_server(context, __MODULE__.Agent)
+    signal = Aikido.Signal.new!("test.model.run", %{directive: directive})
 
-  # Stand-in for the agent process: forwards every cast it receives back
-  # to the test pid so we can assert on the cast signal shape.
-  defp spawn_agent_stub(target_pid) do
-    spawn_link(fn -> forward(target_pid) end)
-  end
+    {:ok, completed} =
+      Aikido.AgentServer.call_until(agent, signal, "ai.react.**", fn runtime ->
+        state = runtime.agent.state.ai
+        if state.status in [:completed, :failed], do: {:ok, state.last_signal}, else: :skip
+      end)
 
-  defp forward(target) do
-    receive do
-      {:"$gen_cast", {:signal, signal}} ->
-        send(target, {:cast, signal})
-        forward(target)
-
-      {:"$gen_call", from, {:subscribe, _, _, _, _, _}} ->
-        GenServer.reply(from, {:ok, make_ref()})
-        forward(target)
-
-      {:"$gen_call", from, {:read_state_with_selector, selector}} ->
-        GenServer.reply(
-          from,
-          selector.(%{agent: %{state: %{ai: %{request_id: "req_1", status: :running}}}})
-        )
-
-        forward(target)
-
-      {:run, fun, from} ->
-        send(from, {:run_done, fun.()})
-        forward(target)
-
-      _ ->
-        forward(target)
-    end
-  end
-
-  defp run_in(pid, fun) do
-    send(pid, {:run, fun, self()})
-
-    receive do
-      {:run_done, result} -> result
-    after
-      1_000 -> :timeout
-    end
+    completed
   end
 
   test "casts execution options before starting model work" do
@@ -91,7 +169,7 @@ defmodule Aikido.AiReact.Directives.LLMCallTest do
              )
   end
 
-  test "spawns a task, calls ReqLLM, and casts ai.react.llm.completed back", %{aikido: aikido} do
+  test "spawns a task, calls ReqLLM, and casts ai.react.llm.completed back", context do
     test_pid = self()
 
     expect(ReqLLM.Generation, :generate_text, fn _model, messages, opts ->
@@ -99,15 +177,9 @@ defmodule Aikido.AiReact.Directives.LLMCallTest do
       {:ok, final_answer_response("ok")}
     end)
 
-    agent = spawn_agent_stub(test_pid)
-
-    :ok =
-      run_in(agent, fn ->
-        Aikido.Directive.exec(directive(), Aikido.Signal.new!("input", %{}), fake_state(aikido))
-      end)
+    signal = run_model(context, directive())
 
     assert_receive {:reqllm_called, 1, [_]}, 1_000
-    assert_receive {:cast, signal}, 1_000
 
     assert signal.type == "ai.react.llm.completed"
     assert signal.data.request_id == "req_1"
@@ -115,47 +187,63 @@ defmodule Aikido.AiReact.Directives.LLMCallTest do
     assert ReqLLM.Response.text(signal.data.turn) == "ok"
   end
 
-  test "casts ai.react.failed when ReqLLM returns an error", %{aikido: aikido} do
-    test_pid = self()
-
+  test "casts ai.react.failed when ReqLLM returns an error", context do
     expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
       {:error, :rate_limited}
     end)
 
-    agent = spawn_agent_stub(test_pid)
+    signal = run_model(context, directive())
 
-    :ok =
-      run_in(agent, fn ->
-        Aikido.Directive.exec(directive(), Aikido.Signal.new!("input", %{}), fake_state(aikido))
-      end)
-
-    assert_receive {:cast, signal}, 1_000
     assert signal.type == "ai.react.failed"
     assert signal.data == %{reason: :rate_limited, request_id: "req_1"}
   end
 
-  test "handoff calls disable streaming and report a separately correlated document", %{
-    aikido: aikido
-  } do
+  test "native provider failures preserve public diagnostics and omit private exception fields",
+       context do
+    cases = [
+      {ReqLLM.Error.API.Request.exception(
+         status: 401,
+         reason: "private-provider-key",
+         headers: [{"authorization", "private-provider-key"}]
+       ), "401", "credential"},
+      {ReqLLM.Error.API.Request.exception(
+         status: 429,
+         reason: "private-provider-key",
+         request_body: %{key: "private-provider-key"}
+       ), "429", "quota"},
+      {ReqLLM.Error.API.Request.exception(status: 503, reason: "private-provider-key"), "503",
+       "backoff"},
+      {ReqLLM.Error.API.Response.exception(
+         status: 200,
+         reason: "private-provider-key",
+         response_body: "private-provider-key"
+       ), "no usable model response", "compatibility"},
+      {ReqLLM.Error.API.Timeout.exception(kind: :receive, timeout: 30_000), "30000ms (receive)",
+       "deadline"}
+    ]
+
+    for {failure, description, recovery} <- cases do
+      expect(ReqLLM.Generation, :generate_text, fn _, _, _ -> {:error, failure} end)
+      signal = run_model(context, directive())
+      assert signal.type == "ai.react.failed"
+      assert %Aikido.AiReact.Errors.ProviderRequestFailed{} = error = signal.data.reason
+      assert Exception.message(error) =~ description
+      assert AshAi.ToToolError.to_tool_error(error) =~ recovery
+      assert AshLua.Error.to_error(error).message =~ recovery
+      refute inspect(error) =~ "private-provider-key"
+    end
+  end
+
+  test "handoff calls disable streaming and report a separately correlated document", context do
     expect(ReqLLM.Generation, :generate_text, fn _, _, opts ->
       assert opts[:tools] == []
       {:ok, final_answer_response("Next action: continue.")}
     end)
 
-    agent = spawn_agent_stub(self())
-
     handoff = directive(mode: :handoff, handoff_id: 7, tools: [], options: %{streaming: true})
 
-    assert :ok =
-             run_in(agent, fn ->
-               Aikido.Directive.exec(
-                 handoff,
-                 Aikido.Signal.new!("input", %{}),
-                 fake_state(aikido)
-               )
-             end)
+    signal = run_model(context, handoff)
 
-    assert_receive {:cast, signal}, 1_000
     assert signal.type == "ai.react.context_handoff.completed"
     assert signal.data.request_id == "req_1"
     assert signal.data.handoff_id == 7

@@ -7,7 +7,7 @@ defmodule AgentExamples.VerifiedAssistant.Verification do
       argument :answer, :term
       argument :todos, {:array, :term}
       argument :metadata, :map
-      run AgentExamples.VerifiedAssistant.Actions.VerifyEvidence
+      run AgentExamples.VerifiedAssistant.Tools.VerifyEvidence
     end
 
     action :record_evidence, :map do

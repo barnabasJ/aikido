@@ -138,13 +138,7 @@ defmodule Aikido.SignalContractTest do
     signal = %Signal{type: "contract.event", data: false, scope: %{tenant: "org"}}
 
     for {module, field, options} <- [
-          {Aikido.Directives.Emit, :signal, %{}},
-          {Aikido.Directives.Reply, :input_signal,
-           %{
-             reply_type: "contract.reply",
-             error_type: "contract.error",
-             build: {Aikido.AgentServer.Actions.QueryChildren, :build_reply, []}
-           }}
+          {Aikido.Directives.Emit, :signal, %{}}
         ] do
       assert Ash.TypedStruct.Info.field(module, field).type == Signal
       assert {:ok, directive} = module.new(Map.put(options, field, signal))

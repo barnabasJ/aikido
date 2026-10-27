@@ -6,9 +6,8 @@ defmodule Aikido.Cron.Scheduler do
   each registered cron job is backed by a dedicated process owned by the
   caller (typically the owning `Aikido.AgentServer`).
 
-  The runtime stores live job processes in `AgentServer.State.cron_jobs` and
-  separately stores durable schedule definitions in `AgentServer.State.cron_specs`.
-  DurableServer snapshots these definitions and restores the jobs on activation.
+  `Aikido.Cron.Slice` owns the registered jobs and durable definitions. Its actions
+  rebuild timer processes after activation and decide whether failed jobs retry.
   """
 
   alias Aikido.Cron.Job
@@ -195,4 +194,17 @@ defmodule Aikido.Cron.Scheduler do
   end
 
   defp durable_term?(_term), do: true
+  @doc "Start a job that delivers its prepared signal to the calling agent."
+  def start_job(agent_id, logical_id, %Aikido.Cron.RuntimeSpec{} = spec) do
+    owner = self()
+
+    run_every(
+      fn ->
+        signal = Aikido.Cron.RuntimeSpec.build_signal(spec, agent_id, logical_id)
+        Aikido.AgentServer.cast(owner, signal)
+      end,
+      spec.cron_expression,
+      timezone: spec.timezone
+    )
+  end
 end

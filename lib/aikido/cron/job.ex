@@ -31,7 +31,7 @@ defmodule Aikido.Cron.Job do
           timezone: String.t(),
           timer_ref: reference() | nil,
           retrying?: boolean,
-          callback_workers: %{reference() => pid()},
+          callback_workers: MapSet.t(pid()),
           owner_pid: pid() | nil,
           owner_ref: reference() | nil
         }
@@ -83,7 +83,7 @@ defmodule Aikido.Cron.Job do
          timezone: timezone,
          timer_ref: timer_ref,
          retrying?: false,
-         callback_workers: %{},
+         callback_workers: MapSet.new(),
          owner_pid: owner_pid,
          owner_ref: owner_ref
        }}
@@ -108,21 +108,17 @@ defmodule Aikido.Cron.Job do
     {:stop, {:owner_down, reason}, state}
   end
 
-  def handle_info({:DOWN, ref, :process, pid, _reason}, state) do
-    if state.callback_workers[ref] == pid do
-      unlink_finished_worker(pid)
-      {:noreply, %{state | callback_workers: Map.delete(state.callback_workers, ref)}}
-    else
-      {:noreply, state}
-    end
-  end
-
-  def handle_info({:EXIT, _pid, :normal}, state), do: {:noreply, state}
-
   def handle_info({:EXIT, pid, reason}, state) do
-    if Enum.any?(state.callback_workers, fn {_ref, worker} -> worker == pid end),
-      do: {:noreply, state},
-      else: {:stop, reason, state}
+    cond do
+      MapSet.member?(state.callback_workers, pid) ->
+        {:noreply, %{state | callback_workers: MapSet.delete(state.callback_workers, pid)}}
+
+      reason == :normal ->
+        {:noreply, state}
+
+      true ->
+        {:stop, reason, state}
+    end
   end
 
   def handle_info(_other, state), do: {:noreply, state}
@@ -136,22 +132,9 @@ defmodule Aikido.Cron.Job do
     if is_reference(timer_ref), do: Process.cancel_timer(timer_ref)
     if is_reference(owner_ref), do: Process.demonitor(owner_ref, [:flush])
 
-    Enum.each(callback_workers, fn {_ref, pid} ->
+    Enum.each(callback_workers, fn pid ->
       if Process.alive?(pid), do: Process.exit(pid, :kill)
     end)
-
-    :ok
-  end
-
-  defp unlink_finished_worker(pid) do
-    # Flush an EXIT already queued before forgetting this worker's identity.
-    Process.unlink(pid)
-
-    receive do
-      {:EXIT, ^pid, _reason} -> :ok
-    after
-      0 -> :ok
-    end
 
     :ok
   end
@@ -257,10 +240,8 @@ defmodule Aikido.Cron.Job do
 
   @spec spawn_callback_worker(state()) :: state()
   defp spawn_callback_worker(%{fun: fun, callback_workers: callback_workers} = state) do
-    {pid, ref} =
-      :erlang.spawn_opt(fn -> invoke_callback_and_log_failure(fun) end, [:link, :monitor])
-
-    %{state | callback_workers: Map.put(callback_workers, ref, pid)}
+    pid = spawn_link(fn -> invoke_callback_and_log_failure(fun) end)
+    %{state | callback_workers: MapSet.put(callback_workers, pid)}
   end
 
   @spec timer_delay_ms(DateTime.t(), DateTime.t()) :: {:ok, non_neg_integer()} | {:error, term()}

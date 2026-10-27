@@ -20,7 +20,14 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice do
       end
     end
 
-    route "simple.noop", {AikidoTest.TestActions, :noop}
+    route "simple.noop", :noop, public?: false
+  end
+
+  actions do
+    action :noop, Aikido.Types.ActionResult do
+      argument :state, :struct, allow_nil?: false, constraints: [instance_of: __MODULE__]
+      run AikidoTest.TestActions.Actions.PreserveState
+    end
   end
 end
 
@@ -39,8 +46,15 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest.RoutedSlice do
       end
     end
 
-    route "absolute.path.one", {AikidoTest.TestActions, :noop}
-    route "absolute.path.two", {AikidoTest.TestActions, :noop}
+    route "absolute.path.one", :noop, public?: false
+    route "absolute.path.two", :noop, public?: false
+  end
+
+  actions do
+    action :noop, Aikido.Types.ActionResult do
+      argument :state, :struct, allow_nil?: false, constraints: [instance_of: __MODULE__]
+      run AikidoTest.TestActions.Actions.PreserveState
+    end
   end
 end
 
@@ -58,7 +72,14 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest.OtherSlice do
       end
     end
 
-    route "other.noop", {AikidoTest.TestActions, :noop}
+    route "other.noop", :noop, public?: false
+  end
+
+  actions do
+    action :noop, Aikido.Types.ActionResult do
+      argument :state, :struct, allow_nil?: false, constraints: [instance_of: __MODULE__]
+      run AikidoTest.TestActions.Actions.PreserveState
+    end
   end
 end
 
@@ -163,7 +184,7 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
       assert stderr =~ ~r/[Dd]uplicate.*paths/
     end
 
-    test "duplicate slice mount paths emit a warning" do
+    test "duplicate slice mount paths cannot create conflicting typed attributes" do
       defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.SimpleSliceDuplicate do
         @moduledoc false
         use Aikido.Slice
@@ -178,24 +199,22 @@ defmodule AikidoTest.Agent.SlicesAttachmentTest do
             end
           end
 
-          route "simple_dup.noop", {AikidoTest.TestActions, :noop}
+          route "simple_dup.noop", {AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice, :noop},
+            public?: false
         end
       end
 
-      stderr =
-        ExUnit.CaptureIO.capture_io(:stderr, fn ->
-          defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.AgentSliceConflict do
-            use Aikido.Agent
+      assert_raise Spark.Error.DslError, ~r/Slice mount :simple conflicts/, fn ->
+        defmodule Elixir.AikidoTest.Agent.SlicesAttachmentTest.AgentSliceConflict do
+          use Aikido.Agent
 
-            agent do
-              name "slice_conflict_agent"
-              slice :simple, AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice
-              slice :simple, AikidoTest.Agent.SlicesAttachmentTest.SimpleSliceDuplicate
-            end
+          agent do
+            name "slice_conflict_agent"
+            slice :simple, AikidoTest.Agent.SlicesAttachmentTest.SimpleSlice
+            slice :simple, AikidoTest.Agent.SlicesAttachmentTest.SimpleSliceDuplicate
           end
-        end)
-
-      assert stderr =~ "Got duplicate Aikido.Agent.SliceMount: simple"
+        end
+      end
     end
   end
 

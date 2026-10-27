@@ -1,8 +1,9 @@
 defmodule AgentExamplesWeb.ExampleComponents do
   @moduledoc "Shared framing, conversation and topology visuals for the example pages."
   use Phoenix.Component
+  import AgentExamplesWeb.Components.UI, only: [section_heading: 1, status_pill: 1]
   import AgentExamplesWeb.Components
-  alias AgentExamples.Catalog
+  import AgentExamplesWeb.Markdown
 
   attr :example, :map, required: true
   attr :definitions, :list, required: true
@@ -17,6 +18,10 @@ defmodule AgentExamplesWeb.ExampleComponents do
   attr :lua, :boolean, required: true
   attr :system_prompt, :string, required: true
   attr :max_iterations, :any, required: true
+  attr :inspection_selected, :any, default: nil
+  attr :inspection_view, :string, default: "diff"
+  attr :inspection_format, :string, default: "tree"
+  attr :inspection_filter, :string, default: ""
   attr :show_signal_activity, :boolean, default: true
   slot :inner_block, required: true
   slot :inspector
@@ -24,175 +29,40 @@ defmodule AgentExamplesWeb.ExampleComponents do
   def page(assigns) do
     ~H"""
     <.shell active={@example.slug}>
-      <header class="example-header">
-        <.link navigate="/" class="back-link">← All examples</.link>
-        <div class="eyebrow">{@example.eyebrow}</div>
-        <div class="title-row">
-          <h1>{@example.title}</h1><span class={["status-pill", active?(@run) && "on"]}>{if @starting,
-            do: "Starting…",
-            else: if(@run, do: to_string(@run.status), else: "Not started")}</span>
-        </div>
-        <p>{@example.description}</p>
-      </header>
+      <AgentExamplesWeb.Components.ExampleHeader.example_header {assigns} />
       <section class="panel overview">
         <p>{@example.detail}</p><.flow steps={@example.flow} />
       </section>
       <div :if={@error || (@run && @run.error)} role="alert" id="error" class="error-banner">
         {@error || @run.error}
       </div>
-      <section :if={Catalog.ai?(@example)} class="panel" id="shared-ai-settings">
-        <h2>AI provider · shared by all AI examples</h2>
-        <form
-          id="provider-form"
-          phx-submit="save_provider"
-          phx-change="provider_settings"
-          class="settings-grid"
-        >
-          <label>Model mode<select name="mode"><option value="offline" selected={@mode == "offline"}>
-            Offline · scripted model
-          </option><option value="live" selected={@mode == "live"}>Live · your provider</option></select></label>
-          <label :if={@mode == "live"}>Provider<select name="provider"><option
-            :for={{label, value} <- AgentExamples.AI.Providers.choices()}
-            value={value}
-            selected={@provider == value}
-          >
-            {label}
-          </option></select></label>
-          <label :if={@mode == "live"}>Model ID<input
-            name="model"
-            value={@model}
-            placeholder="glm-5.3"
-            required
-          /></label>
-          <label :if={@mode == "live"}>API key<input
-            type="password"
-            name="api_key"
-            value=""
-            autocomplete="off"
-            placeholder={
-              if @key_configured,
-                do: "Key saved · leave blank to keep it",
-                else: "Your provider API key"
-            }
-          /></label>
-          <p class="muted settings-note">
-            Saved locally across restarts for this browser. All AI examples and workers use these settings when started. Restart an active example to change its provider. API keys are encrypted with AshCloak in SQLite and never included in agent checkpoints.
-          </p>
-          <button id="save-provider" class="button secondary">Save AI settings</button>
-          <p :if={@provider_saved} role="status" id="provider-saved">
-            AI settings saved for all AI examples.
-          </p>
-        </form>
-      </section>
+      <AgentExamplesWeb.Components.ProviderSettings.provider_settings {assigns} />
       <div class="workspace">
         <div class="primary-column">
-          <section :if={!active?(@run)} class="panel" id="start-panel">
-            <div class="section-heading">
-              <h2>Make it live</h2><span>Your own instance</span>
-            </div>
-            <form id="start-form" phx-submit="start" phx-change="settings">
-              <div :if={Catalog.ai?(@example)} class="settings-grid">
-                <input type="hidden" name="mode" value={@mode} />
-                <input type="hidden" name="provider" value={@provider} />
-                <input type="hidden" name="model" value={@model} />
-                <label>Maximum model turns<input
-                  type="number"
-                  name="max_iterations"
-                  min="1"
-                  value={@max_iterations}
-                  required
-                /></label>
-                <label class="settings-note">System prompt<textarea name="system_prompt" rows="5">{@system_prompt}</textarea></label>
-                <label class="checkbox-label"><input
-                  type="checkbox"
-                  name="lua"
-                  value="true"
-                  checked={@lua}
-                /> Include Ash AI + Lua tools</label>
-                <p class="muted settings-note">
-                  Offline mode runs real tools without a key. Live mode uses the shared provider settings above.
-                </p>
-              </div>
-              <button class="button primary" disabled={@starting}>{if @starting,
-                do: "Starting…",
-                else: "Start example"} <span>→</span></button>
-            </form>
-          </section>
+          <AgentExamplesWeb.Components.StartControls.start_controls {assigns} />
           {render_slot(@inner_block)}
         </div>
         <aside class="inspector">
           {render_slot(@inspector)}
-          <section class="panel">
-            <div class="section-heading">
-              <h2>Under the hood</h2><span class="live-dot"></span>
-            </div><dl>
-              <dt>Runtime</dt><dd>Aikido.Default</dd><dt>
-                Instance
-              </dt><dd class="instance-id">{if @run, do: @run.record.id, else: "Not started"}</dd><dt :if={
-                Catalog.ai?(@example)
-              }>
-                Model turns
-              </dt><dd :if={Catalog.ai?(@example)}>
-                {if @run, do: Map.get(@run.snapshot.ai, :iteration, 0), else: 0}
-              </dd>
-              <dt :if={Catalog.ai?(@example) && @run}>Model in this agent</dt>
-              <dd :if={Catalog.ai?(@example) && @run} id="active-model">
-                {Map.get(@run.snapshot.ai, :model_label, "Not configured")}
-              </dd>
-            </dl>
-            <details :if={@run && !@run.snapshot.team?} id="agent-state" class="agent-state">
-              <summary>View current agent state</summary>
-              <p class="muted">
-                {inspect(@run.snapshot.resource)} · updates as signals are processed{if @run.status ==
-                                                                                          :stopped,
-                                                                                        do:
-                                                                                          " · last recorded state"}
-              </p>
-              <pre>{inspect(display_state(@run.snapshot), pretty: true, limit: :infinity)}</pre>
-            </details>
-            <p :if={@run && @run.snapshot.team?} class="muted">
-              Select an agent in the team tree to inspect its state and activity.
-            </p>
-            <button :if={active?(@run)} id="stop-example" phx-click="stop" class="button danger">Stop example</button>
-          </section>
+          <AgentExamplesWeb.Components.RuntimeDetails.runtime_details {assigns} />
           <.delegated_work run={@run} />
           <.signal_activity :if={@show_signal_activity} run={@run} />
         </aside>
       </div>
-      <section class="definitions" id="definitions" aria-label="Example source definitions">
-        <div class="section-heading">
-          <h2>Code definitions</h2><span>Agents and slices open by default · each module opens independently</span>
-        </div>
-        <details
-          :for={definition <- @definitions}
-          id={definition.id}
-          open={definition.open?}
-          phx-update="ignore"
-          class="code-definition"
-          data-kind={definition.category}
-        >
-          <summary>
-            <span class="definition-name">{definition.name}</span><span class="definition-path">{definition.path}</span>
-          </summary>
-          <pre><code>{definition.code}</code></pre>
-        </details>
-      </section>
+      <Aikido.Inspector.Components.inspector
+        history={@run && @run.inspection}
+        selected={@inspection_selected}
+        view={@inspection_view}
+        format={@inspection_format}
+        filter={@inspection_filter}
+      />
+      <AgentExamplesWeb.Components.SourceDefinitions.source_definitions {assigns} />
       <footer class="page-footer">
         Instances stay available while the server runs. Stop an example to release its processes.
       </footer>
     </.shell>
     """
   end
-
-  defp display_state(snapshot) do
-    %{state: snapshot.own}
-    |> include_slice(:ai, if(snapshot.activity, do: snapshot.ai, else: %{}))
-    |> include_slice(:todos, snapshot.todos)
-    |> include_slice(:journal, snapshot.journal)
-  end
-
-  defp include_slice(state, _name, value) when value in [%{}, []], do: state
-  defp include_slice(state, name, value), do: Map.put(state, name, value)
 
   attr :run, :any, required: true
 
@@ -202,19 +72,12 @@ defmodule AgentExamplesWeb.ExampleComponents do
 
     ~H"""
     <section :if={@tasks != []} class="panel delegated-work" id="tasks">
-      <div class="section-heading">
-        <h2>Delegated work</h2><span>{length(@tasks)} tasks across the tree</span>
-      </div>
+      <.section_heading>
+        <:title>Delegated work</:title>
+        <span>{length(@tasks)} tasks across the tree</span>
+      </.section_heading>
       <div class="delegated-work-scroll">
-        <details :for={task <- @tasks} data-owner={task.owner_path}>
-          <summary>
-            <strong>{task.member_path}</strong><span class="status-pill">{if task.result == :timeout,
-              do: "Timed out",
-              else: task.status}</span>
-          </summary>
-          <p class="muted">Dispatched by {task.owner_path} · Task ID: {task.id}</p>
-          <pre>{if task.result == :timeout, do: "The delegated task exceeded its deadline.", else: result_text(task.result)}</pre>
-        </details>
+        <.delegated_task :for={task <- @tasks} task={task} />
       </div>
     </section>
     """
@@ -224,6 +87,7 @@ defmodule AgentExamplesWeb.ExampleComponents do
     own_tasks =
       Enum.map(snapshot[:tasks] || [], fn task ->
         Map.merge(task, %{
+          team_path: Jason.encode!(path),
           owner_path: if(path == [], do: "Root team", else: Enum.join(path, " / ")),
           member_path: Enum.join(path ++ [to_string(task.member)], " / ")
         })
@@ -242,9 +106,10 @@ defmodule AgentExamplesWeb.ExampleComponents do
   def signal_activity(assigns) do
     ~H"""
     <section class="panel" id="signal-activity">
-      <div class="section-heading">
-        <h2>Signal activity</h2><span>Latest first · UTC</span>
-      </div><p :if={!@run || @run.events == []} class="muted">
+      <.section_heading>
+        <:title>Signal activity</:title>
+        <span>Latest first · UTC</span>
+      </.section_heading><p :if={!@run || @run.events == []} class="muted">
         Signals will appear here as you interact.
       </p><ol id="events" class="events">
         <li :for={event <- if(@run, do: Enum.take(@run.events, 20), else: [])}>
@@ -256,85 +121,23 @@ defmodule AgentExamplesWeb.ExampleComponents do
   end
 
   attr :run, :any, required: true
-  attr :prompt, :string, default: "Signals carry results"
-  attr :queue_messages, :boolean, default: false
-  slot :inner_block
-
-  def conversation(assigns) do
-    ~H"""
-    <section class="panel conversation">
-      {render_slot(@inner_block)}
-      <div class="section-heading">
-        <h2>Conversation</h2><span>{if @run,
-          do: "#{@run.mode} model",
-          else: "Ready when you are"}</span>
-      </div>
-      <div :if={!@run || @run.messages == []} class="empty-state">
-        <span class="empty-symbol">✳</span><h3>A prompt starts the story.</h3><p>
-          Start the example, then send a task. Tool calls and worker results will appear as they happen.
-        </p>
-      </div>
-      <div id="messages" aria-live="polite">
-        <article
-          :for={{message, index} <- Enum.with_index(if(@run, do: @run.messages, else: []))}
-          id={"message-#{index}"}
-          class={["message", to_string(message.role)]}
-        >
-          <span>{if message.role == :user, do: "YOU", else: "AGENT"}</span><pre>{message.text}</pre>
-        </article>
-      </div>
-      <div :if={busy?(@run)} class="working" role="status">
-        <span class="live-dot"></span> Working through model turns and tools…
-      </div>
-      <section
-        :if={active?(@run) && busy?(@run) && Map.get(@run.snapshot.ai, :streaming_text, "") != ""}
-        id="stream-output"
-        aria-live="polite"
-      >
-        <h3>
-          {if @run.snapshot.ai.status == :waiting,
-            do: "Answer waiting for todos",
-            else: "Streaming answer"}
-        </h3>
-        <pre>{Map.get(@run.snapshot.ai, :streaming_text, "")}</pre>
-        <details>
-          <summary>Thinking</summary><pre>{Map.get(@run.snapshot.ai, :streaming_thinking, "")}</pre>
-        </details>
-      </section>
-      <form id="prompt-form" phx-submit="ask" class="prompt-form">
-        <label for="query">Your task</label><textarea
-          id="query"
-          name="query"
-          rows="3"
-          disabled={!active?(@run) || (busy?(@run) && !@queue_messages)}
-        >{@prompt}</textarea>
-        <button
-          class="button primary"
-          disabled={!active?(@run) || (busy?(@run) && !@queue_messages)}
-        >{if busy?(@run) && @queue_messages,
-          do: "Queue message",
-          else: "Send task →"}</button>
-      </form>
-    </section>
-    """
-  end
-
-  attr :run, :any, required: true
   attr :orchestrator, :boolean, default: false
   attr :compact, :boolean, default: false
+  attr :tree_states, :map, default: %{}
   slot :inner_block
 
   def team_topology(assigns) do
     ~H"""
     <section class={["panel", @compact && "nested-team-panel"]}>
-      <div class="section-heading">
-        <h2>Live topology</h2><span id="member-count">{length(members(@run))} members</span>
-      </div>
-      <.live_component
-        module={AgentExamplesWeb.TeamTree}
+      <.section_heading>
+        <:title>Live topology</:title>
+        <span id="member-count">{length(members(@run))} members</span>
+      </.section_heading>
+      <AgentExamplesWeb.TeamTree.tree
         id="team-tree"
         run={@run}
         root_name={if @orchestrator, do: "Orchestrator", else: "Team"}
+        selection={@tree_states["team-tree"] || %{}}
       />
       {render_slot(@inner_block)}
     </section>
@@ -343,7 +146,13 @@ defmodule AgentExamplesWeb.ExampleComponents do
 
   def active?(nil), do: false
   def active?(run), do: run.status != :stopped
-  def busy?(run), do: run && run.status == :running
+
+  def busy?(run) do
+    run &&
+      (run.status == :running ||
+         get_in(run, [:snapshot, :ai, :status]) in [:setup, :running, :waiting])
+  end
+
   def own(nil), do: %{}
   def own(run), do: run.snapshot.own
   def members(nil), do: []
@@ -351,4 +160,39 @@ defmodule AgentExamplesWeb.ExampleComponents do
   defp result_text(value) when is_binary(value), do: value
   defp result_text(nil), do: ""
   defp result_text(value), do: inspect(value)
+
+  attr :task, :map, required: true
+
+  def delegated_task(assigns) do
+    ~H"""
+    <details data-owner={@task.owner_path}>
+      <summary>
+        <strong>{@task.member_path}</strong><.status_pill>
+          {if @task.result == :timeout,
+            do: "Timed out",
+            else: @task.status}
+        </.status_pill>
+      </summary>
+      <p class="muted">Dispatched by {@task.owner_path} · Task ID: {@task.id}</p>
+      <p :if={@task[:mode]} class="muted">
+        {@task.mode} · Requested by {@task[:requester] || "external caller"}
+      </p>
+      <button
+        :if={@task.status == :dispatched && @task[:mode] == :foreground}
+        type="button"
+        class="button"
+        phx-click="background_task"
+        phx-value-task-id={@task.id}
+        phx-value-team-path={@task.team_path}
+      >
+        Continue in background
+      </button>
+      <.markdown text={
+        if @task.result == :timeout,
+          do: "The delegated task exceeded its deadline.",
+          else: result_text(@task.result)
+      } />
+    </details>
+    """
+  end
 end

@@ -26,13 +26,20 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.AgentWithRoutes do
   agent do
     name "agent_with_routes"
 
-    route "agent.action", {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action},
+    route "agent.action", {AikidoTest.AgentServer.SignalRouterTest.AgentWithRoutes, :test_action},
       public?: false
 
     route "agent.priority",
-          {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action},
+          {AikidoTest.AgentServer.SignalRouterTest.AgentWithRoutes, :test_action},
           priority: 10,
           public?: false
+  end
+
+  actions do
+    action :test_action, Aikido.Types.ActionResult do
+      argument :state, :term
+      run AikidoTest.TestActions.Actions.ClearState
+    end
   end
 end
 
@@ -44,7 +51,15 @@ defmodule AikidoTest.AgentServer.SignalRouterTest.AgentWithConfiguredRoutes do
     name "agent_with_configured_routes"
 
     route "agent.configured",
-          {AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}, public?: false
+          {AikidoTest.AgentServer.SignalRouterTest.AgentWithConfiguredRoutes, :test_action},
+          public?: false
+  end
+
+  actions do
+    action :test_action, Aikido.Types.ActionResult do
+      argument :state, :term
+      run AikidoTest.TestActions.Actions.ClearState
+    end
   end
 end
 
@@ -87,7 +102,8 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
           build_state(AikidoTest.AgentServer.SignalRouterTest.AgentWithConfiguredRoutes)
         )
 
-      assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
+      assert {:ok,
+              [{AikidoTest.AgentServer.SignalRouterTest.AgentWithConfiguredRoutes, :test_action}]} =
                Aikido.Signal.Router.route(router, signal("agent.configured"))
     end
 
@@ -97,10 +113,10 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
           build_state(AikidoTest.AgentServer.SignalRouterTest.AgentWithRoutes)
         )
 
-      assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
+      assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.AgentWithRoutes, :test_action}]} =
                Aikido.Signal.Router.route(router, signal("agent.action"))
 
-      assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.SliceWithRoutes, :test_action}]} =
+      assert {:ok, [{AikidoTest.AgentServer.SignalRouterTest.AgentWithRoutes, :test_action}]} =
                Aikido.Signal.Router.route(router, signal("agent.priority"))
     end
 
@@ -145,7 +161,11 @@ defmodule AikidoTest.AgentServer.SignalRouterTest do
           build_state(AikidoTest.AgentServer.SignalRouterTest.AgentWithoutRoutes)
         )
 
-      assert {:ok, [{Aikido.AgentServer.RuntimeActions, :query_children}]} =
+      assert {:ok,
+              [
+                {AikidoTest.AgentServer.SignalRouterTest.AgentWithoutRoutes,
+                 :__aikido_query_children__}
+              ]} =
                Aikido.Signal.Router.route(router, signal("aikido.agent.query.children"))
     end
   end

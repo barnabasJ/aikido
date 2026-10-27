@@ -38,7 +38,8 @@ defmodule Aikido.Agent.Extension do
       action: [type: :any, required: true],
       name: [
         type: :atom,
-        doc: "Optional action name; inferred from the signal or target by default."
+        doc:
+          "Optional public command name, or generated action name for a private route; inferred from the signal or target by default."
       ],
       public?: [
         type: :boolean,
@@ -51,7 +52,7 @@ defmodule Aikido.Agent.Extension do
   }
   @schedule %Spark.Dsl.Entity{
     name: :schedule,
-    target: Aikido.Cron.AgentSchedule,
+    target: Aikido.Cron.Schedule,
     args: [:cron, :signal_type],
     schema: [
       cron: [type: :string, required: true],

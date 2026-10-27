@@ -268,6 +268,8 @@ defmodule Aikido.Team.TopologyOperation do
            result: reason,
            attempt: nil,
            notify: data[:notify],
+           requester: data[:requester],
+           mode: Map.get(data, :mode, :background),
            metadata: data[:metadata] || %{}
          }}
       end)

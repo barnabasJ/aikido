@@ -3,7 +3,6 @@ defmodule Aikido.InitializedStateTest do
 
   test "native reducers validate owning resource state before execution" do
     for {resource, action, arguments} <- [
-          {Aikido.Identity.Slice, :evolve, %{years: 1}},
           {Aikido.Memory.Slice, :put_in_space, %{space: :world, key: :x, value: 1}},
           {Aikido.Thread.Slice, :append, %{entry: %{kind: :note}}}
         ] do

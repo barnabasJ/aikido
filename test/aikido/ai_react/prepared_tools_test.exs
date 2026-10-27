@@ -110,7 +110,7 @@ defmodule Aikido.PreparedToolsTest do
       signal =
         Aikido.Signal.new!("ai.react.tools.ready", %{request_id: "old", prepared_tools: {[], %{}}})
 
-      assert {:ok, %Aikido.Types.ActionResult{state: ^current, directives: []}} =
+      assert {:ok, %Aikido.Types.ActionResult{state: unchanged, directives: []}} =
                then(signal, fn signal ->
                  Aikido.AiReact.Slice
                  |> Ash.ActionInput.for_action(
@@ -121,6 +121,9 @@ defmodule Aikido.PreparedToolsTest do
                  )
                  |> Ash.run_action()
                end)
+
+      assert AikidoTest.SliceState.attributes(unchanged) ==
+               AikidoTest.SliceState.attributes(current)
     end
   end
 

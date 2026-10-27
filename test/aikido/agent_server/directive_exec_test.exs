@@ -238,7 +238,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       child_info =
         await_state_value(
           parent_pid,
-          fn s -> Map.get(s.children, :child_worker) end,
+          fn s -> Map.get(Aikido.Ownership.children(s), :child_worker) end,
           pattern: "aikido.agent.child.started"
         )
 
@@ -249,7 +249,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       GenServer.stop(child_info.pid)
     end
 
-    test("directive itself does not write state.children", %{
+    test("directive itself does not write the ownership slice", %{
       aikido: aikido
     }) do
       parent_pid =
@@ -268,9 +268,9 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
 
       {:ok, before_children} =
         Aikido.AgentServer.state(parent_pid, fn s ->
-          children_before = s.children
+          children_before = Aikido.Ownership.children(s)
           :ok = Aikido.Directive.exec(directive, input_signal, s)
-          {:ok, %{before: children_before, after: s.children}}
+          {:ok, %{before: children_before, after: Aikido.Ownership.children(s)}}
         end)
 
       assert before_children.before == before_children.after
@@ -287,7 +287,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
       }
 
       assert :ok = Aikido.Directive.exec(directive, input_signal, state)
-      refute Map.has_key?(state.children, :failing_child)
+      refute Map.has_key?(Aikido.Ownership.children(state), :failing_child)
     end
 
     test("native types reject a missing agent module") do
@@ -421,7 +421,7 @@ defmodule AikidoTest.AgentServer.DirectiveExecTest do
     info =
       await_state_value(
         parent_pid,
-        fn s -> Map.get(s.children, tag) end,
+        fn s -> Map.get(Aikido.Ownership.children(s), tag) end,
         pattern: "aikido.agent.child.started"
       )
 

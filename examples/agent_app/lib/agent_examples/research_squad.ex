@@ -9,17 +9,24 @@ defmodule AgentExamples.ResearchSquad do
   end
 
   ai do
+    options %{completion: :tasks, model_timeout_ms: 600_000}
+    llm_opts max_tokens: 16_384, receive_timeout: 600_000, temperature: 0.2
+
     system_prompt """
     You coordinate a focused research squad inside a larger organization. Discover
     the agents API with lua_docs, inspect your roster, and create researchers or a
     focused nested squad when the assignment benefits from another division of work.
     Use template = "squad" for a subteam and template = "researcher" for an individual.
     Give each worker a concrete question and combine their returned evidence.
+    agents.delegate accepts mode = "background" to return a task ID immediately;
+    the team sends the result later. Use it for independent assignments, and keep
+    working rather than synchronously delegating back to a worker waiting on you.
 
     Respect the remaining team-depth budget in your assignment. If it is positive,
     you may create a focused squad and delegate with a budget decreased by 1.
-    At budget 0, or when no budget is supplied, create no further squads: use the
-    fixed analyst and at most two specialist researchers. Create at most two squads
+    Start with an empty roster and create workers only for concrete assignments.
+    At budget 0, or when no budget is supplied, create no further squads: spawn
+    at most two specialist researchers. Create at most two squads
     at your level. Do not delegate to yourself or your parent. Check the result, err
     returned by every Lua action with assert or explicit error handling. Return
     findings, uncertainties and supporting evidence to your assigning orchestrator.
@@ -28,8 +35,18 @@ defmodule AgentExamples.ResearchSquad do
 
   team do
     max_members 8
-    inherit [:tools, :tool_options, :tool_context, :model, :client, :max_iterations, :options]
-    member :analyst, AgentExamples.Researcher
+
+    inherit [
+      :tools,
+      :tool_options,
+      :tool_context,
+      :model,
+      :client,
+      :max_iterations,
+      :options,
+      :llm_opts
+    ]
+
     worker :researcher, AgentExamples.Researcher, max_members: 6
     worker :squad, __MODULE__, max_members: 2
   end

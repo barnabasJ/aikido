@@ -1,3 +1,11 @@
+defmodule Aikido.HooksScopeTest.Signals.Notice do
+  use Aikido.Signal
+
+  signal do
+    type "hook.notice"
+  end
+end
+
 defmodule Aikido.HooksScopeTest.Reducer do
   use Ash.Resource.Actions.Implementation
 
@@ -46,19 +54,12 @@ defmodule Aikido.HooksScopeTest.Agent do
     end
 
     slice :ai, Aikido.AiReact.Slice
-    route "hook.notice", :notice
+    route Aikido.HooksScopeTest.Signals.Notice, Aikido.HooksScopeTest.Reducer
   end
 
   policies do
     policy always() do
       authorize_if actor_present()
-    end
-  end
-
-  actions do
-    action :notice, Aikido.Types.ActionResult do
-      argument :state, :term
-      run Aikido.HooksScopeTest.Reducer
     end
   end
 end

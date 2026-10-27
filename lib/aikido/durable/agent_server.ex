@@ -1,19 +1,18 @@
 defmodule Aikido.Durable.AgentServer do
   @moduledoc false
-  use DurableServer, vsn: 1
+  use DurableServer, vsn: 2
   alias Aikido.AgentServer
 
   @impl true
   def dump_state(%{runtime: runtime} = state) do
-    agent = %{runtime.agent | state: clear_transient_team_membership(runtime.agent.state)}
-    agent = Aikido.Durable.Codec.transform_agent(agent, runtime.agent_module, :externalize)
+    agent =
+      Aikido.Durable.Codec.transform_agent(runtime.agent, runtime.agent_module, :externalize)
 
     encode(%{
-      options: boot_options(state.options),
-      parent: parent_binding(runtime.parent) || state[:unresolved_parent],
+      options: Aikido.Durable.Snapshot.boot_options(state.options),
+      parent: parent_binding(Aikido.Ownership.parent(runtime)) || state[:unresolved_parent],
       permanent: state.permanent,
-      agent: serialize_agent(agent, runtime.agent_module),
-      cron_specs: runtime.cron_specs
+      agent: serialize_agent(agent, runtime.agent_module)
     })
   end
 
@@ -39,38 +38,17 @@ defmodule Aikido.Durable.AgentServer do
     agent = Aikido.Durable.Codec.transform_agent(agent, module, :externalize)
 
     encode(%{
-      options: boot_options(options),
+      options: Aikido.Durable.Snapshot.boot_options(options),
       parent: parent_binding(options[:parent]),
       permanent: initial.permanent,
       agent: serialize_agent(agent, module),
-      initial?: true,
-      cron_specs: %{}
+      initial?: true
     })
   end
 
-  # Domain values have exactly one persistence path: the agent/slice codecs.
-  # Runtime configuration is retained, but startup domain state is never saved
-  # beside the codecs' output as a second copy. Applications must keep secrets
-  # in runtime providers rather than in persisted middleware configuration.
-  defp boot_options(options) do
-    Keyword.take(options, [
-      :agent_module,
-      :id,
-      :aikido,
-      :partition,
-      :durable_server,
-      :durable_key,
-      :on_parent_death,
-      :skip_schedules,
-      :debug,
-      :middleware,
-      :sync
-    ])
-  end
-
   @impl true
-  def load_state(version, %{"payload" => payload}) when version in [nil, 1],
-    do: payload |> Base.decode64!() |> :erlang.binary_to_term([:safe])
+  def load_state(version, envelope) when version in [nil, 1, 2],
+    do: Aikido.Durable.Snapshot.load(envelope)
 
   @impl true
   def init(saved) do
@@ -92,11 +70,12 @@ defmodule Aikido.Durable.AgentServer do
           Keyword.put(
             options,
             :restored_agent,
-            restore_agent(saved.agent, options[:agent_module])
+            saved.agent
+            |> restore_agent(options[:agent_module])
+            |> restore_mounted_slices(options[:agent_module])
+            |> restore_cron_mount(options[:agent_module], Map.get(saved, :cron_specs, %{}))
           ),
         else: options
-
-    options = Keyword.put(options, :restored_cron_specs, Map.get(saved, :cron_specs, %{}))
 
     case AgentServer.init(options) do
       {:ok, runtime, {:continue, continue}} ->
@@ -151,7 +130,7 @@ defmodule Aikido.Durable.AgentServer do
 
   def handle_info(:aikido_missing_parent, %{unresolved_parent: parent} = state)
       when not is_nil(parent) do
-    if is_nil(state.runtime.parent) do
+    if is_nil(Aikido.Ownership.parent(state.runtime)) do
       wrap_runtime_reply({:stop, {:shutdown, {:parent_down, :noproc}}, state.runtime}, state)
     else
       {:noreply, %{state | unresolved_parent: nil}}
@@ -176,7 +155,7 @@ defmodule Aikido.Durable.AgentServer do
   defp wrap_runtime_reply({:reply, reply, runtime}, state) do
     next = %{state | runtime: runtime}
 
-    if state.runtime.parent != runtime.parent ||
+    if Aikido.Ownership.parent(state.runtime) != Aikido.Ownership.parent(runtime) ||
          (runtime.sync.mode == :explicit && durable_changed?(state.runtime, runtime)),
        do: {:reply, reply, next, sync: true},
        else: {:reply, reply, next}
@@ -185,7 +164,7 @@ defmodule Aikido.Durable.AgentServer do
   defp wrap_runtime_reply({:noreply, runtime}, state) do
     next = %{state | runtime: runtime}
 
-    if state.runtime.parent != runtime.parent ||
+    if Aikido.Ownership.parent(state.runtime) != Aikido.Ownership.parent(runtime) ||
          (runtime.sync.mode == :explicit && durable_changed?(state.runtime, runtime)),
        do: {:noreply, next, sync: true},
        else: {:noreply, next}
@@ -200,8 +179,7 @@ defmodule Aikido.Durable.AgentServer do
   # Runtime observations, subscriber bookkeeping and debug reads do not change
   # the saved projection. Explicit mode requests sync only for persistent changes.
   defp durable_changed?(previous, next) do
-    previous.agent != next.agent or previous.parent != next.parent or
-      previous.cron_specs != next.cron_specs
+    previous.agent != next.agent
   end
 
   defp stop_reason(:normal, runtime), do: stop_disposition(runtime)
@@ -213,8 +191,7 @@ defmodule Aikido.Durable.AgentServer do
     if Aikido.Durable.keep_snapshot?(runtime.agent_module), do: :permanent, else: :delete
   end
 
-  defp encode(data),
-    do: %{"payload" => Base.encode64(:erlang.term_to_binary(data, [:compressed]))}
+  defp encode(data), do: Aikido.Durable.Snapshot.dump(data)
 
   defp parent_binding(nil), do: nil
   defp parent_binding(parent), do: Map.take(parent, [:id, :partition, :tag, :meta])
@@ -287,19 +264,31 @@ defmodule Aikido.Durable.AgentServer do
   defp restore_agent({:agent, agent}, agent_module),
     do: Aikido.Durable.Codec.transform_agent(agent, agent_module, :reinstate)
 
-  defp clear_transient_team_membership(state) do
-    case state[:team] do
-      %Aikido.Team.Slice{} = team ->
-        Map.put(state, :team, %{
-          team
-          | members: %{},
-            incarnations: %{},
-            operation: %Aikido.Team.Slice{}.operation
-        })
+  defp restore_mounted_slices(agent, resource) do
+    state =
+      Enum.reduce(Aikido.Agent.Info.slice_instances(resource), agent.state, fn instance, state ->
+        if Map.has_key?(state, instance.path),
+          do: state,
+          else: Map.put(state, instance.path, Ash.create!(instance.module, instance.config))
+      end)
 
-      _ ->
-        state
-    end
+    %{agent | state: state}
+  end
+
+  # Read legacy manifests at the persistence boundary. New snapshots retain
+  # definitions only inside the slice; the removed runtime fields stay removed.
+  defp restore_cron_mount(agent, resource, legacy_specs) do
+    mount =
+      Enum.find(Aikido.Agent.Info.slice_instances(resource), &(&1.module == Aikido.Cron.Slice))
+
+    cron = Map.get(agent.state, mount.path) || Ash.create!(Aikido.Cron.Slice, %{})
+
+    cron =
+      if map_size(legacy_specs) == 0,
+        do: cron,
+        else: Ash.update!(cron, %{specs: Map.merge(cron.specs, legacy_specs)})
+
+    %{agent | state: Map.put(agent.state, mount.path, cron)}
   end
 
   defp enqueue_team_reconciliation(runtime) do

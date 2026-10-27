@@ -18,17 +18,82 @@ with independent code accordions: agents and slices open initially, typed signal
 definitions, actions, directives, and supporting modules closed. The headers show module names and
 source paths; live updates preserve your open/closed choices.
 Each URL maps to its own LiveView module under `lib/agent_examples_web/live/`.
-`ExampleComponents` shares the layout, navigation and reusable visuals;
-`ExamplePage` shares run startup, shutdown and subscription handling. Example
-events and controls stay in their page modules.
+
+Try `/examples/cron` to start and pause a clock sending real recurring signals.
+Try `/examples/verified-team` to delegate a background evidence check, observe the
+lead waiting without spending a continuation, then check and record the result. It composes existing Team assignments, blocking Todos and an
+ordinary scoped evidence tool, using the shared provider for both agents in live mode.
+The telemetry link opens `/dashboard/aikido`: actual local processes and cluster
+membership are shown separately, with I/O tasks, retained signal/directive totals,
+bounded current-work samples, active provider requests, timings, tokens and cost.
+These observations start with the application rather than when a chart is opened.
+Request history excludes prompts, responses and credentials; unavailable pricing
+is labelled explicitly. The Metrics page remains available for event charts.
+Try `/examples/checkpoint` to checkpoint a counter, make an unsaved change, crash
+the agent with a signal, then restore the same ID. Checkpoint now uses a graceful
+stop and reactivation; Crash agent calls `Process.exit(self(), :kill)` through a
+directive, skipping the final save. This scenario disables automatic restart and
+uses a one-hour periodic interval so the checkpoint boundary is visible.
+
+The inspector follows child/team signals via `Aikido.Inspector.attach/3` with
+`include_children?: true`, including Quicksort's short-lived partitions. Its
+Actions tab displays actual native Ash action spans and durations. The last 100
+projected events are retained across the attachment; older events can be replaced
+between batches during large sorts.
+Page modules compose regular Phoenix function components. Reusable controls and
+panels live under `lib/agent_examples_web/components/`; interactive components
+provide `on_mount` hooks for their events. There are no LiveComponents.
+`ExamplePage` shares run startup, shutdown and subscriptions and installs the
+provider, source-definition and inspector hooks. `TeamTree.on_mount` owns tree
+selection, while Quicksort's session hook owns sorting progress and restart.
+
+For example, a checklist page only mounts its lifecycle and controls, then
+renders the component:
+
+```elixir
+use Phoenix.LiveView, layout: false
+import AgentExamplesWeb.ExampleComponents, only: [page: 1]
+import AgentExamplesWeb.Components.Checklist, only: [checklist: 1]
+on_mount {AgentExamplesWeb.ExamplePage, "checklist"}
+on_mount {AgentExamplesWeb.Components.Checklist, :default}
+
+def render(assigns) do
+  ~H"""
+  <.page {assigns}><.checklist run={@run} /></.page>
+  """
+end
+```
+
+Conversation controls, Markdown, hook context, diagrams, agent details, provider
+settings and source definitions are shared across examples. Function components
+receive their data as attributes; their hooks keep interaction state in the
+hosting LiveView.
+`Components.UI` provides the smaller shared building blocks: panel headings,
+Markdown or plain-text messages, todo rows, tool-call details and tree navigation.
+The feature components compose these pieces rather than copying their markup.
+`Aikido.Inspector.CodeBlock` shares highlighted source and escaped code/data rendering.
+The inspector components, history projections, CSS and browser hook come from the
+Aikido package. LiveView is an optional package dependency; see
+`Aikido.Inspector.Components` for integration outside this playground.
+Inspector rows, identity popups, view controls, and state diffs are independently
+renderable function components, as are individual approval cards, delegated
+tasks, and source definitions.
 The index links to every example page. No Node installation,
 asset build, database, or API key is needed for offline mode.
+
+Model tools are configured per example in `Catalog`. The research team and Lua
+permissions examples require their Lua tools in both offline and live modes.
+Tool refresh, verified work, resilience and checkpoint recovery use fixed tool
+policies. Other AI examples offer **Enable Lua scripting tools** to add `run_lua`
+and `lua_docs` alongside their direct tools. Lua lifecycle hooks and task approval
+continue to run in either mode. Required and fixed policies are also enforced
+when starting through `Playground`, regardless of submitted toggle values.
 
 | Page | Browser interaction |
 | --- | --- |
 | `/examples/adaptive-tools` | Prepare application-selected tools; refresh during setup and queue a message |
 | `/examples/lua-permissions` | Change the Lua function surface and inspect actor/tenant propagation |
-| `/examples/verified-work` | Deliver a task and todo atomically; verify evidence after bounded continuation |
+| `/examples/verified-work` | Deliver a task and todo atomically; inspect verifier feedback and conversation evidence through bounded continuation |
 | `/examples/resilience` | Exercise deadlines, retries, cancellation and tool loop guards |
 | `/examples/recovery` | Stop/start the same permanent identity and verify retained conversation |
 | `/examples/counter` | Add, increase/decrease through one typed union handler, and count every signal |
@@ -39,7 +104,7 @@ asset build, database, or API key is needed for offline mode.
 | `/examples/nested-teams` | Inspect the fixed home squad, spawn/remove subteams, and signal their counters |
 | `/examples/assistant` | Chat with a tool-equipped assistant |
 | `/examples/hooks` | Run synchronous and asynchronous Lua lifecycle hooks |
-| `/examples/hook-requests` | Answer a request from a waiting Lua hook through the example callback |
+| `/examples/hook-requests` | Approve or deny each new task before any model request; approval is never reused |
 | `/examples/conversation` | Stream responses, retain history, and try todo-gated completion |
 | `/examples/researcher` | Try the research role independently |
 | `/examples/reviewer` | Try the review role independently |
@@ -253,6 +318,12 @@ action sends a task signal through the team; the teammate's answer returns as a
 correlated result signal. The tool task waits, while agent mailboxes stay responsive.
 Expand a tool entry to inspect its script/input and result. Tool failures remain
 marked **Failed** even if the model subsequently completes the conversation.
+The model-facing `run_script` action invokes AshLua's native `eval` action and
+turns its non-nil error envelope into a typed `lua_script_failed` tool failure.
+This preserves structured VM/action details and recovery guidance, and lets the
+agent's configured consecutive-error safeguard count failed scripts. Native
+`eval` retains its `{result, error}` contract; an ordinary returned value that
+contains an `error` key is still successful data.
 The offline script reads the roster before spawning and reuses workers on later prompts.
 
 The **Recursive quicksort** page (`/examples/quicksort`) demonstrates BEAM process
@@ -351,3 +422,66 @@ binds to loopback; add your own access control before exposing it remotely.
 The Delegated work sidebar aggregates tasks from the entire recorded team tree,
 including retained stopped subteams. Each task identifies its dispatching team
 and the full member path, so same-named researchers remain distinguishable.
+
+The research-team example starts with only the orchestrator. Its model creates
+workers and squads as needed; offline mode demonstrates the same dynamic startup.
+Reloading retains the current run. Restart the example to begin with a fresh roster.
+
+Research delegation uses one `agents.delegate` Lua action. It waits in the default
+`foreground` mode; `mode = "background"` returns a task ID and delivers the result
+later. Supplying an existing `task_id` with background mode releases its waiter
+without cancelling its worker. Use **Continue in background** in Delegated work,
+then queue a steering message while the orchestrator continues. The team rejects
+circular foreground waits with an error describing the dependency chain.
+
+The AI metrics read both synchronous ReqLLM token envelopes and streaming usage.
+Empty token charts after successful requests indicate missing usage, while an
+empty cost chart can mean model pricing is unavailable (including coding-plan
+models). Exception charts count raised provider/transport exceptions, separately
+from tool and reducer failures. Charts collect only while their metrics page is
+open; reload that page after changing metric definitions.
+
+Research teams use `options %{completion: :tasks}`: an interim model answer waits
+for background assignments notifying that team, and their result messages resume
+the same request and deadline. Delegation inherits the parent deadline; an
+explicit shorter timeout can cap it. Fire-and-forget tasks and work requested by
+other members do not hold the team's answer.
+
+The research team and its squads allow 16,384 output tokens and ten minutes per
+model/HTTP attempt, within the shared one-hour task deadline. Both model options
+and execution limits propagate into dynamically created squads and researchers.
+Every research squad starts empty; it creates workers for its assigned task.
+Reasoning can consume the provider's output-token budget. A length-limited
+response now fails with a typed truncation error and recovery guidance rather
+than silently accepting a partial report. Provider summaries show finish reasons
+alongside HTTP status and duration.
+
+Conversations, streaming answers, delegated findings and agent details render
+Markdown through MDEx. Tables use the playground theme and wide content scrolls
+within its panel; raw HTML is escaped and generated HTML is sanitized. All these
+views reuse the shared `AgentExamplesWeb.Markdown.markdown/1` component.
+
+Each running example has a built-in **Aikido inspector** below its main panels.
+It retains the last 100 observed transitions across the subscribed team tree.
+Filter by agent ID or signal type, select an event, and switch between Diff,
+Before, State, Signal and Directives. Expand values in Tree view or switch to
+syntax-highlighted Raw JSON. Dense signal rows and independently scrolling panes
+keep the inspector bounded; source definitions are highlighted as Elixir.
+Selecting an event or interacting with its details pins that snapshot, including
+expanded tree nodes. **Live** returns to following new signals. Rows include a
+PID with a consistent hash-derived color; hover to see and copy its full agent ID.
+Directive details include all
+struct fields, subject to the same redaction and size limits as state.
+Native `sensitive? true` metadata redacts resource attributes, mounted slice state,
+nested resource values and routed signal/action arguments before history is
+recorded. Untyped maps and runtime context retain name-based filtering. Size
+limits truncate individual branches while preserving the expandable structure.
+Failed signals show the native error explanation, whether state changed, and
+links to their input and before/after snapshots. This processing result is
+separate from a process-exit notification; raw error details remain expandable.
+History survives a page reload while the
+preview process remains alive and resets for a new example run. Inspection is
+read-only: it never replays network calls or rewinds running agents. Structured
+credential fields and conversation contexts are redacted, executable values are
+omitted, and oversized values are explicitly truncated. It records future events;
+there is no reconstruction of events from before capture began.

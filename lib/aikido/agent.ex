@@ -70,6 +70,30 @@ defmodule Aikido.Agent do
         (name |> :erlang.term_to_binary([:deterministic]) |> Base.url_encode64(padding: false))
   end
 
+  @doc "Project an agent's domain state onto its declared resource attributes."
+  def resource_attributes(%__MODULE__{agent_module: resource} = agent) do
+    fields = Aikido.Agent.Info.state_fields(resource)
+    own_state = Map.get(agent.state, Aikido.Agent.Info.agent_path!(resource), %{})
+
+    Map.new(Ash.Resource.Info.attributes(resource), fn attribute ->
+      value =
+        cond do
+          attribute.name == :id -> agent.id
+          attribute.name in fields -> Map.get(own_state, attribute.name)
+          true -> Map.get(agent.state, attribute.name)
+        end
+
+      {attribute.name, value}
+    end)
+  end
+
+  @doc "Restore routed state paths from a natively cast agent resource record."
+  def state_from_resource(%{__struct__: resource} = record) do
+    mounts = Map.take(record, Aikido.Agent.Info.slice_paths(resource))
+    own = Map.take(record, Aikido.Agent.Info.state_fields(resource))
+    Map.put(mounts, Aikido.Agent.Info.agent_path!(resource), own)
+  end
+
   @doc "Optional durable checkpoint serialization."
   @callback checkpoint(agent :: t(), ctx :: map()) :: {:ok, map()} | {:error, term()}
   @doc "Optional durable checkpoint restoration."

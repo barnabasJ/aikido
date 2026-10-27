@@ -102,9 +102,12 @@ defmodule AikidoTest.FSMTest do
       assert {:ok, record} =
                Aikido.FSM.Slice
                |> Ash.Changeset.for_create(:create, attributes)
-               |> Ash.Changeset.apply_attributes()
+               |> Ash.create()
 
       assert record.terminal? == expected
+
+      scenario = AikidoTest.SliceState.new(Aikido.FSM.Slice, attributes)
+      assert scenario.terminal? == expected
 
       agent =
         AikidoTest.FSMTest.ConfiguredFSMAgent.initialize!(%{

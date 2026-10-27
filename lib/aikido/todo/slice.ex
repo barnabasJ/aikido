@@ -34,6 +34,10 @@ defmodule Aikido.Todo.Slice do
       end
     end
 
+    route Aikido.AiReact.Signals.Deliver, Aikido.Todo.Actions.AcceptDelivery,
+      public?: false,
+      name: :accept_delivery
+
     route Aikido.Todo.Signals.TodoAdd, Aikido.Todo.Actions.Add
     route Aikido.Todo.Signals.TodoRemove, Aikido.Todo.Actions.Remove
     route Aikido.Todo.Signals.TodoActivate, Aikido.Todo.Actions.Activate

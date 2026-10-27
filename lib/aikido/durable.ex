@@ -159,7 +159,8 @@ defmodule Aikido.Durable do
              {:ok,
               {runtime.durable_server, runtime.durable_key, runtime.partition,
                keep_snapshot?(runtime.agent_module)}}
-           end) do
+           end),
+         :ok <- Aikido.AgentServer.prepare_stop(pid) do
       if keep_snapshot?,
         do: DurableServer.Supervisor.terminate_child_permanent(supervisor, pid),
         else: delete(supervisor, key, partition: partition)

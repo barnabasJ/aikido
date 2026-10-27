@@ -1,8 +1,9 @@
 defmodule Aikido.AiReact.Actions.LlmTurn do
   @moduledoc "Adopts model responses, accumulates usage and continues with tools or queued messages."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.RunState
+
   alias Aikido.AiReact.Conversation
+  alias Aikido.AiReact.RunState
 
   @impl true
   def run(input, _opts, _context) do
@@ -63,6 +64,15 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
     |> Map.update!(:iteration, &(&1 + 1))
   end
 
+  defp continue_from_classified_response(state, %{finish_reason: :length}) do
+    error =
+      Aikido.AiReact.Errors.OutputTruncated.exception(
+        max_tokens: Keyword.get(state.llm_opts, :max_tokens)
+      )
+
+    Aikido.Types.ActionResult.new(state: %{state | status: :failed, result: nil, error: error})
+  end
+
   defp continue_from_classified_response(state, %{type: :final_answer, text: text}) do
     if Map.get(state, :queued_messages, []) != [] && state.iteration < state.max_iterations do
       state
@@ -85,7 +95,9 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
         continue_from_classified_response(state, %{type: :final_answer, text: text})
 
       state.iteration >= state.max_iterations ->
-        complete_run(state, nil)
+        Aikido.Types.ActionResult.new(
+          state: %{state | status: :failed, result: nil, error: :max_iterations}
+        )
 
       true ->
         state

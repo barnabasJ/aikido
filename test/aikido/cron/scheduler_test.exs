@@ -205,38 +205,35 @@ defmodule AikidoTest.SchedulerTest do
     send(job, :tick)
     assert_receive {:blocked_callback, replacement}
     refute replacement == worker
-    refute worker in Map.values(:sys.get_state(job).callback_workers)
+    refute worker in :sys.get_state(job).callback_workers
     assert Process.alive?(job)
   end
 
-  test "worker EXIT is isolated whether it precedes or queues behind DOWN" do
-    worker =
-      spawn(fn ->
-        receive do
-          :stop -> :ok
-        end
-      end)
+  test "a normally completed callback is retired by the scheduler's EXIT handler" do
+    parent = self()
 
-    on_exit(fn -> send(worker, :stop) end)
-    ref = make_ref()
-    state = %{callback_workers: %{ref => worker}, owner_ref: nil, owner_pid: nil}
+    {:ok, job} =
+      Aikido.Cron.Scheduler.run_every(
+        fn ->
+          send(parent, {:blocked_callback, self()})
 
-    assert {:noreply, ^state} =
-             Aikido.Cron.Job.handle_info({:EXIT, worker, :shutdown}, state)
+          receive do
+            :release -> :ok
+          end
+        end,
+        "@hourly"
+      )
 
-    send(self(), {:EXIT, worker, :shutdown})
-
-    assert {:noreply, %{callback_workers: workers}} =
-             Aikido.Cron.Job.handle_info({:DOWN, ref, :process, worker, :shutdown}, state)
-
-    assert workers == %{}
-    refute_receive {:EXIT, ^worker, _}
-
-    assert {:stop, :shutdown, _} =
-             Aikido.Cron.Job.handle_info({:EXIT, self(), :shutdown}, %{
-               state
-               | callback_workers: workers
-             })
+    on_exit(fn -> Aikido.Cron.Scheduler.cancel(job) end)
+    1 = :erlang.trace(job, true, [:receive, {:tracer, self()}])
+    send(job, :tick)
+    assert_receive {:blocked_callback, worker}
+    assert worker in :sys.get_state(job).callback_workers
+    send(worker, :release)
+    assert_receive {:trace, ^job, :receive, {:EXIT, ^worker, :normal}}
+    refute worker in :sys.get_state(job).callback_workers
+    assert Process.alive?(job)
+    1 = :erlang.trace(job, false, [:receive])
   end
 
   describe("cancel/1") do
@@ -394,7 +391,7 @@ defmodule AikidoTest.SchedulerTest do
         failed_state = :sys.get_state(job_pid)
         assert failed_state.retrying?
 
-        for {_ref, worker} <- failed_state.callback_workers do
+        for worker <- failed_state.callback_workers do
           AikidoTest.LifecycleWait.await_down(worker)
         end
 

@@ -54,8 +54,17 @@ defmodule Aikido.Team.MemberProcesses do
   @doc "Look up a live member PID in the supplied team state without performing I/O."
   def fetch_running_member_pid(state, name) do
     case Map.fetch(state.members, name) do
-      {:ok, pid} -> {:ok, pid}
-      :error -> {:error, {:member_not_running, name}}
+      {:ok, pid} ->
+        {:ok, pid}
+
+      :error ->
+        {:error,
+         Ash.Error.Action.InvalidArgument.exception(
+           field: :member,
+           message:
+             "Member #{inspect(name)} is not running. Inspect the roster, then use " <>
+               "ensure_member to activate an existing member before sending or assigning work."
+         )}
     end
   end
 end

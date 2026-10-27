@@ -12,7 +12,14 @@ defmodule AikidoTest.SliceTest.MinimalSlice do
       end
     end
 
-    route "minimal.noop", {AikidoTest.TestActions, :noop}
+    route "minimal.noop", :noop, public?: false
+  end
+
+  actions do
+    action :noop, Aikido.Types.ActionResult do
+      argument :state, :struct, allow_nil?: false, constraints: [instance_of: __MODULE__]
+      run AikidoTest.TestActions.Actions.PreserveState
+    end
   end
 end
 
@@ -40,7 +47,14 @@ defmodule AikidoTest.SliceTest.FullSlice do
       end
     end
 
-    route "send", {AikidoTest.TestActions, :noop}
+    route "send", :noop, public?: false
+  end
+
+  actions do
+    action :noop, Aikido.Types.ActionResult do
+      argument :state, :struct, allow_nil?: false, constraints: [instance_of: __MODULE__]
+      run AikidoTest.TestActions.Actions.PreserveState
+    end
   end
 end
 
@@ -59,7 +73,14 @@ defmodule AikidoTest.SliceTest.SchemaSlice do
       end
     end
 
-    route "schema.noop", {AikidoTest.TestActions, :noop}
+    route "schema.noop", :noop, public?: false
+  end
+
+  actions do
+    action :noop, Aikido.Types.ActionResult do
+      argument :state, :struct, allow_nil?: false, constraints: [instance_of: __MODULE__]
+      run AikidoTest.TestActions.Actions.PreserveState
+    end
   end
 end
 
@@ -128,11 +149,11 @@ defmodule AikidoTest.SliceTest do
              ) == "minimal"
 
       assert Aikido.Slice.Info.actions(AikidoTest.SliceTest.MinimalSlice) == [
-               {AikidoTest.TestActions, :noop}
+               {AikidoTest.SliceTest.MinimalSlice, :noop}
              ]
 
       assert Aikido.Slice.Info.signal_routes(AikidoTest.SliceTest.MinimalSlice) == [
-               {"minimal.noop", {AikidoTest.TestActions, :noop}}
+               {"minimal.noop", {AikidoTest.SliceTest.MinimalSlice, :noop}}
              ]
     end
 
@@ -146,7 +167,7 @@ defmodule AikidoTest.SliceTest do
              ) == "A test slice"
 
       assert Aikido.Slice.Info.signal_routes(AikidoTest.SliceTest.FullSlice) == [
-               {"send", {AikidoTest.TestActions, :noop}}
+               {"send", {AikidoTest.SliceTest.FullSlice, :noop}}
              ]
 
       assert Ash.Type.ash_type?(AikidoTest.SliceTest.FullSlice)

@@ -5,10 +5,10 @@ defmodule AgentExamples.AI.LuaSurface do
     extensions: [AshLua.EvalActions]
 
   actions do
-    action :eval, :map do
-      description "Run Lua against the scoped AshLua surface, preserving structured errors in tool responses."
+    action :run_script, :map do
+      description "Run Lua against the scoped AshLua surface; report script failures as failed tool calls with structured recovery guidance."
       argument :script, :string, allow_nil?: false
-      run AgentExamples.AI.LuaSurface.Actions.Evaluate
+      run AgentExamples.AI.LuaSurface.Tools.RunScript
     end
   end
 

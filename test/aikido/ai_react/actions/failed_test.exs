@@ -53,7 +53,8 @@ defmodule Aikido.AiReact.FailedTest do
         |> Ash.run_action()
       end)
 
-    assert returned_slice == slice
+    assert AikidoTest.SliceState.attributes(returned_slice) ==
+             AikidoTest.SliceState.attributes(slice)
   end
 
   test "drops the signal when the slice has already terminated" do
@@ -69,6 +70,7 @@ defmodule Aikido.AiReact.FailedTest do
         |> Ash.run_action()
       end)
 
-    assert returned_slice == slice
+    assert AikidoTest.SliceState.attributes(returned_slice) ==
+             AikidoTest.SliceState.attributes(slice)
   end
 end

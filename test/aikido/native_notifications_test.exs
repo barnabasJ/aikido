@@ -1,3 +1,18 @@
+defmodule Aikido.NativeNotificationsTest.Signals.Commit do
+  use Aikido.Signal
+
+  signal do
+    type "notify.commit"
+
+    schema do
+      attribute :observer, :term do
+        description "Process receiving the native notification."
+        allow_nil? false
+      end
+    end
+  end
+end
+
 defmodule Aikido.NativeNotificationsTest.Notifier do
   use Ash.Notifier
 
@@ -52,15 +67,7 @@ defmodule Aikido.NativeNotificationsTest.Agent do
       end
     end
 
-    route "notify.commit", :commit
-  end
-
-  actions do
-    action :commit, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :observer, :term, allow_nil?: false
-      run Aikido.NativeNotificationsTest.Reducer
-    end
+    route Aikido.NativeNotificationsTest.Signals.Commit, Aikido.NativeNotificationsTest.Reducer
   end
 end
 
@@ -138,47 +145,29 @@ defmodule Aikido.NativeNotificationsTest do
     end
   end
 
-  test "pure native broadcast descriptor publishes through application-owned Phoenix PubSub",
-       context do
+  test "agent publishes a scoped event through application-owned Phoenix PubSub", context do
     pubsub = Aikido.NativeNotificationsTest.PubSub
     start_supervised!({Phoenix.PubSub, name: pubsub})
     :ok = Phoenix.PubSub.subscribe(pubsub, "application.events")
 
-    source =
-      Aikido.Signal.new!("broadcast.request", %{}) |> Aikido.Signal.put(:tenant, "workspace")
-
-    state = %{count: 4}
-
-    input =
-      Ash.ActionInput.for_action(
-        Aikido.AgentServer.RuntimeActions,
-        :broadcast,
-        %{
-          state: state,
-          pubsub: pubsub,
-          topic: "application.events",
-          signal_type: "broadcast.ready",
-          payload: %{answer: 42}
-        },
-        context: %{aikido: %{signal: source}}
+    pid =
+      start_server(context, AikidoTest.TestAgents.NotificationPublisher,
+        initial_state: %{count: 4}
       )
 
-    assert {:ok, %Aikido.Types.ActionResult{state: ^state, directives: [directive]}} =
-             Ash.run_action(input)
+    source =
+      Aikido.Signal.new!("test.broadcast", %{
+        pubsub: pubsub,
+        topic: "application.events",
+        signal_type: "broadcast.ready",
+        payload: %{answer: 42}
+      })
+      |> Aikido.Signal.put(:tenant, "workspace")
 
-    assert %Aikido.Directives.Notify{notification: notification} = directive
-    assert notification.for == Aikido.Notifiers.PubSub
-    assert notification.data.id == nil
     refute_received %Aikido.Signal{type: "broadcast.ready"}
 
-    runtime = %Aikido.AgentServer.State{
-      id: "notify",
-      agent_module: Aikido.NativeNotificationsTest.Agent,
-      agent: %{},
-      aikido: context.aikido
-    }
-
-    assert :ok = Aikido.Directive.exec(directive, source, runtime)
+    assert {:ok, %{count: 4}} =
+             Aikido.AgentServer.call(pid, source, &{:ok, &1.agent.state.state})
 
     assert_receive %Aikido.Signal{
                      type: "broadcast.ready",

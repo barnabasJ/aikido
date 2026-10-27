@@ -1,13 +1,19 @@
 defmodule AgentExamples.Telemetry do
   @moduledoc """
-  LiveDashboard metrics from native Aikido, Ash, ReqLLM and BEAM events.
+  LiveDashboard metrics and retained observations from native runtime events.
 
   Tags describe resources and operations, never prompts, credentials, actors or
   per-run IDs. Charts observe events while open; they do not query agent state.
   Signal timings cover reducers and middleware; directive timings cover dispatch,
   while ReqLLM and Ash action timings include the asynchronous work they execute.
   """
+  use Supervisor
   import Telemetry.Metrics
+
+  def start_link(_), do: Supervisor.start_link(__MODULE__, nil, name: __MODULE__)
+
+  @impl true
+  def init(_), do: Supervisor.init([AgentExamples.Telemetry.Observations], strategy: :one_for_one)
 
   def metrics do
     aikido_metrics() ++ agent_metrics() ++ model_metrics() ++ ash_metrics() ++ vm_metrics()
@@ -92,7 +98,8 @@ defmodule AgentExamples.Telemetry do
       counter("req_llm.request.exception.count",
         measurement: fn _ -> 1 end,
         tags: [:provider, :http_status],
-        description: "Provider request exceptions",
+        description:
+          "Raised provider/transport exceptions only. An empty chart means no exception events observed while this page was open; tool and reducer failures are separate.",
         reporter_options: [nav: "AI"]
       )
     ] ++
@@ -100,10 +107,10 @@ defmodule AgentExamples.Telemetry do
         sum([:req_llm, :request, :stop, key],
           event_name: [:req_llm, :request, :stop],
           measurement: fn _measurements, metadata ->
-            get_in(metadata, [:usage, key])
+            AgentExamples.Telemetry.Usage.reported(metadata[:usage], key)
           end,
           tags: [:provider],
-          description: "Reported #{key}; cost is the available USD estimate",
+          description: AgentExamples.Telemetry.Usage.description(key),
           reporter_options: [nav: "AI"]
         )
       end)

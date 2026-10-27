@@ -30,7 +30,7 @@ defmodule Aikido.Team.TaskDelivery do
   def conversation_message_for_task_result(task) do
     text =
       "Task #{task.id} from #{task.member} #{task.status}: " <>
-        inspect(task.result, limit: 100, printable_limit: 4_000)
+        describe_task_result(task)
 
     %Signal{
       id: nil,
@@ -38,9 +38,49 @@ defmodule Aikido.Team.TaskDelivery do
       data: %{
         text: text,
         request_id: "task-result/" <> task.id,
-        metadata: %{task: Map.take(task, [:id, :member, :status, :result, :metadata])}
+        metadata:
+          (Map.get(task, :metadata) || %{})
+          |> Map.take([:aikido_deadline_at])
+          |> Map.put(:task, Map.take(task, [:id, :member, :status, :result, :metadata]))
       },
       source: "/aikido"
     }
   end
+
+  defp describe_task_result(%{status: :failed, result: :timeout}) do
+    "The task's remaining deadline expired and cancellation was requested. Report partial " <>
+      "findings or request a new run with a smaller assignment or larger budget; do not retry with the expired deadline."
+  end
+
+  defp describe_task_result(%{status: :failed, result: :member_exited}) do
+    "The worker process exited before its result was recorded. Inspect the roster and lifecycle " <>
+      "failure, ensure a replacement is ready, and check completed effects before assigning the work again."
+  end
+
+  defp describe_task_result(%{status: :failed, result: :interrupted}) do
+    "Recovery interrupted this in-flight assignment; its running work was not resumed. Inspect " <>
+      "saved results and completed effects before starting a new assignment with a fresh deadline."
+  end
+
+  defp describe_task_result(%{status: :failed, result: :cancelled}) do
+    "The assignment was cancelled. Do not retry automatically; wait for a new assignment and " <>
+      "check whether earlier effects completed."
+  end
+
+  defp describe_task_result(%{status: :failed, result: error}) when is_exception(error) do
+    if AshAi.ToToolError.impl_for(error) do
+      AshAi.ToToolError.to_tool_error(error)
+    else
+      "Worker failed with #{inspect(error.__struct__)}. Inspect the worker's state and " <>
+        "runtime logs before retrying; its effects may be incomplete."
+    end
+  end
+
+  defp describe_task_result(%{status: :failed, result: error}) do
+    inspect(error, limit: 100, printable_limit: 4_000) <>
+      ". Inspect the task and worker state, correct the reported cause, and check completed effects before retrying."
+  end
+
+  defp describe_task_result(task),
+    do: inspect(task.result, limit: 100, printable_limit: 4_000)
 end

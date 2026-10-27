@@ -1,6 +1,10 @@
 defmodule AgentExamples.LuaAssistant.Tools do
   @moduledoc "Native Ash tools whose execution and documentation share the same application-selected Lua surface."
-  use Ash.Resource, domain: AgentExamples.Agents
+  use Ash.Resource, domain: AgentExamples.Agents, extensions: [AshLua.Resource]
+
+  lua do
+    name "scoped_tools"
+  end
 
   actions do
     action :eval, :map do

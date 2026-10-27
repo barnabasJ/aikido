@@ -2,6 +2,29 @@ defmodule AgentExamples.Catalog do
   @moduledoc "The runnable examples and the descriptions shown on their LiveView pages."
   @examples [
     %{
+      slug: "cron",
+      title: "Recurring cron",
+      eyebrow: "Scheduled signals",
+      resource: AgentExamples.CronClock,
+      kind: :cron,
+      description: "Start and pause a recurring clock that sends a signal every two seconds.",
+      detail:
+        "Enable returns a Register directive under one stable job ID. Cron.Slice actions record the scheduler result, own cancellation and retry failed jobs. Each scheduled tick enters the normal signal/action pipeline. Pause rejects queued ticks and cancels the job; stopping the agent also closes its scheduler.",
+      flow: ["Enable action", "Register cron", "Tick signal", "Count action"]
+    },
+    %{
+      slug: "checkpoint",
+      title: "Crash and restore",
+      eyebrow: "Durable checkpoints",
+      resource: AgentExamples.CheckpointCounter,
+      kind: :checkpoint,
+      description:
+        "Compare live state with saved state by deliberately killing and restoring a counter.",
+      detail:
+        "Checkpoint now gracefully stops and reactivates the same permanent identity. Add an unsaved change, then send a crash signal: its directive kills the process without a final save. Start again to restore the checkpoint. This demo disables automatic crash restart and uses a one-hour periodic sync interval to make the difference visible. Ordinary Stop example saves the current value.",
+      flow: ["Change state", "Checkpoint", "Hard crash", "Same ID → restore"]
+    },
+    %{
       slug: "quicksort",
       title: "Recursive quicksort",
       eyebrow: "BEAM · thousands of real agents",
@@ -17,6 +40,8 @@ defmodule AgentExamples.Catalog do
       title: "Lua permissions and scope",
       eyebrow: "Makewright · filtered VM functions",
       resource: AgentExamples.LuaAssistant,
+      tool_policy: :required_lua,
+      tools: [:scoped_lua, :scoped_lua_docs],
       kind: :ai,
       description:
         "Select Lua functions per agent and carry actor and tenant through to inner Ash actions.",
@@ -34,6 +59,8 @@ defmodule AgentExamples.Catalog do
       title: "Tool setup and refresh",
       eyebrow: "Makewright · application tool configuration",
       resource: AgentExamples.AdaptiveAssistant,
+      tool_policy: :fixed,
+      tools: [],
       kind: :ai,
       description: "Prepare native tools from application context and refresh them during a run.",
       detail:
@@ -50,16 +77,37 @@ defmodule AgentExamples.Catalog do
       title: "Verified task delivery",
       eyebrow: "Makewright · bounded todo continuation",
       resource: AgentExamples.VerifiedAssistant,
+      tool_policy: :fixed,
+      tools: [:record_evidence],
       kind: :ai,
       description:
         "Deliver a task and its todo atomically, then require tool evidence before completion.",
       detail:
-        "Deliver work to start a run. The offline model first proposes an answer without evidence. A native application verifier rejects it, the library requests another turn, and the evidence tool completes the todo through a public command. The verifier then accepts the answer. Continuation is optional and bounded; ordinary assistants still wait for external work by default.",
+        "Deliver work to start a run. The offline model first proposes an answer without evidence. A boolean application verifier checks the explicit todo evidence. Bounded todo continuation requests more work, and the ordinary evidence tool completes the todo through a public command. No transcript access is needed.",
       flow: [
         "Message + todo",
         "Provisional answer",
-        "Verifier rejects → continue",
+        "Missing evidence → continue",
         "Evidence tool → verified answer"
+      ]
+    },
+    %{
+      slug: "verified-team",
+      title: "Background work and evidence",
+      eyebrow: "Makewright · native Team and Todo",
+      resource: AgentExamples.VerifiedTeam,
+      tool_policy: :fixed,
+      tools: [:request_team_evidence, :complete_team_evidence],
+      kind: :ai_team,
+      description:
+        "Track required background work with a blocking Todo and check its result through a normal tool.",
+      detail:
+        "The request tool creates a blocking Todo and assigns its evidence check through Team. An interim answer waits on that requirement. The correlated result resumes the conversation; a scoped completion tool checks the authoritative task record before recording Todo evidence. Missing evidence is an ordinary tool error. Live mode uses your shared provider for both agents.",
+      flow: [
+        "Required Todo + assignment",
+        "Waiting on required work",
+        "Scoped result delivery",
+        "Evidence check → Todo complete"
       ]
     },
     %{
@@ -67,11 +115,13 @@ defmodule AgentExamples.Catalog do
       title: "Retries and loop guards",
       eyebrow: "Makewright · failure isolation",
       resource: AgentExamples.ResilientAssistant,
+      tool_policy: :fixed,
+      tools: [:text_stats, :stamp, :fail_example],
       kind: :ai,
       description:
         "Exercise retry exhaustion, deadlines, cancellation and optional tool loop limits.",
       detail:
-        "Choose retry to exhaust one retry, wait to test the three-second deadline or cancel while work is pending, cycle to repeat alternating tools, or errors to repeat failing tools. All tools run through Ash AI. Cycle and error limits are opt-in; the configured limit stops the run with a visible error rather than consuming the remaining model turns.",
+        "Choose retry to exhaust one retry, wait to test the three-second deadline or cancel while work is pending, cycle to repeat alternating tools, or errors to repeat failing tools. All tools run through Ash AI. This controlled experiment compares tool inputs through a pure callback, ignoring changing output; polling tools would normally keep result-aware comparisons. The model receives a warning after three successful cycles and stops after five. Cycle and error limits are opt-in; the configured limit stops the run with a visible error rather than consuming the remaining model turns.",
       flow: [
         "Deterministic failure",
         "Bounded attempts",
@@ -84,6 +134,8 @@ defmodule AgentExamples.Catalog do
       title: "Checkpoint recovery",
       eyebrow: "Makewright · DurableServer",
       resource: AgentExamples.RecoverableAssistant,
+      tool_policy: :fixed,
+      tools: [:text_stats, :stamp],
       kind: :ai,
       description:
         "Stop a permanent conversation and restore the same identity with retained history.",
@@ -168,6 +220,8 @@ defmodule AgentExamples.Catalog do
       title: "AI assistant",
       eyebrow: "Runtime tools",
       resource: AgentExamples.Assistant,
+      tool_policy: :optional_lua,
+      tools: [:text_stats, :stamp],
       kind: :ai,
       description: "Give an assistant tools at runtime and follow its reasoning-and-tool loop.",
       detail:
@@ -179,6 +233,8 @@ defmodule AgentExamples.Catalog do
       title: "Lua lifecycle hooks",
       eyebrow: "Sync gates & async observers",
       resource: AgentExamples.HookedAssistant,
+      tool_policy: :optional_lua,
+      tools: [:text_stats, :stamp],
       kind: :ai,
       description:
         "Run Lua hooks before model and tool calls, and inject context asynchronously.",
@@ -191,6 +247,8 @@ defmodule AgentExamples.Catalog do
       title: "Conversation and work tracking",
       eyebrow: "Streaming · persistent conversation",
       resource: AgentExamples.ConversationAssistant,
+      tool_policy: :optional_lua,
+      tools: [:text_stats, :stamp],
       kind: :ai,
       description:
         "Stream an answer, retain conversation history, and optionally wait for todos.",
@@ -208,11 +266,13 @@ defmodule AgentExamples.Catalog do
       title: "Lua request / response",
       eyebrow: "Experimental · human in the loop",
       resource: AgentExamples.InteractiveAssistant,
+      tool_policy: :optional_lua,
+      tools: [:text_stats, :stamp],
       kind: :ai,
       description:
         "Let a Lua hook call an application callback, wait for your answer, and continue the same script.",
       detail:
-        "Send a task, then answer the request card for the stamp tool. The Lua script interprets your response and decides whether to continue or stop. Other tools can run before this gate. The agent stays responsive while the hook task waits. Requests expire after two minutes; stopping the example closes the wait. This experiment does not resume Lua tasks after a process restart.",
+        "Every new task asks for approval before its first model request or tool call. Approval applies only to that task and is never reused from conversation history. The Lua script interprets your response and decides whether to continue or stop. The agent stays responsive while the hook task waits. Requests expire after two minutes; stopping the example closes the wait. This experiment does not resume Lua tasks after a process restart.",
       flow: [
         "Lua request",
         "Application callback → LiveView",
@@ -225,6 +285,8 @@ defmodule AgentExamples.Catalog do
       title: "AI researcher",
       eyebrow: "Worker interface",
       resource: AgentExamples.Researcher,
+      tool_policy: :optional_lua,
+      tools: [:text_stats, :stamp],
       kind: :ai,
       description: "Try a research worker directly through the same interface as a team.",
       detail:
@@ -236,6 +298,8 @@ defmodule AgentExamples.Catalog do
       title: "AI reviewer",
       eyebrow: "Review role",
       resource: AgentExamples.Reviewer,
+      tool_policy: :optional_lua,
+      tools: [:text_stats, :stamp],
       kind: :ai,
       description: "Try the fixed reviewer role as an independently addressable agent.",
       detail:
@@ -247,15 +311,38 @@ defmodule AgentExamples.Catalog do
       title: "AI research team",
       eyebrow: "Dynamic orchestration",
       resource: AgentExamples.ResearchTeam,
+      tool_policy: :required_lua,
+      tools: [:text_stats, :stamp, :run_lua, :lua_docs],
       kind: :ai_team,
       description:
         "An AI orchestrator creates research squads, nested subteams and specialist agents.",
       detail:
-        "The live orchestrator chooses purpose-specific investigation and verification squads. Squads can create nested squads and researchers, while the fixed analyst and reviewer remain available. Prompts pass a depth budget with delegated tasks; each team also enforces its configured member limits. Offline mode uses a deterministic worker demonstration.",
-      flow: ["Orchestrator", "Fixed workers", "Dynamic helpers", "Combined answer"]
+        "The live orchestrator chooses purpose-specific investigation and verification squads. The root starts alone; it creates squads and researchers as work requires. Squads can create nested squads and researchers. Prompts pass a depth budget with delegated tasks; each team also enforces its configured member limits. Offline mode uses a deterministic worker demonstration.",
+      flow: ["Orchestrator", "Create squads", "Delegate research", "Combined answer"]
     }
   ]
   def all, do: @examples
   def find(slug), do: Enum.find(@examples, &(&1.slug == slug))
   def ai?(example), do: example.kind in [:ai, :ai_team]
+
+  @doc "The example's native tool policy; non-AI examples have no scripting choice."
+  @spec tool_policy(map()) :: AgentExamples.AI.Types.ToolPolicy.t()
+  def tool_policy(example), do: example[:tool_policy] || :fixed
+
+  @doc "Whether this example supports choosing direct tools or adding Lua scripting."
+  def lua_optional?(example), do: tool_policy(example) == :optional_lua
+
+  @doc "Whether this example requires its configured Lua tools in both offline and live modes."
+  def requires_lua?(example), do: tool_policy(example) == :required_lua
+
+  @doc "Resolve the scripting choice against the example's declared tool policy."
+  def lua_enabled?(example, requested?) do
+    requires_lua?(example) || (lua_optional?(example) && requested?)
+  end
+
+  @doc "Build the example's tool list; fixed and required policies ignore the optional toggle."
+  def tools(%{tool_policy: :optional_lua, tools: tools}, true),
+    do: tools ++ AgentExamples.AI.Tools.for_lua()
+
+  def tools(%{tools: tools}, _requested?), do: tools
 end

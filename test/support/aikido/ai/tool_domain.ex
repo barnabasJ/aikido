@@ -1,5 +1,5 @@
 defmodule Aikido.AI.TestToolDomain do
-  use Ash.Domain, otp_app: :aikido, validate_config_inclusion?: false, extensions: [AshAi]
+  use Ash.Domain, otp_app: :aikido, extensions: [AshAi]
 
   resources do
     resource Aikido.AI.TestTools.Wait

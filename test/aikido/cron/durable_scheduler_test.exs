@@ -19,12 +19,12 @@ defmodule AikidoTest.DurableSchedulerTest do
     durable = start_durable(aikido, CronAgent)
     {:ok, first} = Durable.ensure_started(durable, "cron")
     signal = Signal.new!("register_cron", %{job_id: :durable_tick, cron: "* * * * * * *"})
-    assert {:ok, _} = AgentServer.call(first, signal, &{:ok, &1.cron_specs})
-    old_job = await_state_value(first, &Map.get(&1.cron_jobs, :durable_tick))
+    assert {:ok, _} = AgentServer.call(first, signal, &{:ok, &1.agent.state.cron.specs})
+    old_job = await_state_value(first, &Map.get(&1.agent.state.cron.jobs, :durable_tick))
     assert :ok = Durable.stop(durable, "cron")
     refute Process.alive?(old_job)
     {:ok, second} = Durable.ensure_started(durable, "cron")
-    new_job = await_state_value(second, &Map.get(&1.cron_jobs, :durable_tick))
+    new_job = await_state_value(second, &Map.get(&1.agent.state.cron.jobs, :durable_tick))
     refute new_job == old_job
     assert Process.alive?(new_job)
 
@@ -32,26 +32,37 @@ defmodule AikidoTest.DurableSchedulerTest do
              AgentServer.call(
                second,
                Signal.new!("cancel_cron", %{job_id: :durable_tick}),
-               &{:ok, &1.cron_specs}
+               &{:ok, &1.agent.state.cron.specs}
              )
 
     assert :ok = Durable.stop(durable, "cron")
     {:ok, third} = Durable.ensure_started(durable, "cron")
     assert :ok = AgentServer.await_ready(third)
-    assert {:ok, {%{}, %{}}} = AgentServer.state(third, &{:ok, {&1.cron_jobs, &1.cron_specs}})
+
+    assert {:ok, {%{}, %{}}} =
+             AgentServer.state(
+               third,
+               &{:ok, {&1.agent.state.cron.jobs, &1.agent.state.cron.specs}}
+             )
   end
 
   test "declarative schedules rebuild from code without old process handles", %{aikido: aikido} do
     durable = start_durable(aikido, ScheduledCronAgent)
     {:ok, first} = Durable.ensure_started(durable, "declarative")
     assert :ok = AgentServer.await_ready(first)
-    assert {:ok, [old_job]} = AgentServer.state(first, &{:ok, Map.values(&1.cron_jobs)})
+
+    assert {:ok, [old_job]} =
+             AgentServer.state(first, &{:ok, Map.values(&1.agent.state.cron.jobs)})
+
     assert :ok = Durable.stop(durable, "declarative")
     {:ok, second} = Durable.ensure_started(durable, "declarative")
     assert :ok = AgentServer.await_ready(second)
-    assert {:ok, [new_job]} = AgentServer.state(second, &{:ok, Map.values(&1.cron_jobs)})
+
+    assert {:ok, [new_job]} =
+             AgentServer.state(second, &{:ok, Map.values(&1.agent.state.cron.jobs)})
+
     refute old_job == new_job
     assert Process.alive?(new_job)
-    assert {:ok, %{}} = AgentServer.state(second, &{:ok, &1.cron_specs})
+    assert {:ok, %{}} = AgentServer.state(second, &{:ok, &1.agent.state.cron.specs})
   end
 end

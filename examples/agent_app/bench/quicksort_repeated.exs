@@ -44,7 +44,7 @@ defmodule AgentExamples.Quicksort.Bench.Repeated do
         :rand.seed(:exsss, {42 + iteration, 43, 44})
         if options[:profile], do: reset_profile()
         ensure_disk_capacity!(size)
-        report = run_once(owner, iteration, size)
+        report = run_once(owner, iteration, size, output)
 
         report =
           if options[:truncate_wal],
@@ -56,6 +56,17 @@ defmodule AgentExamples.Quicksort.Bench.Repeated do
 
         append(output, report)
       end
+    catch
+      kind, reason ->
+        append(output, %{
+          phase: :failed,
+          kind: kind,
+          error: Exception.format(kind, reason, __STACKTRACE__),
+          native_profile: if(options[:profile], do: profile()),
+          resources: resources()
+        })
+
+        :erlang.raise(kind, reason, __STACKTRACE__)
     after
       if options[:profile] do
         :erlang.trace(:all, false, [:call])
@@ -63,17 +74,24 @@ defmodule AgentExamples.Quicksort.Bench.Repeated do
       end
 
       send(guard, :stop)
-      :ok = AgentExamples.Playground.stop(owner, "quicksort")
-      append(output, %{phase: :final, resources: resources()})
+      cleanup = stop_benchmark_run(owner)
+      append(output, %{phase: :final, cleanup: inspect(cleanup), resources: resources()})
     end
   end
 
-  defp run_once(owner, iteration, size) do
+  defp stop_benchmark_run(owner) do
+    AgentExamples.Playground.stop(owner, "quicksort")
+  catch
+    kind, reason -> {:error, {kind, reason}}
+  end
+
+  defp run_once(owner, iteration, size, output) do
     root = AgentExamples.Playground.get(owner, "quicksort").record
     topic = AgentExamples.Quicksort.RunHistory.topic(Ash.UUIDv7.generate())
     AgentExamples.Quicksort.RunHistory.open(topic)
     {:ok, probe} = AgentExamples.Quicksort.Bench.LifecycleProbe.start(root, size, topic)
     numbers = Enum.shuffle(Enum.to_list(1..size))
+    IO.puts("Run #{iteration}: sorting #{size} agents with recursive inspection")
 
     try do
       {sort_us, {:ok, :verified}} =
@@ -86,7 +104,7 @@ defmodule AgentExamples.Quicksort.Bench.Repeated do
                 topic: topic
               })
             end,
-            "quicksort.**",
+            "**",
             fn runtime ->
               state = runtime.agent.state.state
 
@@ -107,7 +125,14 @@ defmodule AgentExamples.Quicksort.Bench.Repeated do
           )
         end)
 
-      lifecycle = AgentExamples.Quicksort.Bench.LifecycleProbe.await(probe)
+      IO.puts(
+        "Run #{iteration}: sorted result verified in #{Float.round(sort_us / 1_000_000, 3)}s"
+      )
+
+      {retirement_us, lifecycle} =
+        :timer.tc(fn -> AgentExamples.Quicksort.Bench.LifecycleProbe.await(probe) end)
+
+      IO.puts("Run #{iteration}: all child processes retired; restarting the root")
 
       if lifecycle.failures != [],
         do: raise("Unexpected worker exits: #{inspect(lifecycle, limit: 15)}")
@@ -126,10 +151,21 @@ defmodule AgentExamples.Quicksort.Bench.Repeated do
         size: size,
         root_id: root.id,
         sort_us: sort_us,
+        retirement_us: retirement_us,
         restart_us: restart_us,
         lifecycle: lifecycle,
         resources: resources()
       }
+    catch
+      kind, reason ->
+        append(output, %{
+          phase: :attempt_failed,
+          iteration: iteration,
+          root_id: root.id,
+          lifecycle: AgentExamples.Quicksort.Bench.LifecycleProbe.snapshot(probe)
+        })
+
+        :erlang.raise(kind, reason, __STACKTRACE__)
     after
       if Process.alive?(probe), do: GenServer.stop(probe)
     end
@@ -222,6 +258,7 @@ defmodule AgentExamples.Quicksort.Bench.Repeated do
       atoms: :erlang.system_info(:atom_count),
       io_tasks: length(Task.Supervisor.children(Aikido.task_supervisor_name(Aikido.Default))),
       agents: length(Aikido.Durable.members(pool)),
+      local_agents: DurableServer.Supervisor.count_children(pool).active,
       saved_agents: saved,
       shards: shards,
       wal:

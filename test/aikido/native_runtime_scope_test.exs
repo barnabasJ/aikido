@@ -1,3 +1,35 @@
+defmodule Aikido.NativeRuntimeScopeTest.Signals.Result do
+  use Aikido.Signal
+
+  signal do
+    type "scope.result"
+  end
+end
+
+defmodule Aikido.NativeRuntimeScopeTest.Signals.CaptureScope do
+  use Aikido.Signal
+
+  signal do
+    type "scope.capture"
+  end
+end
+
+defmodule Aikido.NativeRuntimeScopeTest.Signals.ObserveScope do
+  use Aikido.Signal
+
+  signal do
+    type "scope.observe"
+  end
+end
+
+defmodule Aikido.NativeRuntimeScopeTest.Signals.SpawnChild do
+  use Aikido.Signal
+
+  signal do
+    type "scope.spawn"
+  end
+end
+
 defmodule Aikido.NativeRuntimeScopeTest.Create do
   use Ash.Resource.Change
 
@@ -149,10 +181,18 @@ defmodule Aikido.NativeRuntimeScopeTest.Resource do
     end
 
     slice :mounted, Aikido.NativeRuntimeScopeTest.Slice
-    route "scope.capture", :capture_scope, name: :capture
-    route "scope.observe", :observe_scope, name: :observe
-    route "scope.spawn", :spawn_child, name: :spawn
-    route "scope.result", :observe_scope
+
+    route Aikido.NativeRuntimeScopeTest.Signals.CaptureScope,
+          Aikido.NativeRuntimeScopeTest.Capture, name: :capture
+
+    route Aikido.NativeRuntimeScopeTest.Signals.ObserveScope,
+          Aikido.NativeRuntimeScopeTest.Observe, name: :observe
+
+    route Aikido.NativeRuntimeScopeTest.Signals.SpawnChild, Aikido.NativeRuntimeScopeTest.Spawn,
+      name: :spawn
+
+    route Aikido.NativeRuntimeScopeTest.Signals.Result, Aikido.NativeRuntimeScopeTest.Observe,
+      public?: false
   end
 
   changes do
@@ -167,21 +207,6 @@ defmodule Aikido.NativeRuntimeScopeTest.Resource do
   actions do
     read :read do
       primary? true
-    end
-
-    action :capture_scope, Aikido.Types.ActionResult do
-      argument :state, :term
-      run Aikido.NativeRuntimeScopeTest.Capture
-    end
-
-    action :observe_scope, Aikido.Types.ActionResult do
-      argument :state, :term
-      run Aikido.NativeRuntimeScopeTest.Observe
-    end
-
-    action :spawn_child, Aikido.Types.ActionResult do
-      argument :state, :term
-      run Aikido.NativeRuntimeScopeTest.Spawn
     end
   end
 
@@ -335,7 +360,7 @@ defmodule Aikido.NativeRuntimeScopeTest do
     assert {:ok, child} = Aikido.AgentServer.await_child(parent.pid, :child)
     assert_receive {:native_create, Resource, %{actor_id: "alice", marker: "ordinary"}}
     assert_receive {:native_create, Slice, %{actor_id: "alice", marker: "ordinary"}}
-    assert {:ok, pid} = Aikido.AgentServer.state(child, &{:ok, &1.parent.pid})
+    assert {:ok, pid} = Aikido.AgentServer.state(child, &{:ok, Aikido.Ownership.parent(&1).pid})
     assert pid == parent.pid
 
     assert {:ok, team} = action(Team, :start, %{}, scope())

@@ -1,3 +1,11 @@
+defmodule Aikido.RuntimeNativeContractTest.Signals.Invalid do
+  use Aikido.Signal
+
+  signal do
+    type "invalid.directive"
+  end
+end
+
 defmodule Aikido.RuntimeNativeContractTest.RawResult do
   use Ash.Resource.Actions.Implementation
 
@@ -23,14 +31,8 @@ defmodule Aikido.RuntimeNativeContractTest.InvalidDirectiveAgent do
       end
     end
 
-    route "invalid.directive", :invalid
-  end
-
-  actions do
-    action :invalid, Aikido.Types.ActionResult do
-      argument :state, :term
-      run Aikido.RuntimeNativeContractTest.RawResult
-    end
+    route Aikido.RuntimeNativeContractTest.Signals.Invalid,
+          Aikido.RuntimeNativeContractTest.RawResult
   end
 end
 

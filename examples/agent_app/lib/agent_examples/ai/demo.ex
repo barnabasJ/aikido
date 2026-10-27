@@ -32,7 +32,7 @@ defmodule AgentExamples.AI.Demo do
         """)
 
         team = AgentExamples.Agents.research_team_inspect!(team.id)
-        IO.inspect(Map.keys(team.team.members), label: "Fixed and dynamic workers")
+        IO.inspect(Map.keys(team.team.members), label: "Dynamically created workers")
         IO.inspect(team.team.topology.nodes["analyst-helper"].owner, label: "Helper's owner")
       end
     )
@@ -65,7 +65,7 @@ defmodule AgentExamples.AI.Demo do
       {:ok, answer} =
         AI.ask(
           team,
-          "Analyze 'Signals carry results'. Ask the analyst to create a helper and delegate counting to it. Create an independent specialist yourself. Have the reviewer check the results, and report the evidence.",
+          "Analyze 'Signals carry results'. Create an analyst and ask it to create a helper and delegate counting to it. Create an independent specialist yourself. Create a reviewer to check the results, and report the evidence.",
           timeout: 180_000
         )
 

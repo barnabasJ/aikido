@@ -4,6 +4,211 @@
 
 ## Unreleased
 
+- Add an isolated experimental Jido v3 adapter that generates native Ash
+  interfaces from named Jido routes while Jido retains runtime ownership.
+- Preserve the reviewed AI client validation, provider-pressure/input carry,
+  maximum-iteration failure and typed third-cycle warning corrections in the
+  experimental worktree baseline.
+
+- Add opt-in bounded context-summary regeneration for empty, invalid or oversized
+  handoff documents, retaining history and usage with fresh result correlation.
+  Truncated summaries remain terminal; provider retries keep their existing policy.
+
+- Showcase required background work using existing Team assignments, blocking
+  Todos and an ordinary scoped evidence-checking tool in the verified-team
+  playground example.
+
+- Bound todo verification by the owning run's remaining deadline, including
+  cancellation of verifier work when that budget expires.
+
+- Start nested research squads with empty rosters, creating researchers only
+  when the model assigns work instead of starting unused fixed analysts.
+
+- Use published AshLua `~> 0.2.3`, replacing the Git-only dependency so the
+  package builds for Hex. Use native structured input errors and distinct Lua
+  names for example tool resources; remove the redundant protocol override.
+
+- Reject slice mounts that collide with declared resource attributes, preserving
+  the mounted slice's native type contract.
+
+- Preserve structured provider status and recovery guidance through the
+  playground's live client. Load credentials directly at the request boundary
+  instead of queuing lookups behind the playground manager.
+
+- Encode and decode snapshot transport through native Ash term and binary
+  types, retaining legacy snapshot support and rejecting executable terms.
+  Dump the complete nested agent resource using its compiled attribute
+  contract, replacing the separate per-path writer.
+
+- Track cron callback workers through their native links and handle completion
+  in `handle_info/2`, removing duplicate monitors and mailbox flushing.
+
+- Convert native ReqLLM failures to typed Aikido errors carrying public HTTP and
+  timeout diagnostics with recovery guidance. Foreground Lua delegation and
+  background task delivery retain useful errors without raw provider payloads.
+
+- Missing-tool errors now list the prepared tool names and explain how to recover
+  instead of returning only a tool-not-found string.
+
+- Count failed Lua scripts as failed model tool calls, preserving native eval's
+  result/error contract while returning typed details and recovery guidance from
+  the example's model-facing action. Verify consecutive-error safeguards through
+  native ReqLLM HTTP, Ash AI callbacks and Lua execution.
+
+- Apply graceful lifecycle cleanup before explicit stops reach the final durable
+  save, preserving cleanup state on restore without duplicate stopping events.
+
+- Remove all Argus BEAM finding exceptions, enable all analyses by default, and
+  require the analysis engines instead of allowing compiler checks to skip them.
+
+- Fail truncated model responses with a typed `model_output_truncated` error,
+  including token-budget recovery guidance, instead of completing partial answers
+  or executing incomplete tool calls. Provider summaries include finish reasons.
+
+- Preserve the caller's Ash tracer through example completion/delegation waiters
+  and native Ash AI tool callbacks, including Ash actions dispatched by Lua.
+
+- Add native signal call/cast dispatch telemetry, distinct from processing and
+  delivery acknowledgements. The playground's Aikido dashboard retains totals
+  from startup and shows actual local processes, membership, current work and
+  bounded provider request summaries, timings and usage without payload data.
+
+- Reduce recursive inspector capture work by bypassing resource metadata discovery
+  for plain maps and terms while retaining native sensitivity and value bounds.
+  Team assignment and member/template failures now use native argument errors
+  with recovery instructions. Child-exit observations include the logical child ID.
+- Use eight native EKV shards for new playground stores. Preserve the detected
+  shard count of existing stores and reject incompatible overrides before startup.
+
+- Move logical parent and live child bindings and monitor transitions into `Aikido.Ownership.Slice`.
+  Child startup, exit, monitor acknowledgements and stop requests run through
+  ordinary actions. Keep Team responsible for desired topology and delegated work.
+  Child records and lifecycle signal modules now live under `Aikido.Ownership`.
+  Parent attachment, death policies and orphan transitions use native routed
+  actions; runtime context derives its parent references from the mounted slice.
+- Remove the test-only runtime reply projection directive and
+  `Signal.Call.reply_from_state/4`; build reply payloads in actions with `Call.reply/3`.
+  Replace standalone reducer-test resources with real agent/slice scenarios and
+  validate shared tool fixtures through registered application domains.
+
+- Ship the inspector's LiveView components, redacted history, native action
+  telemetry and browser assets in Aikido. LiveView is optional; headless
+  applications retain the observer and history API without the UI dependency.
+  The playground consumes the packaged implementation.
+
+- Serialize declared agent/slice state and restart options with native Ash
+  embedded dump/load APIs. Preserve custom codec and checkpoint contracts, retain
+  safe decoding, and read the previous transport format during migration.
+
+- Restore legacy cron manifests into the mounted slice through native embedded
+  actions while retaining safe snapshot decoding. New snapshots no longer write
+  the legacy manifest.
+
+- Mount recurring scheduling as `Aikido.Cron.Slice`. Native actions own job
+  registration, cancellation, recovery and retry generations. Persist dynamic
+  definitions through the slice codec instead of a separate runtime manifest.
+  Remove AgentServer's cron fields, cascade writes and restart timer handlers.
+- Consolidate schedule declarations into `Aikido.Cron.Schedule` and compilation
+  into `Aikido.Cron.Declarations`. Slice schedules now use the same `timezone:`
+  and `signal_type:` option names as agent schedules.
+
+- Reduce recursive inspector overhead by bounding list traversal before redaction,
+  projecting agent state once and precomputing private field names. Preserve native
+  sensitivity rules, child events and the existing thirty-item display limit.
+
+- Treat unhandled internally emitted lifecycle/identity notifications as optional
+  observations, while preserving missing-route errors for ordinary commands.
+  Support negative inspector filter terms such as `-lifecycle` and let long sequence
+  numbers size their own column without overlapping signal names.
+
+- Add `Aikido.Inspector.attach/3` with optional recursive child/team observation,
+  bounded event batches and automatic cleanup when the root or consumer exits.
+  Use it throughout the playground so Quicksort records child signals too.
+- Add recurring cron and hard-crash/checkpoint counter examples. Demonstrate
+  cancellation, unsaved changes and restoring a permanent logical identity.
+
+- Show native Ash action invocations and timings in the playground inspector,
+  correlated with each signal. Resolve implementation names and configured mount
+  paths from DSL metadata without retaining action arguments or results.
+
+- Exercise notification delivery and built-in stop behavior through real test
+  agents and typed routes instead of a standalone shared action resource.
+  Initialize slice scenarios with native create actions and compare domain
+  attributes independently of Ash selection metadata.
+
+- Materialize inspect/list snapshots through a private native Ash projection
+  action with caller scope. Preserve readonly fields and mounted resource types
+  without invoking create hooks or writing the resource's data layer.
+
+- Remove unused shared reducer wrappers for cancellation, forwarding, notifications,
+  spawning and scheduling. Keep runtime integration fixtures in test support and
+  use the native directives directly. Keep the test-only PubSub notifier
+  in test support and remove its direct production dependency. Remove the unused
+  identity self-model slice; composition tests use the supported Todo slice instead.
+
+- Declare example-specific tool policies. Require Lua for the research team and
+  Lua-permissions workflows, hide unsupported toggles on fixed-tool scenarios,
+  and expose optional scripting only on assistants that support both modes.
+
+- Share the inspector's rows, identity popups, tabs and diffs as function
+  components; reuse code blocks, numeric commands, status displays and individual
+  request, task and source-definition cards across example panels.
+
+- Ask for fresh approval at the start of every request/response example task,
+  including repeated prompts and Lua-based tool use, before any model request.
+
+- Compose example pages from reusable Phoenix function components with mount
+  hooks for controls, tree selection and session lifecycle. Remove the team
+  tree's LiveComponent and share conversation and hook-context panels.
+
+- Store fixed-size SHA-256 tool-batch fingerprints for loop detection instead of
+  retaining argument text. Compare complete arguments without inspect truncation.
+
+- Honor native Ash sensitive fields in inspector snapshots and routed signal
+  payloads before recording them. Preserve nested snapshot structure when applying
+  size limits instead of replacing the whole tree with a JSON string.
+
+- Explain inspector processing failures in plain language, distinguish them from
+  process exits, and retain input-signal and before/after snapshot navigation.
+
+- Render playground conversations, streaming answers, delegated findings and
+  agent output with MDEx, including themed tables and sanitized Markdown.
+
+- Generate Team and built-in runtime reducer actions from typed signal routes;
+  remove duplicate Team command expansion and the production runtime-action
+  registry. Keep explicit native-action reference coverage in test fixtures.
+
+- Preserve inspector selection and expanded state branches as signals arrive,
+  show complete redacted directive fields, and identify processes with stable
+  PID-derived colors and full agent IDs on hover.
+
+- Preserve inherited delegation deadlines unless an explicit shorter timeout is
+  supplied. Opt the research teams into task-based completion so interim answers
+  wait for background results; resume those runs without resetting their request,
+  deadline, iteration count or prepared tools.
+
+- Make the example inspector a compact DevTools-style split view with dense
+  signal rows, expandable state/diffs and highlighted raw JSON. Highlight the
+  example source definitions with Makeup's Elixir lexer.
+
+- Apply the shared navy, red, blue and green palette throughout the example
+  playground, with a colored Aikido wordmark in place of the separate logo badge.
+
+- Add a built-in read-only Aikido inspector to example pages: bounded team-wide
+  signal history, before/after state, nested diffs, returned directive descriptors
+  and errors. Execution-aware subscriptions project these details without replaying effects.
+
+- Read ReqLLM's nested synchronous token-usage envelope in example dashboard
+  metrics; retain unknown pricing as unavailable rather than zero.
+
+- Track foreground delegation dependencies in teams and reject circular waits
+  with actionable Ash AI/Lua errors. Background existing assignments without
+  cancelling workers; the research example exposes both modes through one tool
+  and offers a Continue in background control for steering active runs.
+
+- Start the research-team example with only its orchestrator; all root workers
+  and squads are created dynamically, including in the offline demonstration.
+
 ### Added
 
 - Add a native Phoenix LiveDashboard to the example app with Aikido signal and

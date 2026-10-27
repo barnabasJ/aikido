@@ -3,6 +3,11 @@ defmodule Aikido.AiReact.Directives.VerifyTodos do
   use Aikido.Directive
 
   typed_struct do
+    field :deadline_at, :integer do
+      description "Absolute Unix-millisecond deadline inherited from the run being verified."
+      constraints min: 1
+    end
+
     field :revision, :integer do
       description "Todo revision whose evidence is being checked; newer work requires another verification."
       allow_nil? false
@@ -72,6 +77,7 @@ defmodule Aikido.AiReact.Directives.VerifyTodos do
           supervisor,
           fn _, _ -> verify_work(directive, scope) end,
           timeout: directive.timeout,
+          deadline_at: directive.deadline_at,
           tracer: scope[:tracer]
         )
       end,

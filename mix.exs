@@ -39,28 +39,7 @@ defmodule Aikido.MixProject do
       dialyzer: [
         plt_add_apps: [:mix]
       ],
-      argus: [
-        ignore: [
-          findings: [
-            # DurableServer owns the process, traps exits and delegates termination.
-            {:shutdown, {Aikido.AgentServer, :terminate, 2}},
-            # Each durable identity has its own PID; this is not one shared server.
-            {:blocking, {Aikido.AgentServer, :handle_call, 3}},
-            # These finite names come from compiled Spark declarations, not runtime input.
-            # Exact generated anchors fail closed if compiler output changes.
-            {:unsafe_input,
-             {Aikido.Agent.Extension.Transformers.Build, :"-resolve_local_actions/3-fun-1-", 3}},
-            {:unsafe_input,
-             {Aikido.Domain.Extension.Transformers.Build, :public_action_interface, 2}},
-            # Reads our trusted, compressed backend snapshots, including native callbacks.
-            {:unsafe_input, {Aikido.Durable.AgentServer, :load_state, 2}},
-            # Task-capacity fallback kills only the already retired scheduler PID.
-            {:failure, {Aikido.Cron.Directives.Cancel, :force_shutdown_after_start_failure, 4}},
-            # Flushes only a queued worker EXIT after unlink, with a zero timeout.
-            {:blocking, {Aikido.Cron.Job, :unlink_finished_worker, 1}}
-          ]
-        ]
-      ]
+      argus: [analyses: [:all], engine: :require]
     ]
   end
 
@@ -134,7 +113,7 @@ defmodule Aikido.MixProject do
         Durability: [~r/^Aikido\.Durable(?:\.|$)/],
         "Actions and Effects": [~r/^Aikido\.(?:Actions|Directives)(?:\.|$)/],
         Features: [
-          ~r/^Aikido\.(?:Cron|FSM|AiReact|AiWorker|AI|Identity|Memory|Thread|Todo|Team)(?:\.|$)/
+          ~r/^Aikido\.(?:Cron|FSM|AiReact|AiWorker|AI|Memory|Thread|Todo|Team)(?:\.|$)/
         ],
         Runtime: [Aikido, Aikido.Agent, Aikido.AgentServer, ~r/^Aikido\.AgentServer\./],
         "Types and DSL": [~r/^Aikido\.(?:Types|Dsl)(?:\.|$)/],
@@ -145,7 +124,7 @@ defmodule Aikido.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE", "NOTICE", "usage-rules.md"],
+      files: ["lib", "priv", "mix.exs", "README.md", "LICENSE", "NOTICE", "usage-rules.md"],
       maintainers: ["barnabasJ"],
       licenses: ["Apache-2.0"],
       links: %{
@@ -165,12 +144,11 @@ defmodule Aikido.MixProject do
       {:ash_ai, "~> 1.3"},
       {:lua, "~> 1.0.2"},
       {:ash_lua,
-       git: "https://github.com/ash-project/ash_lua.git",
-       ref: "5388cbbcd176e3f879a713d948733d9f0e281cf6"},
+       git: "https://github.com/barnabasJ/ash_lua.git",
+       ref: "53fe11b883b7f8c8f6b85d07630bf78727a1efed"},
       {:simple_sat, "~> 0.1"},
       {:deep_merge, "~> 1.0"},
       {:jason, "~> 1.4"},
-      {:phoenix_pubsub, "~> 2.1"},
       {:req_llm, "~> 1.24"},
       {:spark, "~> 2.2"},
       {:splode, "~> 0.3.0"},
@@ -178,6 +156,8 @@ defmodule Aikido.MixProject do
       {:telemetry_metrics, "~> 1.1"},
       {:crontab, "~> 1.2"},
       {:time_zone_info, "~> 0.7"},
+      {:phoenix_live_view, "~> 1.1", optional: true},
+      {:makeup_json, "~> 1.0"},
 
       # Development & Test Dependencies
       {:benchee, "~> 1.5", only: :dev, runtime: false},
@@ -193,7 +173,6 @@ defmodule Aikido.MixProject do
       {:expublish, "~> 2.7", only: [:dev], runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:mimic, "~> 2.0", only: :test},
-      {:stream_data, "~> 1.0"},
       {:mix_test_interactive, "~> 5.1", only: :dev, runtime: false}
     ]
   end

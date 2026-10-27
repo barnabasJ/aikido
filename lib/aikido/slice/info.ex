@@ -30,10 +30,16 @@ defmodule Aikido.Slice.Info do
     |> Extension.get_entities([:schedules])
     |> Enum.map(fn schedule ->
       options = [data: schedule.data]
-      options = if schedule.tz, do: Keyword.put(options, :tz, schedule.tz), else: options
 
       options =
-        if schedule.signal, do: Keyword.put(options, :signal, schedule.signal), else: options
+        if schedule.timezone,
+          do: Keyword.put(options, :timezone, schedule.timezone),
+          else: options
+
+      options =
+        if schedule.signal_type,
+          do: Keyword.put(options, :signal_type, schedule.signal_type),
+          else: options
 
       {schedule.cron, action_reference(resource, schedule.action), options}
     end)

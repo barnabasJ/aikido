@@ -8,7 +8,18 @@ defmodule Aikido.Team.Actions.AssignTask do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
-    ActionAdapter.to_action_result(assign_or_activate_member(signal, state, context, config))
+
+    signal = preserve_pending_task_mode(signal, state)
+
+    with :ok <- Aikido.Team.TaskDependencies.validate_assignment(state, signal.data) do
+      ActionAdapter.to_action_result(assign_or_activate_member(signal, state, context, config))
+    end
+  end
+
+  defp preserve_pending_task_mode(signal, state) do
+    id = signal.data[:task_id] || signal.id
+    pending = Map.get(Map.get(state, :pending_tasks, %{}), id, %{})
+    %{signal | data: Map.merge(signal.data, Map.take(pending, [:mode, :notify, :requester]))}
   end
 
   defp assign_or_activate_member(signal, state, context, config) do
@@ -16,14 +27,20 @@ defmodule Aikido.Team.Actions.AssignTask do
 
     cond do
       Map.has_key?(state.tasks, id) ->
-        {:error, {:task_exists, id}}
+        task_exists(id)
 
       Map.has_key?(state.members, signal.data.member) ->
         state = Map.update(state, :pending_tasks, %{}, &Map.delete(&1, id))
         assign_task(signal, state, context)
 
       Map.has_key?(Map.get(state, :pending_tasks, %{}), id) ->
-        {:error, :operation_in_progress}
+        {:error,
+         Ash.Error.Action.InvalidArgument.exception(
+           field: :task_id,
+           message:
+             "Task #{inspect(id)} is already awaiting member activation. " <>
+               "Wait for its existing assignment instead of submitting it again."
+         )}
 
       Map.has_key?(state.topology.nodes, signal.data.member) ->
         state =
@@ -37,7 +54,13 @@ defmodule Aikido.Team.Actions.AssignTask do
         )
 
       true ->
-        {:error, {:unknown_member, signal.data.member}}
+        {:error,
+         Ash.Error.Action.InvalidArgument.exception(
+           field: :member,
+           message:
+             "Unknown team member #{inspect(signal.data.member)}. " <>
+               "Inspect the roster or add the member before assigning work."
+         )}
     end
   end
 
@@ -45,7 +68,7 @@ defmodule Aikido.Team.Actions.AssignTask do
     data = signal.data
     id = Map.get(data, :task_id) || signal.id
 
-    with true <- !Map.has_key?(state.tasks, id) || {:error, {:task_exists, id}},
+    with true <- !Map.has_key?(state.tasks, id) || task_exists(id),
          {:ok, pid} <- Aikido.Team.MemberProcesses.fetch_running_member_pid(state, data.member) do
       task = dispatched_task(id, data, state.incarnations[data.member])
 
@@ -55,13 +78,25 @@ defmodule Aikido.Team.Actions.AssignTask do
     end
   end
 
+  defp task_exists(id) do
+    {:error,
+     Ash.Error.Action.InvalidArgument.exception(
+       field: :task_id,
+       message:
+         "Task #{inspect(id)} already exists. Inspect its result or background the existing " <>
+           "task; use a new task ID only for a distinct assignment."
+     )}
+  end
+
   defp dispatched_task(id, data, attempt) do
     %{
       id: id,
       member: data.member,
       status: :dispatched,
       result: nil,
-      notify: data[:notify],
+      notify: data[:notify] || if(data[:mode] == :background, do: data[:requester]),
+      requester: data[:requester],
+      mode: Map.get(data, :mode, :background),
       worker_lifecycle: Map.get(data, :worker_lifecycle, :keep),
       metadata: data[:metadata] || %{},
       attempt: attempt

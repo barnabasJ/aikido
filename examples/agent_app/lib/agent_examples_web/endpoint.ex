@@ -19,6 +19,8 @@ defmodule AgentExamplesWeb.Endpoint do
     only: ~w(phoenix_live_view.esm.js)
   )
 
+  plug(Plug.Static, at: "/aikido", from: :aikido, only: ~w(inspector))
+
   plug(Plug.RequestId)
   plug(Plug.Telemetry, event_prefix: [:phoenix, :endpoint])
 

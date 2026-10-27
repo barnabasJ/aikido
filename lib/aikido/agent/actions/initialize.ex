@@ -51,7 +51,9 @@ defmodule Aikido.Agent.Actions.Initialize do
 
   defp initialize_slices(instances, values, scope) do
     Enum.reduce_while(instances, {:ok, %{}}, fn instance, {:ok, state} ->
-      attributes = Map.merge(instance.config, Map.get(values, instance.path) || %{})
+      supplied = Map.get(values, instance.path) || %{}
+      supplied = if is_struct(supplied), do: Map.from_struct(supplied), else: supplied
+      attributes = Map.merge(instance.config, supplied)
 
       case initialize(instance.module, :create, attributes, instance.path, scope) do
         {:ok, record} -> {:cont, {:ok, Map.put(state, instance.path, record)}}

@@ -96,14 +96,14 @@ defmodule Aikido.Directives.SpawnAgent do
   @doc """
   Pure I/O directive: starts the child in supervised work through DurableServer
   with its logical parent binding. The
-  child's own `notify_parent_of_startup/1` then casts
+  child's own `Aikido.Ownership.Actions.AnnounceChild` then emits
   `aikido.agent.child.started` back to this agent, where
-  `maybe_track_child_started/2` records the `%ChildInfo{}` and creates
-  the parent-side monitor.
+  `Aikido.Ownership.Actions.TrackChild` records the child and requests
+  the parent-side monitor through a directive.
 
   Async window: between the directive returning and the natural
-  `child.started` arriving, `state.children[tag]` is `nil`. Tests should
-  use `AgentServer.await_child/3` rather than peeking at `state.children`
+  `child.started` arriving, `Aikido.Ownership.children(runtime)[tag]` is `nil`. Tests should
+  use `AgentServer.await_child/3` rather than reading the ownership slice
   immediately.
   """
 
@@ -220,7 +220,7 @@ defmodule Aikido.Directives.SpawnAgent do
         if !Process.alive?(parent_pid) do
           GenServer.cast(
             pid,
-            {:ensure_initial_parent, Aikido.AgentServer.ParentRef.new!(parent_ref)}
+            {:ensure_initial_parent, Aikido.Ownership.ParentRef.new!(parent_ref)}
           )
         end
 

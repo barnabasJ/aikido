@@ -53,9 +53,9 @@ defmodule Aikido.Directives.AdoptChild do
              :error -> nil
            end)
 
-    if is_pid(pid) and pid != self() and not Map.has_key?(state.children, tag) do
+    if is_pid(pid) and pid != self() and not Map.has_key?(Aikido.Ownership.children(state), tag) do
       parent =
-        Aikido.AgentServer.ParentRef.new!(%{
+        Aikido.Ownership.ParentRef.new!(%{
           pid: self(),
           id: state.id,
           partition: state.partition,

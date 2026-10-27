@@ -203,6 +203,81 @@ defmodule Aikido.ReactFeaturesTest do
     assert {:ok, "tool failed safely"} = Task.await(task)
   end
 
+  test "a late timeout for completed tool N leaves pending tool N plus one in the same request",
+       ctx do
+    opts =
+      options(
+        tools: [:test_wait],
+        tool_context: %{context: %{observer: self()}},
+        options: %{tool_timeout_ms: 1_000, tool_max_retries: 0}
+      )
+
+    pid = start_server(ctx, Agent)
+
+    assert {:ok, timeout_result} =
+             Aikido.AgentServer.subscribe(
+               pid,
+               "ai.react.tool.completed",
+               fn _runtime, event -> {:ok, event.signal} end, once: true)
+
+    request = Task.async(fn -> Aikido.AI.ask_sync(pid, "two tool turns", opts) end)
+    assert_receive {:model, first_model, _}, 2_000
+    send(first_model, {:answer, {:ok, tool_turn("turn_n")}})
+    assert_receive {:tool_running, first_worker}, 2_000
+    first_monitor = Process.monitor(first_worker)
+    assert_receive {:DOWN, ^first_monitor, :process, ^first_worker, _}, 2_000
+    assert_receive {:aikido_subscription, ^timeout_result, %{result: {:ok, stale}}}, 2_000
+    assert stale.type == "ai.react.tool.completed"
+    assert stale.data.tool_call_id == "turn_n"
+    assert stale.data.error?
+    assert Jason.decode!(stale.data.content)["error"] =~ "Tool timeout"
+
+    assert_receive {:model, second_model, _}, 2_000
+    send(second_model, {:answer, {:ok, tool_turn("turn_n_plus_one")}})
+    assert_receive {:tool_running, second_worker}, 2_000
+
+    assert {:ok, before} =
+             Aikido.AgentServer.state(pid, fn runtime ->
+               {:ok,
+                Map.take(
+                  runtime.agent.state.ai,
+                  [:request_id, :pending_tool_calls, :tool_results_received, :status]
+                )}
+             end)
+
+    assert Enum.map(before.pending_tool_calls, & &1.id) == ["turn_n_plus_one"]
+    assert before.tool_results_received == []
+    assert before.request_id == stale.data.request_id
+
+    assert {:ok, after_stale} =
+             Aikido.AgentServer.call(pid, stale, fn runtime ->
+               {:ok,
+                Map.take(
+                  runtime.agent.state.ai,
+                  [:request_id, :pending_tool_calls, :tool_results_received, :status]
+                )}
+             end)
+
+    assert after_stale == before
+    send(second_worker, :continue)
+    assert_receive {:model, final_model, _}, 2_000
+    send(final_model, {:answer, {:ok, Responses.final_answer_response("second tool completed")}})
+    assert {:ok, "second tool completed"} = Task.await(request)
+  end
+
+  defp tool_turn(id) do
+    %ReqLLM.Response{
+      id: "response-#{id}",
+      model: "offline",
+      context: ReqLLM.Context.new(),
+      message:
+        ReqLLM.Context.assistant("",
+          tool_calls: [%{id: id, name: "test_wait", arguments: %{}}]
+        ),
+      finish_reason: :tool_calls
+    }
+  end
+
   test "queued messages cannot change the actor or tenant of an active run", ctx do
     pid = start_server(ctx, Agent)
     opts = options(actor: %{id: "alice"}, tenant: "a")

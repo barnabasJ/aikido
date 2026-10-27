@@ -226,6 +226,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
   end
 
   defp model_result_signal({:error, reason}, d, source) do
+    reason = Aikido.AiReact.Errors.ProviderRequestFailed.from_reason(reason)
     data = %{reason: reason, request_id: d.request_id} |> include_handoff_id(d)
     Signal.new!(model_failure_signal_type(d), data, source: source)
   end

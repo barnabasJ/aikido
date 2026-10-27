@@ -13,8 +13,7 @@ end
 defmodule Aikido.AI.TestTools.Wait do
   use Ash.Resource,
     domain: Aikido.AI.TestToolDomain,
-    data_layer: Ash.DataLayer.Simple,
-    validate_domain_inclusion?: false
+    data_layer: Ash.DataLayer.Simple
 
   actions do
     action :wait, :string do
@@ -35,8 +34,7 @@ end
 defmodule Aikido.AI.TestTools.Identity do
   use Ash.Resource,
     domain: Aikido.AI.TestToolDomain,
-    data_layer: Ash.DataLayer.Simple,
-    validate_domain_inclusion?: false
+    data_layer: Ash.DataLayer.Simple
 
   actions do
     action :identity, :string do

@@ -29,7 +29,11 @@ defmodule Aikido.Dsl.AgentTest do
     assert Ash.Resource.Info.attribute(Aikido.Dsl.AgentTest.SimpleAgent, :counter).type ==
              Ash.Type.Integer
 
-    assert Aikido.Agent.Info.slice_instances(Aikido.Dsl.AgentTest.SimpleAgent) == []
+    assert [
+             %Aikido.Slice.Instance{module: Aikido.Ownership.Slice, path: :ownership},
+             %Aikido.Slice.Instance{module: Aikido.Cron.Slice, path: :cron}
+           ] =
+             Aikido.Agent.Info.slice_instances(Aikido.Dsl.AgentTest.SimpleAgent)
   end
 
   test "native initialization casts own state and applies resource defaults" do

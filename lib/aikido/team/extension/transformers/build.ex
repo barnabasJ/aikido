@@ -3,18 +3,6 @@ defmodule Aikido.Team.Extension.Transformers.Build do
   use Spark.Dsl.Transformer
   alias Spark.Dsl.Transformer
 
-  @commands [
-    :start,
-    :reconcile,
-    :add_member,
-    :remove_member,
-    :ensure_member,
-    :stop_member,
-    :send,
-    :broadcast,
-    :assign_task
-  ]
-
   def before?(Aikido.Agent.Extension.Transformers.Build), do: true
   def before?(_), do: false
 
@@ -44,16 +32,15 @@ defmodule Aikido.Team.Extension.Transformers.Build do
       workers: Map.new(workers, &{&1.name, Map.from_struct(&1)})
     }
 
-    add_team_slice_and_commands(dsl, config)
+    mount_configured_team_slice(dsl, config)
   end
 
-  defp add_team_slice_and_commands(dsl, config) do
+  defp mount_configured_team_slice(dsl, config) do
     Code.ensure_compiled!(Aikido.Team.Slice)
 
     dsl
     |> mount_team_slice()
     |> Transformer.persist(:aikido_team_config, config)
-    |> add_team_commands()
     |> then(&{:ok, &1})
   end
 
@@ -65,16 +52,5 @@ defmodule Aikido.Team.Extension.Transformers.Build do
       module: Aikido.Team.Slice,
       options: []
     })
-  end
-
-  defp add_team_commands(dsl) do
-    Enum.reduce(@commands, dsl, fn command, dsl ->
-      Transformer.add_entity(dsl, [:agent], %Aikido.Agent.Route{
-        name: if(command == :start, do: :configure_topology, else: command),
-        public?: true,
-        type: "aikido.ash.team.#{command}",
-        action: {Aikido.Team.Slice, command}
-      })
-    end)
   end
 end

@@ -232,7 +232,7 @@ defmodule Aikido.HooksTest do
         text: "late"
       })
 
-    assert unchanged == state
+    assert AikidoTest.SliceState.attributes(unchanged) == AikidoTest.SliceState.attributes(state)
 
     {:ok, %{state: unchanged}} =
       Aikido.AiReact.Actions.HookCompleted.apply_hook_result(state, %{
@@ -243,7 +243,7 @@ defmodule Aikido.HooksTest do
         result: {:ok, %Decision{decision: :continue}}
       })
 
-    assert unchanged == state
+    assert AikidoTest.SliceState.attributes(unchanged) == AikidoTest.SliceState.attributes(state)
   end
 
   test "runtime hooks supply context and complete through the existing AI interface", ctx do
@@ -293,7 +293,8 @@ defmodule Aikido.HooksTest do
     {:ok, %{state: unchanged, directives: []}} =
       complete(cancelled, gate, {:ok, %Decision{decision: :continue}})
 
-    assert unchanged == cancelled
+    assert AikidoTest.SliceState.attributes(unchanged) ==
+             AikidoTest.SliceState.attributes(cancelled)
   end
 
   test "async observers do not hold up effects and their errors remain observable" do
@@ -367,7 +368,8 @@ defmodule Aikido.HooksTest do
         |> Ash.run_action()
       end)
 
-    assert unchanged == waiting
+    assert AikidoTest.SliceState.attributes(unchanged) ==
+             AikidoTest.SliceState.attributes(waiting)
 
     {:ok, %{state: completed, directives: []}} =
       complete(waiting, gate, {:ok, %Decision{decision: :continue}})

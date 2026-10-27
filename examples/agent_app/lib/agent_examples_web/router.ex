@@ -20,6 +20,7 @@ defmodule AgentExamplesWeb.Router do
     live_dashboard("/dashboard",
       metrics: AgentExamples.Telemetry,
       home_app: {"Aikido", :agent_examples},
+      additional_pages: [aikido: AgentExamplesWeb.TelemetryPage],
       request_logger: false,
       ecto_repos: []
     )
@@ -29,9 +30,12 @@ defmodule AgentExamplesWeb.Router do
       live("/examples/lua-permissions", LuaPermissionsLive)
       live("/examples/adaptive-tools", AdaptiveToolsLive)
       live("/examples/verified-work", VerifiedWorkLive)
+      live("/examples/verified-team", VerifiedTeamLive)
       live("/examples/resilience", ResilienceLive)
       live("/examples/recovery", RecoveryLive)
       live("/examples/counter", CounterLive)
+      live("/examples/cron", CronLive)
+      live("/examples/checkpoint", CheckpointLive)
       live("/examples/checklist", ChecklistLive)
       live("/examples/notebook", NotebookLive)
       live("/examples/worker", WorkerLive)

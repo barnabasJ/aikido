@@ -73,6 +73,9 @@ defmodule Aikido.AI.Extension.Transformers.Build do
         do: default,
         else: Transformer.get_option(dsl, [:ai], name, default)
 
+    # Native MFA defaults defer module casting until Ash initializes the record.
+    default = if name == :client, do: {Function, :identity, [default]}, else: default
+
     [default: default, allow_nil?: nullable, public?: true]
     |> add_attribute_constraints(name)
   end

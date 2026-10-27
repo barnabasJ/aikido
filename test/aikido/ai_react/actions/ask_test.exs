@@ -49,7 +49,7 @@ defmodule Aikido.AiReact.AskTest do
       assert {:error, _} =
                Aikido.AiReact.Slice
                |> Ash.Changeset.for_create(:create, %{max_iterations: invalid})
-               |> Ash.Changeset.apply_attributes()
+               |> Ash.create()
     end
 
     assert {:ok, %{max_iterations: 1}} =

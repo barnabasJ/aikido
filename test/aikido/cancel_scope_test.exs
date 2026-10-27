@@ -37,20 +37,12 @@ defmodule Aikido.CancelScopeTest.Agent do
       end
     end
 
-    route "ai.react.cancel", :cancel_run
+    route Aikido.AiReact.Signals.Cancel, Aikido.CancelScopeTest.Reducer
   end
 
   policies do
     policy always() do
       authorize_if actor_attribute_equals(:id, "alice")
-    end
-  end
-
-  actions do
-    action :cancel_run, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :request_id, :string
-      run Aikido.CancelScopeTest.Reducer
     end
   end
 end

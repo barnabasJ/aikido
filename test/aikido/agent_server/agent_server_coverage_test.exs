@@ -13,7 +13,7 @@ defmodule AikidoTest.AgentServerCoverageTest.SimpleTestAgent do
       end
     end
 
-    route "increment", {AikidoTest.TestActions, :increment}
+    route AikidoTest.TestSignals.Increment, AikidoTest.TestActions.Actions.IncrementCounter
   end
 end
 
@@ -136,8 +136,11 @@ defmodule AikidoTest.AgentServerCoverageTest do
 
   describe("module activation with initialized state") do
     test("uses explicit agent_module for action routing", %{aikido: aikido}) do
-      agent = AikidoTest.TestAgents.Counter.initialize!(%{id: "prebuilt-struct-test"})
-      agent = %{agent | state: put_in(agent.state, [:domain, :counter], 50)}
+      agent =
+        AikidoTest.TestAgents.Counter.initialize!(%{
+          id: "prebuilt-struct-test",
+          state: %{counter: 50}
+        })
 
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(aikido, AikidoTest.TestAgents.Counter,

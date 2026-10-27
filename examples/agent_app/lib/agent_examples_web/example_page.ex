@@ -6,7 +6,7 @@ defmodule AgentExamplesWeb.ExamplePage do
 
   def on_mount(slug, _params, %{"browser_id" => owner}, socket) do
     example = Catalog.find(slug)
-    if connected?(socket), do: Playground.subscribe()
+    if connected?(socket), do: Playground.subscribe(owner)
     provider = Playground.provider_settings(owner)
 
     socket =
@@ -23,7 +23,7 @@ defmodule AgentExamplesWeb.ExamplePage do
         model: provider.model,
         key_configured: provider.key_configured?,
         provider_saved: false,
-        lua: true,
+        lua: Catalog.lua_enabled?(example, true),
         system_prompt: ai_default(example, :system_prompt, ""),
         max_iterations: ai_default(example, :max_iterations, 10)
       )
@@ -31,26 +31,16 @@ defmodule AgentExamplesWeb.ExamplePage do
       |> attach_hook(:example_updates, :handle_info, &handle_info/2)
       |> attach_hook(:example_start, :handle_async, &handle_async/3)
 
-    {:cont, socket}
-  end
-
-  defp handle_event("provider_settings", params, socket) do
-    {:halt,
-     assign(socket,
-       mode: params["mode"] || "offline",
-       provider: params["provider"] || socket.assigns.provider,
-       model: params["model"] || socket.assigns.model,
-       provider_saved: false
-     )}
-  end
-
-  defp handle_event("save_provider", params, socket) do
-    case Playground.configure_provider(socket.assigns.owner, params) do
-      {:ok, settings} ->
-        {:halt, assign_provider(socket, settings) |> assign(error: nil, provider_saved: true)}
-
-      {:error, error} ->
-        {:halt, assign(socket, error: error, provider_saved: false)}
+    with {:cont, socket} <-
+           AgentExamplesWeb.Components.ProviderSettings.on_mount(:default, %{}, %{}, socket),
+         {:cont, socket} <-
+           AgentExamplesWeb.Components.SourceDefinitions.on_mount(:default, %{}, %{}, socket) do
+      Aikido.Inspector.Components.on_mount(
+        {:history, fn assigns -> assigns.run && assigns.run.inspection end},
+        %{},
+        %{},
+        socket
+      )
     end
   end
 
@@ -59,7 +49,7 @@ defmodule AgentExamplesWeb.ExamplePage do
      assign(socket,
        mode: params["mode"] || "offline",
        model: params["model"] || socket.assigns.model,
-       lua: params["lua"] == "true",
+       lua: Catalog.lua_enabled?(socket.assigns.example, params["lua"] == "true"),
        system_prompt: Map.get(params, "system_prompt", socket.assigns.system_prompt),
        max_iterations: Map.get(params, "max_iterations", socket.assigns.max_iterations)
      )}
@@ -83,6 +73,11 @@ defmodule AgentExamplesWeb.ExamplePage do
     {:halt, socket |> assign(error: command_error(result)) |> reload_run()}
   end
 
+  defp handle_event("background_task", %{"task-id" => id, "team-path" => path}, socket) do
+    {:halt, socket} = command(socket, :background_task, %{task_id: id, team_path: path})
+    {:halt, socket}
+  end
+
   defp handle_event(_, _, socket), do: {:cont, socket}
 
   defp start_example(owner, "quicksort", params) do
@@ -104,15 +99,6 @@ defmodule AgentExamplesWeb.ExamplePage do
 
   defp handle_async(_, _, socket), do: {:cont, socket}
 
-  defp handle_info({:provider_updated, owner}, socket) do
-    socket =
-      if owner == socket.assigns.owner,
-        do: assign_provider(socket, Playground.provider_settings(owner)),
-        else: socket
-
-    {:halt, socket}
-  end
-
   defp handle_info({:run_updated, owner, slug}, socket) do
     socket =
       if owner == socket.assigns.owner && slug == socket.assigns.example.slug,
@@ -124,18 +110,9 @@ defmodule AgentExamplesWeb.ExamplePage do
 
   defp handle_info(_, socket), do: {:cont, socket}
 
-  defp assign_provider(socket, settings),
-    do:
-      assign(socket,
-        mode: settings.mode,
-        provider: settings.provider,
-        model: settings.model,
-        key_configured: settings.key_configured?
-      )
-
   def command(socket, action, input) do
     result = Playground.command(socket.assigns.owner, socket.assigns.example.slug, action, input)
-    {:noreply, socket |> assign(error: command_error(result)) |> reload_run()}
+    {:halt, socket |> assign(error: command_error(result)) |> reload_run()}
   end
 
   defp reload_run(socket),

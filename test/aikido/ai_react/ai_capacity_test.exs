@@ -1,76 +1,52 @@
-defmodule Aikido.AICapacityTest.Launch do
-  use Ash.Resource.Actions.Implementation
-
-  @impl true
-  def run(input, _opts, _context) do
-    runtime = input.context.aikido
-    request_id = input.arguments.request_id
-    tool_call = %{id: "capacity-call", name: "unreached", arguments: %{}}
-    context = ReqLLM.Context.new([ReqLLM.Context.user("capacity")])
-
-    {context, pending, effect} =
-      case input.arguments.kind do
-        :model ->
-          {context, [],
-           %Aikido.AiReact.Directives.LLMCall{
-             model: "offline",
-             client: Aikido.AICapacityTest.Client,
-             context: context,
-             request_id: request_id
-           }}
-
-        :tool ->
-          context =
-            ReqLLM.Context.append(
-              context,
-              ReqLLM.Context.assistant("",
-                tool_calls: [
-                  %ReqLLM.ToolCall{
-                    id: tool_call.id,
-                    function: %{name: tool_call.name, arguments: "{}"}
-                  }
-                ]
-              )
-            )
-
-          {context, [tool_call],
-           %Aikido.AiReact.Directives.ToolExec{
-             tool_call: tool_call,
-             request_id: request_id
-           }}
-      end
-
-    ai =
-      runtime.agent.state.ai
-      |> Map.merge(%{
-        status: :running,
-        request_id: request_id,
-        model: "offline",
-        client: Aikido.AICapacityTest.Client,
-        context: context,
-        pending_tool_calls: pending,
-        prepared_tools: {[], %{}}
-      })
-      |> Aikido.AiReact.Conversation.replace_context(context)
-
-    Aikido.Types.ActionResult.new(
-      state: %Aikido.Types.SliceUpdate{slices: %{ai: ai}},
-      directives: [effect]
-    )
-  end
-end
-
 defmodule Aikido.AICapacityTest.Observe do
   use Aikido.Middleware
 
   @impl true
   def on_signal(signal, context, _opts, next) do
-    if signal.type in ["ai.react.failed", "ai.react.tool.completed"] do
-      send(context.context.shared.observer, {:capacity_result, signal.type, signal.data, context})
+    shared = Map.merge(%{kind: nil}, get_in(context, [:context, :shared]) || %{})
+
+    if signal.type == "ai.react.tools.ready" && shared.kind in [:model, :tool] do
+      send(shared.observer, {:tools_prepared, self(), signal.data.request_id})
+
+      receive do
+        {:release_prepared, request_id} when request_id == signal.data.request_id -> :ok
+      after
+        5_000 -> raise "capacity test did not release the prepared-tools gate"
+      end
     end
 
-    next.(signal, context)
+    if is_pid(shared[:observer]) && signal.type in ["ai.react.failed", "ai.react.tool.completed"] do
+      send(shared.observer, {:capacity_result, signal.type, signal.data, context})
+    end
+
+    case next.(signal, context) do
+      {:ok, context, directives}
+      when signal.type == "ai.react.tools.ready" and shared.kind == :tool ->
+        # Only the model transport is scripted. Native Ask/ToolsReady/LlmTurn reducers
+        # still construct the pending batch and invoke the real ToolExec effect.
+        directives = Enum.map(directives, &script_tool_response/1)
+        {:ok, context, directives}
+
+      result ->
+        result
+    end
   end
+
+  defp script_tool_response(%Aikido.AiReact.Directives.LLMCall{} = request) do
+    turn =
+      Aikido.AI.Test.ResponseFixtures.tool_call_response([
+        {"unreached", %{}, "capacity-call"}
+      ])
+
+    %Aikido.Directives.Emit{
+      signal: %Aikido.Signal{
+        type: "ai.react.llm.completed",
+        data: %{request_id: request.request_id, iteration: request.iteration, turn: turn}
+      }
+    }
+  end
+
+  defp script_tool_response(directive), do: directive
 end
 
 defmodule Aikido.AICapacityTest.Agent do
@@ -80,16 +56,6 @@ defmodule Aikido.AICapacityTest.Agent do
     name "ai_capacity"
     middleware [Aikido.AICapacityTest.Observe]
     slice :ai, Aikido.AiReact.Slice
-    route "capacity.launch", :launch
-  end
-
-  actions do
-    action :launch, Aikido.Types.ActionResult do
-      argument :state, :term
-      argument :kind, :atom, allow_nil?: false
-      argument :request_id, :string, allow_nil?: false
-      run Aikido.AICapacityTest.Launch
-    end
   end
 end
 
@@ -118,9 +84,8 @@ defmodule Aikido.AICapacityTest do
   end
 
   defp assert_outer_rejection(kind) do
-    {pid, supervisor} = limited_runtime(2)
-    blockers = for _ <- 1..2, do: occupy(supervisor)
     request_id = unique_id("capacity")
+    {pid, supervisor} = limited_runtime(2)
 
     if kind == :tool do
       {:ok, ref} =
@@ -133,7 +98,7 @@ defmodule Aikido.AICapacityTest do
           once: true
         )
 
-      assert %{status: :failed} = launch_until_terminal(pid, kind, request_id)
+      assert %{status: :failed} = launch_until_terminal(pid, kind, request_id, supervisor, 2)
       assert_receive {:aikido_subscription, ^ref, %{result: {:ok, ai}}}, 5_000
 
       assert [%{tool_call_id: "capacity-call"}] =
@@ -144,22 +109,21 @@ defmodule Aikido.AICapacityTest do
       assert is_binary(message)
     else
       assert %{status: :failed, error: :max_children, request_id: ^request_id} =
-               launch_until_terminal(pid, kind, request_id)
+               launch_until_terminal(pid, kind, request_id, supervisor, 2)
     end
 
     assert_result_scope(kind, request_id)
     assert Process.alive?(pid)
-    Enum.each(blockers, &release/1)
 
     assert %{status: :completed, result: "recovered"} =
-             launch_until_terminal(pid, :model, unique_id("recovered"))
+             launch_until_terminal(pid, :recover, unique_id("recovered"))
 
     await_task_shutdown(supervisor)
   end
 
   defp assert_inner_rejection(kind) do
-    {pid, supervisor} = limited_runtime(1)
     request_id = unique_id("capacity")
+    {pid, supervisor} = limited_runtime(2)
 
     if kind == :tool do
       {:ok, ref} =
@@ -172,7 +136,7 @@ defmodule Aikido.AICapacityTest do
           once: true
         )
 
-      assert %{status: :failed} = launch_until_terminal(pid, kind, request_id)
+      assert %{status: :failed} = launch_until_terminal(pid, kind, request_id, supervisor, 1)
       assert_receive {:aikido_subscription, ^ref, %{result: {:ok, ai}}}, 5_000
 
       assert [%{tool_call_id: "capacity-call"}] =
@@ -183,7 +147,7 @@ defmodule Aikido.AICapacityTest do
       assert is_binary(message)
     else
       assert %{status: :failed, error: %RuntimeError{message: message}, request_id: ^request_id} =
-               launch_until_terminal(pid, kind, request_id)
+               launch_until_terminal(pid, kind, request_id, supervisor, 1)
 
       assert message =~ "maximum number of tasks"
     end
@@ -206,6 +170,7 @@ defmodule Aikido.AICapacityTest do
   defp limited_runtime(limit) do
     instance = String.to_atom(unique_id("ai_capacity"))
     start_supervised!({Aikido, name: instance, max_tasks: limit, durable: durable_options()})
+
     pid = start_server(%{aikido: instance}, Aikido.AICapacityTest.Agent)
     {pid, Aikido.task_supervisor_name(instance)}
   end
@@ -233,34 +198,55 @@ defmodule Aikido.AICapacityTest do
     assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
   end
 
-  defp launch_until_terminal(pid, kind, id) do
-    observer = self()
+  defp launch_until_terminal(pid, kind, id, supervisor \\ nil, blocked_slots \\ 0) do
+    selector = fn runtime ->
+      ai = runtime.agent.state.ai
 
-    assert {:ok, ai} =
-             Aikido.AgentServer.call_until(
-               pid,
-               fn -> launch(pid, kind, id, observer) end,
-               "ai.react.**",
-               fn runtime ->
-                 ai = runtime.agent.state.ai
+      if ai.request_id == id and ai.status in [:completed, :failed],
+        do: {:ok, ai},
+        else: :skip
+    end
 
-                 if ai.request_id == id and ai.status in [:completed, :failed],
-                   do: {:ok, ai},
-                   else: :skip
-               end
-             )
+    assert {:ok, ref} = Aikido.AgentServer.subscribe(pid, "ai.react.**", selector, once: true)
+    assert {:ok, :launched} = launch(pid, kind, id, self())
 
-    ai
+    blockers =
+      if kind == :recover do
+        []
+      else
+        assert_receive {:tools_prepared, ^pid, ^id}, 5_000
+        # Tool setup uses the same supervisor. Saturate only after its real work
+        # has exited, leaving the rejection under test isolated to model/tool execution.
+        await_task_shutdown(supervisor)
+        blockers = Enum.map(List.duplicate(:slot, blocked_slots), fn _ -> occupy(supervisor) end)
+        assert length(Task.Supervisor.children(supervisor)) == blocked_slots
+        send(pid, {:release_prepared, id})
+        blockers
+      end
+
+    try do
+      assert_receive {:aikido_subscription, ^ref, %{result: {:ok, ai}}}, 5_000
+      ai
+    after
+      Enum.each(blockers, &release/1)
+      Aikido.AgentServer.unsubscribe(pid, ref)
+    end
   end
 
   defp launch(pid, kind, id, observer) do
     signal =
-      Aikido.Signal.new!("capacity.launch", %{kind: kind, request_id: id})
+      Aikido.AiReact.Signals.Ask.new!(%{
+        request_id: id,
+        query: if(kind == :recover, do: "recover", else: "exercise capacity"),
+        model: "offline",
+        client: Aikido.AICapacityTest.Client,
+        options: %{streaming: false, model_max_retries: 0}
+      })
       |> Aikido.Signal.put_ctx(%{
         actor: %{id: "capacity-actor"},
         tenant: "capacity-tenant",
         tracer: AikidoTest.Support.TestTracer,
-        context: %{shared: %{observer: observer, marker: "capacity"}}
+        context: %{shared: %{observer: observer, marker: "capacity", kind: kind}}
       })
 
     Aikido.AgentServer.call(pid, signal, fn _ -> {:ok, :launched} end)

@@ -98,7 +98,9 @@ defmodule Aikido.AiReact.Directives.ToolExec do
       if match?(%Aikido.Signal{}, input_signal), do: Aikido.Signal.ctx(input_signal), else: %{}
 
     context =
-      Map.merge(Map.merge(directive.tool_context, inherited), %{
+      Map.merge(
+        Map.merge(Map.drop(directive.tool_context, [:actor, :tenant, :authorize?, :tracer]), inherited),
+        %{
         agent_id: state.id,
         request_id: directive.request_id,
         tool_call_id: directive.tool_call.id,
@@ -111,8 +113,9 @@ defmodule Aikido.AiReact.Directives.ToolExec do
           ),
         aikido: state.aikido,
         partition: Map.get(state, :partition),
-        parent: Map.get(state, :parent)
-      })
+        parent: Aikido.Ownership.parent(state)
+        }
+      )
 
     Map.put(
       context,
@@ -220,7 +223,9 @@ defmodule Aikido.AiReact.Directives.ToolExec do
 
   defp execute_registered_tool_call(%{name: name, arguments: args}, registry, context) do
     ash_context =
-      Map.put(Map.get(context, :context) || %{}, :aikido, Map.delete(context, :context))
+      (Map.get(context, :context) || %{})
+      |> Map.put(:aikido, Map.delete(context, :context))
+      |> preserve_native_tracer_context(context[:tracer])
 
     context = Map.put(context, :context, ash_context)
 
@@ -232,7 +237,22 @@ defmodule Aikido.AiReact.Directives.ToolExec do
         end
 
       :error ->
-        {:tool_error, Jason.encode!(%{error: "tool not found: #{name}"})}
+        {:tool_error,
+         Jason.encode!(%{
+           code: "tool_not_available",
+           error: "Tool #{name} is not available in this run's prepared registry.",
+           available_tools: registry |> Map.keys() |> Enum.sort(),
+           recovery:
+             "Use an exact name from available_tools. If no tools are available, answer directly or request tool configuration before retrying."
+         })}
     end
   end
+
+  # Ash AI forwards application context to native Ash actions, but its callback
+  # options omit the top-level tracer. Ash reads this native private context on
+  # the action input, including for subsequent actions dispatched through Lua.
+  defp preserve_native_tracer_context(context, nil), do: context
+
+  defp preserve_native_tracer_context(context, tracers),
+    do: DeepMerge.deep_merge(context, %{private: %{tracer: tracers}})
 end

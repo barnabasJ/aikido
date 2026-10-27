@@ -138,14 +138,17 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       assert job_state.retrying?
 
       # A tick still dispatches its callback when rescheduling fails.
-      for {_ref, worker} <- job_state.callback_workers do
+      for worker <- job_state.callback_workers do
         AikidoTest.LifecycleWait.await_down(worker)
       end
 
       {:ok, %{heartbeat_pid: heartbeat_pid, baseline: baseline}} =
         Aikido.AgentServer.state(pid, fn s ->
           {:ok,
-           %{heartbeat_pid: s.cron_jobs[:heartbeat], baseline: s.agent.state.domain.tick_count}}
+           %{
+             heartbeat_pid: s.agent.state.cron.jobs[:heartbeat],
+             baseline: s.agent.state.domain.tick_count
+           }}
         end)
 
       assert heartbeat_pid == job_pid
@@ -199,7 +202,11 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
 
       {:ok, snapshot} =
         Aikido.AgentServer.state(pid, fn s ->
-          {:ok, %{cron_jobs: s.cron_jobs, cron_specs_keys: Map.keys(s.cron_specs)}}
+          {:ok,
+           %{
+             cron_jobs: s.agent.state.cron.jobs,
+             cron_specs_keys: Map.keys(s.agent.state.cron.specs)
+           }}
         end)
 
       refute Map.has_key?(snapshot.cron_jobs, :bad_message)
@@ -207,7 +214,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
       assert is_pid(snapshot.cron_jobs[:good_message])
       assert Process.alive?(snapshot.cron_jobs[:good_message])
       refute_received {:DOWN, ^server_ref, :process, ^pid, _reason}
-      assert log =~ "failed to register cron job :bad_message"
+      assert log =~ "Cron job :bad_message could not start"
     end
 
     test("restarting one dynamic cron job does not disrupt sibling jobs", context) do
@@ -239,7 +246,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
         await_state_value(
           pid,
           fn s ->
-            new_alpha_pid = s.cron_jobs[:alpha]
+            new_alpha_pid = s.agent.state.cron.jobs[:alpha]
 
             if is_pid(new_alpha_pid) and new_alpha_pid != alpha_job_pid and
                  Process.alive?(new_alpha_pid) do
@@ -250,7 +257,10 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
         )
 
       assert Process.alive?(beta_job_pid)
-      {:ok, beta_pid} = Aikido.AgentServer.state(pid, fn s -> {:ok, s.cron_jobs[:beta]} end)
+
+      {:ok, beta_pid} =
+        Aikido.AgentServer.state(pid, fn s -> {:ok, s.agent.state.cron.jobs[:beta]} end)
+
       assert beta_pid == beta_job_pid
       assert Process.alive?(restarted_alpha_pid)
 
@@ -280,7 +290,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
 
       {:ok, snapshot} =
         Aikido.AgentServer.state(pid, fn s ->
-          {:ok, %{job_pid: s.cron_jobs[job_id], cron_specs: s.cron_specs}}
+          {:ok, %{job_pid: s.agent.state.cron.jobs[job_id], cron_specs: s.agent.state.cron.specs}}
         end)
 
       assert snapshot.job_pid == job_pid
@@ -298,7 +308,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
         await_state_value(
           pid,
           fn s ->
-            new_job_pid = s.cron_jobs[job_id]
+            new_job_pid = s.agent.state.cron.jobs[job_id]
 
             if is_pid(new_job_pid) and new_job_pid != original_job_pid and
                  Process.alive?(new_job_pid) do
@@ -337,7 +347,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
 
       {:ok, snapshot} =
         Aikido.AgentServer.state(pid, fn s ->
-          {:ok, %{job_pid: s.cron_jobs[job_id], cron_specs: s.cron_specs}}
+          {:ok, %{job_pid: s.agent.state.cron.jobs[job_id], cron_specs: s.agent.state.cron.specs}}
         end)
 
       assert snapshot.job_pid == job_pid
@@ -359,7 +369,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest do
         await_state_value(
           pid,
           fn s ->
-            new_job_pid = s.cron_jobs[job_id]
+            new_job_pid = s.agent.state.cron.jobs[job_id]
 
             if is_pid(new_job_pid) and new_job_pid != original_job_pid and
                  Process.alive?(new_job_pid) do

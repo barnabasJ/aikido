@@ -9,6 +9,7 @@ defmodule AgentExamples.Application do
         AgentExamples.Settings.Repo,
         {Ecto.Migrator, repos: [AgentExamples.Settings.Repo], log: false},
         {EKV, Application.fetch_env!(:agent_examples, :store)},
+        AgentExamples.Telemetry,
         {Aikido, max_tasks: 20_000},
         {Phoenix.PubSub, name: AgentExamples.PubSub},
         {Task.Supervisor, name: AgentExamples.WebTasks},

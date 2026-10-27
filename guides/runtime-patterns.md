@@ -59,6 +59,24 @@ is the runtime callback implementation hosted by DurableServer. Configure
 return state transitions and directives without performing side effects. All
 side effects belong in directives; results return through signals.
 
+
+Initialization runs the resource's native initialize action. DurableServer restores
+saved state through the configured snapshot codecs, then startup lifecycle signals
+run through the existing middleware and action pipeline. Persistence remains
+DurableServer's responsibility; middleware does not write a second checkpoint.
+
+Explicit domain stops and stop directives process `aikido.agent.lifecycle.stopping`
+before returning the final state to DurableServer. Cleanup actions therefore
+contribute their state changes to the final permanent snapshot, and cleanup is
+not repeated in `terminate/2`. External supervisor shutdowns use a best-effort
+`terminate/2` fallback: that callback cannot return changed state for persistence.
+Record business completion through a normal action before stopping the process.
+
+Subscriptions remain in AgentServer. They observe adopted state after directive
+execution for the current signal; they do not wait for asynchronous work launched
+by those directives. Results of that work arrive as later signals and trigger
+later observations. No additional middleware hook is needed for subscriptions.
+
 Choose a root `id` explicitly when an application must recover the same logical
 execution, for example `"workflow/#{workflow_id}/review"`. Starting a stopped
 permanent agent with that same ID restores its snapshot; a new workflow execution
@@ -116,15 +134,20 @@ already delivered are not rolled back; later directives in the batch do not run.
 Signal emission descriptors may use
 `%Aikido.Signal{id: nil, type: "work.ready", data: %{}, source: "/worker"}`.
 Emit, Schedule and Cron complete missing envelope IDs and timestamps during
-execution. Constructing the directive performs no I/O. Identity, memory and
+execution. Constructing the directive performs no I/O. Memory and
 thread actions use the input signal's timestamp and deterministic state/entry
 IDs rather than reading the clock or generating random IDs. Direct calls without
 an input signal use timestamp zero. Mounted slice resources apply their native
 attribute defaults during initialization.
 
-`CronCancel` queues an ordered runtime request, so it also cancels a registration
-returned earlier in the same directive batch. The runtime retires that job's
-ownership and saved definition before supervised shutdown. Cancellation completes
+Every agent mounts `Aikido.Cron.Slice` at `:cron`. Its native actions own job
+registrations and recovery; the runtime only translates scheduler monitor
+messages into signals. Dynamic definitions are persisted through the slice codec,
+while PIDs, monitors, implicit scope and retry state are transient.
+
+`Aikido.Cron.Directives.Cancel` queues an ordered signal, so it also cancels a
+registration returned earlier in the same directive batch. The slice action retires
+that job's ownership and saved definition before supervised shutdown. Cancellation completes
 with `aikido.agent.cron.cancelled`; subscribe before triggering it when completion
 matters. A subsequent replacement keeps its own process and definition even if
 shutdown of the previous process finishes later.
@@ -137,9 +160,20 @@ from durable storage rebuilds the job without that implicit caller context, as d
 static DSL schedules. Explicit scope supplied in a configured message remains
 application-owned configuration and must be safe to persist.
 
-`SpawnAgent` starts durable child agents and snapshots their current logical parent. Teams add desired topology,
-dependencies, ownership, lazy activation, dynamic worker templates, and task
-receipts. A team resource can itself be a member or a worker template.
+`SpawnAgent` starts durable child agents and snapshots their current logical parent.
+`Aikido.Ownership.Slice` records parent and child bindings through attachment,
+startup, monitor and exit signals. Read these with
+`Aikido.Ownership.parent(runtime)`, `orphaned_from(runtime)` and `children(runtime)`.
+Its actions apply parent-death policies and reject stale monitor acknowledgements.
+AgentServer translates process messages into signals rather than maintaining a
+second ownership record. Live bindings and monitor references are transient;
+DurableServer saves the logical parent identity separately and resolves its
+current process before activation.
+
+Teams add desired topology, dependencies, lazy activation, dynamic worker
+templates and task receipts. A team resource can itself be a member or a worker
+template. Team's own slice codec clears live member bindings and lifecycle
+operations before persistence, regardless of its mount path.
 
 A `partition` scopes logical identities inside a runtime instance; it does not
 provide Ash authorization or security isolation. Use Ash actors, tenants, and
@@ -164,6 +198,17 @@ Native Ash action spans connect to custom signal, directive and asynchronous
 work spans. AsyncTask results, AI setup/model/tool results, emitted signals and
 delayed signals preserve that ancestry. Retries create individual attempt spans.
 Signal IDs and types remain metadata on spans and telemetry events.
+
+Model I/O executes inside `aikido_model_call` and individual `aikido_attempt`
+spans. The native ReqLLM/Req request inherits that context; ReqLLM request
+telemetry separately reports HTTP status, duration, retries and provider usage.
+This does not add a separate Ash span for each internal Req step.
+
+Native tool action spans also retain the caller tracer. For Ash AI callbacks,
+Aikido carries it in Ash's native private action context, which continues through
+AshLua's eval action to the Ash actions called by the script. Lua instructions
+themselves do not produce individual spans. Applications can use the action and
+tool/attempt spans to distinguish VM/tool work from provider requests.
 
 The connection lasts across process boundaries even after the initiating call
 has returned. Snapshot recovery starts new work; it does not resume an active
@@ -337,10 +382,13 @@ the value.
 
 The current snapshot envelope contains the serialized agent, logical parent
 binding, cron definitions, restart configuration and selected runtime boot
-options. It encodes compressed Erlang terms as a Base64 payload inside a map;
-it does not automatically dump all attributes to JSON through Ash types.
-Ash types validate action and state contracts; application codecs decide the
-persistent representation. Prepared AI tool callbacks and live run scope are
+options. Slices are typed attributes on the agent resource. Native Ash
+struct dumping traverses that resource and its nested slices, using the same
+compiled attribute contract as native inspection.
+Ash's `:term` and `:binary` types encode and decode the outer transport payload;
+their native casts also restore older compressed snapshots. Application codecs
+can change a path's persistent representation, stored through Ash's term type.
+Prepared AI tool callbacks and live run scope are
 excluded by the ReAct slice codec and tools are rebuilt for each new run.
 
 Both first activation and later durable snapshots apply slice `externalize/1`
@@ -553,6 +601,15 @@ run’s actor and tenant, and preparation retains native Ash authorization.
 
 ### Todo continuation, verification and incoming work
 
+Required background work can be represented with blocking Todos. An application
+assignment tool adds a requirement and invokes the native Team assignment action.
+Use `completion: :todos` with `todo_continuation: :wait` to wait for external work.
+The native task result delivery resumes the conversation. An ordinary scoped
+application action checks the authoritative result and records explicit evidence
+through Todo completion; missing evidence returns an actionable tool error.
+Optional assignments need not create blocking Todos. See
+`/examples/verified-team` for a focused example using these existing APIs.
+
 Todo completion still defaults to waiting for external work. To let an assistant
 continue working after an incomplete answer, mount `Aikido.Todo.Slice` and set:
 
@@ -566,9 +623,11 @@ options %{
 ```
 
 The verifier is optional. It is a native Ash generic action accepting `answer`,
-`todos` (the blocking items), and `metadata`, returning a boolean verdict. It
-runs in cancellable supervised work with the caller's scope and application
-context. It may inspect external evidence; the reducer only adopts its result.
+`todos` (the blocking items), and `metadata`, returning a boolean. It runs in
+cancellable supervised work with the caller's scope and application context,
+bounded by the owning run's remaining deadline. It may inspect authoritative
+external evidence; the reducer only adopts its result. Ordinary evidence tools
+can instead validate requirements and record their results through Todo commands.
 A true verdict accepts the answer, so the application owns what constitutes
 sufficient evidence. False waits or requests another model turn according to
 `todo_continuation`. Verifier errors fail the run. External todo changes on a
@@ -589,6 +648,24 @@ batches. A successful batch resets the error streak. Native Ash AI errors remain
 model-visible tool results, with an additional error marker for the guard;
 business tool errors are not retried as transport failures. Both guards default
 to nil, preserving model recovery and the existing repeated-call warning.
+
+Expose application failures through native Ash errors with an
+`AshAi.ToToolError` implementation so the model gets a cause and recovery
+instructions. If a tool's underlying API returns failures inside a successful
+result envelope, adapt that specific contract in its model-facing action; do
+not make the generic executor infer failure from arbitrary returned data. The
+example Lua tool invokes native `eval`, then converts a non-nil evaluation error
+to `lua_script_failed`. Successful user values containing `error` remain data.
+Unavailable tool names return `tool_not_available` with the prepared names the
+model can actually call.
+
+Native ReqLLM failures become `Aikido.AiReact.Errors.ProviderRequestFailed` at
+the model-call boundary. Agent errors and delegated task results retain only the
+native error type, HTTP status and timeout phase/duration. Raw provider messages,
+request and response bodies, headers and nested causes are not forwarded. Ash AI
+and AshLua render status-specific recovery guidance: for example, HTTP 429 calls
+for checking quota, concurrency and the credential's plan before a bounded retry.
+Application-supplied model clients keep their own error contracts.
 
 See the example app's [Makewright scenario checklist](../examples/agent_app/MAKEWRIGHT.md)
 for isolated browser flows and the tests that cover each integration boundary.
@@ -631,3 +708,75 @@ team member `initial_state`, or SpawnAgent `opts` to override it. Synchronizatio
 settings are saved with boot options and restored with the agent. Concurrent team
 topology commands wait in a transient scoped queue and resume after lifecycle
 completion; queued continuations are not recovered after a process restart.
+
+### Inspecting transitions
+
+`AgentServer.subscribe/4` also accepts a two-argument selector:
+
+```elixir
+Aikido.AgentServer.subscribe(pid, "**", fn runtime, event ->
+  {:ok, %{type: event.signal.type, state: runtime.agent.state,
+          directive_types: Enum.map(event.directives, & &1.__struct__), error: event.error}}
+end)
+```
+
+The event describes the processed signal, returned directives and processing error.
+Selectors run synchronously: keep projections small and remove private scope,
+credentials and executable values before retaining or displaying them. Existing
+one-argument selectors and subscription message envelopes remain supported.
+`Aikido.Inspector.History` records redacted, bounded projections and provides
+read-only history; selecting historical state never replays effects.
+
+Applications with LiveView can use the packaged `Aikido.Inspector.Components`.
+Add `{:phoenix_live_view, "~> 1.1"}` to the application, serve the package's
+`priv/static` assets using `Plug.Static`, and include `inspector/inspector.css`
+and the exported `AgentIdentity` JavaScript hook. Mount the component's
+`:default` hook and pass the `:inspection` history and selection assigns to its
+`inspector/1` function. Its module documentation contains the complete render
+example. The playground uses these same components and assets. Aikido does not
+require LiveView in headless applications.
+
+For a whole tree, attach an observer from an external process:
+
+```elixir
+projection = fn runtime, event ->
+  {:ok, %{type: event.signal.type, resource: runtime.agent_module}}
+end
+
+{:ok, ref} = Aikido.Inspector.attach(agent.pid, projection,
+  include_children?: true, limit: 100, flush_interval_ms: 100
+)
+
+# Receive {:aikido_inspection, ref, %{sequence: count, entries: entries}}.
+# Each entry identifies its agent ID and PID and carries the projected result.
+Aikido.Inspector.detach(ref)
+```
+
+Descendant observation is opt-in and follows existing and future owned children
+and team members. It captures signals directly after processing, including those
+from short-lived children, without polling. The limit applies across the tree:
+at high volumes, older records can be overwritten between batches. Sequence
+counts include those records. Root/target exit releases the attachment; retained
+historical display data belongs to the consumer. Projections run inside agents,
+so keep them bounded, redact secrets, and perform no blocking calls.
+
+The playground's Actions tab uses native Ash action telemetry, correlated with
+the current signal. It shows resource/action names, implementation modules,
+configured mount paths and durations, without arguments or return values. Ash
+emits action stop timings even on failure; consult the signal error rather than
+treating an ended span as success.
+
+All notifications remain inspectable. Use `-lifecycle` in the filter to exclude
+lifecycle signals, or combine terms such as `quicksort -lifecycle -identity`.
+Terms match signal names, agent IDs and PID labels without case sensitivity.
+Internally emitted lifecycle/identity notifications do not require a reducer
+route; unhandled ordinary commands still return routing errors.
+
+Snapshots serialize the complete agent resource, with slices as typed nested
+attributes, through native `Ash.Type.dump_to_embedded/3` and
+`Ash.Type.cast_from_embedded/3`. This omits
+resource runtime metadata and uses each attribute's declared storage contract.
+The transport still supports binary values returned by embedded types.
+Application codecs that change a path's shape and agent-wide checkpoint callbacks
+retain their explicit contracts. Opaque `:term` values keep Ash's safe,
+non-executable term loading; prefer concrete types for portable structured data.

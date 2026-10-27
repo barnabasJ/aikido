@@ -51,7 +51,7 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 ## Avoid
 - Embedding runtime side effects directly in core state transition code.
 - Using directives as a hidden state-mutation mechanism — they perform I/O only.
-- Mutating `%AgentServer.State{}` runtime fields (`children`, `cron_*`, etc.) from inside a directive's `exec/3` body. Runtime bookkeeping belongs in the GenServer callbacks and signal-cascade callbacks invoked by `process_signal/2`.
+- Mutating domain or runtime state inside a directive's `exec/3` body. Ownership and cron transitions belong in their slice actions; runtime-only bookkeeping belongs in GenServer callbacks.
 - Tight coupling between unrelated agent modules.
 
 ## References
@@ -61,3 +61,20 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - `AGENTS.md`
 - https://github.com/barnabasJ/aikido
 - https://hexdocs.pm/usage_rules/readme.html#usage-rules
+
+## Tool-loop comparison and warning metadata
+
+- Configure `options.tool_loop_key` with a pure bounded `{module, function, arguments}`
+  only when application-specific equivalence is needed. It receives a sorted list
+  of `{name, arguments, content}` completed entries and returns `{:ok, key}` or
+  `{:error, reason}`. Keep loop history and termination in native Aikido; do not
+  build a middleware/stateful policy process for comparison alone. Callback
+  failures fail explicitly. Default comparison includes exact inputs and results.
+
+- Tool-cycle warning messages expose `metadata[:aikido_tool_cycle_warning]` using
+  the native `Aikido.AiReact.Types.ToolCycleWarning` embedded type. Validate payloads
+  and actual run/turn correlation when projecting notes; never match English
+  warning text. AI context is not a permanent journal: mirror through existing
+  Thread.Append or application storage before handoff replaces it. No automatic
+  Thread/UI projection is implied. Three complete successful cycles warn; the
+  configured terminal repeat limit stays independent.

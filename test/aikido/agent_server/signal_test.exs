@@ -1,7 +1,9 @@
 defmodule AikidoTest.AgentServer.SignalTest do
   use ExUnit.Case, async: true
 
-  alias Aikido.AgentServer.Signals.{ChildExit, Orphaned, Scheduled}
+  alias Aikido.AgentServer.Signals.Scheduled
+  alias Aikido.Ownership.Signals.Orphaned
+  alias Aikido.Ownership.Signals.ChildExit
 
   describe "Orphaned signal" do
     test "creates signal with correct type" do

@@ -20,4 +20,27 @@ defmodule AgentExamplesWeb.DelegatedWorkTest do
     assert html =~ ~s(data-owner="investigation")
     assert html =~ ~s(data-owner="retired")
   end
+
+  test "foreground tasks expose a background control at the owning team path" do
+    task = %{
+      id: "waiting-task",
+      member: "worker",
+      requester: :analyst,
+      mode: :foreground,
+      status: :dispatched,
+      result: nil
+    }
+
+    run = %{snapshot: %{tasks: [], children: %{"squad" => %{tasks: [task], children: %{}}}}}
+    html = render_component(&AgentExamplesWeb.ExampleComponents.delegated_work/1, run: run)
+    assert html =~ "Continue in background"
+    assert html =~ ~s(phx-value-task-id="waiting-task")
+    assert html =~ ~s(phx-value-team-path="[&quot;squad&quot;]")
+    assert html =~ "Requested by analyst"
+
+    background = put_in(run.snapshot.children["squad"].tasks, [%{task | mode: :background}])
+
+    refute render_component(&AgentExamplesWeb.ExampleComponents.delegated_work/1, run: background) =~
+             "Continue in background"
+  end
 end

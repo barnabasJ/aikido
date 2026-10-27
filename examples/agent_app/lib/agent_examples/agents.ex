@@ -8,6 +8,7 @@ defmodule AgentExamples.Agents do
     resource AgentExamples.LuaAssistant.Tools
     resource AgentExamples.AdaptiveAssistant.ToolPreparation
     resource AgentExamples.VerifiedAssistant.Verification
+    resource AgentExamples.VerifiedTeam.Tools
     resource AgentExamples.ResilientAssistant.Failures
     resource AgentExamples.AI.Tools
     resource AgentExamples.AI.LuaSurface
@@ -35,6 +36,8 @@ defmodule AgentExamples.Agents do
     tool :scoped_lua, AgentExamples.LuaAssistant.Tools, :eval
     tool :scoped_lua_docs, AgentExamples.LuaAssistant.Tools, :docs
     tool :record_evidence, AgentExamples.VerifiedAssistant.Verification, :record_evidence
+    tool :request_team_evidence, AgentExamples.VerifiedTeam.Tools, :request_evidence
+    tool :complete_team_evidence, AgentExamples.VerifiedTeam.Tools, :complete_evidence
     tool :fail_example, AgentExamples.ResilientAssistant.Failures, :fail
     tool :team_roster, AgentExamples.AI.Tools, :team_roster
     tool :spawn_worker, AgentExamples.AI.Tools, :spawn_worker
@@ -44,7 +47,7 @@ defmodule AgentExamples.Agents do
     tool :text_stats, AgentExamples.AI.Tools, :text_stats
     tool :stamp, AgentExamples.AI.Tools, :stamp
 
-    tool :run_lua, AgentExamples.AI.LuaSurface, :eval do
+    tool :run_lua, AgentExamples.AI.LuaSurface, :run_script do
       description """
       Execute Lua against the exposed Ash actions. Calls return result, err; a failure
       returns nil, err rather than raising. Use return assert(agents.members({})) to
@@ -81,6 +84,8 @@ defmodule AgentExamples.Agents do
     agent :research_team, AgentExamples.ResearchTeam
     agent :research_squad, AgentExamples.ResearchSquad
     agent :counter, AgentExamples.Counter
+    agent :cron_clock, AgentExamples.CronClock
+    agent :checkpoint_counter, AgentExamples.CheckpointCounter
     agent :checklist, AgentExamples.Checklist
     agent :notebook, AgentExamples.Notebook
     agent :worker, AgentExamples.Worker

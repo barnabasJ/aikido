@@ -100,6 +100,10 @@ defmodule AgentExamples.AI.Activity do
   end
 
   defp stage(%{status: :setup}, _), do: "Preparing tools"
+
+  defp stage(%{status: :waiting, options: %{completion: :tasks}}, _),
+    do: "Waiting for delegated work"
+
   defp stage(%{status: :waiting}, _), do: "Waiting for tracked work"
   defp stage(%{status: :completed}, _), do: "Completed"
   defp stage(%{status: :failed}, _), do: "Failed"

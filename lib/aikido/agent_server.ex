@@ -17,7 +17,7 @@ defmodule Aikido.AgentServer do
 
   Aikido's parent-child hierarchy is **logical**, not OTP supervisory ancestry.
   Parent and child agents are still OTP peers under a supervisor; the parent
-  relationship is represented explicitly with `Aikido.AgentServer.ParentRef`,
+  relationship is represented explicitly with `Aikido.Ownership.ParentRef`,
   runtime monitors, and lifecycle signals.
 
   ## Public API
@@ -149,14 +149,14 @@ defmodule Aikido.AgentServer do
   ## Orphans and Adoption
 
   If a child is configured with `on_parent_death: :continue` or `:emit_orphan`,
-  the runtime clears the current parent reference immediately when the logical
+  the ownership action clears the current parent reference when the logical
   parent dies:
 
-  - `state.parent` becomes `nil`
-  - the former parent is preserved in `state.orphaned_from`
+  - the ownership slice's `parent` becomes `nil`
+  - the former parent is preserved in its `orphaned_from` attribute
 
-  Identity (`partition`, `parent`, `orphaned_from`) lives only on
-  `%AgentServer.State{}`. Actions reach the current values via
+  Partition lives on `%AgentServer.State{}`; parent bindings live in
+  `Aikido.Ownership.Slice`. Actions reach the current values via
   `input.context.aikido` and emitted
   identity-transition signals (`aikido.agent.identity.*`).
 
@@ -188,17 +188,14 @@ defmodule Aikido.AgentServer do
   require Ash.Tracer
   require Logger
 
-  alias Aikido.AgentServer.{ChildInfo, Options, ParentRef, SignalRouter, State}
+  alias Aikido.AgentServer.{Options, SignalRouter, State}
+  alias Aikido.Ownership.ParentRef
+  alias Aikido.Ownership.Child
 
   alias Aikido.AgentServer.Signals.{
-    ChildExit,
-    ChildStarted,
-    IdentityOrphaned,
     LifecycleReady,
     LifecycleStarting,
     LifecycleStopping,
-    Orphaned,
-    ParentDied,
     PartitionAssigned
   }
 
@@ -207,8 +204,6 @@ defmodule Aikido.AgentServer do
   alias Aikido.Signal.Router
   alias Aikido.Telemetry.Formatter
   @type server :: pid() | atom() | {:via, module(), term()} | String.t()
-  @cron_restart_base_ms 500
-  @cron_restart_max_ms 30_000
   # ---------------------------------------------------------------------------
   # Public API
   # ---------------------------------------------------------------------------
@@ -226,12 +221,17 @@ defmodule Aikido.AgentServer do
   Use `subscribe/4` for the ambient pattern that supports `:skip`.
   """
   @type call_selector :: (State.t() -> {:ok, term()} | {:error, term()})
+  @typedoc "Signal, returned effect descriptors and processing error available to subscription projections."
+  @type execution_event :: %{signal: Signal.t(), directives: [struct()], error: term()}
   @typedoc """
   Selector for `subscribe/4`. Same calling convention as `call_selector/0`,
   with one extra return value: `:skip` keeps the subscription alive and
-  delivers nothing to the subscriber.
+  delivers nothing to the subscriber. A two-argument selector additionally receives
+  the processed signal, returned directives and processing error.
   """
-  @type subscribe_selector :: (State.t() -> {:ok, term()} | {:error, term()} | :skip)
+  @type subscribe_selector ::
+          (State.t() -> {:ok, term()} | {:error, term()} | :skip)
+          | (State.t(), execution_event() -> {:ok, term()} | {:error, term()} | :skip)
   @doc """
   Synchronously sends a signal, runs the pipeline, and projects the
   post-pipeline state through `selector`.
@@ -270,9 +270,12 @@ defmodule Aikido.AgentServer do
     timeout = Keyword.get(opts, :timeout, Defaults.agent_server_call_timeout_ms())
 
     with {:ok, pid} <- resolve(server) do
+      signal = Aikido.Signal.capture_tracing(signal)
+      emit_signal_dispatch(signal, pid, :call)
+
       GenServer.call(
         pid,
-        {:signal_with_selector, Aikido.Signal.capture_tracing(signal), selector},
+        {:signal_with_selector, signal, selector},
         timeout
       )
     end
@@ -413,8 +416,18 @@ defmodule Aikido.AgentServer do
   @spec cast(server(), Signal.t()) :: :ok | {:error, term()}
   def cast(server, %Signal{} = signal) do
     with {:ok, pid} <- resolve(server) do
-      GenServer.cast(pid, {:signal, Aikido.Signal.capture_tracing(signal)})
+      signal = Aikido.Signal.capture_tracing(signal)
+      emit_signal_dispatch(signal, pid, :cast)
+      GenServer.cast(pid, {:signal, signal})
     end
+  end
+
+  defp emit_signal_dispatch(signal, pid, delivery) do
+    emit_telemetry(
+      [:aikido, :agent_server, :signal, :sent],
+      %{system_time: System.system_time()},
+      %{signal_type: signal.type, signal_id: signal.id, target: pid, delivery: delivery}
+    )
   end
 
   @doc """
@@ -463,6 +476,11 @@ defmodule Aikido.AgentServer do
   Subscribe to signals matching `pattern`, with a selector deciding what
   the subscriber sees.
 
+  A two-argument selector also receives an execution event containing the original
+  `:signal`, returned `:directives` and processing `:error` (nil on success).
+  Project only the data the subscriber needs; signals and directives can contain
+  private application data. This adds no state mutation or replay behavior.
+
   The selector runs after the outermost middleware unwinds (same hook
   point as `call/4`). Returning `:skip` keeps the subscription silent and
   alive; `{:ok, _}` / `{:error, _}` dispatches the result to the
@@ -492,7 +510,7 @@ defmodule Aikido.AgentServer do
   @spec subscribe(server(), String.t(), subscribe_selector(), keyword()) ::
           {:ok, reference()} | {:error, term()}
   def subscribe(server, pattern, selector, opts \\ [])
-      when is_binary(pattern) and is_function(selector, 1) do
+      when is_binary(pattern) and (is_function(selector, 1) or is_function(selector, 2)) do
     with {:ok, options} <-
            Spark.Options.validate(opts,
              target: [type: :pid, default: self()],
@@ -602,8 +620,8 @@ defmodule Aikido.AgentServer do
 
   defp subscribe_and_await_child(pid, child_tag, timeout) do
     selector = fn %State{} = state ->
-      case Map.get(state.children, child_tag) do
-        %ChildInfo{pid: child_pid} when is_pid(child_pid) -> {:ok, child_pid}
+      case Map.get(Aikido.Ownership.children(state), child_tag) do
+        %Child{pid: child_pid} when is_pid(child_pid) -> {:ok, child_pid}
         _ -> :skip
       end
     end
@@ -617,7 +635,7 @@ defmodule Aikido.AgentServer do
   # Re-check after subscribing — the natural `child.started` cast can
   # arrive between the initial `:get_child_pid` reply and the `subscribe`
   # call returning, in which case the cascade already populated
-  # state.children but our subscriber wasn't registered in time to
+  # the ownership slice but our subscriber wasn't registered in time to
   # observe it.
   defp recheck_or_wait_for_child(pid, child_tag, ref, timeout) do
     case GenServer.call(pid, {:get_child_pid, child_tag}) do
@@ -704,9 +722,9 @@ defmodule Aikido.AgentServer do
   Low-level primitive: imperatively attach a running agent to a parent ref.
 
   Used internally by the `%Aikido.Directives.AdoptChild{}` executor to
-  push the parent relationship into the child's live `state.parent`.
+  route the parent attachment through the child's ownership slice.
   Prefer booting the child with `parent: parent_ref` in its AgentServer
-  options (`State.from_options/3` consumes it) so `post_init` can emit
+  options (the ownership configuration action consumes it) so `post_init` can emit
   `aikido.agent.child.started` declaratively — this function exists for
   the explicit-adoption-at-runtime path only.
   """
@@ -730,7 +748,7 @@ defmodule Aikido.AgentServer do
 
   Adopts a live child into this agent's logical child map. Updates both
   the child's live parent reference and the manager's tracked
-  `state.children` map before returning.
+  ownership slice before returning.
 
   Prefer returning a `%Aikido.Directives.AdoptChild{}` from an action
   when the initiator is already inside an agent — this function is for
@@ -778,200 +796,14 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  # ---------------------------------------------------------------------------
   @doc false
-  @spec start_runtime_cron_job(State.t(), term(), Aikido.Cron.RuntimeSpec.t()) ::
-          {:ok, pid()} | {:error, term()}
-  def start_runtime_cron_job(
-        %State{} = state,
-        logical_id,
-        %Aikido.Cron.RuntimeSpec{} = runtime_spec
-      ) do
-    agent_pid = self()
-    agent_id = state.id
-
-    Aikido.Cron.Scheduler.run_every(
-      fn ->
-        if Process.alive?(agent_pid) do
-          signal = Aikido.Cron.RuntimeSpec.build_signal(runtime_spec, agent_id, logical_id)
-          _ = Aikido.AgentServer.cast(agent_pid, signal)
-        end
-
-        :ok
-      end,
-      runtime_spec.cron_expression,
-      timezone: runtime_spec.timezone
-    )
-  end
-
-  @doc false
-  @spec register_runtime_cron_job(State.t(), term(), Aikido.Cron.RuntimeSpec.t()) ::
-          {:ok, State.t()} | {:error, term(), State.t()}
-  def register_runtime_cron_job(
-        %State{} = state,
-        logical_id,
-        %Aikido.Cron.RuntimeSpec{} = runtime_spec
-      ) do
-    case start_runtime_cron_job(state, logical_id, runtime_spec) do
-      {:ok, pid} ->
-        {:ok, track_cron_job(state, logical_id, pid, runtime_spec: runtime_spec)}
-
-      {:error, reason} ->
-        Logger.error(
-          "AgentServer #{state.id} failed to register #{runtime_cron_log_label(runtime_spec)} #{inspect(logical_id)}: #{inspect(reason)}"
-        )
-
-        {:error, reason, state}
+  def prepare_stop(server, reason \\ :normal) do
+    with {:ok, pid} <- resolve(server) do
+      GenServer.call(pid, {:prepare_stop, reason})
     end
-  end
-
-  defp runtime_cron_log_label(%Aikido.Cron.RuntimeSpec{kind: :dynamic}) do
-    "runtime cron job"
-  end
-
-  defp runtime_cron_log_label(%Aikido.Cron.RuntimeSpec{kind: :schedule}) do
-    "schedule"
-  end
-
-  @doc false
-  @spec track_cron_job(State.t(), term(), pid(), keyword()) :: State.t()
-  def track_cron_job(%State{} = state, logical_id, pid, opts \\ []) when is_pid(pid) do
-    runtime_spec = Keyword.get(opts, :runtime_spec)
-    previous_pid = Map.get(state.cron_jobs, logical_id)
-    monitor_ref = Keyword.get(opts, :monitor_ref) || Process.monitor(pid)
-
-    state
-    |> retire_previous_cron_registration(logical_id, previous_pid, pid, monitor_ref, opts)
-    |> retain_cron_runtime_spec(logical_id, runtime_spec)
-    |> install_cron_registration(logical_id, pid, monitor_ref)
-  end
-
-  defp retire_previous_cron_registration(state, id, previous_pid, pid, monitor_ref, opts) do
-    if previous_pid == pid && state.cron_monitors[id] == monitor_ref do
-      state
-    else
-      {_old_pid, cleaned} =
-        untrack_cron_job(state, id,
-          cancel?: previous_pid != pid,
-          input_signal: opts[:input_signal]
-        )
-
-      cleaned
-    end
-  end
-
-  defp retain_cron_runtime_spec(state, id, %Aikido.Cron.RuntimeSpec{} = spec) do
-    %{state | cron_runtime_specs: Map.put(state.cron_runtime_specs, id, spec)}
-  end
-
-  defp retain_cron_runtime_spec(state, _id, _spec), do: state
-
-  defp install_cron_registration(state, id, pid, monitor_ref) do
-    %{
-      state
-      | cron_jobs: Map.put(state.cron_jobs, id, pid),
-        cron_monitors: Map.put(state.cron_monitors, id, monitor_ref),
-        cron_monitor_refs: Map.put(state.cron_monitor_refs, monitor_ref, id),
-        cron_restart_attempts: Map.delete(state.cron_restart_attempts, id)
-    }
-  end
-
-  @doc false
-  @spec untrack_cron_job(State.t(), term(), keyword()) :: {pid() | nil, State.t()}
-  def untrack_cron_job(%State{} = state, logical_id, opts \\ []) do
-    pid = Map.get(state.cron_jobs, logical_id)
-
-    new_state =
-      state
-      |> remove_cron_monitor(logical_id)
-      |> remove_cron_restart_timer(logical_id)
-      |> remove_cron_job_entry(logical_id)
-      |> maybe_drop_cron_specifications(logical_id, Keyword.get(opts, :drop_runtime_spec?, false))
-
-    maybe_cancel_tracked_cron(state, logical_id, pid, opts)
-    {pid, new_state}
-  end
-
-  defp remove_cron_monitor(state, id) do
-    ref = Map.get(state.cron_monitors, id)
-    if is_reference(ref), do: Process.demonitor(ref, [:flush])
-
-    %{
-      state
-      | cron_monitors: Map.delete(state.cron_monitors, id),
-        cron_monitor_refs:
-          if(is_reference(ref),
-            do: Map.delete(state.cron_monitor_refs, ref),
-            else: state.cron_monitor_refs
-          )
-    }
-  end
-
-  defp remove_cron_restart_timer(state, id) do
-    ref = Map.get(state.cron_restart_timers, id)
-    if is_reference(ref), do: :erlang.cancel_timer(ref)
-
-    %{
-      state
-      | cron_restart_timers: Map.delete(state.cron_restart_timers, id),
-        cron_restart_timer_refs:
-          if(is_reference(ref),
-            do: Map.delete(state.cron_restart_timer_refs, ref),
-            else: state.cron_restart_timer_refs
-          )
-    }
-  end
-
-  defp remove_cron_job_entry(state, id) do
-    %{
-      state
-      | cron_jobs: Map.delete(state.cron_jobs, id),
-        cron_restart_attempts: Map.delete(state.cron_restart_attempts, id)
-    }
-  end
-
-  defp maybe_drop_cron_specifications(state, id, true) do
-    %{
-      state
-      | cron_runtime_specs: Map.delete(state.cron_runtime_specs, id),
-        cron_specs: Map.delete(state.cron_specs, id)
-    }
-  end
-
-  defp maybe_drop_cron_specifications(state, _id, false), do: state
-
-  defp maybe_cancel_tracked_cron(state, id, pid, opts) do
-    if Keyword.get(opts, :cancel?, false) and is_pid(pid) and Process.alive?(pid) do
-      signal =
-        opts[:input_signal] || Aikido.Signal.new!("aikido.agent.cron.cancel", %{job_id: id})
-
-      Aikido.Cron.Directives.Cancel.shutdown_io(id, signal, state)
-    end
-  end
-
-  @doc false
-  @spec emit_cron_telemetry_event(State.t(), atom(), map()) :: :ok
-  def emit_cron_telemetry_event(%State{} = state, event, metadata \\ %{})
-      when is_atom(event) and is_map(metadata) do
-    emit_telemetry(
-      [:aikido, :agent_server, :cron, event],
-      %{system_time: System.system_time()},
-      Map.merge(
-        %{
-          agent_id: state.id,
-          agent_module: state.agent_module,
-          aikido_instance: state.aikido,
-          aikido_partition: state.partition
-        },
-        metadata
-      )
-    )
-
-    :ok
   end
 
   # ---------------------------------------------------------------------------
-  # GenServer Callbacks
   # ---------------------------------------------------------------------------
   @impl true
   def init(raw_opts) do
@@ -984,7 +816,6 @@ defmodule Aikido.AgentServer do
 
     {initialization_options, opts} = Keyword.pop(opts, :initialization_options, [])
     {restored_agent, opts} = Keyword.pop(opts, :restored_agent)
-    {restored_cron, opts} = Keyword.pop(opts, :restored_cron_specs, %{})
 
     with {:ok, options} <- Options.new(opts),
          agent_module = options.agent_module,
@@ -992,15 +823,24 @@ defmodule Aikido.AgentServer do
          agent = restored_agent || build_agent(agent_module, options, initialization_options),
          {:ok, state} <-
            State.from_options(options, agent_module, agent, middleware_chain: chain) do
-      state = maybe_monitor_parent(state)
-
       # Lifecycle observers see restored domain state before schedules start.
       signal_router = SignalRouter.build(state)
       state = %{state | signal_router: signal_router}
-      state = emit_through_chain(state, lifecycle_starting_signal(state))
-      state = restore_cron_specs(state, restored_cron)
-      state = emit_through_chain(state, partition_assigned_signal(state))
-      {:ok, state, {:continue, :post_init}}
+
+      ownership =
+        Aikido.Ownership.Signals.Configure.new!(
+          %{parent: options.parent, on_parent_death: options.on_parent_death},
+          source: "/agent/#{state.id}"
+        )
+
+      with {:ok, state, _} <- process_signal(state, ownership) do
+        state = emit_through_chain(state, lifecycle_starting_signal(state))
+        state = emit_through_chain(state, partition_assigned_signal(state))
+        {:ok, state, {:continue, :post_init}}
+      else
+        {:error, _, reason} -> {:stop, reason}
+        {:stop, reason, _} -> {:stop, reason}
+      end
     else
       {:error, reason} -> {:stop, reason}
     end
@@ -1030,9 +870,6 @@ defmodule Aikido.AgentServer do
 
   @impl true
   def handle_continue(:post_init, state) do
-    state = register_slice_schedules(state)
-    state = register_restored_cron_specs(state)
-    notify_parent_of_startup(state)
     state = emit_through_chain(state, lifecycle_ready_signal(state))
     state = %{state | status: :idle}
 
@@ -1068,8 +905,9 @@ defmodule Aikido.AgentServer do
           # A directive returned :stop. Run the selector against the
           # post-directive state so the caller still gets a tagged tuple,
           # then stop after replying.
+          executed_state = prepare_graceful_stop(executed_state, stop_reason)
           reply = invoke_selector(selector, executed_state)
-          {:stop, stop_reason, reply, %{executed_state | status: :stopping}}
+          {:stop, stop_reason, reply, executed_state}
       end
     catch
       kind, reason ->
@@ -1090,6 +928,10 @@ defmodule Aikido.AgentServer do
     {:reply, invoke_selector(selector, state), state}
   end
 
+  def handle_call({:prepare_stop, reason}, _from, %State{} = state) do
+    {:reply, :ok, prepare_graceful_stop(state, reason)}
+  end
+
   def handle_call({:set_debug, enabled}, _from, %State{} = state) do
     new_state = %{state | debug: enabled}
     {:reply, :ok, new_state}
@@ -1105,8 +947,8 @@ defmodule Aikido.AgentServer do
   end
 
   def handle_call({:get_child_pid, child_tag}, _from, %State{} = state) do
-    case Map.get(state.children, child_tag) do
-      %ChildInfo{pid: pid} when is_pid(pid) -> {:reply, {:ok, pid}, state}
+    case Map.get(Aikido.Ownership.children(state), child_tag) do
+      %Child{pid: pid} when is_pid(pid) -> {:reply, {:ok, pid}, state}
       _ -> {:reply, :not_found, state}
     end
   end
@@ -1116,7 +958,8 @@ defmodule Aikido.AgentServer do
         _from,
         %State{} = state
       )
-      when is_binary(pattern) and is_function(selector, 1) and is_pid(caller_pid) and
+      when is_binary(pattern) and (is_function(selector, 1) or is_function(selector, 2)) and
+             is_pid(caller_pid) and
              is_boolean(once?) do
     case Router.validate_pattern(pattern) do
       {:ok, _} ->
@@ -1139,33 +982,26 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  def handle_call({:adopt_parent, %ParentRef{} = parent_ref}, _from, %State{} = state) do
-    case attach_parent(state, parent_ref) do
-      {:ok, next} ->
-        {:reply,
-         {:ok, %{id: next.id, agent_module: next.agent_module, partition: next.partition}}, next}
-
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-    end
-  end
-
-  def handle_call({:stop_child, tag, reason}, _from, %State{} = state) do
+  def handle_call({:adopt_parent, %ParentRef{} = parent_ref}, from, %State{} = state) do
     signal =
-      Signal.new!(
-        "aikido.agent.stop_child",
-        %{tag: tag, reason: reason},
+      Aikido.Ownership.Signals.AttachParent.new!(%{parent: parent_ref},
         source: "/agent/#{state.id}"
       )
 
-    :ok =
-      Aikido.Directives.StopChild.exec(
-        %Aikido.Directives.StopChild{tag: tag, reason: reason},
-        signal,
-        state
+    selector = fn runtime ->
+      {:ok, %{id: runtime.id, agent_module: runtime.agent_module, partition: runtime.partition}}
+    end
+
+    handle_call({:signal_with_selector, signal, selector}, from, state)
+  end
+
+  def handle_call({:stop_child, tag, reason}, from, %State{} = state) do
+    signal =
+      Aikido.Ownership.Signals.StopChildRequested.new!(%{tag: tag, reason: reason},
+        source: "/agent/#{state.id}"
       )
 
-    {:reply, :ok, state}
+    handle_call({:signal_with_selector, signal, fn _runtime -> :ok end}, from, state)
   end
 
   def handle_call(_msg, _from, state) do
@@ -1174,14 +1010,12 @@ defmodule Aikido.AgentServer do
 
   @impl true
   def handle_cast({:adopt_parent, %ParentRef{} = parent_ref}, %State{} = state) do
-    case attach_parent(state, parent_ref) do
-      {:ok, next} ->
-        {:noreply, next}
+    signal =
+      Aikido.Ownership.Signals.AttachParent.new!(%{parent: parent_ref},
+        source: "/agent/#{state.id}"
+      )
 
-      {:error, reason} ->
-        Logger.warning("Agent #{state.id} could not attach parent: #{inspect(reason)}")
-        {:noreply, state}
-    end
+    handle_cast({:signal, signal}, state)
   end
 
   # Initial activation can outlive its parent before DurableServer resolves the
@@ -1189,13 +1023,15 @@ defmodule Aikido.AgentServer do
   # or completed orphan transition must retain its current lifecycle decision.
   def handle_cast(
         {:ensure_initial_parent, %ParentRef{} = parent_ref},
-        %State{parent: nil, orphaned_from: nil} = state
+        %State{} = state
       ) do
-    handle_cast({:adopt_parent, parent_ref}, state)
-  end
+    signal =
+      Aikido.Ownership.Signals.AttachParent.new!(%{parent: parent_ref, initial_only?: true},
+        source: "/agent/#{state.id}"
+      )
 
-  def handle_cast({:ensure_initial_parent, %ParentRef{}}, %State{} = state),
-    do: {:noreply, state}
+    handle_cast({:signal, signal}, state)
+  end
 
   def handle_cast({:unsubscribe, sub_ref}, %State{} = state) when is_reference(sub_ref) do
     case Map.pop(state.signal_subscribers, sub_ref) do
@@ -1227,7 +1063,7 @@ defmodule Aikido.AgentServer do
     case process_signal(state, signal) do
       {:ok, new_state, _directives} -> {:noreply, new_state}
       {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
+      {:stop, reason, new_state} -> {:stop, reason, prepare_graceful_stop(new_state, reason)}
     end
   end
 
@@ -1240,58 +1076,19 @@ defmodule Aikido.AgentServer do
     case process_signal(state, signal) do
       {:ok, new_state, _directives} -> {:noreply, new_state}
       {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
+      {:stop, reason, new_state} -> {:stop, reason, prepare_graceful_stop(new_state, reason)}
     end
   end
 
   def handle_info({:DOWN, ref, :process, pid, reason}, state) do
-    case Map.get(state.cron_monitor_refs, ref) do
+    case Aikido.Cron.Messages.from_down(state, ref, pid, reason) do
+      %Signal{} = signal ->
+        handle_info({:signal, signal}, state)
+
       nil ->
         state = drop_dead_subscriber(state, ref)
 
-        if match?(%{parent: %ParentRef{pid: ^pid}}, state) do
-          handle_parent_down(state, pid, reason)
-        else
-          handle_child_down(state, pid, reason)
-        end
-
-      logical_id ->
-        {:noreply, handle_cron_job_down(state, logical_id, pid, reason)}
-    end
-  end
-
-  def handle_info({:timeout, ref, {:cron_restart, logical_id}}, state) do
-    case Map.get(state.cron_restart_timer_refs, ref) do
-      ^logical_id ->
-        state = clear_cron_restart_timer(state, logical_id)
-
-        case Map.get(state.cron_runtime_specs, logical_id) do
-          %Aikido.Cron.RuntimeSpec{} = runtime_spec ->
-            case register_runtime_cron_job(state, logical_id, runtime_spec) do
-              {:ok, new_state} ->
-                emit_cron_telemetry_event(new_state, :restart_succeeded, %{
-                  job_id: logical_id,
-                  cron_expression: runtime_spec.cron_expression
-                })
-
-                # Synthesize a lifecycle signal and run it through the
-                # agent's own pipeline so `subscribe/4` subscribers see
-                # the post-restart state through subscriptions.
-                new_pid = Map.fetch!(new_state.cron_jobs, logical_id)
-                signal = cron_restarted_signal(new_state, logical_id, new_pid)
-                new_state = dispatch_synthetic_signal(signal, new_state)
-                {:noreply, new_state}
-
-              {:error, reason, failed_state} ->
-                {:noreply, schedule_cron_restart(failed_state, logical_id, reason)}
-            end
-
-          _ ->
-            {:noreply, state}
-        end
-
-      _ ->
-        {:noreply, state}
+        dispatch_owned_process_exit(state, ref, pid, reason)
     end
   end
 
@@ -1299,7 +1096,7 @@ defmodule Aikido.AgentServer do
     case process_signal(state, signal) do
       {:ok, new_state, _directives} -> {:noreply, new_state}
       {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
+      {:stop, reason, new_state} -> {:stop, reason, prepare_graceful_stop(new_state, reason)}
     end
   end
 
@@ -1309,22 +1106,21 @@ defmodule Aikido.AgentServer do
 
   @impl true
   def terminate(reason, state) do
-    # Notify lifecycle observers before shutting down owned runtime processes.
-    state =
-      if clean_shutdown?(reason) do
-        emit_through_chain(state, lifecycle_stopping_signal(state, reason))
-      else
-        state
-      end
-
-    # Clean up all cron jobs owned by this agent
-    Enum.each(state.cron_jobs, fn {_job_id, pid} ->
-      if is_pid(pid) and Process.alive?(pid) do
-        Aikido.Cron.Scheduler.cancel(pid)
-      end
-    end)
-
+    # External supervisor shutdowns cannot return updated callback state. Their
+    # cleanup is best effort; explicit stops prepare it before final persistence.
+    _state = prepare_graceful_stop(state, reason)
     :ok
+  end
+
+  defp prepare_graceful_stop(%State{status: :stopping} = state, _reason), do: state
+
+  defp prepare_graceful_stop(state, reason) do
+    state =
+      if clean_shutdown?(reason),
+        do: emit_through_chain(state, lifecycle_stopping_signal(state, reason)),
+        else: state
+
+    %{state | status: :stopping}
   end
 
   defp clean_shutdown?(:normal) do
@@ -1396,9 +1192,6 @@ defmodule Aikido.AgentServer do
     state =
       state
       |> State.record_debug_event(:signal_received, %{type: signal.type, id: signal.id})
-      |> maybe_track_child_started(signal)
-      |> maybe_track_cron_registered(signal)
-      |> maybe_cancel_cron(signal)
 
     emit_telemetry(
       [:aikido, :agent_server, :signal, :start],
@@ -1435,18 +1228,18 @@ defmodule Aikido.AgentServer do
   end
 
   defp execute_signal_effects({:error, state, reason}, signal) do
-    {:error, fire_subscribers(state, signal), reason}
+    {:error, fire_subscribers(state, signal, [], reason), reason}
   end
 
   defp notify_after_effects({:ok, state}, signal, directives),
-    do: {:ok, fire_subscribers(state, signal), directives}
+    do: {:ok, fire_subscribers(state, signal, directives, nil), directives}
 
   # Shutdown is observed through the process monitor, not a terminal state snapshot.
   defp notify_after_effects({:stop, reason, state}, _signal, _directives),
     do: {:stop, reason, state}
 
-  defp notify_after_effects({:error, state, reason}, signal, _directives),
-    do: {:error, fire_subscribers(state, signal), reason}
+  defp notify_after_effects({:error, state, reason}, signal, directives),
+    do: {:error, fire_subscribers(state, signal, directives, reason), reason}
 
   # Invokes a call, state or subscription selector in a try/rescue so a raising
   # selector doesn't crash the agent. Returns the selector's tagged tuple
@@ -1469,9 +1262,15 @@ defmodule Aikido.AgentServer do
   # the action errored downstream. Action-level rollback already happened
   # before accepting the action results.
   #
-  defp run_middleware_and_adopt_agent(%Signal{} = signal, %State{middleware_chain: chain} = state)
+  defp run_middleware_and_adopt_agent(
+         %Signal{} = signal,
+         %State{middleware_chain: chain} = state,
+         opts \\ []
+       )
        when is_function(chain, 2) do
-    ctx = build_signal_ctx(signal, state)
+    ctx =
+      build_signal_ctx(signal, state)
+      |> Map.put(:__allow_unhandled__, Keyword.get(opts, :allow_unhandled?, false))
 
     case chain.(signal, ctx) do
       {:ok, new_ctx, directives} ->
@@ -1492,7 +1291,7 @@ defmodule Aikido.AgentServer do
   # middleware unwinds and directives have executed.
   defp emit_through_chain(%State{} = state, %Signal{} = signal) do
     with_signal_span(state, signal, fn signal ->
-      case run_middleware_and_adopt_agent(signal, state) do
+      case run_middleware_and_adopt_agent(signal, state, allow_unhandled?: true) do
         {:ok, next, directives} ->
           executed =
             case execute_directives(directives, signal, next) do
@@ -1501,10 +1300,10 @@ defmodule Aikido.AgentServer do
               {:error, state, _reason} -> state
             end
 
-          fire_subscribers(executed, signal)
+          fire_subscribers(executed, signal, directives, nil)
 
-        {:error, next, _reason} ->
-          fire_subscribers(next, signal)
+        {:error, next, reason} ->
+          fire_subscribers(next, signal, [], reason)
       end
     end)
   end
@@ -1518,10 +1317,10 @@ defmodule Aikido.AgentServer do
       agent_id: state.id,
       agent_pid: self(),
       partition: state.partition,
-      parent: state.parent,
-      orphaned_from: state.orphaned_from,
+      parent: Aikido.Ownership.parent(state),
+      orphaned_from: Aikido.Ownership.orphaned_from(state),
       aikido: state.aikido,
-      cron_specs: state.cron_specs,
+      skip_schedules: state.skip_schedules,
       __signal_router__: state.signal_router
     }
 
@@ -1537,8 +1336,7 @@ defmodule Aikido.AgentServer do
   #
   # The directive contract has no state slot in its return value:
   # directives mutate no state. This runtime loop records debug events.
-  # Cascade callbacks retire cron ownership before shutdown and install
-  # runtime results received through subsequent signals.
+  # Feature slices adopt effect results through subsequent routed signals.
   @spec execute_directives([struct()], Signal.t(), State.t()) ::
           {:ok, State.t()} | {:stop, term(), State.t()} | {:error, State.t(), term()}
   def execute_directives(directives, signal, state)
@@ -1601,90 +1399,6 @@ defmodule Aikido.AgentServer do
     %{directive_count: 0, directive_types: %{}, error: reason}
   end
 
-  defp maybe_track_child_started(
-         %State{id: state_id} = state,
-         %Signal{type: "aikido.agent.child.started", data: data}
-       )
-       when is_map(data) do
-    with %{
-           parent_id: ^state_id,
-           tag: tag,
-           pid: pid,
-           child_id: child_id,
-           child_module: child_module
-         } <- data,
-         true <- is_pid(pid),
-         true <- is_binary(child_id),
-         true <- is_atom(child_module) do
-      meta = Map.get(data, :meta, %{})
-      child_partition = Map.get(data, :child_partition)
-
-      case Map.get(state.children, tag) do
-        %ChildInfo{pid: ^pid} ->
-          state
-
-        %ChildInfo{ref: ref} ->
-          Process.demonitor(ref, [:flush])
-          track_child_started(state, pid, child_module, child_id, child_partition, tag, meta)
-
-        nil ->
-          track_child_started(state, pid, child_module, child_id, child_partition, tag, meta)
-      end
-    else
-      _ -> state
-    end
-  end
-
-  defp maybe_track_child_started(state, _signal) do
-    state
-  end
-
-  defp track_child_started(state, pid, child_module, child_id, child_partition, tag, meta) do
-    ref = Process.monitor(pid)
-
-    child_info =
-      ChildInfo.new!(%{
-        pid: pid,
-        ref: ref,
-        module: child_module,
-        id: child_id,
-        partition: child_partition,
-        tag: tag,
-        meta: meta
-      })
-
-    State.add_child(state, tag, child_info)
-  end
-
-  # Registration and recovery use the same runtime ownership installer.
-  defp maybe_track_cron_registered(
-         %State{} = state,
-         %Signal{type: "aikido.agent.cron.registered", data: data} = signal
-       )
-       when is_map(data) do
-    case data do
-      %{job_id: _, pid: pid, monitor_ref: monitor_ref, cron_spec: _, runtime_spec: _}
-      when is_pid(pid) and is_reference(monitor_ref) ->
-        commit_cron_io_result(state, data, signal)
-
-      _ ->
-        state
-    end
-  end
-
-  defp maybe_track_cron_registered(state, _signal), do: state
-
-  defp maybe_cancel_cron(
-         state,
-         %Signal{type: "aikido.agent.cron.cancel.requested", data: %{job_id: job_id}} = signal
-       ) do
-    {_pid, next} = untrack_cron_job(state, job_id, drop_runtime_spec?: true)
-    Aikido.Cron.Directives.Cancel.shutdown_io(job_id, signal, state)
-    next
-  end
-
-  defp maybe_cancel_cron(state, _signal), do: state
-
   # ---------------------------------------------------------------------------
   # Internal: subscriber dispatch
   #
@@ -1696,32 +1410,39 @@ defmodule Aikido.AgentServer do
   # table to fire alongside subscribers.
   # ---------------------------------------------------------------------------
 
-  defp fire_subscribers(%State{signal_subscribers: subs} = state, _signal)
-       when map_size(subs) == 0 do
-    state
-  end
+  defp fire_subscribers(%State{} = state, %Signal{type: type} = signal, directives, error) do
+    event = %{signal: signal, directives: directives, error: error}
+    Aikido.Inspector.observe(state, event)
 
-  defp fire_subscribers(%State{} = state, %Signal{type: type} = signal) do
     Enum.reduce(state.signal_subscribers, state, fn {sub_ref, entry}, acc_state ->
       if Router.matches_compiled?(type, entry.pattern_compiled) do
-        fire_matching_subscriber(acc_state, sub_ref, entry, signal)
+        fire_matching_subscriber(acc_state, sub_ref, entry, event)
       else
         acc_state
       end
     end)
   end
 
-  defp fire_matching_subscriber(acc_state, sub_ref, entry, signal) do
-    case invoke_selector(entry.selector, acc_state) do
+  defp fire_matching_subscriber(acc_state, sub_ref, entry, event) do
+    case invoke_subscription_selector(entry.selector, acc_state, event) do
       :skip ->
         acc_state
 
       {:ok, _value} = fire ->
-        deliver_subscription_result(acc_state, sub_ref, entry, signal, fire)
+        deliver_subscription_result(acc_state, sub_ref, entry, event.signal, fire)
 
       {:error, _reason} = fire ->
-        deliver_subscription_result(acc_state, sub_ref, entry, signal, fire)
+        deliver_subscription_result(acc_state, sub_ref, entry, event.signal, fire)
     end
+  end
+
+  defp invoke_subscription_selector(selector, state, _event) when is_function(selector, 1),
+    do: invoke_selector(selector, state)
+
+  defp invoke_subscription_selector(selector, state, event) do
+    selector.(state, event)
+  rescue
+    exception -> {:error, {:selector_raised, exception, __STACKTRACE__}}
   end
 
   defp deliver_subscription_result(acc_state, sub_ref, entry, signal, fire) do
@@ -1756,26 +1477,11 @@ defmodule Aikido.AgentServer do
         {:ok, actions}
 
       {:error, %{details: %{reason: :no_handlers_found}}} ->
-        default_system_action(signal)
+        {:error, :no_matching_route}
 
       {:error, reason} ->
         {:error, reason}
     end
-  end
-
-  defp default_system_action(%Signal{type: "aikido.agent.stop", data: data}) do
-    params =
-      if is_map(data) do
-        data
-      else
-        %{}
-      end
-
-    {:ok, [{{Aikido.AgentServer.RuntimeActions, :stop_self}, params}]}
-  end
-
-  defp default_system_action(_signal) do
-    {:error, :no_matching_route}
   end
 
   defp target_to_action({resource, action}, %Signal{data: data})
@@ -1831,6 +1537,9 @@ defmodule Aikido.AgentServer do
       {:ok, targets} ->
         apply_actions(signal, ctx, targets)
 
+      {:error, :no_matching_route} when ctx.__allow_unhandled__ ->
+        {:ok, ctx, []}
+
       {:error, reason} ->
         error =
           Aikido.Error.routing_error("No route for signal #{inspect(signal.type)}", %{
@@ -1874,8 +1583,10 @@ defmodule Aikido.AgentServer do
     |> Map.get(reference, [Spark.Dsl.Extension.get_opt(agent_module, [:agent], :path)])
   end
 
-  defp adopt_action_state(ctx, %Aikido.Types.SliceUpdate{slices: slices}, _path) do
-    put_in(ctx.agent.state, Map.merge(ctx.agent.state, slices))
+  defp adopt_action_state(ctx, %Aikido.Ownership.Slice{} = slice, path) do
+    ctx
+    |> put_in([Access.key(:agent), Access.key(:state), path], slice)
+    |> Map.merge(%{parent: slice.parent, orphaned_from: slice.orphaned_from})
   end
 
   defp adopt_action_state(ctx, slice, path) do
@@ -1936,222 +1647,6 @@ defmodule Aikido.AgentServer do
   # Log them here so operators can identify signals without a valid route.
   defp log_routing_error(ctx, %{message: message}) do
     Logger.debug("Agent #{Map.get(ctx, :agent_id, "unknown")} [routing]: #{message}")
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Slice Schedules
-  # ---------------------------------------------------------------------------
-  @doc false
-  defp register_slice_schedules(%State{skip_schedules: true} = state) do
-    Logger.debug("AgentServer #{state.id} skipping slice schedules")
-    state
-  end
-
-  defp register_slice_schedules(%State{} = state) do
-    agent_module = state.agent_module
-    schedules = Aikido.Agent.Info.schedules(agent_module)
-
-    Enum.reduce(schedules, state, fn schedule_spec, acc_state ->
-      register_schedule(acc_state, schedule_spec)
-    end)
-  end
-
-  defp restore_cron_specs(state, specs) do
-    {valid, invalid} = Aikido.Cron.Scheduler.classify_cron_specs(specs)
-
-    Enum.each(invalid, fn {job_id, spec, reason} ->
-      Logger.error(
-        "AgentServer #{state.id} dropped malformed persisted cron spec #{inspect(job_id)}: #{inspect(spec)} (#{inspect(reason)})"
-      )
-    end)
-
-    %{state | cron_specs: Map.merge(state.cron_specs, valid)}
-  end
-
-  defp register_restored_cron_specs(%State{cron_specs: cron_specs} = state)
-       when map_size(cron_specs) == 0 do
-    state
-  end
-
-  defp register_restored_cron_specs(%State{} = state) do
-    Enum.reduce(state.cron_specs, state, fn {job_id, spec}, acc_state ->
-      register_restored_cron_spec(acc_state, job_id, spec)
-    end)
-  end
-
-  defp register_restored_cron_spec(
-         %State{} = state,
-         job_id,
-         %{cron_expression: cron_expr, message: message, timezone: timezone}
-       ) do
-    if Map.has_key?(state.cron_jobs, job_id) do
-      Logger.warning(
-        "AgentServer #{state.id} skipping restored cron job #{inspect(job_id)} because declarative/slice schedule already exists"
-      )
-
-      %{state | cron_specs: Map.delete(state.cron_specs, job_id)}
-    else
-      register_restored_cron_runtime(state, job_id, cron_expr, message, timezone)
-    end
-  end
-
-  defp register_restored_cron_spec(%State{} = state, job_id, invalid_spec) do
-    Logger.error(
-      "AgentServer #{state.id} skipped invalid persisted cron spec #{inspect(job_id)}: #{inspect(invalid_spec)}"
-    )
-
-    state
-  end
-
-  # GenServer-context helper that restores a persisted cron spec by
-  # spawning the scheduler job and installing the runtime maps directly
-  # (no synthetic-signal cascade). Used only by the post-init restore
-  # path. Mirrors the directive's `register_io/5` flow without the
-  # cascade dispatch — directives go through `maybe_track_cron_registered/2`,
-  # but a still-initializing GenServer can't rely on signal mailbox
-  # turns yet. On failure we drop the persisted spec so a broken entry
-  # doesn't block boot.
-  defp register_restored_cron_runtime(state, job_id, cron_expr, message, timezone) do
-    case Aikido.Cron.Directives.Register.register_io(state, cron_expr, message, job_id, timezone) do
-      {:ok, io_result} ->
-        commit_cron_io_result(state, io_result)
-
-      {:error, reason} ->
-        Logger.error(
-          "AgentServer #{state.id} failed to register cron job #{inspect(job_id)}: #{inspect(reason)}"
-        )
-
-        {_pid, runtime_state} =
-          untrack_cron_job(state, job_id, cancel?: true, drop_runtime_spec?: true)
-
-        %{runtime_state | cron_specs: Map.delete(runtime_state.cron_specs, job_id)}
-    end
-  end
-
-  defp commit_cron_io_result(state, io_result, input_signal \\ nil)
-
-  defp commit_cron_io_result(%State{} = state, io_result, input_signal) do
-    %{
-      job_id: job_id,
-      pid: pid,
-      monitor_ref: monitor_ref,
-      cron_spec: cron_spec,
-      runtime_spec: runtime_spec
-    } = io_result
-
-    committed =
-      track_cron_job(state, job_id, pid,
-        runtime_spec: runtime_spec,
-        monitor_ref: monitor_ref,
-        input_signal: input_signal
-      )
-
-    %{committed | cron_specs: Map.put(committed.cron_specs, job_id, cron_spec)}
-  end
-
-  defp register_schedule(%State{} = state, schedule_spec) do
-    %{
-      cron_expression: cron_expr,
-      job_id: job_id,
-      signal_type: signal_type,
-      timezone: timezone
-    } = schedule_spec
-
-    runtime_spec =
-      Aikido.Cron.RuntimeSpec.schedule(
-        cron_expr,
-        signal_type,
-        timezone,
-        Map.get(schedule_spec, :data, %{})
-      )
-
-    case register_runtime_cron_job(state, job_id, runtime_spec) do
-      {:ok, new_state} ->
-        Logger.debug(
-          "AgentServer #{state.id} registered schedule #{inspect(job_id)}: #{cron_expr}"
-        )
-
-        new_state
-
-      {:error, _reason, failed_state} ->
-        failed_state
-    end
-  end
-
-  defp handle_cron_job_down(state, logical_id, pid, reason) do
-    {tracked_pid, state} = untrack_cron_job(state, logical_id, cancel?: false)
-
-    if tracked_pid == pid do
-      # Emit before scheduling restart so subscribers see the death
-      # announcement on a state where `cron_jobs[logical_id]` is already
-      # removed. A `aikido.agent.cron.restarted` follows when the restart
-      # timer succeeds (only for abnormal exits).
-      state = dispatch_synthetic_signal(cron_died_signal(state, logical_id, pid, reason), state)
-
-      if clean_shutdown?(reason) do
-        state
-      else
-        schedule_cron_restart(state, logical_id, reason)
-      end
-    else
-      state
-    end
-  end
-
-  defp cron_died_signal(%State{} = state, logical_id, pid, reason) do
-    Aikido.Cron.Signals.Died.new!(%{job_id: logical_id, pid: pid, reason: reason},
-      source: "/agent/#{state.id}/cron"
-    )
-  end
-
-  defp cron_restarted_signal(%State{} = state, logical_id, pid) do
-    Aikido.Cron.Signals.Restarted.new!(%{job_id: logical_id, pid: pid},
-      source: "/agent/#{state.id}/cron"
-    )
-  end
-
-  defp schedule_cron_restart(state, logical_id, reason) do
-    if Map.has_key?(state.cron_runtime_specs, logical_id) do
-      attempt = Map.get(state.cron_restart_attempts, logical_id, 0)
-
-      delay =
-        min((@cron_restart_base_ms * :math.pow(2, attempt)) |> trunc(), @cron_restart_max_ms)
-
-      timer_ref = :erlang.start_timer(delay, self(), {:cron_restart, logical_id})
-
-      Logger.warning(
-        "AgentServer #{state.id} scheduling cron restart for #{inspect(logical_id)} in #{delay}ms after #{inspect(reason)}"
-      )
-
-      emit_cron_telemetry_event(state, :restart_scheduled, %{
-        job_id: logical_id,
-        reason: reason,
-        delay_ms: delay
-      })
-
-      %{
-        state
-        | cron_restart_attempts: Map.put(state.cron_restart_attempts, logical_id, attempt + 1),
-          cron_restart_timers: Map.put(state.cron_restart_timers, logical_id, timer_ref),
-          cron_restart_timer_refs: Map.put(state.cron_restart_timer_refs, timer_ref, logical_id)
-      }
-    else
-      state
-    end
-  end
-
-  defp clear_cron_restart_timer(state, logical_id) do
-    case Map.pop(state.cron_restart_timers, logical_id) do
-      {timer_ref, timers} when is_reference(timer_ref) ->
-        %{
-          state
-          | cron_restart_timers: timers,
-            cron_restart_timer_refs: Map.delete(state.cron_restart_timer_refs, timer_ref)
-        }
-
-      {_other, timers} ->
-        %{state | cron_restart_timers: timers}
-    end
   end
 
   # ---------------------------------------------------------------------------
@@ -2220,7 +1715,7 @@ defmodule Aikido.AgentServer do
   # ---------------------------------------------------------------------------
 
   defp ensure_adopt_tag_available(state, tag) do
-    case Map.get(state.children, tag) do
+    case Map.get(Aikido.Ownership.children(state), tag) do
       nil -> :ok
       _child -> {:error, {:tag_in_use, tag}}
     end
@@ -2247,189 +1742,11 @@ defmodule Aikido.AgentServer do
     {:error, {:invalid_child, child}}
   end
 
-  defp attach_parent(state, parent_ref) do
-    cond do
-      not is_nil(state.parent) ->
-        {:error, :already_attached}
-
-      not is_pid(parent_ref.pid) or parent_ref.pid == self() ->
-        {:error, :invalid_parent}
-
-      true ->
-        next = state |> State.attach_parent(parent_ref) |> maybe_monitor_parent()
-        notify_parent_of_startup(next)
-        {:ok, next}
+  defp dispatch_owned_process_exit(state, ref, pid, reason) do
+    case Aikido.Ownership.Messages.from_down(state, ref, pid, reason) do
+      %Signal{} = signal -> handle_info({:signal, signal}, state)
+      nil -> {:noreply, state}
     end
-  end
-
-  defp maybe_monitor_parent(%State{parent: %ParentRef{pid: pid}} = state) when is_pid(pid) do
-    Process.monitor(pid)
-    state
-  end
-
-  defp maybe_monitor_parent(state) do
-    state
-  end
-
-  defp notify_parent_of_startup(%State{parent: %ParentRef{} = parent} = state)
-       when is_pid(parent.pid) do
-    child_started =
-      ChildStarted.new!(
-        %{
-          parent_id: parent.id,
-          child_id: state.id,
-          child_partition: state.partition,
-          child_module: state.agent_module,
-          tag: parent.tag,
-          pid: self(),
-          meta: parent.meta || %{}
-        },
-        source: "/agent/#{state.id}"
-      )
-
-    _ = cast(parent.pid, child_started)
-    :ok
-  end
-
-  defp notify_parent_of_startup(_state) do
-    :ok
-  end
-
-  defp handle_parent_down(
-         %State{on_parent_death: :stop, parent: former_parent} = state,
-         _pid,
-         reason
-       ) do
-    state = emit_parent_died(state, former_parent, reason)
-    stop_reason = wrap_parent_down_reason(reason)
-
-    Logger.info(
-      "AgentServer #{state.id} stopping: parent died (#{inspect(reason)}), wrapped stop_reason: #{inspect(stop_reason)}"
-    )
-
-    {:stop, stop_reason, %{state | status: :stopping}}
-  end
-
-  defp handle_parent_down(%State{on_parent_death: :continue} = state, _pid, reason) do
-    {former_parent, orphaned_state} = transition_to_orphan(state, reason)
-    orphaned_state = emit_parent_died(orphaned_state, former_parent, reason)
-
-    Logger.info(
-      "AgentServer #{state.id} continuing as orphan after parent #{former_parent.id} died (#{inspect(reason)})"
-    )
-
-    {:noreply, orphaned_state}
-  end
-
-  defp handle_parent_down(%State{on_parent_death: :emit_orphan} = state, _pid, reason) do
-    {former_parent, orphaned_state} = transition_to_orphan(state, reason)
-    orphaned_state = emit_parent_died(orphaned_state, former_parent, reason)
-    orphaned_state = emit_identity_orphaned(orphaned_state, former_parent, reason)
-
-    signal =
-      Orphaned.new!(
-        %{
-          parent_id: former_parent.id,
-          parent_pid: former_parent.pid,
-          tag: former_parent.tag,
-          meta: former_parent.meta || %{},
-          reason: reason
-        },
-        source: "/agent/#{orphaned_state.id}"
-      )
-
-    case process_signal(orphaned_state, signal) do
-      {:ok, new_state, _directives} -> {:noreply, new_state}
-      {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
-    end
-  end
-
-  defp emit_parent_died(%State{} = state, %ParentRef{} = former_parent, reason) do
-    signal =
-      ParentDied.new!(%{former_parent: former_parent, reason: reason},
-        source: "/agent/#{state.id}"
-      )
-
-    dispatch_synthetic_signal(signal, state)
-  end
-
-  defp emit_parent_died(%State{} = state, _former_parent, _reason) do
-    state
-  end
-
-  defp emit_identity_orphaned(%State{} = state, %ParentRef{} = former_parent, reason) do
-    signal =
-      IdentityOrphaned.new!(%{former_parent: former_parent, reason: reason},
-        source: "/agent/#{state.id}"
-      )
-
-    dispatch_synthetic_signal(signal, state)
-  end
-
-  # Synthesize a signal locally and run it through the agent's own
-  # `process_signal/2` pipeline so subscribers see it. Used by handlers
-  # that mutate state outside the signal pipeline (DOWN handlers,
-  # restart timers, adoption handlers) to give `subscribe/4` consumers
-  # a subscribable channel for state-only transitions.
-  #
-  # Returns the post-pipeline `%State{}`. The caller composes it into
-  # whatever return shape the surrounding handler needs (`{:noreply, _}`,
-  # `{:reply, _, _}`, etc.). `:stop` directives from middleware are
-  # collapsed to a state return — synthetic signals shouldn't terminate
-  # the agent on their own.
-  defp dispatch_synthetic_signal(signal, %State{} = state) do
-    case process_signal(state, signal) do
-      {:ok, new_state, _directives} -> new_state
-      {:error, committed_state, _reason} -> committed_state
-      {:stop, _reason, new_state} -> new_state
-    end
-  end
-
-  defp handle_child_down(%State{} = state, pid, reason) do
-    child =
-      Enum.find_value(state.children, fn {_tag, child} -> if child.pid == pid, do: child end)
-
-    {tag, state} = State.remove_child_by_pid(state, pid)
-
-    if is_nil(tag) do
-      {:noreply, state}
-    else
-      Logger.debug("AgentServer #{state.id} child #{inspect(tag)} exited: #{inspect(reason)}")
-
-      signal =
-        ChildExit.new!(%{tag: tag, pid: pid, reason: reason},
-          source: "/agent/#{state.id}"
-        )
-
-      if team_pid = child.meta[:team_pid] do
-        if team_pid != self(), do: cast(team_pid, signal)
-      end
-
-      case process_signal(state, signal) do
-        {:ok, new_state, _directives} -> {:noreply, new_state}
-        {:error, committed_state, _reason} -> {:noreply, committed_state}
-        {:stop, reason, new_state} -> {:stop, reason, %{new_state | status: :stopping}}
-      end
-    end
-  end
-
-  # Wraps parent-down reasons so OTP treats them as clean shutdowns.
-  # OTP only considers :normal, :shutdown, and {:shutdown, term} as "normal" exits.
-  # All other reasons get logged as errors by the default GenServer logger.
-  defp wrap_parent_down_reason(reason), do: {:shutdown, {:parent_down, reason}}
-
-  defp transition_to_orphan(%State{parent: %ParentRef{} = former_parent} = state, reason) do
-    orphaned_state =
-      state
-      |> State.orphan_parent()
-      |> State.record_debug_event(:orphaned, %{
-        former_parent_id: former_parent.id,
-        tag: former_parent.tag,
-        reason: reason
-      })
-
-    {former_parent, orphaned_state}
   end
 
   # ---------------------------------------------------------------------------

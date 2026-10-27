@@ -16,12 +16,28 @@ store_directory =
       Path.expand("../_build/aikido_durable/Elixir.Aikido.Default.DurableAgents", __DIR__)
     end
 
+# Reopening a native store with a different shard count changes key placement.
+# Preserve existing stores; use eight shards for new high-concurrency playgrounds.
+existing_shards = Path.wildcard(Path.join(store_directory, "shard_*.db")) |> length()
+requested_shards = System.get_env("AIKIDO_EXAMPLES_EKV_SHARDS")
+
+store_shards =
+  if requested_shards,
+    do: String.to_integer(requested_shards),
+    else: if(existing_shards > 0, do: existing_shards, else: 8)
+
+if existing_shards > 0 and store_shards != existing_shards do
+  raise "The example store has #{existing_shards} EKV shards; reopening it with " <>
+          "#{store_shards} would change key placement. Keep its shard count or choose " <>
+          "a new AIKIDO_DURABLE_DIR. The existing store has not been modified."
+end
+
 config :agent_examples, :store,
   name: AgentExamples.Store,
   data_dir: store_directory,
   cluster_size: 1,
   node_id: "local",
-  shards: String.to_integer(System.get_env("AIKIDO_EXAMPLES_EKV_SHARDS", "1")),
+  shards: store_shards,
   gc_interval: 30_000
 
 config :aikido, :durable,

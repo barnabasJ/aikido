@@ -10,11 +10,11 @@ defmodule Aikido.AiReact.HookQueue do
   """
   alias Aikido.AiReact.Directives.ExecuteHook
   alias Aikido.AiReact.Directives.{LLMCall, ToolExec}
+  alias Aikido.AiReact.ProviderPressure
 
   @doc "Queue lifecycle hooks only when an action changed its state; preserve errors and no-ops."
   def queue_event_hooks_if_changed({:ok, %{state: state}} = result, input, event, payload)
-      when state != input.arguments.state,
-      do: queue_event_hooks(result, event, payload)
+      when state != input.arguments.state, do: queue_event_hooks(result, event, payload)
 
   def queue_event_hooks_if_changed(result, _input, _event, _payload), do: result
 
@@ -121,6 +121,7 @@ defmodule Aikido.AiReact.HookQueue do
   end
 
   def release_queued_steps(state, [{:effect, %LLMCall{} = effect} | rest], status, directives) do
+    state = %{state | opening_messages: state.opening_messages ++ state.queued_messages}
     state = state |> append_queued_text_to_conversation() |> append_hook_text_to_conversation()
     effect = %{effect | context: state.context}
 
@@ -131,10 +132,12 @@ defmodule Aikido.AiReact.HookQueue do
         {:ok, %{result | directives: directives ++ result.directives}}
       end
     else
+      state = ProviderPressure.prepare_request(state, effect)
+
       {state, effect} =
         if Aikido.AiReact.ConversationHandoff.required?(state, effect),
           do: Aikido.AiReact.ConversationHandoff.prepare_request(state, effect),
-          else: {state, effect}
+          else: {%{state | opening_messages: []}, effect}
 
       release_queued_steps(state, rest, status, directives ++ [effect])
     end

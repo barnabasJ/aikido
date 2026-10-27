@@ -76,12 +76,12 @@ defmodule AgentExamples.Quicksort do
     route AgentExamples.Quicksort.Signals.RetryChild, AgentExamples.Quicksort.Actions.RetryChild,
       public?: false
 
-    route [Aikido.AgentServer.Signals.ChildExit, AgentExamples.Quicksort.Signals.Failed],
+    route [Aikido.Ownership.Signals.ChildExit, AgentExamples.Quicksort.Signals.Failed],
           AgentExamples.Quicksort.Actions.Fail, public?: false
 
     route AgentExamples.Quicksort.Signals.Sort, AgentExamples.Quicksort.Actions.Partition
 
-    route Aikido.AgentServer.Signals.ChildStarted, AgentExamples.Quicksort.Actions.StartChild,
+    route Aikido.Ownership.Signals.ChildStarted, AgentExamples.Quicksort.Actions.StartChild,
       public?: false
 
     route AgentExamples.Quicksort.Signals.Sorted, AgentExamples.Quicksort.Actions.Combine,

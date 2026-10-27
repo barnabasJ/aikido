@@ -4,7 +4,7 @@ defmodule AgentExamples.ResilientAssistant.Failures do
 
   actions do
     action :fail, :map do
-      run AgentExamples.ResilientAssistant.Actions.RejectWork
+      run AgentExamples.ResilientAssistant.Tools.RejectWork
     end
   end
 end

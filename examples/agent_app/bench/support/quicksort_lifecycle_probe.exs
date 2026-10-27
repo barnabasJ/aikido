@@ -4,6 +4,7 @@ defmodule AgentExamples.Quicksort.Bench.LifecycleProbe do
 
   def start(root, size, topic), do: GenServer.start(__MODULE__, {root, size, topic})
   def await(pid), do: GenServer.call(pid, :await, 600_000)
+  def snapshot(pid), do: GenServer.call(pid, :snapshot)
 
   def capture_ready(_event, _measurements, metadata, {collector, root_id}) do
     if String.starts_with?(metadata.agent_id, root_id <> "/"),
@@ -32,6 +33,10 @@ defmodule AgentExamples.Quicksort.Bench.LifecycleProbe do
        completed: MapSet.new(),
        peak_agents: 1,
        peak_memory: :erlang.memory(:total),
+       started_ms: System.monotonic_time(:millisecond),
+       last_spawn_ms: System.monotonic_time(:millisecond),
+       longest_spawn_gap_ms: 0,
+       samples: [],
        failures: [],
        waiter: nil
      }}
@@ -40,9 +45,20 @@ defmodule AgentExamples.Quicksort.Bench.LifecycleProbe do
   @impl true
   def handle_call(:await, from, state), do: finish_if_retired(%{state | waiter: from})
 
+  def handle_call(:snapshot, _from, state), do: {:reply, report(state), state}
+
   def handle_call({:ready, id, pid}, _from, state) do
+    now = System.monotonic_time(:millisecond)
     ref = Process.monitor(pid)
-    state = %{state | ids: MapSet.put(state.ids, id), live: Map.put(state.live, ref, pid)}
+
+    state = %{
+      state
+      | ids: MapSet.put(state.ids, id),
+        live: Map.put(state.live, ref, pid),
+        last_spawn_ms: now,
+        longest_spawn_gap_ms: max(state.longest_spawn_gap_ms, now - state.last_spawn_ms)
+    }
+
     {:reply, :ok, %{state | peak_agents: max(state.peak_agents, map_size(state.live) + 1)}}
   end
 
@@ -64,7 +80,20 @@ defmodule AgentExamples.Quicksort.Bench.LifecycleProbe do
 
   def handle_info(:sample, state) do
     Process.send_after(self(), :sample, 1_000)
-    {:noreply, %{state | peak_memory: max(state.peak_memory, :erlang.memory(:total))}}
+    memory = :erlang.memory(:total)
+
+    sample = %{
+      elapsed_ms: System.monotonic_time(:millisecond) - state.started_ms,
+      spawned: MapSet.size(state.ids),
+      completed: MapSet.size(state.completed),
+      live_children: map_size(state.live),
+      beam_memory: memory,
+      run_queue: :erlang.statistics(:run_queue),
+      processes: :erlang.system_info(:process_count)
+    }
+
+    {:noreply,
+     %{state | peak_memory: max(state.peak_memory, memory), samples: [sample | state.samples]}}
   end
 
   defp finish_if_retired(state) do
@@ -72,14 +101,23 @@ defmodule AgentExamples.Quicksort.Bench.LifecycleProbe do
          MapSet.size(state.ids) == state.expected do
       GenServer.reply(
         state.waiter,
-        Map.take(state, [:peak_agents, :peak_memory, :failures])
-        |> Map.put(:spawned, MapSet.size(state.ids))
+        report(state)
       )
 
       {:noreply, %{state | waiter: nil}}
     else
       {:noreply, state}
     end
+  end
+
+  defp report(state) do
+    Map.take(state, [:peak_agents, :peak_memory, :longest_spawn_gap_ms, :failures])
+    |> Map.merge(%{
+      spawned: MapSet.size(state.ids),
+      completed: MapSet.size(state.completed),
+      live_children: map_size(state.live),
+      samples: Enum.reverse(state.samples)
+    })
   end
 
   defp clean_exit?(reason) when reason in [:normal, :shutdown, {:shutdown, :delete}], do: true

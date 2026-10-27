@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.LLMTurnTest do
   use ExUnit.Case, async: true
-  alias Aikido.AiReact.Directives.ToolExec
 
+  alias Aikido.AiReact.Directives.ToolExec
   alias ReqLLM.Context
 
   defp running_slice(opts \\ []) do
@@ -16,7 +16,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
       error: nil,
       pending_tool_calls: [],
       tool_results_received: [],
-      previous_tool_signature: Keyword.get(opts, :previous_tool_signature, nil),
+      previous_tool_signature: Keyword.get(opts, :previous_tool_signature),
       model: "anthropic:claude-haiku-4-5-20251001",
       tools: Keyword.get(opts, :tools, [:test_add]),
       llm_opts: []
@@ -25,6 +25,33 @@ defmodule Aikido.AiReact.LLMTurnTest do
 
   defp signal(request_id, turn) do
     Aikido.Signal.new!("ai.react.llm.completed", %{turn: turn, request_id: request_id})
+  end
+
+  test "output-limited responses never complete partial answers or execute partial tool calls" do
+    for calls <- [[], [ReqLLM.ToolCall.new("partial", "test_add", ~s({"a":1}))]] do
+      response = %ReqLLM.Response{
+        id: "limited",
+        model: "offline",
+        context: Context.new(),
+        message: Context.assistant("unfinished", tool_calls: calls),
+        finish_reason: :length
+      }
+
+      result =
+        Aikido.AiReact.Slice
+        |> Ash.ActionInput.for_action(
+          :llm_turn,
+          %{state: running_slice(), request_id: "req_1", turn: response},
+          context: %{aikido: %{signal: signal("req_1", response)}}
+        )
+        |> Ash.run_action!()
+
+      assert result.state.status == :failed
+      assert %Aikido.AiReact.Errors.OutputTruncated{} = result.state.error
+      assert result.state.result == nil
+      assert result.state.prepared_tools == nil
+      refute Enum.any?(result.directives, &match?(%ToolExec{}, &1))
+    end
   end
 
   test "model history retains the canonical assistant message and provider reasoning" do
@@ -169,7 +196,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
       assert Enum.all?(directives, &match?(%ToolExec{}, &1))
     end
 
-    test "settles :completed (truncated, result nil) when the cap is hit" do
+    test "fails unfinished tool work at the cap while retaining the model turn" do
       slice = running_slice(iteration: 3, max_iterations: 4)
       calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
 
@@ -184,9 +211,12 @@ defmodule Aikido.AiReact.LLMTurnTest do
         end)
 
       assert directives == []
-      assert new_slice.status == :completed
+      assert new_slice.status == :failed
+      assert new_slice.error == :max_iterations
       assert new_slice.result == nil
       assert new_slice.iteration == 4
+      assert List.last(new_slice.context.messages).tool_calls != []
+      assert new_slice.pending_tool_calls == []
     end
   end
 
@@ -204,7 +234,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
           |> Ash.run_action()
         end)
 
-      assert returned == slice
+      assert AikidoTest.SliceState.attributes(returned) == AikidoTest.SliceState.attributes(slice)
     end
 
     test "drops a signal that arrives after the slice has already terminated" do
@@ -220,7 +250,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
           |> Ash.run_action()
         end)
 
-      assert returned == slice
+      assert AikidoTest.SliceState.attributes(returned) == AikidoTest.SliceState.attributes(slice)
     end
   end
 

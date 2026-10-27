@@ -36,7 +36,29 @@ defmodule AgentExamples.AI.Tools.ToolFailure do
         "Correct the reported cause before retrying. Inspect agents.members when selecting a worker; report persistent provider failures to the user."
       )
 
-  def from_reason(reason), do: reason
+  def from_reason(%{__struct__: module} = error)
+      when module in [Ash.Error.Invalid, Ash.Error.Forbidden, Ash.Error.Framework],
+      do: error
+
+  def from_reason(%{__exception__: true} = error) do
+    if AshAi.ToToolError.impl_for(error) && AshLua.Error.impl_for(error) do
+      error
+    else
+      failure(
+        "team_operation_failed",
+        "The team operation failed with #{inspect(error.__struct__)} without a public diagnostic.",
+        "Inspect the worker and runtime diagnostics, correct the cause, and check whether earlier effects completed before retrying. Do not repeat the same call unchanged."
+      )
+    end
+  end
+
+  def from_reason(_reason) do
+    failure(
+      "team_operation_failed",
+      "The team operation returned a runtime failure without a public diagnostic.",
+      "Inspect agents.members and the task or worker state. Ensure the intended worker is running, check completed effects, and correct the cause before retrying."
+    )
+  end
 
   def failure(code, message, recovery),
     do: exception(code: code, message: message, recovery: recovery)

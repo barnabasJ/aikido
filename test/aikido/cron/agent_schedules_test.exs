@@ -2,7 +2,7 @@ defmodule AikidoTest.Agent.SchedulesTest do
   use ExUnit.Case, async: true
 
   test "native schedule entities retain payload, timezone and identity" do
-    schedule = %Aikido.Cron.AgentSchedule{
+    schedule = %Aikido.Cron.Schedule{
       cron: "* * * * *",
       signal_type: "heartbeat.tick",
       job_id: :heartbeat,
@@ -10,7 +10,7 @@ defmodule AikidoTest.Agent.SchedulesTest do
       data: %{amount: 3}
     }
 
-    assert [spec] = Aikido.Cron.AgentSchedules.expand_schedules([schedule], "agent")
+    assert [spec] = Aikido.Cron.Declarations.agent_schedules([schedule], "agent")
 
     assert spec == %{
              cron_expression: "* * * * *",
@@ -22,13 +22,13 @@ defmodule AikidoTest.Agent.SchedulesTest do
   end
 
   test "schedule defaults use the signal identity and UTC" do
-    schedule = %Aikido.Cron.AgentSchedule{cron: "@daily", signal_type: "cleanup.run", data: %{}}
-    assert [spec] = Aikido.Cron.AgentSchedules.expand_schedules([schedule], "agent")
+    schedule = %Aikido.Cron.Schedule{cron: "@daily", signal_type: "cleanup.run", data: %{}}
+    assert [spec] = Aikido.Cron.Declarations.agent_schedules([schedule], "agent")
     assert spec.job_id == {:agent_schedule, "agent", "cleanup.run"}
     assert spec.timezone == "Etc/UTC"
   end
 
   test "no declarations produce no schedules" do
-    assert Aikido.Cron.AgentSchedules.expand_schedules([], "agent") == []
+    assert Aikido.Cron.Declarations.agent_schedules([], "agent") == []
   end
 end

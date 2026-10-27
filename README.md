@@ -4,6 +4,10 @@ Thank you to the [Jido project](https://github.com/agentjido/jido) and its
 contributors. Aikido started as a fork of Jido and gradually evolved into an
 independent project. Their work provided the foundation for what Aikido is today.
 
+An opt-in [experimental Jido v3 adapter](experimental/jido_ash/README.md) generates
+Ash interfaces for named Jido inputs while Jido owns runtime execution and state.
+It has a separate dependency graph and does not change the Aikido runtime.
+
 [![CI](https://github.com/barnabasJ/aikido/actions/workflows/ci.yml/badge.svg)](https://github.com/barnabasJ/aikido/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -206,7 +210,8 @@ mix docs
 ```
 
 `mix q` includes all Argus BEAM analyses alongside formatting, compilation,
-Credo and Dialyzer. Run `mix argus --all` separately to inspect its findings.
+Credo and Dialyzer, with no suppressed Argus findings. Run `mix argus --all`
+separately to inspect its findings. Missing analysis engines fail the check.
 The first run downloads verified analysis engines; subsequent runs reuse the
 local cache. CI caches these engines with the build dependencies.
 
@@ -214,3 +219,20 @@ See [Contributing](CONTRIBUTING.md) and [Changelog](CHANGELOG.md).
 
 Aikido is derived from Jido and is developed independently. Original copyright
 notices and the Apache 2.0 license are retained.
+
+### Context summary recovery
+
+Set `handoff_max_regenerations` in AI execution `options` to allow additional
+summary generations after an empty, invalid or oversized handoff document.
+The default is `0`, preserving failure without changing conversation history.
+The conversation example enables one regeneration. Each regeneration requests
+corrective output from the original history with a fresh handoff ID. It keeps
+the run deadline, caller scope, model options and accumulated usage. With `R`
+regenerations and `M` model retries, at most `(R + 1) * (M + 1)` provider attempts
+are made for that handoff, subject to cancellation and remaining time.
+
+Truncated summaries remain failures: the runtime has no verified output ceiling
+for safely increasing their output budget. Provider, permission and configuration
+failures do not trigger summary regeneration; eligible provider failures retain
+the existing `model_max_retries` policy. Recovery interrupts an in-flight summary
+rather than replaying it. No invalid summary replaces retained history.

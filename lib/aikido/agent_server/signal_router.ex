@@ -31,7 +31,6 @@ defmodule Aikido.AgentServer.SignalRouter do
   alias Aikido.Signal.Router
 
   @agent_default_priority 0
-  @slice_default_priority -10
 
   @doc """
   Builds a unified router from all route sources in the agent state.
@@ -48,19 +47,8 @@ defmodule Aikido.AgentServer.SignalRouter do
       []
       |> add_agent_routes(state)
       |> add_slice_routes(state)
-      |> add_builtin_routes()
 
     Router.new!(routes)
-  end
-
-  # Built-in system routes available on every agent. Priority sits below
-  # slice/agent so user-defined routes always win on conflict.
-  defp add_builtin_routes(routes) do
-    builtin = [
-      {"aikido.agent.query.children", {Aikido.AgentServer.RuntimeActions, :query_children}}
-    ]
-
-    routes ++ normalize_routes(builtin, @slice_default_priority - 10)
   end
 
   defp add_agent_routes(routes, %State{agent_module: agent_module}) do

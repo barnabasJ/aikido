@@ -33,7 +33,8 @@ defmodule Aikido.Slice.Extension do
       action: [type: :any, required: true],
       name: [
         type: :atom,
-        doc: "Optional action name; inferred from the signal or target by default."
+        doc:
+          "Optional public command name, or generated action name for a private route; inferred from the signal or target by default."
       ],
       public?: [
         type: :boolean,
@@ -64,14 +65,14 @@ defmodule Aikido.Slice.Extension do
   }
   @schedule %Spark.Dsl.Entity{
     name: :schedule,
-    target: Aikido.Cron.SliceSchedule,
+    target: Aikido.Cron.Schedule,
     args: [:cron, :action],
     schema: [
       cron: [type: :string, required: true],
       action: [type: :any, required: true],
       data: [type: :map, default: %{}],
-      tz: [type: :string],
-      signal: [type: :string]
+      timezone: [type: :string],
+      signal_type: [type: :string]
     ]
   }
   @schedules %Spark.Dsl.Section{name: :schedules, entities: [@schedule]}

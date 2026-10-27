@@ -5,7 +5,7 @@ defmodule Aikido.Dsl.ExtensionComposeTest.MultiHost do
   agent do
     name "multi_host"
     slice :short_term, Aikido.Memory.Slice
-    slice :who, Aikido.Identity.Slice
+    slice :tasks, Aikido.Todo.Slice
     slice :history, Aikido.Thread.Slice
   end
 end
@@ -17,7 +17,7 @@ defmodule Aikido.Dsl.ExtensionComposeTest.DefaultPaths do
   agent do
     name "host_default_paths"
     slice :memory, Aikido.Memory.Slice
-    slice :identity, Aikido.Identity.Slice
+    slice :todo, Aikido.Todo.Slice
   end
 end
 
@@ -29,10 +29,10 @@ defmodule Aikido.Dsl.ExtensionComposeTest do
     test "all three slices mount at the agent-declared paths" do
       instances = Aikido.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.MultiHost)
       memory = Enum.find(instances, &(&1.module == Aikido.Memory.Slice))
-      identity = Enum.find(instances, &(&1.module == Aikido.Identity.Slice))
+      todo = Enum.find(instances, &(&1.module == Aikido.Todo.Slice))
       thread = Enum.find(instances, &(&1.module == Aikido.Thread.Slice))
       assert memory.path == :short_term
-      assert identity.path == :who
+      assert todo.path == :tasks
       assert thread.path == :history
     end
   end
@@ -43,9 +43,9 @@ defmodule Aikido.Dsl.ExtensionComposeTest do
         Aikido.Agent.Info.slice_instances(Aikido.Dsl.ExtensionComposeTest.DefaultPaths)
 
       memory = Enum.find(instances, &(&1.module == Aikido.Memory.Slice))
-      identity = Enum.find(instances, &(&1.module == Aikido.Identity.Slice))
+      todo = Enum.find(instances, &(&1.module == Aikido.Todo.Slice))
       assert memory.path == :memory
-      assert identity.path == :identity
+      assert todo.path == :todo
     end
   end
 end

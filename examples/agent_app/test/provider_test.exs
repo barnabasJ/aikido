@@ -34,19 +34,63 @@ defmodule AgentExamples.ProviderTest do
     on_exit(fn -> Playground.stop(owner, "research-team") end)
     assert {:ok, run} = Playground.start(owner, "research-team", %{"lua" => "true"})
 
-    assert {:ok, {options, workers}} =
+    assert {:ok, _} =
+             AgentExamples.ResearchTeam
+             |> Ash.ActionInput.for_action(:add_member, %{
+               agent: run.record,
+               member: "budget-squad",
+               template: :squad
+             })
+             |> Ash.run_action()
+
+    assert {:ok, {options, llm_opts, workers}} =
              Aikido.AgentServer.state(
                run.record.pid,
-               &{:ok, {&1.agent.state.ai.options, &1.agent.state.team.members}}
+               &{:ok,
+                {&1.agent.state.ai.options, &1.agent.state.ai.llm_opts,
+                 &1.agent.state.team.members}}
              )
 
-    assert options.model_timeout_ms == 180_000
+    assert options.model_timeout_ms == 600_000
+    assert llm_opts[:max_tokens] == 16_384
+    assert llm_opts[:receive_timeout] == 600_000
     assert options.tool_timeout_ms == 3_600_000
     assert options.model_max_retries == 4
     assert options.retry_backoff_ms == 10_000
 
+    assert map_size(workers) == 1
+
     for {_name, pid} <- workers do
-      assert {:ok, ^options} = Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.options})
+      assert {:ok, {^options, ^llm_opts, members}} =
+               Aikido.AgentServer.state(
+                 pid,
+                 &{:ok,
+                  {&1.agent.state.ai.options, &1.agent.state.ai.llm_opts,
+                   &1.agent.state.team.members}}
+               )
+
+      assert members == %{}
+
+      assert {:ok, _} =
+               AgentExamples.ResearchSquad
+               |> Ash.ActionInput.for_action(:add_member, %{
+                 agent: pid,
+                 member: "budget-researcher",
+                 template: :researcher
+               })
+               |> Ash.run_action()
+
+      assert {:ok, researcher} =
+               Aikido.AgentServer.state(
+                 pid,
+                 &{:ok, Map.fetch!(&1.agent.state.team.members, "budget-researcher")}
+               )
+
+      assert {:ok, {^options, ^llm_opts}} =
+               Aikido.AgentServer.state(
+                 researcher,
+                 &{:ok, {&1.agent.state.ai.options, &1.agent.state.ai.llm_opts}}
+               )
     end
   end
 
@@ -89,7 +133,7 @@ defmodule AgentExamples.ProviderTest do
     assert ReqLLM.Response.text(response) == "Real provider path"
   end
 
-  test "provider errors cannot copy the submitted key into public run errors" do
+  test "live provider errors retain HTTP status and recovery without private response details" do
     owner = Ash.UUIDv7.generate()
     key = "redaction-test-key"
 
@@ -101,18 +145,37 @@ defmodule AgentExamples.ProviderTest do
                "api_key" => key
              })
 
-    Req.Test.stub(__MODULE__, fn conn ->
-      conn |> Plug.Conn.put_status(401) |> Req.Test.json(%{error: %{message: "Rejected #{key}"}})
-    end)
+    for status <- [401, 429, 503] do
+      Req.Test.stub(__MODULE__, fn conn ->
+        conn
+        |> Plug.Conn.put_status(status)
+        |> Req.Test.json(%{error: %{message: "Rejected #{key}"}})
+      end)
 
+      assert {:error, %Aikido.AiReact.Errors.ProviderRequestFailed{status: ^status} = error} =
+               AI.LiveClient.generate_text(
+                 %{credential_owner: owner, provider: :zai, id: "glm-5.3"},
+                 [ReqLLM.Context.user("hello")],
+                 req_http_options: [plug: {Req.Test, __MODULE__}, retry: false]
+               )
+
+      assert Exception.message(error) =~ "HTTP #{status}"
+      assert error |> AshAi.ToToolError.to_tool_error() |> String.downcase() =~ "retry"
+      refute inspect(error) =~ key
+      refute Exception.message(error) =~ "Rejected"
+    end
+  end
+
+  test "a missing live credential explains how to configure it" do
     assert {:error, message} =
              AI.LiveClient.generate_text(
-               %{credential_owner: owner, provider: :zai, id: "glm-5.3"},
+               %{credential_owner: Ash.UUIDv7.generate(), provider: :zai, id: "glm-5.3"},
                [ReqLLM.Context.user("hello")],
-               req_http_options: [plug: {Req.Test, __MODULE__}]
+               []
              )
 
-    refute message =~ key
+    assert message =~ "Save the provider credential"
+    assert message =~ "restart the example"
   end
 
   test "coding-plan providers send requests to the coding endpoint" do

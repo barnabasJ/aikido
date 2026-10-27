@@ -116,7 +116,77 @@ defmodule AikidoTest.TypedRouteReservedNamesTest do
 
     assert errors == []
     assert Ash.Resource.Info.action(resource, :inspect).run == {Noop, []}
-    assert Spark.Dsl.Extension.get_persisted(resource, :aikido_generated_handlers, %{}) == %{}
+
+    assert Spark.Dsl.Extension.get_persisted(resource, :aikido_generated_handlers, %{}) == %{
+             __aikido_query_children__: Aikido.Ownership.Actions.ReplyChildren,
+             __aikido_stop_self__: Aikido.Actions.Lifecycle.StopSelf
+           }
+  end
+
+  test "runtime defaults do not collide with ordinary action names and explicit routes override them" do
+    native_actions = """
+    actions do
+      for name <- [:stop_self, :query_children] do
+        action name, Aikido.Types.ActionResult do
+          public? false
+          argument :state, :term
+          run #{inspect(Noop)}
+        end
+      end
+    end
+    """
+
+    {resource, errors} = resource(:agent, "", native_actions)
+    assert errors == []
+    assert Ash.Resource.Info.action(resource, :stop_self).run == {Noop, []}
+    assert Ash.Resource.Info.action(resource, :query_children).run == {Noop, []}
+    assert Ash.Resource.Info.action(resource, :__aikido_stop_self__)
+    assert Ash.Resource.Info.action(resource, :__aikido_query_children__)
+
+    {override, errors} =
+      resource(
+        :agent,
+        """
+        route "aikido.agent.stop", :stop_self, public?: false
+        route "aikido.agent.query.children", :query_children, public?: false
+        """,
+        native_actions
+      )
+
+    assert errors == []
+    router = Aikido.Signal.Router.new!(Aikido.Agent.Info.signal_routes(override))
+
+    for {type, action} <- [
+          {"aikido.agent.stop", :stop_self},
+          {"aikido.agent.query.children", :query_children}
+        ] do
+      assert {:ok, [{^override, ^action}]} =
+               Aikido.Signal.Router.route(router, Aikido.Signal.new!(type, %{}))
+    end
+
+    refute Ash.Resource.Info.action(override, :__aikido_stop_self__)
+    refute Ash.Resource.Info.action(override, :__aikido_query_children__)
+  end
+
+  test "a mounted slice owns an explicitly routed system stop" do
+    {slice, errors} =
+      resource(:slice, """
+      route Aikido.AgentServer.Signals.StopSelf, #{inspect(Noop)}, public?: false
+      """)
+
+    assert errors == []
+    {agent, errors} = resource(:agent, "slice :custom_stop, #{inspect(slice)}")
+    assert errors == []
+    refute Ash.Resource.Info.action(agent, :__aikido_stop_self__)
+    assert Ash.Resource.Info.action(agent, :__aikido_query_children__)
+
+    router =
+      Aikido.Signal.Router.new!(
+        Aikido.Agent.Info.signal_routes(agent) ++ Aikido.Agent.Info.routes(agent)
+      )
+
+    assert {:ok, [{^slice, :stop_self}]} =
+             Aikido.Signal.Router.route(router, Aikido.Signal.new!("aikido.agent.stop", %{}))
   end
 
   test "ordinary typed slices retain their native create defaults and update action" do

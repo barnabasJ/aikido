@@ -42,7 +42,7 @@ defmodule Aikido.AiWorker.Slice do
     route Aikido.AiWorker.Signals.CancelTask, Aikido.AiWorker.Actions.Cancel, public?: false
 
     route "ai.react.**", Aikido.AiWorker.Actions.Observe
-    route "aikido.todo.changed", Aikido.AiWorker.Actions.Observe, public?: false
+    route Aikido.Todo.Signals.TodoChanged, Aikido.AiWorker.Actions.Observe, public?: false
 
     route Aikido.AiWorker.Signals.Settle, Aikido.AiWorker.Actions.Settle, public?: false
   end

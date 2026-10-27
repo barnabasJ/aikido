@@ -4,10 +4,12 @@ defmodule Aikido.Agent.Commands.Inspect do
   alias Aikido.Agent.CommandRuntime
 
   @impl true
-  def run(input, _opts, _context) do
+  def run(input, _opts, context) do
+    options = Ash.Scope.to_opts(context, context: input.context)
+
     CommandRuntime.catch_runtime_exit(fn ->
       with {:ok, {_id, pid}} <- CommandRuntime.resolve(input.resource, input.arguments.agent),
-           {:ok, record} <- CommandRuntime.snapshot(input.resource, pid) do
+           {:ok, record} <- CommandRuntime.snapshot(input.resource, pid, options) do
         {:ok,
          if(input.arguments[:fields],
            do: Map.take(record, input.arguments[:fields]),

@@ -10,20 +10,20 @@ defmodule Aikido.Agent.Commands.List do
     options = Ash.Scope.to_opts(context, context: input.context)
 
     CommandRuntime.catch_runtime_exit(fn ->
-      with {:ok, records} <- collect_live_snapshots(resource),
+      with {:ok, records} <- collect_live_snapshots(resource, options),
            {:ok, records} <- filter_snapshots(records, resource, arguments[:filter], options) do
         {:ok, sort_and_paginate(records, arguments)}
       end
     end)
   end
 
-  defp collect_live_snapshots(resource) do
+  defp collect_live_snapshots(resource, options) do
     resource
     |> Aikido.Agent.Info.agent_instance!()
     |> Aikido.durable_supervisor_name()
     |> Aikido.Durable.members()
     |> Enum.reduce_while({:ok, []}, fn {_id, pid}, {:ok, records} ->
-      case live_snapshot(resource, pid) do
+      case live_snapshot(resource, pid, options) do
         {:ok, record} ->
           {:cont, {:ok, [record | records]}}
 
@@ -59,8 +59,8 @@ defmodule Aikido.Agent.Commands.List do
 
   # Registry cleanup can lag process termination, including immediately after
   # destroy. A read enumerates live agents, so omit entries that have exited.
-  defp live_snapshot(resource, pid) do
-    CommandRuntime.snapshot(resource, pid)
+  defp live_snapshot(resource, pid, options) do
+    CommandRuntime.snapshot(resource, pid, options)
   catch
     :exit, {reason, {GenServer, :call, _}} when reason in [:noproc, :normal, :shutdown] ->
       {:error, :not_running}

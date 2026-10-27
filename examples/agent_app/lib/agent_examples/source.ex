@@ -8,6 +8,7 @@ defmodule AgentExamples.Source do
              "lib/aikido/ai_react/**/*.ex",
              "lib/aikido/ai_worker/**/*.ex",
              "lib/aikido/todo/**/*.ex",
+             "lib/aikido/cron/**/*.ex",
              "lib/aikido/ai/extension.ex",
              "lib/aikido/team/extension.ex",
              "lib/aikido/team/*.ex",
@@ -72,6 +73,14 @@ defmodule AgentExamples.Source do
 
                          Aikido.Directive in contracts ->
                            :directive
+
+                         Ash.Resource.Actions.Implementation in contracts and
+                             "Tools" in Module.split(module) ->
+                           :tool
+
+                         Ash.Resource.Actions.Implementation in contracts and
+                             "Commands" in Module.split(module) ->
+                           :command
 
                          Ash.Resource.Actions.Implementation in contracts ->
                            :action
@@ -142,9 +151,13 @@ defmodule AgentExamples.Source do
 
   defp supporting_modules("hook-requests"), do: [AgentExamples.Playground]
 
+  defp supporting_modules("verified-team"), do: [Aikido.Team, Aikido.Todo]
+
   defp supporting_modules("conversation"), do: [Aikido.Todo]
 
+  defp supporting_modules("cron"), do: [Aikido.Cron]
   defp supporting_modules("counter"), do: []
+  defp supporting_modules("checkpoint"), do: [AgentExamples.Counter.Actions.Increment]
   defp supporting_modules("checklist"), do: []
   defp supporting_modules("notebook"), do: [AgentExamples.Journal]
   defp supporting_modules("worker"), do: []
@@ -174,6 +187,8 @@ defmodule AgentExamples.Source do
   defp source_kind_rank(:slice), do: 2
   defp source_kind_rank(:signal), do: 3
   defp source_kind_rank(:action), do: 4
+  defp source_kind_rank(:tool), do: 4
+  defp source_kind_rank(:command), do: 4
   defp source_kind_rank(:directive), do: 5
   defp source_kind_rank(:domain), do: 6
   defp source_kind_rank(_), do: 7

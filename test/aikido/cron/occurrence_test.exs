@@ -17,7 +17,7 @@ defmodule AikidoTest.AgentServer.CronOccurrenceTest do
           aikido: nil
         }
 
-      {:ok, job} = Aikido.AgentServer.start_runtime_cron_job(runtime, :tick, spec)
+      {:ok, job} = Aikido.Cron.Scheduler.start_job(runtime.id, :tick, spec)
       on_exit(fn -> Aikido.Cron.Scheduler.cancel(job) end)
       send(job, :tick)
       assert_receive {:"$gen_cast", {:signal, first}}, 1_000

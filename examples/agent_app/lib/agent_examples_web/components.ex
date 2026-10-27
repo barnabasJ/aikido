@@ -11,9 +11,11 @@ defmodule AgentExamplesWeb.Components do
     ~H"""
     <div class="app-shell">
       <aside class="sidebar">
-        <.link navigate="/" class="brand"><span class="brand-icon">A</span>
-        Aikido <span class="brand-tag">playground</span></.link>
-        <.link href="/dashboard" class="nav-link" id="telemetry-dashboard-link">
+        <.link navigate="/" class="brand" aria-label="Aikido playground">
+          <span class="brand-wordmark" aria-hidden="true"><span class="brand-letter-a">A</span><span class="brand-letter-i">i</span><span class="brand-letter-k">k</span><span class="brand-word-rest">ido</span></span>
+          <span class="brand-tag">playground</span>
+        </.link>
+        <.link href="/dashboard/aikido" class="nav-link" id="telemetry-dashboard-link">
           <span class="nav-dot"></span>Telemetry dashboard ↗
         </.link>
         <p class="nav-heading">EXPLORE THE EXAMPLES</p>

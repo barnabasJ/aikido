@@ -28,13 +28,19 @@ defmodule Aikido.Cron.Directives.Register do
   """
 
   require Logger
-
   alias Aikido.AgentServer
-  alias Aikido.AgentServer.State
 
   use Aikido.Directive
 
   typed_struct do
+    field :runtime_spec, :term do
+      description "Prepared declaration or retry spec; dynamic registrations build one at the I/O boundary."
+    end
+
+    field :generation, :term do
+      description "Expected registration generation for a retry; nil starts a new registration."
+    end
+
     field :job_id, :term do
       allow_nil? true
       description "Logical cron job id within the agent"
@@ -65,40 +71,6 @@ defmodule Aikido.Cron.Directives.Register do
           runtime_spec: term()
         }
 
-  # Pure I/O for cron registration. Validates the expression, spawns
-  # the scheduler job and monitors it.
-  # Returns the data the cascade callback
-  # (`maybe_track_cron_registered/2`) needs to install in the runtime
-  # maps. It does not mutate `%AgentServer.State{}`; runtime field writes
-  # flow through the cascade callbacks.
-  @doc false
-  @spec register_io(
-          State.t(),
-          term(),
-          term(),
-          term() | nil,
-          term() | nil,
-          Aikido.Signal.t() | nil
-        ) ::
-          {:ok, io_result()} | {:error, term()}
-  def register_io(%State{} = state, cron_expr, message, logical_id, tz, origin \\ nil) do
-    logical_id = if is_nil(logical_id), do: make_ref(), else: logical_id
-
-    with {:ok, cron_spec} <-
-           Aikido.Cron.Scheduler.validate_and_build_cron_spec(cron_expr, message, tz),
-         # Keep inherited authority transient; cron_spec is persisted outside agent codecs.
-         runtime_spec =
-           Aikido.Cron.RuntimeSpec.dynamic(
-             cron_spec.cron_expression,
-             cron_spec.message,
-             cron_spec.timezone,
-             origin
-           ),
-         {:ok, pid} <- AgentServer.start_runtime_cron_job(state, logical_id, runtime_spec) do
-      {:ok, build_io_result(logical_id, pid, cron_spec, runtime_spec)}
-    end
-  end
-
   defp build_io_result(logical_id, pid, cron_spec, runtime_spec) do
     %{
       job_id: logical_id,
@@ -110,51 +82,58 @@ defmodule Aikido.Cron.Directives.Register do
   end
 
   @impl true
-  def exec(
-        %{cron: cron_expr, message: message, job_id: logical_id, timezone: tz},
-        input_signal,
-        state
-      ) do
+  def exec(descriptor, input_signal, state) do
+    logical_id = if is_nil(descriptor.job_id), do: make_ref(), else: descriptor.job_id
     origin = Aikido.Signal.capture_tracing(input_signal)
 
-    case Aikido.Cron.Directives.Register.register_io(
-           state,
-           cron_expr,
-           message,
-           logical_id,
-           tz,
-           origin
-         ) do
-      {:ok, io_result} ->
-        publish_registration(io_result, input_signal, state)
+    result =
+      with {:ok, cron_spec} <-
+             Aikido.Cron.Scheduler.validate_and_build_cron_spec(
+               descriptor.cron,
+               descriptor.message,
+               descriptor.timezone
+             ),
+           runtime_spec =
+             descriptor.runtime_spec ||
+               Aikido.Cron.RuntimeSpec.dynamic(
+                 cron_spec.cron_expression,
+                 cron_spec.message,
+                 cron_spec.timezone,
+                 origin
+               ),
+           {:ok, pid} <- Aikido.Cron.Scheduler.start_job(state.id, logical_id, runtime_spec) do
+        {:ok, build_io_result(logical_id, pid, cron_spec, runtime_spec)}
+      end
 
-        Logger.debug(
-          "AgentServer #{state.id} registered cron job #{inspect(io_result.job_id)}: #{cron_expr}"
-        )
-
-        AgentServer.emit_cron_telemetry_event(state, :register, %{
-          job_id: io_result.job_id,
-          cron_expression: cron_expr
-        })
-
-        :ok
-
-      {:error, reason} ->
-        Logger.error(
-          "AgentServer #{state.id} failed to register cron job #{inspect(logical_id)}: #{inspect(reason)}"
-        )
-
-        :ok
-    end
-  end
-
-  defp publish_registration(result, input_signal, state) do
     signal =
-      result
-      |> Map.take([:job_id, :pid, :monitor_ref, :cron_spec, :runtime_spec])
-      |> Aikido.Cron.Signals.Registered.new!(source: "/agent/#{state.id}")
-      |> Aikido.Signal.inherit(input_signal)
+      case result do
+        {:ok, result} ->
+          Aikido.Cron.Telemetry.emit(state, :register, %{
+            job_id: logical_id,
+            cron_expression: descriptor.cron
+          })
 
-    AgentServer.cast(self(), signal)
+          Aikido.Cron.Signals.Registered.new!(Map.put(result, :generation, descriptor.generation),
+            source: "/agent/#{state.id}"
+          )
+
+        {:error, reason} ->
+          Logger.error(
+            "Cron job #{inspect(logical_id)} could not start: #{Aikido.Telemetry.Formatter.safe_inspect(reason)}"
+          )
+
+          Aikido.Cron.Telemetry.emit(state, :register_failed, %{
+            job_id: logical_id,
+            reason: reason
+          })
+
+          Aikido.Cron.Signals.RegistrationFailed.new!(
+            %{job_id: logical_id, reason: reason, generation: descriptor.generation},
+            source: "/agent/#{state.id}"
+          )
+      end
+
+    AgentServer.cast(self(), Aikido.Signal.inherit(signal, input_signal))
+    :ok
   end
 end

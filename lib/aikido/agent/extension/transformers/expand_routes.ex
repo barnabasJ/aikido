@@ -22,7 +22,7 @@ defmodule Aikido.Agent.Extension.Transformers.ExpandRoutes do
   defp persist_slice_routes(dsl, instances) do
     routes =
       Enum.flat_map(instances, &Aikido.Slice.Info.signal_routes(&1.module)) ++
-        Enum.flat_map(instances, &Aikido.Cron.SliceSchedules.schedule_routes/1)
+        Enum.flat_map(instances, &Aikido.Cron.Declarations.slice_routes/1)
 
     routes =
       routes
@@ -59,12 +59,12 @@ defmodule Aikido.Agent.Extension.Transformers.ExpandRoutes do
     schedules =
       dsl
       |> Transformer.get_entities([:schedules])
-      |> Aikido.Cron.AgentSchedules.expand_schedules(Transformer.get_option(dsl, [:agent], :name))
+      |> Aikido.Cron.Declarations.agent_schedules(Transformer.get_option(dsl, [:agent], :name))
 
     dsl
     |> Transformer.persist(
       :expanded_slice_schedules,
-      Enum.flat_map(instances, &Aikido.Cron.SliceSchedules.expand_schedules/1)
+      Enum.flat_map(instances, &Aikido.Cron.Declarations.slice_schedules/1)
     )
     |> Transformer.persist(:expanded_agent_schedules, schedules)
   end

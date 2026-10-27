@@ -40,7 +40,8 @@ defmodule Aikido.AiReact.Conversation do
     Map.merge(state, %{
       context: context,
       estimated_tokens: if(context, do: estimate_tokens(context), else: 0),
-      last_input_tokens: nil
+      last_input_tokens: nil,
+      last_input_shape: nil
     })
   end
 

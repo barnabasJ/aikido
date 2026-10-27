@@ -9,7 +9,6 @@ defmodule Aikido.PureActionsTest do
     timestamp = Signal.timestamp(signal)
 
     for {resource, params} <- [
-          {Aikido.Identity.Slice, %{profile: %{age: 1}}},
           {Aikido.Memory.Slice, %{}},
           {Aikido.Thread.Slice, %{}}
         ] do
@@ -17,9 +16,6 @@ defmodule Aikido.PureActionsTest do
 
       result =
         case resource do
-          Aikido.Identity.Slice ->
-            replay(resource, :evolve, %{state: state, years: 1}, signal)
-
           Aikido.Memory.Slice ->
             replay(
               resource,
@@ -59,7 +55,6 @@ defmodule Aikido.PureActionsTest do
 
   test "initialized updates without a signal still have deterministic metadata" do
     for {resource, action, params} <- [
-          {Aikido.Identity.Slice, :evolve, %{years: 1}},
           {Aikido.Memory.Slice, :put_in_space, %{space: :world, key: :hello, value: "world"}},
           {Aikido.Thread.Slice, :append, %{entry: %{payload: %{text: "one"}}}}
         ] do

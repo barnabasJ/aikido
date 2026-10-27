@@ -139,7 +139,7 @@ defmodule Aikido.CronScopeTest do
       await_state_value(
         pid,
         fn runtime ->
-          current = runtime.cron_jobs[:inherited]
+          current = runtime.agent.state.cron.jobs[:inherited]
           if is_pid(current) && current != job, do: current
         end,
         timeout: 6_000
@@ -162,7 +162,8 @@ defmodule Aikido.CronScopeTest do
     supervisor = Aikido.durable_supervisor_name(ctx.aikido)
 
     # A new mailbox request observes the completed registration checkpoint.
-    assert {:ok, ^message} = AgentServer.state(pid, &{:ok, &1.cron_specs.durable.message})
+    assert {:ok, ^message} =
+             AgentServer.state(pid, &{:ok, &1.agent.state.cron.specs.durable.message})
 
     {key, _} =
       Enum.find(DurableServer.Supervisor.global_members(supervisor), fn {_, {member, _}} ->
@@ -171,8 +172,11 @@ defmodule Aikido.CronScopeTest do
 
     assert {:ok, info} = DurableServer.Supervisor.get_server_info(supervisor, key)
     saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
-    assert saved.cron_specs.durable.message == message
-    assert saved.cron_specs.raw.message == :wake_up
+    assert {:agent, saved_agent} = saved.agent
+    assert saved_agent.state.cron.specs.durable.message == message
+    assert saved_agent.state.cron.specs.raw.message == :wake_up
+    assert saved_agent.state.cron.runtime_specs == %{}
+    assert saved_agent.state.cron.jobs == %{}
     refute Map.has_key?(saved, :cron_runtime_specs)
     refute inspect(saved) =~ "actor-private-marker"
     refute inspect(saved) =~ "context-private-marker"
@@ -184,11 +188,11 @@ defmodule Aikido.CronScopeTest do
     assert {:ok, restored} = Durable.ensure_started(supervisor, id, agent: __MODULE__.Resource)
     assert :ok = AgentServer.await_ready(restored)
 
-    assert {:ok, job} = AgentServer.state(restored, &{:ok, &1.cron_jobs.durable})
+    assert {:ok, job} = AgentServer.state(restored, &{:ok, &1.agent.state.cron.jobs.durable})
     observed = tick(restored, job)
     assert %{actor_id: nil, tenant: nil, marker: nil, tracers: []} = observed
     assert observed.data == %{declarative: true}
-    assert {:ok, raw_job} = AgentServer.state(restored, &{:ok, &1.cron_jobs.raw})
+    assert {:ok, raw_job} = AgentServer.state(restored, &{:ok, &1.agent.state.cron.jobs.raw})
 
     assert %{actor_id: nil, tenant: nil, marker: nil, tracers: [], data: data} =
              tick(restored, raw_job)
@@ -206,8 +210,8 @@ defmodule Aikido.CronScopeTest do
     assert {:ok, job} =
              AgentServer.state(pid, fn runtime ->
                {:ok,
-                Enum.find_value(runtime.cron_runtime_specs, fn {key, spec} ->
-                  if spec.kind == :schedule, do: runtime.cron_jobs[key]
+                Enum.find_value(runtime.agent.state.cron.runtime_specs, fn {key, spec} ->
+                  if spec.kind == :schedule, do: runtime.agent.state.cron.jobs[key]
                 end)}
              end)
 
@@ -240,7 +244,7 @@ defmodule Aikido.CronScopeTest do
 
     assert {:ok, job} =
              AgentServer.call_until(pid, signal, "aikido.agent.cron.registered", fn runtime ->
-               case runtime.cron_jobs[job_id] do
+               case runtime.agent.state.cron.jobs[job_id] do
                  nil -> :skip
                  job -> {:ok, job}
                end

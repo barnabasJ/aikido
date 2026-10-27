@@ -1,5 +1,22 @@
 # Recursive quicksort benchmarks
 
+The [published-AshLua verification](results/research-team-published-lua-2026-10-25.json)
+completed with AshLua 0.2.3 and the saved z.ai coding-plan credential in 162.817 s.
+Every squad started empty: five agents completed four delegations, including
+an independent background result and a researcher three levels below the root.
+The retained task and membership records confirm completion and worker retirement;
+the final synthesis returned the matching observed word counts. These records,
+rather than the model's description of which squads remain available, establish
+the actual lifecycle state.
+
+The retained [real-provider research run](results/research-team-larger-budget-2026-10-25.json)
+also completed with the updated 16,384-token output budget and ten-minute model
+attempt timeout: 18 recorded agents, 41 tasks across the tree, 11 root model turns,
+zero active agents and a final synthesis. It exercised nested squads, background
+results and stopped-worker history. Its final response reports recovering from
+truncated responses by requesting compact replacements; completion does not mean
+every individual model call succeeded on its first attempt.
+
 Run from `examples/agent_app`:
 
 ```sh
@@ -51,8 +68,40 @@ this measures projection, not HTML generation, browser layout or event ingestion
 
 ## Observations on this workstation
 
-Elixir 1.19.5 / OTP 28.5.0.4, Ryzen 5950X, 32 schedulers. These observations are
-workload-specific and are not CI thresholds or a validated 100,000-agent run.
+The inspector-specific benchmark uses the actual Playground collector with fresh
+eight-shard stores. Run `mix run --no-start bench/inspector_cost.exs --benchee`, or
+use `--profile` for call-time attribution. With the complete nested agent resource
+serialized through native Ash types and initialized contracts reused, 1,024-agent
+averages were 642.35 ms without inspection, 639.38 ms for root state, 1.04 s for
+full recursive state and 653.53 ms for recursive signal identities. Full state
+capture still costs about 62% more than the no-inspector baseline. These
+five-second sampling windows on eight schedulers are diagnostics, not stable
+performance gates; the small root-only advantage is within run variation. See
+the [current Benchee output](results/inspector-native-ash-resource-2026-10-25.log).
+The preceding [plain-map/sorting measurements](results/inspector-benchee-sortkeys-2026-10-25.log)
+and [profile](results/inspector-profile-current-2026-10-25.log) explain the earlier
+projection improvements.
+
+The same native snapshot format also completed two consecutive 100,000-agent
+runs through the Playground with recursive state inspection: 111.071 s and
+127.722 s, with every sorted value checked. All 100,000 agents completed and
+the 99,999 children retired in each run; the fresh-root restart took 3.351 s and 3.715 s. Each restart
+left one root and one snapshot, zero child survivors and zero I/O tasks. Final
+stop left zero agents, snapshots, tasks and retained tree histories. See the
+[full lifecycle measurements](results/quicksort-native-ash-resource-100k-2026-10-25.jsonl).
+These are runtime rechecks of persistence and inspection; the preceding browser
+verification remains recorded separately.
+
+During this continuous workload native passive checkpointing reported transient
+starvation. At final stop every shard reported all WAL frames checkpointed and
+no starvation. Seven WAL files still occupied roughly 3 GB each; SQLite can reuse
+that allocated space after a complete checkpoint. File occupancy alone does not
+mean agents or uncheckpointed writes remain. The report retains both frame
+progress and file sizes; it does not claim the WAL files immediately shrink.
+
+The earlier measurements below used Elixir 1.19.5 / OTP 28.5.0.4 on a Ryzen
+5950X with 32 schedulers. They cover up to 4,096 agents and are workload-specific,
+not CI thresholds. The separate 100,000-agent reports above use eight schedulers.
 
 | Persisted tree | EKV shards | Median sorting | Median cleanup | Survivors after stop |
 | --- | ---: | ---: | ---: | ---: |
@@ -409,3 +458,117 @@ browser-driven run completed and verified every value in 9.4 seconds. The retire
 root namespaces had zero live processes and saved snapshots, the formerly
 conflicting process was dead, and no I/O tasks remained. The two current completed
 roots and their UI histories remain available for inspection.
+
+## Recursive inspector capture cost
+
+To isolate inspector capture from browser rendering, run three rotated rounds of
+identical 1,024-agent sorts with no observer, root state, child identities and full
+child state. Every run verifies the complete sorted result. Use a new store path:
+
+```sh
+AIKIDO_DURABLE_DIR=/tmp/aikido-inspector-cost-new ERL_FLAGS='+S 8:8' \
+  mix run --no-start bench/inspector_cost.exs --benchee
+```
+
+Omit `--benchee` for three rotated rounds with JSONL timings. Benchee excludes
+root activation and cleanup via its iteration hooks. Its five-second window gives
+only a few samples per scenario; increase it for precise comparisons.
+
+This probe starts the example application, including its endpoint, but makes no
+AI requests. The isolated store is left at the supplied path for inspection.
+Activation and root cleanup are outside the sorting timer. This measures capture
+in the signal pipeline; it excludes the playground collector's diffs and browser
+rendering. Stop other workloads for comparable results.
+
+On 2026-10-25, three rounds before the projection change averaged 0.99s without
+an inspector and 6.88s with full child state. After bounding traversal before
+redaction, removing duplicate state projection and precomputing private names,
+three rounds averaged 1.06s and 2.55s respectively. These are diagnostic samples
+on this workstation, not performance guarantees. Full state capture still has
+measurable cost; observing child identities alone averaged 1.10s after the change.
+
+A separate five-second Benchee run after the change averaged 1.03s without an
+inspector, 1.04s for root state, 1.10s for child identities and 2.49s for full
+child state. The browser then completed 4,096 agents in 9.804s with full recursive
+inspection and retained child messages. Browser timings include UI collection;
+they should not be directly compared with the isolated capture benchmark.
+
+### Further capture profiling and large runs, 2026-10-25
+
+Add `--profile` to the capture probe to use OTP's `tprof` across agent processes.
+It reports function costs separately from Benchee's elapsed sorting time. The
+profile found repeated schema discovery for plain maps and terms; these now skip
+Ash/Spark resource discovery while preserving constrained-map fields and native
+resource sensitivity. Private-name checks reuse one string conversion and a set.
+
+The latest five-second [Benchee comparison](results/inspector-benchee-fastmaps-2026-10-25.log)
+averaged 1.18s without inspection, 1.17s for root state, 1.21s for child identities
+and 1.54s for full recursive state. Full capture still has a measured cost. These
+short diagnostic windows are not throughput guarantees.
+
+A later fresh eight-shard run with retained application telemetry measured
+0.62s without inspection, 0.63s for root state, 0.64s for recursive identities
+and 1.17s for full recursive state. See the
+[telemetry-enabled comparison](results/inspector-benchee-telemetry-2026-10-25.log).
+Full state projection remains substantially more expensive than signal-only
+inspection; these results do not establish that its remaining overhead is solved.
+
+The single-shard 100,000-agent retry exposed storage pressure delaying native
+DurableServer heartbeats. Its heartbeat watchdog stopped the lifecycle manager;
+the resulting child exit reached Quicksort as `:normal`. The previous benchmark
+also masked its primary failure with a cleanup timeout. The harness now observes
+terminal state after every signal, preserves primary failures, logs phase
+boundaries, and records spawn gaps, retirement time and local supervisor counts.
+Its [failure log](results/quicksort-diagnostic-100k-2026-10-25.log) is retained.
+
+With **eight native EKV shards**, two consecutive 100,000-agent runs through the
+actual Playground collector and Restart path passed in one VM and one store:
+
+| Run | Sorting | Last child retirement after result | Restart |
+| --- | ---: | ---: | ---: |
+| 1 | 119.33s | 0.294s | 3.14s |
+| 2 | 128.36s | 0.268s | 3.07s |
+
+Each run verified all sorted values and all 100,000 process identities, observed
+zero remaining children and returned to one root, one snapshot, zero I/O tasks
+and zero old display histories. Final stop left zero agents and saved snapshots.
+All eight post-exit integrity checks passed. See the
+[summary](results/quicksort-eight-shards-100k-2026-10-25.json) and
+[raw reports](results/quicksort-eight-shards-100k-2026-10-25.jsonl).
+
+All restart WAL checkpoints completed. Logical WAL file sizes totalled about
+19.6GB and 19.9GB after the runs: checkpointed files retain reusable high-water
+space and do not count saved agent snapshots. Native consensus metadata for fresh
+identities is also separate from retained agent state. Two runs do not establish
+indefinite memory or metadata stability.
+
+Two subsequent browser runs on an isolated eight-shard preview completed all
+100,000 partitions in **131.58s** and **134.73s**, with full recursive inspection
+enabled. The browser showed deep descendant signals and retained the completed
+tree. After each run the native supervisor and membership both returned to one
+root, with one saved agent snapshot and zero I/O tasks. Restart produced a fresh
+root ID and was observed ready within 7.6 seconds (an observation upper bound).
+Final stop left zero local agents and zero agent snapshots; all eight live-store
+SQLite integrity checks passed. Native WAL maintenance returned each shard's
+WAL to 64 MiB after quiescence, without manual truncation. See the
+[browser observations](results/quicksort-browser-100k-2026-10-25.json).
+
+After moving explicit graceful cleanup before the final durable save, another
+two consecutive browser runs completed 100,000 agents in **121.301s** and
+**125.082s**, using the actual Playground elapsed metric. Both returned to one
+root and one saved snapshot. The second complete result was checked against
+every integer from 1 through 100,000 in the browser. Recursive history retained
+deep child IDs, and totals recorded zero processing and directive exceptions.
+Final stop left zero local agents, memberships, I/O tasks and agent snapshots;
+all eight live-store integrity checks passed and native WAL maintenance again
+settled at 64 MiB per shard. The isolated preview exited cleanly and its generated
+store was removed after verification. Native logs included 11 transient WAL
+checkpoint-starvation warnings during writes; they cleared at quiescence, with
+no heartbeat or eviction errors. See the
+[current cleanup verification](results/quicksort-browser-current-cleanup-100k-2026-10-25.json).
+
+New playground stores default to eight shards. Existing stores retain their
+detected shard count; an incompatible explicit override fails before startup.
+To reproduce the large run, use a fresh disk-backed `AIKIDO_DURABLE_DIR` with
+`AIKIDO_EXAMPLES_EKV_SHARDS=8`. Do not change the shard count of an existing store:
+it changes key placement. The heartbeat watchdog remains enabled.

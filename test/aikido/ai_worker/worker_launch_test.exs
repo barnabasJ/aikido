@@ -55,6 +55,34 @@ defmodule Aikido.WorkerLaunchTest do
 
   alias Aikido.WorkerLaunchTest.Domain
 
+  test "typed todo changes defer settlement through the worker's schema-backed observer" do
+    signal = Aikido.Todo.Signals.TodoChanged.new!(%{})
+    state = Ash.create!(Aikido.AiWorker.Slice, %{pending: %{task_id: "waiting"}})
+
+    route =
+      Aikido.AiWorker.Slice
+      |> Spark.Dsl.Extension.get_entities([:slice])
+      |> Enum.find(&(&1.type == signal.type))
+
+    assert route.signal_module == Aikido.Todo.Signals.TodoChanged
+    assert {Aikido.AiWorker.Slice, action} = route.action
+
+    assert {:ok, result} =
+             Aikido.AiWorker.Slice
+             |> Ash.ActionInput.for_action(action, %{state: state},
+               context: %{aikido: %{signal: signal, agent_pid: self()}}
+             )
+             |> Ash.run_action()
+
+    assert AikidoTest.SliceState.attributes(result.state) ==
+             AikidoTest.SliceState.attributes(state)
+
+    assert [directive] = result.directives
+    assert directive.target == self()
+    assert directive.signal.type == "harness.ai.observe"
+    assert directive.signal.data.task_id == "waiting"
+  end
+
   test "a missing model fails the team's task before its deadline and permits the next task" do
     start_supervised!({Aikido, name: Aikido.Default, durable: AikidoTest.Case.durable_options()})
     team = Domain.launch_start!(%{})
@@ -99,7 +127,7 @@ defmodule Aikido.WorkerLaunchTest do
     missing_one = task("missing-one", nil, %{actor: :alice, tenant: "one"})
     missing_two = task("missing-two", nil, %{actor: :bob, tenant: "two"})
     valid = task("valid", "offline", %{actor: :carol, tenant: "three"})
-    state = %Aikido.AiWorker.Slice{queue: [missing_one, missing_two, valid]}
+    state = Ash.create!(Aikido.AiWorker.Slice, %{queue: [missing_one, missing_two, valid]})
 
     assert {:ok, result} = run_action(:settle, %{state: state}, nil)
     assert result.state.queue == []
@@ -138,7 +166,7 @@ defmodule Aikido.WorkerLaunchTest do
       assert {:ok, result} =
                run_action(
                  :accept,
-                 Map.put(params, :state, %Aikido.AiWorker.Slice{}),
+                 Map.put(params, :state, Ash.create!(Aikido.AiWorker.Slice, %{})),
                  configured_model
                )
 
@@ -152,13 +180,16 @@ defmodule Aikido.WorkerLaunchTest do
     params = task("duplicate", nil, %{}) |> Map.delete(:signal_context)
 
     for state <- [
-          %Aikido.AiWorker.Slice{
+          Ash.create!(Aikido.AiWorker.Slice, %{
             pending: Map.take(params, [:task_id, :member, :attempt, :reply_to])
-          },
-          %Aikido.AiWorker.Slice{queue: [params]}
+          }),
+          Ash.create!(Aikido.AiWorker.Slice, %{queue: [params]})
         ] do
       assert {:ok, result} = run_action(:accept, Map.put(params, :state, state), nil)
-      assert result.state == state
+
+      assert AikidoTest.SliceState.attributes(result.state) ==
+               AikidoTest.SliceState.attributes(state)
+
       assert result.directives == []
     end
   end

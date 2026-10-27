@@ -362,7 +362,7 @@ defmodule AikidoTest.AshFixtures.DefaultCounter do
 end
 
 defmodule AikidoTest.AshFixtures.Domain do
-  use Ash.Domain, extensions: [Aikido.Domain.Extension], validate_config_inclusion?: false
+  use Ash.Domain, otp_app: :aikido, extensions: [Aikido.Domain.Extension]
 
   agents do
     agent :generated_counter, AikidoTest.AshFixtures.GeneratedCounter

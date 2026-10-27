@@ -84,7 +84,8 @@ defmodule Aikido.AiReact.EventGatesTest do
       result = run(:cancel, original, %{key => requested})
 
       if requested == "obsolete" do
-        assert result.state == original
+        assert AikidoTest.SliceState.attributes(result.state) ==
+                 AikidoTest.SliceState.attributes(original)
       else
         assert result.state.status == :failed
         assert result.state.error == :cancelled

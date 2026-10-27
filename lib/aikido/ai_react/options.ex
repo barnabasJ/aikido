@@ -39,13 +39,23 @@ defmodule Aikido.AiReact.Options do
       constraints min: 1
     end
 
+    field :tool_loop_key, :tuple do
+      description "Optional pure {module, function, arguments} returning {:ok, comparison_key} for a sorted completed batch of {name, arguments, content} entries."
+
+      constraints fields: [
+                    module: [type: :atom, allow_nil?: false],
+                    function: [type: :atom, allow_nil?: false],
+                    arguments: [type: {:array, :term}, allow_nil?: false]
+                  ]
+    end
+
     field :max_repeated_tool_cycles, :integer do
       description "Optional repeat limit for tool cycles of one to four batches; nil keeps warning-only behavior."
       constraints min: 2, max: 100
     end
 
     field :completion, Aikido.AiReact.Types.CompletionMode do
-      description "Whether the run completes from the model response or from the tracked todo state."
+      description "Whether the run completes from the model response, blocking todos or the team's background assignments."
       default :model
       allow_nil? false
     end
@@ -132,6 +142,13 @@ defmodule Aikido.AiReact.Options do
     field :handoff_buffer_tokens, :integer do
       description "Token headroom reserved below the context budget before starting a handoff."
       default 24_000
+      allow_nil? false
+      constraints min: 0
+    end
+
+    field :handoff_max_regenerations, :integer do
+      description "Additional summary generations allowed after empty, invalid or oversized handoff documents. Truncated summaries are not retried."
+      default 0
       allow_nil? false
       constraints min: 0
     end

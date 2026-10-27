@@ -5,9 +5,183 @@ defmodule AgentExamplesWeb.LiveViewTest do
   alias AgentExamples.{Catalog, Playground}
   @endpoint AgentExamplesWeb.Endpoint
 
+  defmodule GatedClient do
+    @behaviour Aikido.AiReact.Client
+    def generate_text(%{probe: probe}, _messages, _options) do
+      send(probe, {:waiting_worker, self()})
+
+      receive do
+        :finish ->
+          {:ok,
+           %ReqLLM.Response{
+             id: "gated",
+             model: "offline",
+             context: ReqLLM.Context.new(),
+             message: ReqLLM.Context.assistant("worker finished", tool_calls: []),
+             finish_reason: :stop
+           }}
+      end
+    end
+  end
+
   setup do
-    Playground.subscribe()
-    %{conn: build_conn() |> Plug.Test.init_test_session(%{browser_id: Ash.UUIDv7.generate()})}
+    owner = Ash.UUIDv7.generate()
+    Playground.subscribe(owner)
+    %{conn: build_conn() |> Plug.Test.init_test_session(%{browser_id: owner})}
+  end
+
+  test "Lua controls match each example's supported tool modes", %{conn: conn} do
+    optional = ~w(assistant hooks conversation hook-requests researcher reviewer)
+    required = ~w(research-team lua-permissions)
+    fixed = ~w(adaptive-tools verified-work verified-team resilience recovery)
+
+    for slug <- optional ++ required ++ fixed do
+      {:ok, view, _} = live(conn, "/examples/#{slug}")
+
+      if slug in optional do
+        assert has_element?(view, "#start-form input[type=checkbox][name=lua]")
+        assert has_element?(view, "#start-form", "Enable Lua scripting tools")
+      else
+        refute has_element?(view, "#start-form input[type=checkbox][name=lua]")
+      end
+
+      if slug in required do
+        assert has_element?(view, "#start-form input[type=hidden][name=lua][value=true]")
+        assert has_element?(view, "#lua-required")
+      else
+        refute has_element?(view, "#lua-required")
+      end
+
+      GenServer.stop(view.pid)
+    end
+  end
+
+  test "example tool policies are enforced when starting outside the form" do
+    cases = [
+      {"research-team", "false", [:text_stats, :stamp, :run_lua, :lua_docs]},
+      {"lua-permissions", "false", [:scoped_lua, :scoped_lua_docs]},
+      {"adaptive-tools", "true", []},
+      {"verified-work", "true", [:record_evidence]},
+      {"verified-team", "true", [:request_team_evidence, :complete_team_evidence]},
+      {"resilience", "true", [:text_stats, :stamp, :fail_example]},
+      {"assistant", "false", [:text_stats, :stamp]},
+      {"assistant", "true", [:text_stats, :stamp, :run_lua, :lua_docs]}
+    ]
+
+    for {slug, lua, expected} <- cases do
+      owner = Ash.UUIDv7.generate()
+      {:ok, run} = Playground.start(owner, slug, %{"mode" => "offline", "lua" => lua})
+      on_exit(fn -> Playground.stop(owner, slug) end)
+
+      assert {:ok, ^expected} =
+               Aikido.AgentServer.state(run.record.pid, fn runtime ->
+                 {:ok, runtime.agent.state.ai.tools}
+               end)
+
+      assert :ok = Playground.stop(owner, slug)
+    end
+  end
+
+  test "optional Lua examples complete tasks with scripting both enabled and disabled" do
+    for slug <- ~w(assistant hooks conversation hook-requests researcher reviewer),
+        lua <- ["true", "false"] do
+      owner = Ash.UUIDv7.generate()
+      {:ok, _run} = Playground.start(owner, slug, %{"mode" => "offline", "lua" => lua})
+      on_exit(fn -> Playground.stop(owner, slug) end)
+      assert :ok = Playground.command(owner, slug, :ask, %{query: "Signals carry results"})
+
+      if slug == "hook-requests" do
+        await(owner, slug, &(&1.requests != []))
+        [request] = Playground.get(owner, slug).requests
+
+        assert :ok =
+                 Playground.command(owner, slug, :respond, %{
+                   interaction_id: request.id,
+                   response: %{choice: "approve"}
+                 })
+      end
+
+      await(owner, slug, &(&1.status == :completed && &1.snapshot.ai.status == :completed))
+      run = Playground.get(owner, slug)
+      assert run.snapshot.ai.status == :completed
+      assert Enum.any?(run.messages, &(&1.role == :assistant))
+      assert :ok = Playground.stop(owner, slug)
+    end
+  end
+
+  test "Aikido inspector keeps selectable state history without changing the live agent", %{
+    conn: conn
+  } do
+    {:ok, view, _} = live(conn, "/examples/counter")
+    owner = start(view, "counter")
+    assert has_element?(view, "#aikido-inspector")
+    assert :ok = Playground.command(owner, "counter", :add, %{amount: 3})
+
+    await(owner, "counter", fn run ->
+      Enum.any?(run.inspection.entries, &(&1.after["state"]["count"] == 3))
+    end)
+
+    assert has_element?(view, "#inspector-content", "count")
+    assert has_element?(view, "#inspector-content", "3")
+    history = Playground.get(owner, "counter").inspection.entries
+    entry = Enum.find(history, &(&1.execution.signal.type == "counter.add"))
+    assert entry.before["state"]["count"] == 0
+    assert entry.after["state"]["count"] == 3
+    assert :ok = Playground.command(owner, "counter", :add, %{amount: 4})
+
+    await(owner, "counter", fn run ->
+      Enum.any?(run.inspection.entries, &(&1.after["state"]["count"] == 7))
+    end)
+
+    view
+    |> element("#aikido-inspector button[phx-value-sequence='#{entry.sequence}']")
+    |> render_click()
+
+    view |> element("#aikido-inspector button[phx-value-view=after]") |> render_click()
+    assert has_element?(view, "#inspector-content", "3")
+    assert Playground.get(owner, "counter").snapshot.own.count == 7
+    assert has_element?(view, "#inspector-content details.inspector-value")
+    assert has_element?(view, "#inspector-content .inspector-number", "3")
+
+    view |> element("#aikido-inspector button[phx-value-format=raw]") |> render_click()
+    assert has_element?(view, "#inspector-content .syntax-highlight span")
+    assert has_element?(view, "#inspector-content", "count")
+    assert has_element?(view, "#definition-AgentExamples-Counter .syntax-highlight span")
+    assert Playground.get(owner, "counter").snapshot.own.count == 7
+
+    assert :ok = Playground.command(owner, "counter", :add, %{amount: 5})
+
+    await(owner, "counter", fn run ->
+      Enum.any?(run.inspection.entries, &(&1.after["state"]["count"] == 12))
+    end)
+
+    assert has_element?(
+             view,
+             "#aikido-inspector button[phx-value-sequence='#{entry.sequence}'][aria-pressed=true]"
+           )
+
+    assert has_element?(view, "#inspector-content .mi", "3")
+
+    assert has_element?(
+             view,
+             ".inspector-agent[title='#{Playground.get(owner, "counter").record.id}']"
+           )
+
+    view |> element("#aikido-inspector button[phx-click=inspection_live]") |> render_click()
+    assert has_element?(view, "#inspector-content .mi", "12")
+
+    view |> form("#inspector-filter", filter: "no-such-signal") |> render_change()
+    assert has_element?(view, "#aikido-inspector", "No matching signals.")
+    refute has_element?(view, "#aikido-inspector button[phx-value-sequence]")
+    view |> form("#inspector-filter", filter: "counter.add") |> render_change()
+    assert has_element?(view, "#aikido-inspector button[phx-value-sequence='#{entry.sequence}']")
+
+    {:ok, reloaded, _} = live(conn, "/examples/counter")
+
+    assert has_element?(
+             reloaded,
+             "#aikido-inspector button[phx-value-sequence='#{entry.sequence}']"
+           )
   end
 
   test "the index links to a descriptive LiveView page for every example", %{conn: conn} do
@@ -28,9 +202,12 @@ defmodule AgentExamplesWeb.LiveViewTest do
       {"lua-permissions", AgentExamplesWeb.LuaPermissionsLive},
       {"adaptive-tools", AgentExamplesWeb.AdaptiveToolsLive},
       {"verified-work", AgentExamplesWeb.VerifiedWorkLive},
+      {"verified-team", AgentExamplesWeb.VerifiedTeamLive},
       {"resilience", AgentExamplesWeb.ResilienceLive},
       {"recovery", AgentExamplesWeb.RecoveryLive},
       {"counter", AgentExamplesWeb.CounterLive},
+      {"cron", AgentExamplesWeb.CronLive},
+      {"checkpoint", AgentExamplesWeb.CheckpointLive},
       {"checklist", AgentExamplesWeb.ChecklistLive},
       {"notebook", AgentExamplesWeb.NotebookLive},
       {"worker", AgentExamplesWeb.WorkerLive},
@@ -58,6 +235,18 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
   test "an unknown example has no route", %{conn: conn} do
     assert conn |> get("/examples/unknown") |> response(404) =~ "Not Found"
+  end
+
+  test "source definitions distinguish native tool boundaries from reducers" do
+    example = Catalog.find("resilience")
+    definitions = AgentExamples.Source.for_example(example)
+
+    tool =
+      Enum.find(definitions, &(&1.module == AgentExamples.ResilientAssistant.Tools.RejectWork))
+
+    assert tool.category == :tool
+    assert tool.path =~ "resilient_assistant/tools/reject_work.ex"
+    refute tool.open?
   end
 
   test "every example shows one source panel per definition with the requested defaults", %{
@@ -93,7 +282,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
       for definition <- definitions do
         assert has_element?(view, "##{definition.id} summary", definition.name)
         assert has_element?(view, "##{definition.id} summary", definition.path)
-        assert has_element?(view, "##{definition.id} code", "def")
+        assert has_element?(view, "##{definition.id} code", "def") == definition.open?
         assert has_element?(view, "##{definition.id}[open]") == definition.open?
       end
     end
@@ -210,11 +399,16 @@ defmodule AgentExamplesWeb.LiveViewTest do
   test "counter union controls and wildcard notices update the signal visual", %{conn: conn} do
     {:ok, view, html} = live(conn, "/examples/counter")
     assert html =~ "native Ash union"
+    view |> element("#definition-AgentExamples-Counter-Actions-Adjust summary") |> render_click()
+
+    view
+    |> element("#definition-AgentExamples-Counter-Actions-CountAll summary")
+    |> render_click()
 
     assert has_element?(
              view,
              "#definition-AgentExamples-Counter-Actions-Adjust code",
-             "%Ash.Union"
+             "value"
            )
 
     assert has_element?(
@@ -264,10 +458,52 @@ defmodule AgentExamplesWeb.LiveViewTest do
     refute has_element?(view, "#agent-details")
   end
 
+  test "background button releases a foreground delegation without cancelling it", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/research-team")
+    owner = start(view, "research-team", %{mode: "offline", lua: "true"})
+    run = Playground.get(owner, "research-team")
+
+    assert :ok =
+             Playground.command(owner, "research-team", :add_member, %{
+               member: "waiting",
+               template: :researcher,
+               initial_state: %{model: %{probe: self()}, client: GatedClient, tools: []}
+             })
+
+    waiter =
+      Task.async(fn ->
+        AgentExamples.AI.delegate(run.record, "waiting", "Check the claim", ash: run.scope)
+      end)
+
+    assert_receive {:waiting_worker, worker}, 5_000
+
+    await(
+      owner,
+      "research-team",
+      &Enum.any?(&1.snapshot.tasks, fn task -> task[:mode] == :foreground end)
+    )
+
+    assert has_element?(view, "#tasks button", "Continue in background")
+    view |> element("#tasks button", "Continue in background") |> render_click()
+    assert {:ok, %{task_id: id, mode: :background}} = Task.await(waiter, 5_000)
+    assert Process.alive?(worker)
+    refute has_element?(view, "#tasks button", "Continue in background")
+    send(worker, :finish)
+
+    await(
+      owner,
+      "research-team",
+      &Enum.any?(&1.snapshot.tasks, fn task -> task.id == id && task.status == :completed end)
+    )
+
+    assert has_element?(view, "#tasks", "worker finished")
+  end
+
   test "the AI team page runs orchestration, Lua, and dynamic helpers", %{conn: conn} do
     {:ok, view, _} = live(conn, "/examples/research-team")
     owner = start(view, "research-team", %{mode: "offline", lua: "true"})
-    assert has_element?(view, "#member-count", "2 members")
+    refute has_element?(view, "#team-tree [data-node=analyst]")
+    refute has_element?(view, "#team-tree [data-node=reviewer]")
 
     view
     |> form("#prompt-form", %{query: "orchestrate: Signals carry results"})
@@ -355,9 +591,10 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert html =~ "aikido.request"
     owner = start(view, "hook-requests", %{mode: "offline", lua: "true"})
     view |> form("#prompt-form", %{query: "Signals carry results"}) |> render_submit()
-    await(owner, "hook-requests", &(&1.requests != []))
+    await(owner, "hook-requests", &(&1.requests != [] && &1.snapshot.ai.iteration == 0))
     [request] = Playground.get(owner, "hook-requests").requests
-    assert has_element?(view, "#request-#{request.id}", "Allow the stamp tool to run?")
+    assert has_element?(view, "#request-#{request.id}", "Allow this task to run?")
+    assert Playground.get(owner, "hook-requests").snapshot.ai.iteration == 0
     assert Playground.get(owner, "hook-requests").status == :running
 
     assert {:error, :request_not_pending} =
@@ -386,8 +623,12 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
     assert has_element?(reconnected, "#messages", "Words: 3")
 
-    reconnected |> form("#prompt-form", %{query: "Try denial"}) |> render_submit()
-    await(owner, "hook-requests", &(&1.requests != []))
+    # Repeating the same task and its answer history must still require fresh permission.
+    reconnected |> form("#prompt-form", %{query: "Signals carry results"}) |> render_submit()
+    await(owner, "hook-requests", &(&1.requests != [] && &1.snapshot.ai.iteration == 0))
+    [next_request] = Playground.get(owner, "hook-requests").requests
+    refute next_request.id == request.id
+    assert Playground.get(owner, "hook-requests").snapshot.ai.iteration == 0
     reconnected |> element("#hook-requests button[phx-value-choice=deny]") |> render_click()
     await(owner, "hook-requests", &(&1.status == :failed))
     assert render(reconnected) =~ "Lua chose to stop after the response."
@@ -521,7 +762,9 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
       await(owner, "nested-teams", fn run ->
         child = run.snapshot.children["again"]
-        child && map_size(child.children) == 3
+
+        child && map_size(child.children) == 3 &&
+          map_size(playground_subscriptions(key)) == map_size(baseline) + 4
       end)
     end
 
@@ -783,6 +1026,28 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert has_element?(view, "#tool-refresh")
   end
 
+  test "background evidence completes its required todo through a normal scoped tool", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/verified-team")
+    owner = start(view, "verified-team")
+    assert :ok = Playground.command(owner, "verified-team", :ask, %{query: "Check background result delivery"})
+    await(owner, "verified-team", &(&1.snapshot.ai.status == :waiting))
+    waiting = Playground.get(owner, "verified-team")
+    refute waiting.snapshot.ai.todo_verification_pending
+    assert waiting.snapshot.ai.todo_continuations == 0
+    assert {:ok, waiting_ai} = Aikido.AgentServer.state(waiting.record.pid, &{:ok, &1.agent.state.ai})
+    request_id = waiting_ai.request_id
+    await(owner, "verified-team", &(&1.status == :completed))
+    completed = Playground.get(owner, "verified-team")
+    assert {:ok, completed_ai} = Aikido.AgentServer.state(completed.record.pid, &{:ok, &1.agent.state.ai})
+    assert completed_ai.request_id == request_id
+    assert List.last(completed.messages).text =~ "worker's evidence"
+    assert Enum.any?(completed_ai.run_metadata.deliveries, &(get_in(&1, [:metadata, :task, :status]) == :completed))
+    assert [%{status: :completed, result: %{task_id: task_id, member: :evidence, result: result}}] = completed.snapshot.todos
+    assert is_binary(task_id)
+    assert result =~ "Evidence checked:"
+    refute Enum.any?(completed.events, &(&1.type == "ai.react.todos.verified"))
+  end
+
   test "delivered todo work is verified only after the evidence tool completes it", %{conn: conn} do
     {:ok, view, _} = live(conn, "/examples/verified-work")
     owner = start(view, "verified-work")
@@ -804,11 +1069,11 @@ defmodule AgentExamplesWeb.LiveViewTest do
     owner = start(view, "resilience")
 
     for {query, error} <- [
-          {"cycle", {:tool_cycle_limit, 2, 2}},
+          {"cycle", {:tool_cycle_limit, 2, 5}},
           {"errors", {:tool_error_limit, 2}}
         ] do
       view |> element("#scenario-#{query}") |> render_click()
-      await(owner, "resilience", &(&1.status == :failed))
+      await(owner, "resilience", &(&1.status == :failed && &1.snapshot.ai.error == error))
       assert Playground.get(owner, "resilience").snapshot.ai.error == error
     end
   end
@@ -819,12 +1084,12 @@ defmodule AgentExamplesWeb.LiveViewTest do
     {:ok, view, _} = live(conn, "/examples/resilience")
     owner = start(view, "resilience")
     view |> element("#scenario-retry") |> render_click()
-    await(owner, "resilience", &(&1.status == :failed))
+    await(owner, "resilience", &(&1.status == :failed && &1.snapshot.ai.error == :timeout))
     assert Playground.get(owner, "resilience").snapshot.ai.error == :timeout
     view |> element("#scenario-wait") |> render_click()
     await(owner, "resilience", &(&1.snapshot.ai.status == :running))
     view |> element("#cancel-run") |> render_click()
-    await(owner, "resilience", &(&1.status == :failed))
+    await(owner, "resilience", &(&1.status == :failed && &1.snapshot.ai.error == :cancelled))
     assert Playground.get(owner, "resilience").snapshot.ai.error == :cancelled
   end
 
@@ -902,7 +1167,13 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert has_element?(view, ".sort-visualization .sort-sidebar > #sort-depth-breakdown")
     assert has_element?(view, ".sort-sidebar > #sort-depth-breakdown + #signal-activity")
     refute has_element?(view, ".inspector #signal-activity")
-    view |> element("button[phx-click=focus][phx-value-branch=rootL]") |> render_click()
+
+    branch =
+      if has_element?(view, "button[phx-click=focus][phx-value-branch=rootL]"),
+        do: "rootL",
+        else: "rootR"
+
+    view |> element("button[phx-click=focus][phx-value-branch=#{branch}]") |> render_click()
     view |> element(".sort-navigation button", "Up one parent") |> render_click()
     assert has_element?(view, "#sorting-tree p", "Showing up to 80 nodes beneath root.")
     assert has_element?(view, ".sort-navigation button[disabled]", "Up one parent")
@@ -1038,6 +1309,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
   end
 
   defp await(owner, slug, predicate, timeout \\ 5_000) do
+    Playground.subscribe(owner)
     deadline = System.monotonic_time(:millisecond) + timeout
     wait(owner, slug, predicate, deadline)
   end

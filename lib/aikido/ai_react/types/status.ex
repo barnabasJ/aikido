@@ -5,7 +5,7 @@ defmodule Aikido.AiReact.Types.Status do
       idle: "No run has started.",
       setup: "Hooks and tools are being prepared.",
       running: "Model, tool or hook work is in progress.",
-      waiting: "A model answer is waiting for required todos.",
+      waiting: "A proposed answer is waiting for required todos or delegated task results.",
       completed: "The run has completed.",
       failed: "The run failed or was cancelled."
     ]

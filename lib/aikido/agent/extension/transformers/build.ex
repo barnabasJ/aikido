@@ -11,9 +11,79 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
 
   @impl true
   def transform(dsl) do
-    with {:ok, dsl} <- Aikido.Signal.Routes.expand(dsl, :agent) do
+    with {:ok, dsl} <-
+           dsl
+           |> add_builtin_slices()
+           |> add_runtime_routes()
+           |> Aikido.Signal.Routes.expand(:agent) do
       expand_agent_resource(dsl)
     end
+  end
+
+  defp add_builtin_slices(dsl) do
+    Enum.reduce([{:cron, Aikido.Cron.Slice}, {:ownership, Aikido.Ownership.Slice}], dsl, fn {path,
+                                                                                             module},
+                                                                                            dsl ->
+      if Enum.any?(
+           Transformer.get_entities(dsl, [:agent]),
+           &match?(%Aikido.Agent.SliceMount{module: ^module}, &1)
+         ) do
+        dsl
+      else
+        Transformer.add_entity(dsl, [:agent], %Aikido.Agent.SliceMount{
+          path: path,
+          module: module,
+          options: %{}
+        })
+      end
+    end)
+  end
+
+  defp add_runtime_routes(dsl) do
+    Enum.reduce(
+      [
+        {Aikido.Ownership.Signals.QueryChildren, Aikido.Ownership.Actions.ReplyChildren,
+         :__aikido_query_children__},
+        {Aikido.AgentServer.Signals.StopSelf, Aikido.Actions.Lifecycle.StopSelf,
+         :__aikido_stop_self__}
+      ],
+      dsl,
+      fn {signal, implementation, name}, dsl ->
+        if declared_runtime_route?(dsl, signal) do
+          dsl
+        else
+          Transformer.add_entity(dsl, [:agent], %Aikido.Agent.Route{
+            type: signal,
+            action: implementation,
+            name: name,
+            public?: false,
+            priority: -20
+          })
+        end
+      end
+    )
+  end
+
+  defp declared_runtime_route?(dsl, signal) do
+    type = Aikido.Signal.Info.signal_type!(signal)
+
+    Enum.any?(Transformer.get_entities(dsl, [:agent]), fn
+      %Aikido.Agent.Route{type: declared, match: nil} ->
+        Enum.any?(List.wrap(declared), &(&1 in [signal, type]))
+
+      %Aikido.Agent.SliceMount{module: module} ->
+        Code.ensure_compiled!(module)
+
+        Spark.Dsl.is?(module, Ash.Resource) &&
+          Aikido.Slice.Extension in Spark.extensions(module) &&
+          Enum.any?(Spark.Dsl.Extension.get_entities(module, [:slice]), fn
+            %Aikido.Slice.Route{type: ^type, match: nil} -> true
+            _ -> false
+          end)
+
+      _ ->
+        false
+    end)
   end
 
   defp expand_agent_resource(dsl) do
@@ -39,7 +109,8 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
          {:ok, dsl} <- add_mounts(dsl, mounts, team_slice),
          {:ok, dsl} <- add_lifecycle_actions(dsl),
          {:ok, dsl} <- add_signals(dsl, signals),
-         {:ok, dsl} <- add_initialization_action(dsl, attributes) do
+         {:ok, dsl} <- add_initialization_action(dsl, attributes),
+         {:ok, dsl} <- add_snapshot_action(dsl) do
       {:ok, persist_state_and_routes(dsl, attributes, entities, mounts, aliases)}
     end
   end
@@ -66,6 +137,30 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
       accept: Enum.uniq([:id | accepted]),
       manual: Aikido.Agent.Actions.Initialize,
       public?: false
+    )
+  end
+
+  defp add_snapshot_action(dsl) do
+    resource = Transformer.get_persisted(dsl, :module)
+
+    fields =
+      Enum.map(Ash.Resource.Info.attributes(dsl), fn attribute ->
+        {attribute.name,
+         [type: attribute.type, constraints: attribute.constraints, allow_nil?: true]}
+      end)
+
+    argument =
+      build_argument!(:snapshot, :struct,
+        allow_nil?: false,
+        constraints: [instance_of: resource, fields: fields, preserve_nil_values?: true]
+      )
+
+    Builder.add_new_action(dsl, :action, :__aikido_snapshot__,
+      returns: :struct,
+      constraints: [instance_of: resource],
+      public?: false,
+      arguments: [argument],
+      run: {Aikido.Agent.Commands.Snapshot, []}
     )
   end
 
@@ -214,13 +309,20 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
 
   defp add_mounts(dsl, mounts, team_slice) do
     Enum.reduce_while(mounts, {:ok, dsl}, fn mount, {:ok, dsl} ->
-      case Builder.add_new_attribute(dsl, mount.path, mount.module,
-             public?: true,
-             writable?:
-               mount.module != team_slice &&
-                 !(Transformer.get_persisted(dsl, :aikido_ai?, false) &&
-                     mount.path in [:ai, :work])
-           ) do
+      result =
+        if Ash.Resource.Info.attribute(dsl, mount.path) do
+          error("Slice mount #{inspect(mount.path)} conflicts with a declared resource attribute")
+        else
+          Builder.add_new_attribute(dsl, mount.path, mount.module,
+            public?: true,
+            writable?:
+              mount.module != team_slice &&
+                !(Transformer.get_persisted(dsl, :aikido_ai?, false) &&
+                    mount.path in [:ai, :work])
+          )
+        end
+
+      case result do
         {:ok, dsl} -> {:cont, {:ok, dsl}}
         error -> {:halt, error}
       end
@@ -288,8 +390,14 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
   end
 
   defp build_argument!(name, type, options) do
-    {:ok, argument} = Builder.build_action_argument(name, type, options)
-    argument
+    case Builder.build_action_argument(name, type, options) do
+      {:ok, argument} ->
+        argument
+
+      {:error, reason} ->
+        message = if is_binary(reason), do: reason, else: inspect(reason)
+        raise Spark.Error.DslError, message: message, path: [:agent, :arguments, name]
+    end
   end
 
   defp reference_argument do

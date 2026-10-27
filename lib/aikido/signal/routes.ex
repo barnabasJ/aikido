@@ -72,7 +72,8 @@ defmodule Aikido.Signal.Routes do
                  section,
                  definitions,
                  entity.action,
-                 public?(entity)
+                 public?(entity),
+                 entity.name
                ) do
           entries =
             Enum.map(definitions, fn module ->
@@ -101,7 +102,8 @@ defmodule Aikido.Signal.Routes do
              section,
              definition,
              entity.action,
-             public?(entity)
+             public?(entity),
+             entity.name
            ) do
       name = entity.name || route_name(definition, target)
 
@@ -157,9 +159,9 @@ defmodule Aikido.Signal.Routes do
         "Expected a signal definition module or string pattern, got #{inspect(value)}"
       )
 
-  defp resolve_or_generate_action_reference(dsl, section, definition, target, public?) do
+  defp resolve_or_generate_action_reference(dsl, section, definition, target, public?, name) do
     if implementation_reference?(target) do
-      with {:ok, dsl, action} <- generate(dsl, section, definition, target, public?) do
+      with {:ok, dsl, action} <- generate(dsl, section, definition, target, public?, name) do
         {:ok, dsl, {Transformer.get_persisted(dsl, :module), action}, target}
       end
     else
@@ -172,9 +174,12 @@ defmodule Aikido.Signal.Routes do
 
   defp implementation_reference?(_), do: false
 
-  defp generate(dsl, section, definition, implementation, public?) do
+  defp generate(dsl, section, definition, implementation, public?, name) do
     name =
-      handler_name(if is_list(definition), do: implementation, else: definition || implementation)
+      if(public?, do: nil, else: name) ||
+        handler_name(
+          if is_list(definition), do: implementation, else: definition || implementation
+        )
 
     with {:ok, payload} <- payload_arguments(definition, section) do
       generate_action(dsl, section, definition, implementation, name, payload, public?)

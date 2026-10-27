@@ -22,6 +22,7 @@ defmodule Aikido.AiReact.TodoRequirements do
         request_id: state.request_id,
         iteration: state.iteration,
         timeout: state.options.model_timeout_ms,
+        deadline_at: state.deadline_at,
         tool_context: state.tool_context
       }
 

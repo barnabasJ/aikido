@@ -2,11 +2,10 @@ defmodule AgentExamplesWeb.AssistantLive do
   @moduledoc "Interactive assistant example."
   use Phoenix.LiveView, layout: false
   import AgentExamplesWeb.ExampleComponents
+  import AgentExamplesWeb.Components.Conversation, only: [conversation: 1]
   alias AgentExamplesWeb.ExamplePage
   on_mount({ExamplePage, "assistant"})
-
-  def handle_event("ask", %{"query" => query}, socket),
-    do: ExamplePage.command(socket, :ask, %{query: query})
+  on_mount({AgentExamplesWeb.Components.Conversation, :ask})
 
   def render(assigns) do
     ~H"""

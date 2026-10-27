@@ -1,5 +1,5 @@
 defmodule AgentExamples.ResearchTeam do
-  @moduledoc "The team is the orchestrator: fixed members and bounded dynamic subworkers."
+  @moduledoc "A research orchestrator that creates its workers and squads dynamically."
   use Ash.Resource,
     domain: AgentExamples.Agents,
     extensions: [Aikido.Agent.Extension, Aikido.AI.Extension, Aikido.Team.Extension]
@@ -10,10 +10,13 @@ defmodule AgentExamples.ResearchTeam do
 
   # Optional role defaults; callers supply the model and tools at creation.
   ai do
+    options %{completion: :tasks, model_timeout_ms: 600_000}
+    llm_opts max_tokens: 16_384, receive_timeout: 600_000, temperature: 0.2
+
     system_prompt """
     You lead a research organization. Demonstrate dynamic, hierarchical collaboration:
-    create purpose-specific squads with the squad template, rather than assigning
-    everything to the fixed analyst and reviewer. For a substantial task, create an
+    Start with an empty roster and create purpose-specific squads with the squad
+    template. For a substantial task, create an
     investigation squad and an independent verification squad. Ask the investigation
     squad to create a focused subteam, whose researchers may use specialist subagents.
     Delegate concrete questions, collect the findings, then synthesize one answer.
@@ -35,7 +38,12 @@ defmodule AgentExamples.ResearchTeam do
     Lua actions return result, err. Use return assert(agents.members({})) to inspect
     the roster, and return assert(agents.delegate({input = {member = "investigation",
     text = "Investigate the assigned question. Remaining team-depth budget: 1."}}))
-    to delegate. Check errors or use assert so failed work is visible. Start useful
+    to delegate. Use mode = "background" for independent work: delegate returns
+    a task ID immediately, and the team delivers the result later as a conversation
+    message. Foreground waits for the answer. An existing foreground task can be
+    backgrounded with agents.delegate({input = {task_id = "the-task-id", mode = "background"}})
+    without cancelling the worker. Do not duplicate an assignment while awaiting its result.
+    Check errors or use assert so failed work is visible. Start useful
     independent branches before collecting their findings. Use only supplied tools
     and base your final answer on the returned evidence.
     """
@@ -45,9 +53,18 @@ defmodule AgentExamples.ResearchTeam do
 
   team do
     max_members 8
-    inherit [:tools, :tool_options, :tool_context, :model, :client, :max_iterations, :options]
-    member :analyst, AgentExamples.Researcher
-    member :reviewer, AgentExamples.Reviewer
+
+    inherit [
+      :tools,
+      :tool_options,
+      :tool_context,
+      :model,
+      :client,
+      :max_iterations,
+      :options,
+      :llm_opts
+    ]
+
     worker :researcher, AgentExamples.Researcher, max_members: 6
     worker :squad, AgentExamples.ResearchSquad, max_members: 2
   end

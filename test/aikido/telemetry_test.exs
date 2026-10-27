@@ -26,7 +26,13 @@ defmodule AikidoTest.TelemetryTest do
 
   test "event counters produce a datapoint without a count measurement" do
     counters = Enum.filter(Aikido.Telemetry.metrics(), &match?(%Telemetry.Metrics.Counter{}, &1))
-    assert length(counters) == 2
+
+    assert Enum.sort(Enum.map(counters, & &1.name)) ==
+             Enum.sort([
+               [:aikido, :agent_server, :signal, :sent, :count],
+               [:aikido, :agent_server, :signal, :stop, :count],
+               [:aikido, :agent_server, :directive, :stop, :count]
+             ])
 
     for metric <- counters do
       assert metric.measurement.(%{duration: 0}) == 1

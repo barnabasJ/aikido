@@ -16,8 +16,16 @@ defmodule Aikido.Team.Actions.EnsureMember do
   end
 
   defp plan_member_activation(data, state, _config) do
-    if Map.has_key?(state.topology.nodes, data.member),
-      do: {:ok, state.topology, [], [data.member], Map.delete(state.paused, data.member)},
-      else: {:error, {:unknown_member, data.member}}
+    if Map.has_key?(state.topology.nodes, data.member) do
+      {:ok, state.topology, [], [data.member], Map.delete(state.paused, data.member)}
+    else
+      {:error,
+       Ash.Error.Action.InvalidArgument.exception(
+         field: :member,
+         message:
+           "Unknown team member #{inspect(data.member)}. " <>
+             "Inspect the roster or add the member before activating it."
+       )}
+    end
   end
 end

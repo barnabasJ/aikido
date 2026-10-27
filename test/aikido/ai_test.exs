@@ -63,6 +63,7 @@ end
 defmodule Aikido.AITest do
   use AikidoTest.Case, async: false
   use Mimic
+
   import Aikido.AI.Test.ResponseFixtures
 
   setup :set_mimic_global
@@ -169,7 +170,11 @@ defmodule Aikido.AITest do
       assert ai.tool_results_received == []
     end
 
-    test("appends a cycle warning when consecutive tool batches are identical", ctx) do
+    test("appends a cycle warning after three identical successful batches", ctx) do
+      expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
+        {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 1}}}])}
+      end)
+
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
         {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 1}}}])}
       end)
@@ -181,13 +186,13 @@ defmodule Aikido.AITest do
       test_pid = self()
 
       expect(ReqLLM.Generation, :generate_text, fn _model, messages, _opts ->
-        send(test_pid, {:third_call_messages, messages})
+        send(test_pid, {:fourth_call_messages, messages})
         {:ok, final_answer_response("done")}
       end)
 
       pid = start_test_server(ctx, Aikido.AITest.MathAgent)
       assert {:ok, "done"} = Aikido.AI.ask_sync(pid, "loop", timeout: 1000)
-      assert_receive {:third_call_messages, messages}, 1000
+      assert_receive {:fourth_call_messages, messages}, 1000
 
       texts =
         for msg <- messages,
@@ -197,7 +202,7 @@ defmodule Aikido.AITest do
           text
         end
 
-      assert Enum.any?(texts, &String.contains?(&1, "Do NOT repeat the same calls"))
+      assert Enum.any?(texts, &String.contains?(&1, "Do NOT repeat this pattern"))
     end
 
     test("tool errors are returned as JSON in tool.completed (not as :failed)", ctx) do
@@ -217,17 +222,20 @@ defmodule Aikido.AITest do
   end
 
   describe("max iterations") do
-    test("settles :completed without a result when the cap is hit", ctx) do
+    test("fails unfinished tool work when the cap is hit", ctx) do
       expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
         {:ok, tool_call_response([{"test_add", %{"input" => %{"a" => 1, "b" => 2}}}])}
       end)
 
       pid = start_test_server(ctx, Aikido.AITest.TightAgent)
-      assert {:ok, nil} = Aikido.AI.ask_sync(pid, "loop", timeout: 1000)
+      assert {:error, :max_iterations} = Aikido.AI.ask_sync(pid, "loop", timeout: 1000)
       ai = read_ai(pid)
-      assert ai.status == :completed
+      assert ai.status == :failed
+      assert ai.error == :max_iterations
       assert ai.result == nil
       assert ai.iteration == 1
+      assert List.last(ai.context.messages).tool_calls != []
+      assert ai.pending_tool_calls == []
     end
   end
 

@@ -39,7 +39,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest.TelemetryAgent do
       end
     end
 
-    route "increment", {AikidoTest.TestActions, :increment}
+    route AikidoTest.TestSignals.Increment, AikidoTest.TestActions.Actions.IncrementCounter
     route "emit_directive", {AikidoTest.AgentServer.TelemetryTest.TelemetryAgent, :emit_directive}
 
     route "schedule_directive",
@@ -70,6 +70,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
     :telemetry.attach_many(
       handler_id,
       [
+        [:aikido, :agent_server, :signal, :sent],
         [:aikido, :agent_server, :signal, :start],
         [:aikido, :agent_server, :signal, :stop],
         [:aikido, :agent_server, :signal, :exception],
@@ -91,6 +92,26 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
   end
 
   describe("signal telemetry") do
+    test "dispatch events distinguish call and cast without exposing payload", context do
+      pid = start_server(context, AikidoTest.AgentServer.TelemetryTest.TelemetryAgent)
+      first = Aikido.Signal.new!("increment", %{private_value: "not telemetry metadata"})
+      second = Aikido.Signal.new!("increment", %{})
+      assert {:ok, _} = Aikido.AgentServer.call(pid, first, &{:ok, &1.id})
+      assert :ok = Aikido.AgentServer.cast(pid, second)
+
+      assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :sent], _,
+                      %{signal_id: first_id, target: ^pid, delivery: :call} = metadata}
+
+      assert first_id == first.id
+      refute Map.has_key?(metadata, :data)
+      refute inspect(metadata) =~ "not telemetry metadata"
+
+      assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :sent], _,
+                      %{signal_id: second_id, delivery: :cast}}
+
+      assert second_id == second.id
+    end
+
     test("emits start and stop events for signal processing", %{aikido: aikido}) do
       {:ok, pid} =
         AikidoTest.Case.start_test_agent(
@@ -103,14 +124,14 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
 
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], measurements,
-                      metadata}
+                      %{signal_type: "increment"} = metadata}
 
       assert is_integer(measurements.system_time)
       assert metadata.agent_id == "telemetry-signal-test"
       assert metadata.signal_type == "increment"
 
       assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], measurements,
-                      metadata}
+                      %{signal_type: "increment"} = metadata}
 
       assert is_integer(measurements.duration)
       assert measurements.duration >= 0
@@ -128,8 +149,13 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
       signal = Aikido.Signal.new!("emit_directive", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-      assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, _}
-      assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], _, metadata}
+
+      assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _,
+                      %{signal_type: "emit_directive"}}
+
+      assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :stop], _,
+                      %{signal_type: "emit_directive"} = metadata}
+
       assert metadata.directive_count == 1
       assert metadata.directive_types == %{"Emit" => 1}
       GenServer.stop(pid)
@@ -220,7 +246,10 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
 
       signal = Aikido.Signal.new!("increment", %{}, source: "/test")
       {:ok, _agent} = Aikido.AgentServer.call(pid, signal, fn s -> {:ok, s.agent} end)
-      assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _, metadata}
+
+      assert_receive {:telemetry_event, [:aikido, :agent_server, :signal, :start], _,
+                      %{signal_type: "increment"} = metadata}
+
       assert metadata.agent_id == "telemetry-metadata-test"
       assert metadata.agent_module == AikidoTest.AgentServer.TelemetryTest.TelemetryAgent
       assert metadata.signal_type == "increment"

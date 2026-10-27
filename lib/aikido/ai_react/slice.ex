@@ -16,6 +16,8 @@ defmodule Aikido.AiReact.Slice do
   actions apply their results. Callers supply Ash AI tool names and native
   `tool_options`; prepared callbacks are rebuilt for each run and never saved.
   """
+  @behaviour Aikido.Durable.Codec
+
   use Ash.Resource,
     data_layer: :embedded,
     extensions: [Aikido.Slice.Extension]
@@ -34,7 +36,7 @@ defmodule Aikido.AiReact.Slice do
       end
 
       attribute :tool_batch_history, {:array, :string} do
-        description "Bounded recent batch signatures used to detect repeating tool-call cycles."
+        description "Bounded recent SHA-256 batch fingerprints used to detect repeating tool-call cycles."
         default []
         allow_nil? false
       end
@@ -72,10 +74,18 @@ defmodule Aikido.AiReact.Slice do
       end
 
       attribute :handoff_count, :integer do
-        description "Number of context handoffs adopted during this run."
+        description "Number of correlated context-summary requests issued during this run."
         public? true
         default 0
         allow_nil? false
+      end
+
+      attribute :handoff_regenerations, :integer do
+        description "Additional summary generations attempted for the current context handoff. Recovery interrupts in-flight summaries."
+        default 0
+        allow_nil? false
+        public? true
+        constraints min: 0
       end
 
       attribute :last_handoff, :map do
@@ -93,6 +103,16 @@ defmodule Aikido.AiReact.Slice do
 
       attribute :last_input_tokens, :integer do
         description "Provider-reported input token count from the latest model response."
+      end
+
+      attribute :last_input_shape, :string do
+        description "Digest of the provider-visible request shape for the latest model response."
+      end
+
+      attribute :opening_messages, {:array, :string} do
+        description "Current-turn user input retained until an ordinary model request consumes it."
+        default []
+        allow_nil? false
       end
 
       attribute :prepared_tools, :term do
@@ -218,8 +238,8 @@ defmodule Aikido.AiReact.Slice do
         default []
       end
 
-      attribute :previous_tool_signature, :term do
-        description "Signature of the previous tool batch used to detect repeated calls."
+      attribute :previous_tool_signature, :string do
+        description "Fixed-size SHA-256 fingerprint of the previous tool names and arguments used to detect repeated calls."
         public? true
         allow_nil? true
         default nil
@@ -426,8 +446,6 @@ defmodule Aikido.AiReact.Slice do
     route Aikido.AiReact.Signals.HookContext, Aikido.AiReact.Actions.HookContext, public?: false
   end
 
-  @behaviour Aikido.Durable.Codec
-
   @doc false
   @impl true
   def externalize(state),
@@ -435,6 +453,7 @@ defmodule Aikido.AiReact.Slice do
       Map.merge(state, %{
         handoff_pending: nil,
         prepared_tools: nil,
+        opening_messages: [],
         todo_verification_pending: false,
         tool_refresh_pending: false,
         tools_resume: nil,
@@ -463,6 +482,7 @@ defmodule Aikido.AiReact.Slice do
     Map.merge(state, %{
       handoff_pending: nil,
       prepared_tools: nil,
+      opening_messages: [],
       todo_verification_pending: false,
       tool_refresh_pending: false,
       tools_resume: nil,

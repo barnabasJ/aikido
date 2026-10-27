@@ -1,3 +1,30 @@
+defmodule AikidoTest.Agent.SchedulesIntegrationTest.Signals.Tick do
+  @moduledoc false
+  use Aikido.Signal
+
+  signal do
+    type "agent.tick"
+  end
+end
+
+defmodule AikidoTest.Agent.SchedulesIntegrationTest.Signals.Heartbeat do
+  @moduledoc false
+  use Aikido.Signal
+
+  signal do
+    type "heartbeat.tick"
+  end
+end
+
+defmodule AikidoTest.Agent.SchedulesIntegrationTest.Signals.Cleanup do
+  @moduledoc false
+  use Aikido.Signal
+
+  signal do
+    type "cleanup.run"
+  end
+end
+
 defmodule AikidoTest.Agent.SchedulesIntegrationTest.Actions.CountTick do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
@@ -23,19 +50,13 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent do
       end
     end
 
-    route "agent.tick", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick},
-      public?: false
+    route AikidoTest.Agent.SchedulesIntegrationTest.Signals.Tick,
+          AikidoTest.Agent.SchedulesIntegrationTest.Actions.CountTick,
+          public?: false
   end
 
   schedules do
     schedule "* * * * * * *", "agent.tick", job_id: :tick
-  end
-
-  actions do
-    action :tick, Aikido.Types.ActionResult do
-      argument :state, :term
-      run AikidoTest.Agent.SchedulesIntegrationTest.Actions.CountTick
-    end
   end
 end
 
@@ -53,11 +74,13 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.MultiScheduleAgent do
       end
     end
 
-    route "heartbeat.tick", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick},
-      public?: false
+    route AikidoTest.Agent.SchedulesIntegrationTest.Signals.Heartbeat,
+          AikidoTest.Agent.SchedulesIntegrationTest.Actions.CountTick,
+          public?: false
 
-    route "cleanup.run", {AikidoTest.Agent.SchedulesIntegrationTest.ScheduledAgent, :tick},
-      public?: false
+    route AikidoTest.Agent.SchedulesIntegrationTest.Signals.Cleanup,
+          AikidoTest.Agent.SchedulesIntegrationTest.Actions.CountTick,
+          public?: false
   end
 
   schedules do
@@ -88,15 +111,13 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest do
   @moduletag capture_log: true
 
   describe("agent with schedules") do
-    test "Info.schedules/1 typespec includes slice and agent schedule specs" do
+    test "Info.schedules/1 exposes the shared schedule contract" do
       module = Aikido.Agent.Info
       {:ok, specs} = Code.Typespec.fetch_specs(module)
       {{:schedules, 1}, [spec]} = List.keyfind(specs, {:schedules, 1}, 0)
 
       rendered = :schedules |> Code.Typespec.spec_to_quoted(spec) |> Macro.to_string()
-      assert String.contains?(rendered, "Aikido.Cron.SliceSchedules.schedule_spec()")
-      assert String.contains?(rendered, "Aikido.Cron.AgentSchedules.schedule_spec()")
-      assert String.contains?(rendered, "|")
+      assert String.contains?(rendered, "Aikido.Cron.Declarations.schedule_spec()")
     end
 
     test "Info.schedules/1 includes agent schedules" do

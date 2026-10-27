@@ -20,12 +20,15 @@ defmodule AgentExamples.MixProject do
         {:telemetry_metrics, "~> 1.1"},
         {:telemetry_poller, "~> 1.1"},
         {:phoenix_html, "~> 4.3"},
+        {:makeup_elixir, "~> 1.0"},
+        {:makeup_json, "~> 1.0"},
+        {:mdex, "~> 0.14.1"},
         {:bandit, "~> 1.6"},
         {:lazy_html, ">= 0.1.0", only: :test},
         {:ash_ai, "~> 1.3"},
         {:ash_lua,
-         git: "https://github.com/ash-project/ash_lua.git",
-         ref: "5388cbbcd176e3f879a713d948733d9f0e281cf6"},
+         git: "https://github.com/barnabasJ/ash_lua.git",
+         ref: "53fe11b883b7f8c8f6b85d07630bf78727a1efed"},
         {:sourceror, "~> 1.7", only: [:dev, :test]}
       ],
       aliases: [

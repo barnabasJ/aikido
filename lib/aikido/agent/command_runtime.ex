@@ -40,42 +40,27 @@ defmodule Aikido.Agent.CommandRuntime do
 
   def resolve(_resource, _), do: {:error, "Expected an agent ID, PID, or reference"}
 
-  def snapshot(resource, pid) do
-    AgentServer.state(pid, fn state ->
-      if state.agent.agent_module == resource do
-        {:ok, resource_record_from_agent(resource, state.agent)}
-      else
-        {:error, :different_resource}
-      end
-    end)
-  end
+  def snapshot(resource, pid, options \\ []) do
+    with {:ok, attributes} <-
+           AgentServer.state(pid, fn state ->
+             if state.agent.agent_module == resource do
+               {:ok, Aikido.Agent.resource_attributes(state.agent)}
+             else
+               {:error, :different_resource}
+             end
+           end) do
+      # Inspect/list already authorize the caller. This internal action only casts
+      # their read projection; it must not introduce another authorization policy.
+      projection_options = Keyword.put(options, :authorize?, false)
 
-  defp resource_record_from_agent(resource, agent) do
-    attributes =
-      Map.new(Ash.Resource.Info.attributes(resource), fn attr ->
-        value =
-          cond do
-            attr.name == :id ->
-              agent.id
-
-            attr.name in Aikido.Agent.Info.state_fields(resource) ->
-              agent.state
-              |> Map.get(Aikido.Agent.Info.agent_path!(resource), %{})
-              |> Map.get(attr.name)
-
-            true ->
-              Map.get(agent.state, attr.name)
-          end
-
-        value =
-          if is_map(value) && !is_struct(value) && Spark.Dsl.is?(attr.type, Ash.Resource),
-            do: struct(attr.type, value),
-            else: value
-
-        {attr.name, value}
-      end)
-
-    struct(resource, attributes)
+      resource
+      |> Ash.ActionInput.for_action(
+        :__aikido_snapshot__,
+        %{snapshot: attributes},
+        projection_options
+      )
+      |> Ash.run_action(projection_options)
+    end
   end
 
   @doc "Translate runtime process exits into the public tagged error contract."

@@ -19,6 +19,7 @@ defmodule AikidoTest.AshTest do
   end
 
   test "generic commands accept IDs and PIDs and return compact receipts" do
+    Code.ensure_loaded!(AikidoTest.AshFixtures.Domain)
     assert function_exported?(AikidoTest.AshFixtures.Domain, :counter_start, 1)
     assert function_exported?(AikidoTest.AshFixtures.Domain, :counter_add, 2)
     refute function_exported?(AikidoTest.AshFixtures.Domain, :start_counter, 1)
@@ -484,7 +485,7 @@ defmodule AikidoTest.AshTest do
     [signal] =
       Enum.filter(
         Spark.Dsl.Extension.get_entities(resource, [:agent]),
-        &match?(%Aikido.Agent.Route{}, &1)
+        &match?(%Aikido.Agent.Route{public?: true}, &1)
       )
 
     assert signal.name == :increment
@@ -493,8 +494,10 @@ defmodule AikidoTest.AshTest do
     refute Ash.Resource.Info.action(resource, :tick)
     refute function_exported?(AikidoTest.AshFixtures.Domain, :composed_internal, 1)
 
-    assert Aikido.Agent.Info.signal_routes(resource) ==
-             []
+    assert Aikido.Agent.Info.signal_routes(resource) == [
+             {"aikido.agent.stop", {resource, :__aikido_stop_self__}, -20},
+             {"aikido.agent.query.children", {resource, :__aikido_query_children__}, -20}
+           ]
 
     assert Aikido.Agent.Info.slice_paths_for_action(resource)[
              signal.action

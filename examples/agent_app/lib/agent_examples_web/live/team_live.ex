@@ -1,24 +1,16 @@
 defmodule AgentExamplesWeb.TeamLive do
   @moduledoc "Interactive team example."
   use Phoenix.LiveView, layout: false
-  import AgentExamplesWeb.ExampleComponents
-  alias AgentExamplesWeb.ExamplePage
-  on_mount({ExamplePage, "team"})
-
-  def handle_event("team_add", _, socket),
-    do:
-      ExamplePage.command(socket, :send, %{
-        member: :counter,
-        type: "counter.add",
-        payload: %{amount: 1}
-      })
+  import AgentExamplesWeb.ExampleComponents, only: [page: 1]
+  import AgentExamplesWeb.Components.Team, only: [team: 1]
+  on_mount({AgentExamplesWeb.ExamplePage, "team"})
+  on_mount({AgentExamplesWeb.TeamTree, :default})
+  on_mount({AgentExamplesWeb.Components.Team, :default})
 
   def render(assigns) do
     ~H"""
     <.page {assigns}>
-      <.team_topology run={@run}>
-        <button id="team-add" phx-click="team_add" class="button secondary" disabled={!active?(@run)}>Send +1 to the counter</button>
-      </.team_topology>
+      <.team run={@run} team_trees={@team_trees} />
     </.page>
     """
   end

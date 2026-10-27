@@ -131,7 +131,7 @@ defmodule AgentExamples.QuicksortTest do
 
       assert {:ok, {result, children}} =
                Aikido.AgentServer.state(root.pid, fn runtime ->
-                 {:ok, {runtime.agent.state.state.result, runtime.children}}
+                 {:ok, {runtime.agent.state.state.result, Aikido.Ownership.children(runtime)}}
                end)
 
       assert result == numbers

@@ -2,9 +2,8 @@ defmodule AgentExamples.AI.ScriptedClient do
   @moduledoc """
   A deterministic model substitute that exercises real tools and signal flows.
 
-  An `orchestrate:` request starts a team specialist, delegates to the fixed
-  analyst (which starts and delegates to its own helper), then asks the fixed
-  reviewer and the specialist. Ordinary requests use text_stats and team_roster.
+  An `orchestrate:` request creates an analyst, reviewer and specialist, delegates
+  to the analyst (which creates its own helper), then asks the reviewer and specialist. Ordinary requests use text_stats and team_roster.
   """
   @behaviour Aikido.AiReact.Client
 
@@ -91,6 +90,8 @@ defmodule AgentExamples.AI.ScriptedClient do
     task = String.trim_leading(query, "orchestrate:") |> String.trim()
 
     operations = [
+      {"spawn_worker", %{name: "analyst", specialty: "analysis"}},
+      {"spawn_worker", %{name: "reviewer", specialty: "review"}},
       {"spawn_worker", %{name: "specialist", specialty: "independent verification"}},
       {"delegate", %{member: "analyst", text: "expand: #{task}"}},
       {"delegate", %{member: "reviewer", text: task}},

@@ -100,6 +100,9 @@ defmodule Aikido.Team.Extension do
 
   defp expose_operation_failure({:ok, _} = result), do: result
 
+  defp expose_operation_failure({:error, %Ash.Error.Action.InvalidArgument{}} = error),
+    do: error
+
   defp expose_operation_failure({:error, reason}) do
     {:error,
      Ash.Error.Action.InvalidArgument.exception(
@@ -128,6 +131,19 @@ defmodule Aikido.Team.Extension do
 
   defp operation_failure_message({:invalid_member_name, name}),
     do: "Member name #{inspect(name)} is invalid. Use a nonempty name without path separators."
+
+  defp operation_failure_message({:required_by, members}),
+    do:
+      "This member is required by #{Enum.map_join(members, ", ", &inspect/1)}. " <>
+        "Remove those dependencies first, or explicitly request cascade? true to remove the dependent members too."
+
+  defp operation_failure_message(:cyclic_topology),
+    do:
+      "The topology contains a dependency or ownership cycle. Remove the circular relationships before retrying."
+
+  defp operation_failure_message(:ambiguous_member_ids),
+    do:
+      "Multiple topology members resolve to the same agent identity. Give each member a distinct name and ownership path."
 
   defp operation_failure_message(:timeout),
     do:

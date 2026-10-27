@@ -5,9 +5,12 @@ defmodule AgentExamples.LuaAssistant.Tools.Evaluate do
   def run(input, _opts, context) do
     options = AgentExamples.LuaAssistant.Tools.vm_options(input.context)
 
-    AshLua.Eval.run(
-      input.arguments.script,
-      options ++ Ash.Scope.to_opts(context, context: input.context)
-    )
+    with {:ok, result} <-
+           AshLua.Eval.run(
+             input.arguments.script,
+             options ++ Ash.Scope.to_opts(context, context: input.context)
+           ) do
+      AgentExamples.AI.Errors.LuaScriptFailed.reject_script_error(result)
+    end
   end
 end

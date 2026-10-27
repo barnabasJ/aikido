@@ -24,16 +24,18 @@ defmodule Aikido.AiReact.RunState do
 
   @doc "Resolve todo-dependent run status and discard finished-run resources in an action result."
   def resolve_run_outcome({:ok, %{state: state, directives: []}} = unchanged, input)
-      when state == input.arguments.state,
-      do: unchanged
+      when state == input.arguments.state, do: unchanged
 
-  def resolve_run_outcome(
-        {:ok, %{state: %{status: :completed} = state} = result},
-        input
-      ) do
+  def resolve_run_outcome({:ok, %{state: %{status: :completed} = state} = result}, input) do
     agent_state = (input.context.aikido[:agent] && input.context.aikido.agent.state) || %{}
 
     {state, directives} = Aikido.AiReact.TodoRequirements.plan_run_outcome(state, agent_state)
+
+    state =
+      if state.options.completion == :tasks,
+        do: Aikido.Team.TaskCompletion.await_background_results(state, agent_state),
+        else: state
+
     state = clear_tools_and_handoff(state)
     {:ok, %{result | state: state, directives: result.directives ++ directives}}
   end
@@ -57,11 +59,26 @@ defmodule Aikido.AiReact.RunState do
 
   def clear_tools_and_handoff(state), do: state
 
+  @doc "Resume a waiting conversation with incoming text, preserving its request, deadline and tool registry."
+  def resume_waiting_run(state, text) do
+    state =
+      state
+      |> Conversation.append_message(ReqLLM.Context.user(text))
+      |> Map.update(:opening_messages, [text], &(&1 ++ [text]))
+      |> Map.merge(%{status: :running, result: nil, streaming_text: "", streaming_thinking: ""})
+
+    Aikido.AiReact.HookQueue.queue_before_model_hooks(state, model_turn_directive(state))
+  end
+
   @doc "Describe the next model turn using this run’s prepared tools and conversation."
   def request_model_turn(state) do
+    Aikido.Types.ActionResult.new(state: state, directives: [model_turn_directive(state)])
+  end
+
+  defp model_turn_directive(state) do
     {tools, _registry} = state.prepared_tools
 
-    directive = %Aikido.AiReact.Directives.LLMCall{
+    %Aikido.AiReact.Directives.LLMCall{
       tools: tools,
       client: state.client,
       model: state.model,
@@ -72,8 +89,6 @@ defmodule Aikido.AiReact.RunState do
       options: state.options,
       iteration: state.iteration + 1
     }
-
-    Aikido.Types.ActionResult.new(state: state, directives: [directive])
   end
 
   defp resolve_configuration(data, state) do
@@ -145,8 +160,9 @@ defmodule Aikido.AiReact.RunState do
       tools_resume: nil,
       handoff_pending: nil,
       handoff_count: 0,
+      handoff_regenerations: 0,
       last_handoff: nil,
-      last_input_tokens: nil,
+      opening_messages: Map.get(state, :queued_messages, []) ++ [data.query],
       queued_messages: [],
       streaming_text: "",
       streaming_thinking: "",

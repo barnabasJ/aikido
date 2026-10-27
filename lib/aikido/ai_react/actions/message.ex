@@ -1,7 +1,7 @@
 defmodule Aikido.AiReact.Actions.Message do
   @moduledoc "Queues a message or resumes a waiting run within its bound caller scope."
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{HookQueue, RunState, RunCaller}
+  alias Aikido.AiReact.{RunState, RunCaller}
 
   @impl true
   def run(input, _opts, _context) do
@@ -14,19 +14,7 @@ defmodule Aikido.AiReact.Actions.Message do
     state = input.arguments.state
 
     if state.status == :waiting do
-      with {:ok, result} <-
-             RunState.begin_run(
-               %{
-                 query: input.arguments.text,
-                 request_id: state.request_id,
-                 metadata: Map.get(state, :run_metadata, %{})
-               },
-               state
-             ) do
-        {:ok, result}
-        |> RunCaller.bind_run_caller(input)
-        |> HookQueue.queue_event_hooks(:run_started, %{query: input.arguments.text})
-      end
+      RunState.resume_waiting_run(state, input.arguments.text)
     else
       state =
         Map.update(

@@ -1,6 +1,13 @@
 defmodule AgentExamples.AI.Tools do
   @moduledoc "Native Ash actions exposed to the model as tools."
-  use Ash.Resource, domain: AgentExamples.Agents, data_layer: Ash.DataLayer.Simple
+  use Ash.Resource,
+    domain: AgentExamples.Agents,
+    data_layer: Ash.DataLayer.Simple,
+    extensions: [AshLua.Resource]
+
+  lua do
+    name "research_tools"
+  end
 
   def for_assistant, do: [:text_stats, :stamp]
 
@@ -37,16 +44,31 @@ defmodule AgentExamples.AI.Tools do
     end
 
     action :delegate, :map do
-      description "Assign a bounded task to a running worker and wait for its answer. Cannot target yourself or the orchestrator."
+      description "Assign a team task. Foreground waits for its result; background returns a task ID and delivers the result later. To background existing work without cancelling it, supply task_id and mode background instead of member/text."
 
-      argument :member, :string, allow_nil?: false
+      argument :mode, Aikido.Team.Types.DelegationMode do
+        description "Wait for the answer, or continue while the worker runs."
+        default :foreground
+        allow_nil? false
+      end
+
+      argument :task_id, :string do
+        description "Existing foreground task to move into the background, preserving the same worker and task identity."
+      end
+
+      argument :member, :string do
+        description "Running teammate receiving a new task; omit when backgrounding an existing task."
+      end
 
       argument :worker_lifecycle, Aikido.Team.Types.WorkerLifecycle do
         description "Keep a reusable teammate, or stop a one-off worker and its descendants after its result is recorded."
         default :keep
       end
 
-      argument :text, :string, allow_nil?: false
+      argument :text, :string do
+        description "Instructions for a new task; omit when backgrounding an existing task."
+      end
+
       run AgentExamples.AI.Tools.Actions.Delegate
     end
 

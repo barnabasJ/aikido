@@ -6,11 +6,10 @@ defmodule AikidoTest.Signal.CallTest.Actions.ReplyToEcho do
     signal = input.context.aikido.signal
 
     directive =
-      Aikido.Signal.Call.reply_from_state(
+      Aikido.Signal.Call.reply(
         signal,
         "aikido.test.echo.reply",
-        "aikido.test.echo.error",
-        {__MODULE__, :build_reply, []}
+        %{ok: true}
       )
 
     directives = List.wrap(directive)
@@ -20,8 +19,6 @@ defmodule AikidoTest.Signal.CallTest.Actions.ReplyToEcho do
 
     Aikido.Types.ActionResult.new(state: %{}, directives: directives)
   end
-
-  def build_reply(_runtime), do: {:ok, %{ok: true}}
 end
 
 defmodule AikidoTest.Signal.CallTest.Actions.IgnoreSignal do
@@ -61,7 +58,7 @@ defmodule AikidoTest.Signal.CallTest do
   Tests for `Aikido.Signal.Call` — the synchronous request/reply primitive
   over signals.
 
-  Covers the happy path (query → `%Reply{}` directive → reply signal) and
+  Covers the happy path (query → `%Emit{}` directive → reply signal) and
   the error modes the primitive promises:
 
   * `{:error, :noproc}` — target process dies (or was already dead) before

@@ -10,9 +10,9 @@ defmodule Aikido.AgentServer.Options do
   hierarchy settings and middleware configuration.
   """
 
-  alias Aikido.AgentServer.ParentRef
+  alias Aikido.Ownership.ParentRef
 
-  @type on_parent_death :: Aikido.AgentServer.Types.ParentDeathPolicy.t()
+  @type on_parent_death :: Aikido.Ownership.Types.ParentDeathPolicy.t()
 
   use Ash.TypedStruct
 
@@ -64,7 +64,7 @@ defmodule Aikido.AgentServer.Options do
       description "Parent reference for hierarchy"
     end
 
-    field :on_parent_death, Aikido.AgentServer.Types.ParentDeathPolicy do
+    field :on_parent_death, Aikido.Ownership.Types.ParentDeathPolicy do
       allow_nil? false
       default :stop
       description "Behavior when parent dies"

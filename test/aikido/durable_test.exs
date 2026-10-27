@@ -255,6 +255,66 @@ defmodule AikidoTest.DurableTest do
     assert length(entries) == 2
   end
 
+  test "snapshots use native embedded field representations and restore declared types", %{
+    durable: durable
+  } do
+    {:ok, pid} =
+      Aikido.Durable.ensure_started(durable, "native-embedded",
+        agent: AikidoTest.TestAgents.Basic
+      )
+
+    {key, _} =
+      Enum.find(DurableServer.Supervisor.global_members(durable), fn {_, {member, _}} ->
+        member == pid
+      end)
+
+    assert {:ok, info} = DurableServer.Supervisor.get_server_info(durable, key)
+
+    assert %{"format" => "ash-embedded-v2", "resource" => "Elixir.AikidoTest.TestAgents.Basic"} =
+             info.user_state
+
+    assert {:ok, binary} = Ash.Type.cast_from_embedded(:binary, info.user_state["payload"])
+    assert {:ok, stored} = Ash.Type.cast_from_embedded(:term, binary)
+    assert {:ash_agent, %{state: record}} = stored.agent
+    assert Map.take(record.state, [:counter, :status]) == %{counter: 0, status: "idle"}
+    refute Map.has_key?(record.state.cron, "__meta__")
+    assert stored.options[:sync] == %{mode: "explicit", interval_ms: 30_000}
+
+    loaded = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
+    assert {:agent, agent} = loaded.agent
+    assert agent.state.domain == %{counter: 0, status: :idle}
+    assert %Aikido.Cron.Slice{jobs: %{}} = agent.state.cron
+
+    legacy_state =
+      record.state
+      |> Map.take(Aikido.Agent.Info.slice_paths(AikidoTest.TestAgents.Basic))
+      |> Map.put(:domain, Map.take(record.state, [:counter, :status]))
+      |> Map.new(fn {path, value} ->
+        {Atom.to_string(path), %{"opaque" => false, "value" => value}}
+      end)
+
+    legacy_agent = %{
+      "id" => record.id,
+      "name" => record.name,
+      "description" => record.description,
+      "state" => legacy_state
+    }
+
+    assert {:ok, binary} =
+             Ash.Type.dump_to_embedded(:term, %{stored | agent: {:ash_agent, legacy_agent}})
+
+    assert {:ok, payload} = Ash.Type.dump_to_embedded(:binary, binary)
+
+    legacy_envelope = %{
+      info.user_state
+      | "format" => "ash-embedded-v1",
+        "payload" => payload
+    }
+
+    assert {:agent, restored} = Aikido.Durable.Snapshot.load(legacy_envelope).agent
+    assert restored == agent
+  end
+
   test "dynamic cron definitions restore and cancellation persists", %{durable: durable} do
     alias AikidoTest.Support.SchedulerIntegrationHarness
 
@@ -270,7 +330,8 @@ defmodule AikidoTest.DurableTest do
 
     assert {:ok, info} = DurableServer.Supervisor.get_server_info(durable, key)
     saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
-    assert Map.has_key?(saved.cron_specs, :annual)
+    assert {:agent, saved_agent} = saved.agent
+    assert Map.has_key?(saved_agent.state.cron.specs, :annual)
 
     redumped =
       saved
@@ -288,7 +349,7 @@ defmodule AikidoTest.DurableTest do
     :ok = SchedulerIntegrationHarness.cancel_cron(second, :annual)
 
     AikidoTest.AgentWait.await_state_value(second, fn state ->
-      !Map.has_key?(state.cron_specs, :annual)
+      !Map.has_key?(state.agent.state.cron.specs, :annual)
     end)
 
     :ok = Aikido.Durable.stop(durable, "scheduled")
@@ -296,7 +357,10 @@ defmodule AikidoTest.DurableTest do
     assert :ok = Aikido.AgentServer.await_ready(third)
 
     assert {:ok, {%{}, %{}}} =
-             Aikido.AgentServer.state(third, &{:ok, {&1.cron_jobs, &1.cron_specs}})
+             Aikido.AgentServer.state(
+               third,
+               &{:ok, {&1.agent.state.cron.jobs, &1.agent.state.cron.specs}}
+             )
   end
 
   test("agent and slice codecs compose with custom checkpoint/restore", %{durable: durable}) do

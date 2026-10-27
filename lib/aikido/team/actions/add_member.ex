@@ -41,10 +41,23 @@ defmodule Aikido.Team.Actions.AddMember do
 
     cond do
       is_nil(definition) ->
-        {:error, {:unknown_worker_template, template}}
+        {:error,
+         Ash.Error.Action.InvalidArgument.exception(
+           field: :template,
+           message:
+             "Unknown worker template #{inspect(template)}. " <>
+               "Choose one of the configured templates: #{inspect(Map.keys(config.workers))}."
+         )}
 
       template && count >= definition.max_members ->
-        {:error, {:worker_limit, template}}
+        {:error,
+         Ash.Error.Action.InvalidArgument.exception(
+           field: :template,
+           message:
+             "Worker template #{inspect(template)} has reached its limit of " <>
+               "#{definition.max_members} members. Reuse an existing worker or remove " <>
+               "an idle member before spawning another."
+         )}
 
       true ->
         {:ok,

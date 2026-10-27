@@ -1,10 +1,5 @@
 defmodule Aikido.Cron.Signals.CancelRequested do
-  @moduledoc """
-  Ordered request to retire a logical cron job and start its shutdown.
-
-  Queued by CronCancel alongside registration callbacks so an earlier pending
-  registration is installed before cancellation resolves its current process.
-  """
+  @moduledoc "Ordered request for the cron slice to detach a schedule and release its scheduler."
 
   use Aikido.Signal
 
