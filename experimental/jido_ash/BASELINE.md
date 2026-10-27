@@ -46,7 +46,7 @@ The root Aikido build, adapter build and adapter dependency graph are isolated
 from the source/integration checkouts. Dependency warnings from the host's newer
 Elixir compiler are recorded in the logs. No push or publication was requested.
 
-Adapter verification: **11 tests passed**, Spark formatting check passed, and
+Adapter verification: **12 tests passed**, Spark formatting check passed, and
 `MIX_ENV=test mix compile --warnings-as-errors` passed. A fresh VM loaded and
 called the example's generated resource from its saved BEAM without recompiling.
 Logs are `/tmp/aikido-adapter-{tests-final,format-final,compile-final,fresh-vm}.log`.

@@ -8,6 +8,7 @@ defmodule AikidoJido.MixProject do
       elixir: "~> 1.19",
       deps: [
         {:ash, "~> 3.36"},
+        {:simple_sat, "~> 0.1", only: [:dev, :test]},
         {:sourceror, "~> 1.12", only: [:dev, :test], runtime: false},
         {:jido, github: "agentjido/jido", ref: "aaca071c90691662c7036fe4d71ab63e6ee3432a"}
       ]

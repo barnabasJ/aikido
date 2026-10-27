@@ -10,6 +10,7 @@ defmodule Aikido.Jido do
   @options [
     domain: [type: :atom, default: Aikido.Jido.Domain],
     authorizers: [type: {:list, :atom}, default: []],
+    fragments: [type: {:list, :atom}, default: []],
     extensions: [type: {:list, :atom}, default: []]
   ]
 

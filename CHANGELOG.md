@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- Support native Spark resource fragments in the experimental Jido adapter,
+  including ordinary Ash policy declarations without custom authorizer code.
+
 - Add an isolated experimental Jido v3 adapter that generates native Ash
   interfaces from named Jido routes while Jido retains runtime ownership.
 - Preserve the reviewed AI client validation, provider-pressure/input carry,

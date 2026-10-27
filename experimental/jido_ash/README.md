@@ -95,10 +95,30 @@ caught or converted. Pending handles retain Jido's original caller ownership and
 must be awaited or abandoned through Jido from that process.
 
 Native Ash actor, tenant, authorization and context options apply at the generated
-resource boundary. Configure `authorizers: [MyAuthorizer]` and `extensions: [...]`
-on `use Aikido.Jido`; the default resource has no authorization policy. Supply
-`domain: MyDomain` to use an application domain and register `MyAgent.Ash` there
-normally. Otherwise a shared internal domain accepts the generated resources.
+resource boundary. Use ordinary Ash policies through a native Spark fragment:
+
+```elixir
+defmodule CounterPolicies do
+  use Spark.Dsl.Fragment, of: Ash.Resource, authorizers: [Ash.Policy.Authorizer]
+
+  policies do
+    policy always() do
+      authorize_if actor_attribute_equals(:role, :operator)
+    end
+  end
+end
+
+# On the Jido agent, after use Jido.Agent:
+use Aikido.Jido, fragments: [CounterPolicies]
+```
+
+Policies use the standard Ash policy authorizer and the application's normal SAT
+solver dependency, such as `simple_sat`. No custom authorizer implementation is
+required. Native `authorizers:` and `extensions:` options remain available for
+applications that already use them. The default resource has no authorization
+policy. Supply `domain: MyDomain` to use an application domain and register
+`MyAgent.Ash` there normally. Otherwise a shared internal domain accepts the
+generated resources.
 
 Native scope, tracer metadata and span contexts captured with `Ash.Tracer` reach
 the Jido turn as `context.ash`; user

@@ -23,6 +23,7 @@ defmodule Aikido.Jido.Resource do
         use Ash.Resource,
           domain: unquote(opts[:domain]),
           authorizers: unquote(opts[:authorizers]),
+          fragments: unquote(opts[:fragments]),
           extensions: unquote(opts[:extensions])
 
         actions do
