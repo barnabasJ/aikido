@@ -39,6 +39,16 @@ defmodule Aikido.AiReact.Options do
       constraints min: 1
     end
 
+    field :tool_loop_key, :tuple do
+      description "Optional pure {module, function, arguments} returning {:ok, comparison_key} for a sorted completed batch of {name, arguments, content} entries."
+
+      constraints fields: [
+                    module: [type: :atom, allow_nil?: false],
+                    function: [type: :atom, allow_nil?: false],
+                    arguments: [type: {:array, :term}, allow_nil?: false]
+                  ]
+    end
+
     field :max_repeated_tool_cycles, :integer do
       description "Optional repeat limit for tool cycles of one to four batches; nil keeps warning-only behavior."
       constraints min: 2, max: 100

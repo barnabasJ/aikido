@@ -252,3 +252,30 @@ for safely increasing their output budget. Provider, permission and configuratio
 failures do not trigger summary regeneration; eligible provider failures retain
 the existing `model_max_retries` policy. Recovery interrupts an in-flight summary
 rather than replaying it. No invalid summary replaces retained history.
+
+### Tool-loop comparison keys
+
+`options.tool_loop_key` optionally configures a pure MFA such as
+`{MyApp.Tools, :loop_key, []}`. The function receives the completed batch followed
+by the configured arguments and returns `{:ok, key}` or `{:error, reason}`.
+The batch is a sorted list of `{tool_name, complete_arguments, returned_content}`
+entries. Results are joined by call ID first; IDs and result arrival order do
+not affect comparison, and duplicate calls remain separate entries.
+
+By default the entire batch is the key. Applications may instead compare only
+inputs or normalize selected values. Aikido hashes the returned key and keeps
+its existing bounded successful-cycle history and separate error streak; no
+middleware or second policy process is required. Detection happens after result
+adoption and before another model request or context handoff. The same key is
+used for repeat warnings and the optional `max_repeated_tool_cycles` limit.
+
+The function must be bounded, deterministic and perform no I/O or state writes. Use a
+module/function/arguments tuple, not a closure, so configuration can persist.
+Failed or mixed batches leave successful history unchanged and do not invoke
+the function. An error, exception, throw or invalid return fails the run with
+`{:tool_loop_key_failed, {module, function, reason}}`, retaining adopted tool
+messages. The runtime never silently falls back to a different comparison.
+
+The playground’s retries and loop guards example supplies an input-only key
+for its controlled repetition experiment. Applications with polling or changing
+observations should retain output in their key.

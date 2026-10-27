@@ -63,3 +63,10 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - `AGENTS.md`
 - https://github.com/barnabasJ/aikido
 - https://hexdocs.pm/usage_rules/readme.html#usage-rules
+
+- Configure `options.tool_loop_key` with a pure bounded `{module, function, arguments}`
+  only when application-specific equivalence is needed. It receives a sorted list
+  of `{name, arguments, content}` completed entries and returns `{:ok, key}` or
+  `{:error, reason}`. Keep loop history and termination in native Aikido; do not
+  build a middleware/stateful policy process for comparison alone. Callback
+  failures fail explicitly. Default comparison includes exact inputs and results.

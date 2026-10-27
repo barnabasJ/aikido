@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Allow a pure MFA to select completed tool-batch comparison keys while retaining
+  native bounded cycle detection, result adoption and exact comparisons by
+  default. Fail explicitly when a configured comparison callback fails.
+
 - Add opt-in bounded context-summary regeneration for empty, invalid or oversized
   handoff documents, retaining history and usage with fresh result correlation.
   Truncated summaries remain terminal; provider retries keep their existing policy.

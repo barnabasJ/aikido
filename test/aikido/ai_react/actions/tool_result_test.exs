@@ -1,3 +1,19 @@
+defmodule Aikido.AiReact.ToolResultTest.Keys do
+  def inputs(batch, tag),
+    do: {:ok, {tag, Enum.map(batch, fn {name, arguments, _content} -> {name, arguments} end)}}
+
+  def full(batch), do: {:ok, batch}
+
+  def expect_batch(batch, expected) do
+    if batch == expected, do: {:ok, batch}, else: {:error, :unexpected_batch}
+  end
+
+  def fail(_batch), do: {:error, :comparison_unavailable}
+  def invalid(_batch), do: :not_a_key_result
+  def raise_error(_batch), do: raise(ArgumentError, "comparison failed")
+  def throw_error(_batch), do: throw(:comparison_failed)
+end
+
 defmodule Aikido.AiReact.ToolResultTest do
   use ExUnit.Case, async: true
 
@@ -115,7 +131,7 @@ defmodule Aikido.AiReact.ToolResultTest do
     last = List.last(messages)
     assert last.role == :user
     text = last.content |> hd() |> Map.get(:text)
-    assert text =~ "Do NOT repeat the same calls"
+    assert text =~ "Do NOT repeat this pattern"
     assert directive.context == new_slice.context
   end
 
@@ -282,6 +298,169 @@ defmodule Aikido.AiReact.ToolResultTest do
 
     assert result.state.tool_batch_history == [result.state.previous_tool_signature]
     result.state.previous_tool_signature
+  end
+
+  test "a configured key may ignore changing output while preserving the native cycle limit" do
+    keys = Aikido.AiReact.ToolResultTest.Keys
+    calls = [%{id: "first", name: "test_add", arguments: %{"item" => 1}}]
+
+    options =
+      Aikido.AiReact.Options.new!(%{
+        tool_loop_key: {keys, :inputs, ["policy"]},
+        max_repeated_tool_cycles: 2
+      })
+
+    first =
+      complete_batch(%{slice_with_pending(calls) | options: options}, [{"first", "old", false}])
+
+    second =
+      complete_batch(
+        %{first | pending_tool_calls: [%{hd(calls) | id: "second"}]},
+        [{"second", "changed", false}]
+      )
+
+    assert second.previous_tool_signature == first.previous_tool_signature
+    assert second.error == {:tool_cycle_limit, 1, 2}
+    assert byte_size(second.previous_tool_signature) == 64
+    assert length(second.tool_batch_history) == 2
+    assert Enum.count(Context.to_list(second.context), &(&1.role == :tool)) == 2
+  end
+
+  test "a full-batch callback has exactly the default fingerprint despite result arrival order" do
+    keys = Aikido.AiReact.ToolResultTest.Keys
+
+    calls = [
+      %{id: "a", name: "test_add", arguments: %{"item" => 1}},
+      %{id: "b", name: "test_add", arguments: %{"item" => 2}}
+    ]
+
+    default =
+      complete_batch(slice_with_pending(calls), [{"b", "two", false}, {"a", "one", false}])
+
+    custom =
+      complete_batch(
+        %{
+          slice_with_pending(Enum.reverse(calls))
+          | options: Aikido.AiReact.Options.new!(%{tool_loop_key: {keys, :full, []}})
+        },
+        [{"a", "one", false}, {"b", "two", false}]
+      )
+
+    assert custom.previous_tool_signature == default.previous_tool_signature
+  end
+
+  test "the callback receives every duplicate call paired with its own actual content" do
+    keys = Aikido.AiReact.ToolResultTest.Keys
+    arguments = %{"item" => 1}
+
+    calls = [
+      %{id: "a", name: "test_add", arguments: arguments},
+      %{id: "b", name: "test_add", arguments: arguments}
+    ]
+
+    expected = [{"test_add", arguments, "first"}, {"test_add", arguments, "second"}]
+    options = Aikido.AiReact.Options.new!(%{tool_loop_key: {keys, :expect_batch, [expected]}})
+
+    actual =
+      complete_batch(
+        %{slice_with_pending(calls) | options: options},
+        [{"b", "second", false}, {"a", "first", false}]
+      )
+
+    default =
+      complete_batch(slice_with_pending(calls), [{"a", "first", false}, {"b", "second", false}])
+
+    assert actual.status == :running
+    assert actual.previous_tool_signature == default.previous_tool_signature
+  end
+
+  test "mixed batches never invoke a configured fail-if-called callback" do
+    keys = Aikido.AiReact.ToolResultTest.Keys
+
+    calls = [
+      %{id: "a", name: "test_add", arguments: %{a: 1}},
+      %{id: "b", name: "test_add", arguments: %{a: 2}}
+    ]
+
+    options = Aikido.AiReact.Options.new!(%{tool_loop_key: {keys, :raise_error, []}})
+
+    actual =
+      complete_batch(
+        %{
+          slice_with_pending(calls)
+          | options: options,
+            tool_batch_history: ["previous"],
+            previous_tool_signature: "previous"
+        },
+        [{"a", "useful", false}, {"b", "failure", true}]
+      )
+
+    assert actual.status == :running
+    assert actual.error == nil
+    assert actual.tool_error_streak == 1
+    assert actual.tool_batch_history == ["previous"]
+    assert actual.previous_tool_signature == "previous"
+    assert Enum.count(Context.to_list(actual.context), &(&1.role == :tool)) == 2
+  end
+
+  test "callback errors, exceptions, throws and invalid returns fail explicitly after result adoption" do
+    keys = Aikido.AiReact.ToolResultTest.Keys
+    calls = [%{id: "a", name: "test_add", arguments: %{}}]
+
+    for function <- [:fail, :raise_error, :throw_error, :invalid, :missing_function] do
+      options = Aikido.AiReact.Options.new!(%{tool_loop_key: {keys, function, []}})
+
+      failed =
+        complete_batch(%{slice_with_pending(calls) | options: options}, [{"a", "retained", false}])
+
+      assert failed.status == :failed
+      assert {:tool_loop_key_failed, {^keys, ^function, _reason}} = failed.error
+      assert failed.tool_batch_history == []
+      assert failed.previous_tool_signature == nil
+      assert failed.pending_tool_calls == []
+      assert List.last(Context.to_list(failed.context)).role == :tool
+    end
+  end
+
+  test "failed batches bypass the comparison callback and retain successful history" do
+    keys = Aikido.AiReact.ToolResultTest.Keys
+    calls = [%{id: "a", name: "test_add", arguments: %{}}]
+    options = Aikido.AiReact.Options.new!(%{tool_loop_key: {keys, :raise_error, []}})
+
+    failed_batch =
+      complete_batch(
+        %{
+          slice_with_pending(calls)
+          | options: options,
+            tool_batch_history: ["existing"],
+            previous_tool_signature: "existing"
+        },
+        [{"a", "error", true}]
+      )
+
+    assert failed_batch.status == :running
+    assert failed_batch.tool_error_streak == 1
+    assert failed_batch.tool_batch_history == ["existing"]
+    assert failed_batch.previous_tool_signature == "existing"
+  end
+
+  test "legacy options without the added key retain the exact default comparison" do
+    calls = [%{id: "a", name: "test_add", arguments: %{"item" => 1}}]
+    current = slice_with_pending(calls)
+    expected = complete_batch(current, [{"a", "same", false}])
+    # Historical opaque checkpoint representation intentionally lacks the new field.
+    legacy = %{current | options: Map.delete(current.options, :tool_loop_key)}
+    actual = complete_batch(legacy, [{"a", "same", false}])
+    assert actual.previous_tool_signature == expected.previous_tool_signature
+    assert actual.status == :running
+  end
+
+  test "native options require an MFA rather than a closure or malformed callback" do
+    for callback <- [fn _ -> {:ok, :key} end, {:only_module}, {__MODULE__, :key, nil}] do
+      assert {:error, _} = Aikido.AiReact.Options.new(%{tool_loop_key: callback})
+    end
+
+    assert Aikido.AiReact.Options.new!(%{}).tool_loop_key == nil
   end
 
   defp complete_batch(state, results) do

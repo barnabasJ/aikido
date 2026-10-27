@@ -2,7 +2,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
   @moduledoc "Adopts each pending tool result once and resumes the model after the complete batch."
   use Ash.Resource.Actions.Implementation
 
-  @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
+  @cycle_warning "The completed tool batch matches a previous batch under this run’s loop comparison. Do NOT repeat this pattern. Use the available results to form a final answer, or try a different approach."
   alias Aikido.AiReact.RunState
   alias Aikido.AiReact.Conversation
 
@@ -71,12 +71,14 @@ defmodule Aikido.AiReact.Actions.ToolResult do
     if Enum.any?(state.tool_results_received, &Map.get(&1, :error?, false)) do
       Aikido.AiReact.ToolLoopGuard.record_batch(state, nil)
     else
-      signature = tool_batch_signature(state.pending_tool_calls, state.tool_results_received)
-
-      state
-      |> maybe_append_cycle_warning(state.previous_tool_signature, signature)
-      |> Map.put(:previous_tool_signature, signature)
-      |> Aikido.AiReact.ToolLoopGuard.record_batch(signature)
+      with {:ok, signature} <- tool_batch_signature(state) do
+        state
+        |> maybe_append_cycle_warning(state.previous_tool_signature, signature)
+        |> Map.put(:previous_tool_signature, signature)
+        |> Aikido.AiReact.ToolLoopGuard.record_batch(signature)
+      else
+        {:error, reason} -> %{state | status: :failed, error: {:tool_loop_key_failed, reason}}
+      end
     end
   end
 
@@ -91,7 +93,21 @@ defmodule Aikido.AiReact.Actions.ToolResult do
 
   defp maybe_append_cycle_warning(state, _previous, _current), do: state
 
-  defp tool_batch_signature(tool_calls, results) do
+  defp tool_batch_signature(state) do
+    batch = completed_tool_batch(state.pending_tool_calls, state.tool_results_received)
+
+    with {:ok, key} <- comparison_key(batch, Map.get(state.options, :tool_loop_key)) do
+      signature =
+        key
+        |> :erlang.term_to_binary([:deterministic])
+        |> then(&:crypto.hash(:sha256, &1))
+        |> Base.encode16(case: :lower)
+
+      {:ok, signature}
+    end
+  end
+
+  defp completed_tool_batch(tool_calls, results) do
     by_id = Map.new(results, &{&1.tool_call_id, &1.content})
 
     tool_calls
@@ -101,8 +117,19 @@ defmodule Aikido.AiReact.Actions.ToolResult do
       {name, arguments, Map.fetch!(by_id, Map.get(call, :id) || Map.get(call, "id"))}
     end)
     |> Enum.sort()
-    |> :erlang.term_to_binary([:deterministic])
-    |> then(&:crypto.hash(:sha256, &1))
-    |> Base.encode16(case: :lower)
+  end
+
+  defp comparison_key(batch, nil), do: {:ok, batch}
+
+  defp comparison_key(batch, {module, function, arguments}) do
+    case apply(module, function, [batch | arguments]) do
+      {:ok, key} -> {:ok, key}
+      {:error, reason} -> {:error, {module, function, reason}}
+      _other -> {:error, {module, function, :invalid_return}}
+    end
+  rescue
+    exception -> {:error, {module, function, exception}}
+  catch
+    kind, reason -> {:error, {module, function, {kind, reason}}}
   end
 end

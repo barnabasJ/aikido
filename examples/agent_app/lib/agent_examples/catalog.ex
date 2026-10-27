@@ -99,9 +99,16 @@ defmodule AgentExamples.Catalog do
       tool_policy: :fixed,
       tools: [:request_team_evidence, :complete_team_evidence],
       kind: :ai_team,
-      description: "Track required background work with a blocking Todo and check its result through a normal tool.",
-      detail: "The request tool creates a blocking Todo and assigns its evidence check through Team. An interim answer waits on that requirement. The correlated result resumes the conversation; a scoped completion tool checks the authoritative task record before recording Todo evidence. Missing evidence is an ordinary tool error. Live mode uses your shared provider for both agents.",
-      flow: ["Required Todo + assignment", "Waiting on required work", "Scoped result delivery", "Evidence check → Todo complete"]
+      description:
+        "Track required background work with a blocking Todo and check its result through a normal tool.",
+      detail:
+        "The request tool creates a blocking Todo and assigns its evidence check through Team. An interim answer waits on that requirement. The correlated result resumes the conversation; a scoped completion tool checks the authoritative task record before recording Todo evidence. Missing evidence is an ordinary tool error. Live mode uses your shared provider for both agents.",
+      flow: [
+        "Required Todo + assignment",
+        "Waiting on required work",
+        "Scoped result delivery",
+        "Evidence check → Todo complete"
+      ]
     },
     %{
       slug: "resilience",
@@ -114,7 +121,7 @@ defmodule AgentExamples.Catalog do
       description:
         "Exercise retry exhaustion, deadlines, cancellation and optional tool loop limits.",
       detail:
-        "Choose retry to exhaust one retry, wait to test the three-second deadline or cancel while work is pending, cycle to repeat alternating tools, or errors to repeat failing tools. All tools run through Ash AI. Cycle and error limits are opt-in; the configured limit stops the run with a visible error rather than consuming the remaining model turns.",
+        "Choose retry to exhaust one retry, wait to test the three-second deadline or cancel while work is pending, cycle to repeat alternating tools, or errors to repeat failing tools. All tools run through Ash AI. This controlled experiment compares tool inputs through a pure callback, ignoring changing output; polling tools would normally keep result-aware comparisons. Cycle and error limits are opt-in; the configured limit stops the run with a visible error rather than consuming the remaining model turns.",
       flow: [
         "Deterministic failure",
         "Bounded attempts",

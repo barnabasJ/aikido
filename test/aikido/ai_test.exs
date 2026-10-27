@@ -198,7 +198,7 @@ defmodule Aikido.AITest do
           text
         end
 
-      assert Enum.any?(texts, &String.contains?(&1, "Do NOT repeat the same calls"))
+      assert Enum.any?(texts, &String.contains?(&1, "Do NOT repeat this pattern"))
     end
 
     test("tool errors are returned as JSON in tool.completed (not as :failed)", ctx) do
