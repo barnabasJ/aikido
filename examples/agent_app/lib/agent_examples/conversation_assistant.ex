@@ -16,7 +16,8 @@ defmodule AgentExamples.ConversationAssistant do
       streaming: true,
       completion: :todos,
       context_max_tokens: 4_000,
-      handoff_buffer_tokens: 1_000
+      handoff_buffer_tokens: 1_000,
+      handoff_max_regenerations: 1
     }
   end
 end

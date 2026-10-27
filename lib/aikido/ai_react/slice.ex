@@ -74,10 +74,18 @@ defmodule Aikido.AiReact.Slice do
       end
 
       attribute :handoff_count, :integer do
-        description "Number of context handoffs adopted during this run."
+        description "Number of correlated context-summary requests issued during this run."
         public? true
         default 0
         allow_nil? false
+      end
+
+      attribute :handoff_regenerations, :integer do
+        description "Additional summary generations attempted for the current context handoff. Recovery interrupts in-flight summaries."
+        default 0
+        allow_nil? false
+        public? true
+        constraints min: 0
       end
 
       attribute :last_handoff, :map do

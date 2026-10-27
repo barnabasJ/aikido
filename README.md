@@ -235,3 +235,20 @@ See [Contributing](CONTRIBUTING.md) and [Changelog](CHANGELOG.md).
 
 Aikido is derived from Jido and is developed independently. Original copyright
 notices and the Apache 2.0 license are retained.
+
+### Context summary recovery
+
+Set `handoff_max_regenerations` in AI execution `options` to allow additional
+summary generations after an empty, invalid or oversized handoff document.
+The default is `0`, preserving failure without changing conversation history.
+The conversation example enables one regeneration. Each regeneration requests
+corrective output from the original history with a fresh handoff ID. It keeps
+the run deadline, caller scope, model options and accumulated usage. With `R`
+regenerations and `M` model retries, at most `(R + 1) * (M + 1)` provider attempts
+are made for that handoff, subject to cancellation and remaining time.
+
+Truncated summaries remain failures: the runtime has no verified output ceiling
+for safely increasing their output budget. Provider, permission and configuration
+failures do not trigger summary regeneration; eligible provider failures retain
+the existing `model_max_retries` policy. Recovery interrupts an in-flight summary
+rather than replaying it. No invalid summary replaces retained history.

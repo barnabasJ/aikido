@@ -44,7 +44,57 @@ defmodule Aikido.AiReact.ConversationHandoff do
       |> Context.append(Context.user(options.handoff_prompt || instructions()))
 
     directive = %{directive | mode: :handoff, handoff_id: count, context: context, tools: []}
-    {%{state | handoff_count: count, handoff_pending: count}, directive}
+    {%{state | handoff_count: count, handoff_pending: count, handoff_regenerations: 0}, directive}
+  end
+
+  @doc "Regenerate an unusable summary within its explicit bound, retaining the original conversation."
+  def regenerate_document(state, reason) do
+    attempts = Map.get(state, :handoff_regenerations, 0)
+
+    if reason in [:empty_or_invalid_document, :document_exceeds_context_limit] &&
+         attempts < state.options.handoff_max_regenerations do
+      count = state.handoff_count + 1
+
+      correction =
+        case reason do
+          :empty_or_invalid_document ->
+            "The previous summary was empty or not a final text document. Return a nonempty plain-text handoff, without tool calls."
+
+          :document_exceeds_context_limit ->
+            "The previous summary exceeded the replacement context budget. Write a substantially shorter handoff while preserving the mission, identifiers, evidence and next action."
+        end
+
+      context =
+        state.context
+        |> Context.append(Context.user(state.options.handoff_prompt || instructions()))
+        |> Context.append(Context.user(correction))
+
+      directive = %LLMCall{
+        mode: :handoff,
+        handoff_id: count,
+        context: context,
+        tools: [],
+        client: state.client,
+        model: state.model,
+        llm_opts: state.llm_opts,
+        options: state.options,
+        request_id: state.request_id,
+        deadline_at: state.deadline_at,
+        iteration: state.iteration + 1
+      }
+
+      Aikido.Types.ActionResult.new(
+        state: %{
+          state
+          | handoff_count: count,
+            handoff_pending: count,
+            handoff_regenerations: attempts + 1
+        },
+        directives: [directive]
+      )
+    else
+      :exhausted
+    end
   end
 
   @doc false

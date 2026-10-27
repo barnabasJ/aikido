@@ -136,6 +136,13 @@ defmodule Aikido.AiReact.Options do
       constraints min: 0
     end
 
+    field :handoff_max_regenerations, :integer do
+      description "Additional summary generations allowed after empty, invalid or oversized handoff documents. Truncated summaries are not retried."
+      default 0
+      allow_nil? false
+      constraints min: 0
+    end
+
     field :handoff_prompt, :string do
       description "Optional instruction used to summarize context during a conversation handoff."
     end

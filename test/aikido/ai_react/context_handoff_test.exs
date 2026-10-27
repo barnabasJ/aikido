@@ -385,6 +385,313 @@ defmodule Aikido.ContextHandoffTest do
     refute_received {:request, _, _, _}
   end
 
+  test "summary regeneration preserves history, usage and fresh correlation", ctx do
+    pid = start_server(ctx, Agent)
+    opts = regeneration_options(self())
+
+    task =
+      Task.async(fn -> Aikido.AI.ask_sync(pid, String.duplicate("evidence ", 1_400), opts) end)
+
+    assert_receive {:request, first, _, []}, 5_000
+    assert {:ok, original} = ai(pid)
+    send(first, {:answer, {:ok, summary_response("   ")}})
+    assert_receive {:request, retry, messages, []}, 5_000
+    assert text(List.last(messages)) =~ "previous summary was empty"
+    assert {:ok, retried} = ai(pid)
+    assert retried.context == original.context
+    assert retried.handoff_regenerations == 1
+    assert retried.handoff_pending != original.handoff_pending
+    assert retried.usage.input_tokens == 20
+
+    late =
+      Aikido.AiReact.Signals.HandoffCompleted.new!(%{
+        request_id: original.request_id,
+        handoff_id: original.handoff_pending,
+        turn: summary_response("stale summary")
+      })
+
+    assert {:ok, unchanged} = Aikido.AgentServer.call(pid, late, &{:ok, &1.agent.state.ai})
+    assert unchanged == retried
+
+    late_failure =
+      Aikido.AiReact.Signals.HandoffFailed.new!(%{
+        request_id: original.request_id,
+        handoff_id: original.handoff_pending,
+        reason: :provider_unavailable
+      })
+
+    assert {:ok, unchanged} =
+             Aikido.AgentServer.call(pid, late_failure, &{:ok, &1.agent.state.ai})
+
+    assert unchanged == retried
+
+    send(retry, {:answer, {:ok, summary_response("Mission: inspect evidence. Next: finish.")}})
+    assert_receive {:request, successor, _, [_]}, 5_000
+    send(successor, {:answer, {:ok, summary_response("done")}})
+    assert {:ok, "done"} = Task.await(task)
+    assert {:ok, %{usage: %{input_tokens: 60, output_tokens: 9}}} = ai(pid)
+  end
+
+  test "unusable summaries exhaust the explicit bound without replacing history", ctx do
+    for {document, reason} <- [
+          {"", :empty_or_invalid_document},
+          {String.duplicate("oversized ", 2_000), :document_exceeds_context_limit}
+        ] do
+      pid = start_server(ctx, Agent)
+      opts = regeneration_options(self())
+
+      task =
+        Task.async(fn -> Aikido.AI.ask_sync(pid, String.duplicate("evidence ", 1_400), opts) end)
+
+      assert_receive {:request, first, _, []}, 5_000
+      assert {:ok, original} = ai(pid)
+      send(first, {:answer, {:ok, summary_response(document)}})
+      assert_receive {:request, retry, _, []}, 5_000
+      send(retry, {:answer, {:ok, summary_response(document)}})
+      assert {:error, {:context_handoff_failed, ^reason}} = Task.await(task)
+      assert {:ok, failed} = ai(pid)
+      assert failed.context == original.context
+      assert failed.handoff_regenerations == 1
+      assert failed.usage.input_tokens == 40
+      refute_received {:request, _, _, _}
+    end
+  end
+
+  test "truncated documents and provider failures are not summary-regenerated", ctx do
+    for {response, reason} <- [
+          {{:ok, summary_response("partial", :length)}, :truncated_document},
+          {{:ok, summary_response("", :length)}, :truncated_document},
+          {{:error, :provider_unavailable}, :provider_unavailable}
+        ] do
+      pid = start_server(ctx, Agent)
+      opts = regeneration_options(self())
+
+      task =
+        Task.async(fn -> Aikido.AI.ask_sync(pid, String.duplicate("evidence ", 1_400), opts) end)
+
+      assert_receive {:request, writer, _, []}, 5_000
+      send(writer, {:answer, response})
+      assert {:error, {:context_handoff_failed, ^reason}} = Task.await(task)
+      assert {:ok, %{handoff_regenerations: 0}} = ai(pid)
+      refute_received {:request, _, _, _}
+    end
+  end
+
+  test "a regenerated summary keeps the original run deadline", ctx do
+    pid = start_server(ctx, Agent)
+    deadline = System.system_time(:millisecond) + 2_000
+
+    opts =
+      regeneration_options(self())
+      |> Keyword.put(:metadata, %{aikido_deadline_at: deadline})
+
+    task =
+      Task.async(fn -> Aikido.AI.ask_sync(pid, String.duplicate("evidence ", 1_400), opts) end)
+
+    assert_receive {:request, first, _, []}, 5_000
+    send(first, {:answer, {:ok, summary_response("")}})
+    assert_receive {:request, retry, _, []}, 5_000
+    monitor = Process.monitor(retry)
+    assert {:ok, %{deadline_at: ^deadline}} = ai(pid)
+    assert {:error, {:context_handoff_failed, :timeout}} = Task.await(task, 5_000)
+    assert_receive {:DOWN, ^monitor, :process, ^retry, _}, 5_000
+    refute_received {:request, _, _, _}
+  end
+
+  test "recovery interrupts a regenerated summary rather than replaying it", ctx do
+    pid = start_server(ctx, Agent)
+    opts = regeneration_options(self())
+
+    task =
+      Task.async(fn -> Aikido.AI.ask_sync(pid, String.duplicate("evidence ", 1_400), opts) end)
+
+    assert_receive {:request, first, _, []}, 5_000
+    send(first, {:answer, {:ok, summary_response("")}})
+    assert_receive {:request, _retry, _, []}, 5_000
+    assert {:ok, state} = ai(pid)
+    restored = state |> Aikido.AiReact.Slice.externalize() |> Aikido.AiReact.Slice.reinstate()
+    assert restored.status == :failed
+    assert restored.error == :interrupted
+    assert restored.handoff_pending == nil
+    assert restored.prepared_tools == nil
+    assert restored.context == state.context
+    assert restored.handoff_regenerations == 1
+    assert :ok = Aikido.AI.cancel(pid)
+    assert {:error, :cancelled} = Task.await(task)
+  end
+
+  test "encoded snapshots restore retry policy and interrupt pending regeneration", ctx do
+    pid = start_server(ctx, Agent)
+    opts = regeneration_options(self())
+
+    task =
+      Task.async(fn -> Aikido.AI.ask_sync(pid, String.duplicate("evidence ", 1_400), opts) end)
+
+    assert_receive {:request, first, _, []}, 5_000
+    send(first, {:answer, {:ok, summary_response("")}})
+    assert_receive {:request, _retry, _, []}, 5_000
+    assert {:ok, before} = ai(pid)
+    saved = saved_runtime(pid)
+    assert :ok = Aikido.AI.cancel(pid)
+    assert {:error, :cancelled} = Task.await(task)
+    :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(ctx.aikido), pid)
+    restored = activate_saved(ctx, saved)
+    assert {:ok, state} = ai(restored)
+    assert state.status == :failed
+    assert state.error == :interrupted
+    assert state.context == before.context
+    assert state.handoff_pending == nil
+    assert state.prepared_tools == nil
+    assert state.hooks_pending == %{}
+    assert state.options.handoff_max_regenerations == 1
+    assert state.handoff_regenerations == 1
+    refute_received {:request, _, _, _}
+
+    next = Task.async(fn -> Aikido.AI.ask_sync(restored, "continue", opts) end)
+    assert_receive {:request, summary, _, []}, 5_000
+    assert {:ok, %{handoff_regenerations: 0}} = ai(restored)
+    send(summary, {:answer, {:ok, summary_response("Next: finish retained work.")}})
+    assert_receive {:request, model, _, [_]}, 5_000
+    send(model, {:answer, {:ok, summary_response("done")}})
+    assert {:ok, "done"} = Task.await(next)
+  end
+
+  test "old encoded snapshots default missing retry fields to zero", ctx do
+    pid = start_server(ctx, Agent)
+    saved = saved_runtime(pid)
+    :ok = Aikido.Durable.stop(Aikido.durable_supervisor_name(ctx.aikido), pid)
+    envelope = Aikido.Durable.Snapshot.dump(saved)
+    {:ok, binary} = Ash.Type.cast_from_embedded(:binary, envelope["payload"])
+    {:ok, stored} = Ash.Type.cast_from_embedded(:term, binary)
+    {:ok, binary} = Ash.Type.dump_to_embedded(:term, remove_retry_fields(stored))
+    {:ok, payload} = Ash.Type.dump_to_embedded(:binary, binary)
+    legacy = Aikido.Durable.Snapshot.load(%{envelope | "payload" => payload})
+    restored = activate_saved(ctx, legacy)
+
+    assert {:ok, %{handoff_regenerations: 0, options: %{handoff_max_regenerations: 0}}} =
+             ai(restored)
+
+    opts = options(self())
+
+    task =
+      Task.async(fn ->
+        Aikido.AI.ask_sync(restored, String.duplicate("evidence ", 1_400), opts)
+      end)
+
+    assert_receive {:request, summary, _, []}, 5_000
+    send(summary, {:answer, {:ok, summary_response("")}})
+    assert {:error, {:context_handoff_failed, :empty_or_invalid_document}} = Task.await(task)
+    refute_received {:request, _, _, _}
+  end
+
+  defp saved_runtime(pid) do
+    {:ok, envelope} =
+      Aikido.AgentServer.state(pid, fn runtime ->
+        {:ok,
+         Aikido.Durable.AgentServer.dump_state(%{
+           runtime: runtime,
+           options: [agent_module: Agent, id: runtime.id, aikido: runtime.aikido],
+           permanent: false
+         })}
+      end)
+
+    Aikido.Durable.Snapshot.load(envelope)
+  end
+
+  defp activate_saved(ctx, saved) do
+    durable = Aikido.durable_supervisor_name(ctx.aikido)
+    key = "restored-#{System.unique_integer([:positive])}"
+
+    assert {:ok, {pid, _}} =
+             DurableServer.Supervisor.start_child(
+               durable,
+               {Aikido.Durable.AgentServer, key: key, initial_state: saved}
+             )
+
+    on_exit(fn ->
+      if Process.alive?(pid), do: Aikido.Durable.stop(durable, pid)
+    end)
+
+    pid
+  end
+
+  # Legacy encoded fixture: the previous schema had neither retry field.
+  defp remove_retry_fields(value) when is_map(value) do
+    value
+    |> Map.drop([
+      :handoff_regenerations,
+      "handoff_regenerations",
+      :handoff_max_regenerations,
+      "handoff_max_regenerations"
+    ])
+    |> Map.new(fn {key, child} -> {key, remove_retry_fields(child)} end)
+  end
+
+  defp remove_retry_fields(value) when is_list(value), do: Enum.map(value, &remove_retry_fields/1)
+
+  defp remove_retry_fields(value) when is_tuple(value),
+    do: value |> Tuple.to_list() |> Enum.map(&remove_retry_fields/1) |> List.to_tuple()
+
+  defp remove_retry_fields(value), do: value
+
+  test "invalid tool-call summaries regenerate and only accepted summaries run after-model hooks",
+       ctx do
+    pid = start_server(ctx, Agent)
+
+    opts =
+      regeneration_options(self())
+      |> Keyword.put(:hooks, [
+        %{
+          name: "accepted_summary",
+          event: :after_model,
+          mode: :sync,
+          script: ~s(return {context = "accepted summary hook"})
+        }
+      ])
+
+    task =
+      Task.async(fn -> Aikido.AI.ask_sync(pid, String.duplicate("evidence ", 1_400), opts) end)
+
+    assert_receive {:request, first, _, []}, 5_000
+
+    invalid = %{
+      summary_response("not a summary", :tool_calls)
+      | message:
+          ReqLLM.Context.assistant("",
+            tool_calls: [
+              %{id: "not_executable", name: "test_add", arguments: %{a: 1, b: 2}}
+            ]
+          )
+    }
+
+    send(first, {:answer, {:ok, invalid}})
+    assert_receive {:request, retry, messages, []}, 5_000
+    assert text(List.last(messages)) =~ "without tool calls"
+    assert {:ok, %{hook_sequence: 0, pending_tool_calls: []}} = ai(pid)
+    send(retry, {:answer, {:ok, summary_response("Next: finish the work.")}})
+    assert_receive {:request, successor, messages, [_]}, 5_000
+    assert Enum.any?(messages, &(text(&1) =~ "accepted summary hook"))
+    assert {:ok, %{hook_sequence: 1}} = ai(pid)
+    send(successor, {:answer, {:ok, summary_response("done")}})
+    assert {:ok, "done"} = Task.await(task)
+  end
+
+  defp regeneration_options(observer) do
+    options(observer)
+    |> Keyword.update!(:options, &Map.put(&1, :handoff_max_regenerations, 1))
+  end
+
+  defp summary_response(text, finish_reason \\ :stop) do
+    %ReqLLM.Response{
+      id: "summary",
+      model: "offline",
+      context: ReqLLM.Context.new(),
+      message: ReqLLM.Context.assistant(text, tool_calls: []),
+      finish_reason: finish_reason,
+      usage: %{input_tokens: 20, output_tokens: 3}
+    }
+  end
+
   defp ai(pid), do: Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai})
   defp text(message), do: Enum.map_join(message.content, &(&1.text || ""))
 

@@ -160,6 +160,7 @@ defmodule Aikido.AiReact.RunState do
       tools_resume: nil,
       handoff_pending: nil,
       handoff_count: 0,
+      handoff_regenerations: 0,
       last_handoff: nil,
       opening_messages: Map.get(state, :queued_messages, []) ++ [data.query],
       queued_messages: [],

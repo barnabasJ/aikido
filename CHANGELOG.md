@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add opt-in bounded context-summary regeneration for empty, invalid or oversized
+  handoff documents, retaining history and usage with fresh result correlation.
+  Truncated summaries remain terminal; provider retries keep their existing policy.
+
 - Fail an AI run at its configured turn limit when the last model response still requests executable tools. Retain the response history and usage, execute no further tools, and accept a genuine final answer at the limit.
 
 - Run the existing synchronous before-model hooks when incoming text resumes a
