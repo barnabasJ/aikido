@@ -49,16 +49,21 @@ defmodule Aikido.Todo.Slice do
   @doc false
   def externalize(state), do: state
   @doc false
+  def reinstate(state, %{fresh?: true}), do: state
+
+  def reinstate(state, %{fresh?: false}), do: reinstate(state)
+
+  @doc false
   def reinstate(state) do
     # Timers are process-local. Do not leave a lost deadline pretending to run.
     items =
-      Enum.map(state.items, fn item ->
+      Enum.map(Map.get(state, :items, []), fn item ->
         if(item.status in [:pending, :active] && Map.get(item, :timeout_ms),
           do: Map.merge(item, %{status: :blocked, reason: :interrupted}),
           else: item
         )
       end)
 
-    %{state | items: items}
+    Map.put(state, :items, items)
   end
 end

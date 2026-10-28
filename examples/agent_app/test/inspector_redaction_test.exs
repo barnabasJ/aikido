@@ -6,8 +6,8 @@ defmodule AgentExamples.InspectorRedactionTest do
     use Ash.Resource.Actions.Implementation
 
     @impl true
-    def run(input, _opts, _context) do
-      Aikido.Types.ActionResult.new(state: input.arguments.state)
+    def run(_input, _opts, _context) do
+      Aikido.Types.ActionResult.new(changes: nil)
     end
   end
 

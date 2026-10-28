@@ -7,12 +7,11 @@ defmodule Aikido.Thread.Actions.Clear do
     thread = input.arguments.state
 
     Aikido.Types.ActionResult.new(
-      state: %{
-        thread
-        | entries: [],
-          rev: thread.rev + 1,
-          updated_at: Aikido.Signal.timestamp(get_in(input.context, [:aikido, :signal])),
-          stats: %{thread.stats | entry_count: 0}
+      changes: %{
+        entries: [],
+        rev: thread.rev + 1,
+        updated_at: Aikido.Signal.timestamp(get_in(input.context, [:aikido, :signal])),
+        stats: %{thread.stats | entry_count: 0}
       }
     )
   end

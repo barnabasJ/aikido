@@ -23,7 +23,7 @@ defmodule Aikido.Ownership.Actions.StopChild do
           []
       end
 
-    Aikido.Types.ActionResult.new(state: state, directives: directives)
+    Aikido.Types.ActionResult.new(changes: nil, directives: directives)
   end
 
   defp shutdown_reason(:normal), do: :normal

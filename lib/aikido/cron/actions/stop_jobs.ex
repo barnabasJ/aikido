@@ -13,6 +13,14 @@ defmodule Aikido.Cron.Actions.StopJobs do
         end
       )
 
-    Aikido.Types.ActionResult.new(state: state, directives: directives)
+    Aikido.Types.ActionResult.new(
+      changes: %{
+        jobs: state.jobs,
+        monitors: state.monitors,
+        generations: state.generations,
+        restart_attempts: state.restart_attempts
+      },
+      directives: directives
+    )
   end
 end

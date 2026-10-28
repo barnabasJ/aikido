@@ -3,7 +3,11 @@ defmodule Aikido.ToolScopeIsolationTest.ObserveNativeScope do
 
   @impl true
   def run(input, _opts, context) do
-    send(input.context.observer, {:tool_scope, context.actor, context.tenant, input.context.aikido.agent_id})
+    send(
+      input.context.observer,
+      {:tool_scope, context.actor, context.tenant, input.context.aikido.agent_id}
+    )
+
     {:ok, "observed"}
   end
 end
@@ -39,16 +43,24 @@ defmodule Aikido.ToolScopeIsolationTest.Prepare do
     send(observer, {:preparation_scope, context.actor, context.tenant})
 
     if input.arguments.metadata.native? do
-      {:ok, input.arguments.options
-        |> Keyword.put(:actions, [{Aikido.ToolScopeIsolationTest.NativeTool, [:observe]}])
-        |> Keyword.put(:tools, [:native_scope])}
+      {:ok,
+       input.arguments.options
+       |> Keyword.put(:actions, [{Aikido.ToolScopeIsolationTest.NativeTool, [:observe]}])
+       |> Keyword.put(:tools, [:native_scope])}
     else
-      tool = ReqLLM.Tool.new!(name: "raw_scope", description: "Observe the executing tool scope",
-        parameter_schema: %{"type" => "object", "properties" => %{}}, callback: fn _ -> {:ok, "observed"} end)
+      tool =
+        ReqLLM.Tool.new!(
+          name: "raw_scope",
+          description: "Observe the executing tool scope",
+          parameter_schema: %{"type" => "object", "properties" => %{}},
+          callback: fn _ -> {:ok, "observed"} end
+        )
+
       callback = fn _arguments, live ->
         send(observer, {:tool_scope, live[:actor], live[:tenant], live.agent_id})
         {:ok, "observed"}
       end
+
       {:ok, Keyword.put(input.arguments.options, :extra_tools, [{tool, callback}])}
     end
   end
@@ -59,7 +71,9 @@ defmodule Aikido.ToolScopeIsolationTest.Preparation do
 
   actions do
     action :prepare, :term do
-      argument :options, {:array, :tuple}, constraints: [items: [fields: [key: [type: :atom], value: [type: :term]]]]
+      argument :options, {:array, :tuple},
+        constraints: [items: [fields: [key: [type: :atom], value: [type: :term]]]]
+
       argument :metadata, :map
       run Aikido.ToolScopeIsolationTest.Prepare
     end
@@ -69,6 +83,7 @@ end
 defmodule Aikido.ToolScopeIsolationTest.Client do
   def generate_text(_model, _messages, opts) do
     send(opts[:observer], {:model, self()})
+
     receive do
       {:response, response} -> {:ok, response}
     end
@@ -91,16 +106,30 @@ defmodule Aikido.AiReact.ToolScopeIsolationTest do
   test "native scope is the sole source of tool authority for raw and Ash callbacks", ctx do
     observer = self()
 
-    for native? <- [false, true], scope <- [[], [actor: %{id: "executing-agent"}, tenant: "org"]] do
+    for native? <- [false, true],
+        scope <- [[], [actor: %{id: "executing-agent"}, tenant: "org"]] do
       id = unique_id()
-      pid = start_server(ctx, Aikido.ToolScopeIsolationTest.Agent,
-        id: id, initial_state: %{ai: %{
-          model: "offline", client: Aikido.ToolScopeIsolationTest.Client,
-          options: %{tool_preparation: {Aikido.ToolScopeIsolationTest.Preparation, :prepare}},
-          tool_options: [actions: []], llm_opts: [observer: observer],
-          tool_context: %{actor: %{id: "configuration-is-not-an-actor"}, tenant: "not-a-scope",
-                          authorize?: false, context: %{observer: observer}}
-        }})
+
+      pid =
+        start_server(ctx, Aikido.ToolScopeIsolationTest.Agent,
+          id: id,
+          initial_state: %{
+            ai: %{
+              model: "offline",
+              client: Aikido.ToolScopeIsolationTest.Client,
+              options: %{tool_preparation: {Aikido.ToolScopeIsolationTest.Preparation, :prepare}},
+              tool_options: [actions: []],
+              llm_opts: [observer: observer],
+              tool_context: %{
+                actor: %{id: "configuration-is-not-an-actor"},
+                tenant: "not-a-scope",
+                authorize?: false,
+                context: %{observer: observer}
+              }
+            }
+          }
+        )
+
       opts = Keyword.put(scope, :metadata, %{observer: observer, native?: native?})
       task = Task.async(fn -> Aikido.AI.ask_sync(pid, "observe scope", opts) end)
       actor = scope[:actor]

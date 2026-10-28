@@ -6,8 +6,7 @@ defmodule AikidoTest.AgentServer.DirectiveStrictSeparationTest.Actions.ReturnDir
     directive =
       input.arguments.directive
 
-    slice = input.arguments.state
-    Aikido.Types.ActionResult.new(state: slice || %{}, directives: [directive])
+    Aikido.Types.ActionResult.new(directives: [directive])
   end
 end
 

@@ -83,15 +83,13 @@ defmodule Aikido.AiReact.ConversationHandoff do
         iteration: state.iteration + 1
       }
 
-      Aikido.Types.ActionResult.new(
-        state: %{
-          state
-          | handoff_count: count,
-            handoff_pending: count,
-            handoff_regenerations: attempts + 1
-        },
-        directives: [directive]
-      )
+      {:ok,
+       %{
+         state
+         | handoff_count: count,
+           handoff_pending: count,
+           handoff_regenerations: attempts + 1
+       }, [directive]}
     else
       :exhausted
     end

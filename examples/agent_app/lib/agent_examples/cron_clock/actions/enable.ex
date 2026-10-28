@@ -2,9 +2,9 @@ defmodule AgentExamples.CronClock.Actions.Enable do
   @moduledoc "Enable tick acceptance and request one recurring job under a stable job ID."
   use Ash.Resource.Actions.Implementation
 
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | enabled: true},
+      changes: %{enabled: true},
       directives: [
         %Aikido.Cron.Directives.Register{
           job_id: :clock,

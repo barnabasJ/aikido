@@ -3,7 +3,7 @@ defmodule AikidoTest.GracefulCleanup.RecordActivation do
 
   def run(input, _opts, _context) do
     state = input.arguments.state
-    Aikido.Types.ActionResult.new(state: %{state | activations: state.activations + 1})
+    Aikido.Types.ActionResult.new(changes: %{activations: state.activations + 1})
   end
 end
 
@@ -12,7 +12,7 @@ defmodule AikidoTest.GracefulCleanup.RecordCleanup do
 
   def run(input, _opts, _context) do
     state = input.arguments.state
-    Aikido.Types.ActionResult.new(state: %{state | cleanups: state.cleanups + 1})
+    Aikido.Types.ActionResult.new(changes: %{cleanups: state.cleanups + 1})
   end
 end
 
@@ -27,11 +27,8 @@ end
 defmodule AikidoTest.GracefulCleanup.Shutdown do
   use Ash.Resource.Actions.Implementation
 
-  def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(
-      state: input.arguments.state,
-      directives: [%Aikido.Directives.Stop{}]
-    )
+  def run(_input, _opts, _context) do
+    Aikido.Types.ActionResult.new(directives: [%Aikido.Directives.Stop{}])
   end
 end
 

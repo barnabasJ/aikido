@@ -9,6 +9,7 @@ defmodule AgentExamples.Source do
              "lib/aikido/ai_worker/**/*.ex",
              "lib/aikido/todo/**/*.ex",
              "lib/aikido/cron/**/*.ex",
+             "lib/aikido/notifications/**/*.ex",
              "lib/aikido/ai/extension.ex",
              "lib/aikido/team/extension.ex",
              "lib/aikido/team/*.ex",
@@ -155,6 +156,7 @@ defmodule AgentExamples.Source do
 
   defp supporting_modules("conversation"), do: [Aikido.Todo]
 
+  defp supporting_modules("notifications"), do: [Aikido.Notifications]
   defp supporting_modules("cron"), do: [Aikido.Cron]
   defp supporting_modules("counter"), do: []
   defp supporting_modules("checkpoint"), do: [AgentExamples.Counter.Actions.Increment]

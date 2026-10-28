@@ -56,7 +56,7 @@ defmodule Aikido.AiReact.ToolResultTest do
 
     slice = slice_with_pending(calls)
 
-    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: directives}} =
+    {:ok, %Aikido.Types.ActionResult{changes: changes, directives: directives}} =
       then(signal("req_1", "call_1", "test_add", "{\"result\":3}"), fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
@@ -67,9 +67,9 @@ defmodule Aikido.AiReact.ToolResultTest do
       end)
 
     assert directives == []
-    assert length(new_slice.tool_results_received) == 1
-    assert new_slice.pending_tool_calls == calls
-    messages = Context.to_list(new_slice.context)
+    assert length(changes.tool_results_received) == 1
+    assert changes.pending_tool_calls == calls
+    messages = Context.to_list(changes.context)
     assert List.last(messages).role == :tool
   end
 
@@ -77,7 +77,7 @@ defmodule Aikido.AiReact.ToolResultTest do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
     slice = slice_with_pending(calls)
 
-    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [%LLMCall{} = directive]}} =
+    {:ok, %Aikido.Types.ActionResult{changes: changes, directives: [%LLMCall{} = directive]}} =
       then(signal("req_1", "call_1", "test_add", "{\"result\":3}"), fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
@@ -87,15 +87,15 @@ defmodule Aikido.AiReact.ToolResultTest do
         |> Ash.run_action()
       end)
 
-    assert new_slice.pending_tool_calls == []
-    assert new_slice.tool_results_received == []
-    assert is_binary(new_slice.previous_tool_signature)
-    assert directive.context == new_slice.context
+    assert changes.pending_tool_calls == []
+    assert changes.tool_results_received == []
+    assert is_binary(changes.previous_tool_signature)
+    assert directive.context == changes.context
     assert directive.model == slice.model
     assert directive.tools == elem(slice.prepared_tools, 0)
 
-    assert new_slice.estimated_tokens ==
-             Aikido.AiReact.Conversation.estimate_tokens(new_slice.context)
+    assert changes.estimated_tokens ==
+             Aikido.AiReact.Conversation.estimate_tokens(changes.context)
 
     assert directive.request_id == slice.request_id
     assert directive.llm_opts == slice.llm_opts
@@ -104,10 +104,12 @@ defmodule Aikido.AiReact.ToolResultTest do
   test "appends the cycle warning on the third completed repetition" do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
 
+    initial = slice_with_pending(calls)
+
     first_result =
       Aikido.AiReact.Slice
       |> Ash.ActionInput.for_action(:tool_result, %{
-        state: slice_with_pending(calls),
+        state: initial,
         request_id: "req_1",
         tool_call_id: "call_1",
         name: "test_add",
@@ -115,16 +117,18 @@ defmodule Aikido.AiReact.ToolResultTest do
       })
       |> Ash.run_action!()
 
+    first = Ash.update!(initial, first_result.changes, action: :update)
+
     second =
       complete_batch(
-        %{first_result.state | pending_tool_calls: calls},
+        Ash.update!(first, %{pending_tool_calls: calls}, action: :update),
         [{"call_1", "{\"result\":3}", false}]
       )
 
     assert List.last(Context.to_list(second.context)).role == :tool
     slice = %{second | pending_tool_calls: calls}
 
-    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [%LLMCall{} = directive]}} =
+    {:ok, %Aikido.Types.ActionResult{changes: changes, directives: [%LLMCall{} = directive]}} =
       then(signal("req_1", "call_1", "test_add", "{\"result\":3}"), fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
@@ -134,19 +138,19 @@ defmodule Aikido.AiReact.ToolResultTest do
         |> Ash.run_action()
       end)
 
-    messages = Context.to_list(new_slice.context)
+    messages = Context.to_list(changes.context)
     last = List.last(messages)
     assert last.role == :user
     text = last.content |> hd() |> Map.get(:text)
     assert text =~ "Do NOT repeat this pattern"
-    assert directive.context == new_slice.context
+    assert directive.context == changes.context
   end
 
   test "does not append the cycle warning on the first tool batch" do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
     slice = slice_with_pending(calls, previous_tool_signature: nil)
 
-    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [%LLMCall{}]}} =
+    {:ok, %Aikido.Types.ActionResult{changes: changes, directives: [%LLMCall{}]}} =
       then(signal("req_1", "call_1", "test_add", "{\"result\":3}"), fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
@@ -156,7 +160,7 @@ defmodule Aikido.AiReact.ToolResultTest do
         |> Ash.run_action()
       end)
 
-    messages = Context.to_list(new_slice.context)
+    messages = Context.to_list(changes.context)
     refute List.last(messages).role == :user
   end
 
@@ -164,7 +168,7 @@ defmodule Aikido.AiReact.ToolResultTest do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
     slice = slice_with_pending(calls, request_id: "req_active")
 
-    {:ok, %Aikido.Types.ActionResult{state: returned, directives: []}} =
+    {:ok, %Aikido.Types.ActionResult{changes: changes, directives: []}} =
       then(signal("req_old", "call_1", "test_add", "{}"), fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
@@ -174,7 +178,7 @@ defmodule Aikido.AiReact.ToolResultTest do
         |> Ash.run_action()
       end)
 
-    assert AikidoTest.SliceState.attributes(returned) == AikidoTest.SliceState.attributes(slice)
+    assert changes == %{}
   end
 
   test "batch fingerprints stay fixed-size for large arguments and outputs" do
@@ -311,8 +315,8 @@ defmodule Aikido.AiReact.ToolResultTest do
       })
       |> Ash.run_action!()
 
-    assert result.state.tool_batch_history == [result.state.previous_tool_signature]
-    result.state.previous_tool_signature
+    assert result.changes.tool_batch_history == [result.changes.previous_tool_signature]
+    result.changes.previous_tool_signature
   end
 
   test "a configured key may ignore changing output while preserving the native cycle limit" do
@@ -566,7 +570,7 @@ defmodule Aikido.AiReact.ToolResultTest do
         error?: error?
       })
       |> Ash.run_action!()
-      |> Map.fetch!(:state)
+      |> then(&Ash.update!(current, &1.changes, action: :update))
     end)
   end
 
@@ -574,7 +578,7 @@ defmodule Aikido.AiReact.ToolResultTest do
     calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
     slice = %{slice_with_pending(calls) | status: :completed, result: "earlier"}
 
-    {:ok, %Aikido.Types.ActionResult{state: returned, directives: []}} =
+    {:ok, %Aikido.Types.ActionResult{changes: changes, directives: []}} =
       then(signal("req_1", "call_1", "test_add", "{}"), fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:tool_result, Map.put(signal.data || %{}, :state, slice),
@@ -584,6 +588,6 @@ defmodule Aikido.AiReact.ToolResultTest do
         |> Ash.run_action()
       end)
 
-    assert AikidoTest.SliceState.attributes(returned) == AikidoTest.SliceState.attributes(slice)
+    assert changes == %{}
   end
 end

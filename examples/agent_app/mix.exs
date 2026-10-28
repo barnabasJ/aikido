@@ -10,7 +10,7 @@ defmodule AgentExamples.MixProject do
       deps: [
         {:aikido, path: "../.."},
         {:benchee, "~> 1.5", only: :dev, runtime: false},
-        {:ash, "~> 3.36"},
+        {:ash, "~> 3.37 and >= 3.37.2"},
         {:ash_sqlite, "~> 0.2.19"},
         {:ash_cloak, "~> 0.4"},
         {:cloak, "~> 1.1"},

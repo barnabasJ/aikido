@@ -1,19 +1,23 @@
 defmodule Aikido.Types.ActionResult do
   @moduledoc """
-  The result of a native Ash agent action: its next state and validated I/O directives.
+  The result of a native Ash agent action: attribute changes and validated I/O directives.
 
-  Actions are pure: return the next state and descriptors for all side effects.
+  Actions are pure: return attribute changes and descriptors for all side effects.
   Only directives perform I/O; actions must never execute those effects themselves.
 
   Construct results with `new/1` or `new!/1`. The execution boundary also validates
   returned maps and structs before applying state or executing any directives.
-  State is the next value for the action’s own mounted path: a map or typed slice struct.
+  `changes` contains optional attribute keys for the action's own mounted path.
+  Omitted keys stay unchanged; supplied values are cast by the native update action.
+  Supply nested attribute maps for embedded edits, using normal Ash embedded
+  update/replacement semantics. Existing embedded structs retain Ash's native
+  trusted-value behavior.
   """
   use Ash.TypedStruct
 
   typed_struct do
-    field :state, :term do
-      description "Next value for the action's state path, or an explicit multi-slice update."
+    field :changes, :map do
+      description "Sparse attribute changes for the action's own mounted path."
     end
 
     field :directives, {:array, Aikido.Types.Directive} do

@@ -3,7 +3,7 @@ defmodule AikidoTest.ScopeReducer do
 
   def run(input, _, context) do
     Aikido.Types.ActionResult.new(
-      state: %{
+      changes: %{
         observed: %{
           actor: context.actor,
           tenant: context.tenant,

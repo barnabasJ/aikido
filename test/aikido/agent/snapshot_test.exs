@@ -91,7 +91,15 @@ defmodule AikidoTest.Agent.SnapshotTest.Resource do
   end
 
   policies do
-    policy action([:start, :initialize, :__aikido_initialize_state__, :inspect, :list, :read]) do
+    policy action([
+             :start,
+             :initialize,
+             :__aikido_initialize_state__,
+             :__aikido_apply_state__,
+             :inspect,
+             :list,
+             :read
+           ]) do
       authorize_if actor_present()
     end
   end
@@ -147,14 +155,15 @@ defmodule AikidoTest.Agent.SnapshotTest do
     refute_receive {:snapshot_fixture_created, _}
 
     spans = TestTracer.get_spans()
+    command_caller = self()
 
     projection_refs =
       for {:start, ref, :action, name} <- spans,
           String.ends_with?(name, ".__aikido_snapshot__"),
+          Enum.any?(spans, &match?({:parent, ^ref, _, ^command_caller}, &1)),
           do: ref
 
     assert length(projection_refs) == 2
-    command_caller = self()
 
     for ref <- projection_refs do
       assert Enum.any?(spans, &match?({:parent, ^ref, _, ^command_caller}, &1))

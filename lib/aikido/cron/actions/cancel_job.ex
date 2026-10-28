@@ -7,13 +7,16 @@ defmodule Aikido.Cron.Actions.CancelJob do
     {state, directives} = Aikido.Cron.Registrations.detach(input.arguments.state, id)
     state = Aikido.Cron.Registrations.invalidate(state, id)
 
-    next = %{
-      state
-      | specs: Map.delete(state.specs, id),
-        runtime_specs: Map.delete(state.runtime_specs, id),
-        errors: Map.delete(state.errors, id)
+    changes = %{
+      jobs: state.jobs,
+      monitors: state.monitors,
+      generations: state.generations,
+      restart_attempts: state.restart_attempts,
+      specs: Map.delete(state.specs, id),
+      runtime_specs: Map.delete(state.runtime_specs, id),
+      errors: Map.delete(state.errors, id)
     }
 
-    Aikido.Types.ActionResult.new(state: next, directives: directives)
+    Aikido.Types.ActionResult.new(changes: changes, directives: directives)
   end
 end

@@ -585,14 +585,11 @@ defmodule Aikido.ContextHandoffTest do
   end
 
   defp saved_runtime(pid) do
+    wrapper = :sys.get_state(pid).user_state
+
     {:ok, envelope} =
       Aikido.AgentServer.state(pid, fn runtime ->
-        {:ok,
-         Aikido.Durable.AgentServer.dump_state(%{
-           runtime: runtime,
-           options: [agent_module: Agent, id: runtime.id, aikido: runtime.aikido],
-           permanent: false
-         })}
+        {:ok, Aikido.Durable.AgentServer.dump_state(%{wrapper | runtime: runtime})}
       end)
 
     Aikido.Durable.Snapshot.load(envelope)
@@ -600,7 +597,17 @@ defmodule Aikido.ContextHandoffTest do
 
   defp activate_saved(ctx, saved) do
     durable = Aikido.durable_supervisor_name(ctx.aikido)
-    key = "restored-#{System.unique_integer([:positive])}"
+    logical_key = saved.options[:durable_key]
+    partition = saved.options[:partition]
+    key = Aikido.Durable.storage_key(logical_key, partition)
+    assert :ok = Aikido.Durable.delete(durable, logical_key, partition: partition)
+    refute match?({:ok, _}, DurableServer.Supervisor.get_server_info(durable, key))
+    prefix = DurableServer.Supervisor.__get_config__(durable).prefix
+
+    assert {:error, :not_found} =
+             DurableServer.fetch_stored_state(durable, %{key: key, prefix: prefix},
+               consistent: true
+             )
 
     assert {:ok, {pid, _}} =
              DurableServer.Supervisor.start_child(

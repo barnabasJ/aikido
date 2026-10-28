@@ -60,9 +60,8 @@ defmodule AikidoTest.TypedRoutesTest.Add do
 
   def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: %{
-        input.arguments.state
-        | count: input.arguments.state.count + input.arguments.amount
+      changes: %{
+        count: input.arguments.state.count + input.arguments.amount
       }
     )
   end
@@ -76,17 +75,15 @@ defmodule AikidoTest.TypedRoutesTest.Change do
         _opts,
         _context
       ) do
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | count: input.arguments.state.count + payload.amount}
-    )
+    Aikido.Types.ActionResult.new(changes: %{count: input.arguments.state.count + payload.amount})
   end
 
   def run(
-        %{arguments: %{data: %Ash.Union{type: :reset, value: payload}}} = input,
+        %{arguments: %{data: %Ash.Union{type: :reset, value: payload}}},
         _opts,
         _context
       ) do
-    Aikido.Types.ActionResult.new(state: %{input.arguments.state | count: payload.value})
+    Aikido.Types.ActionResult.new(changes: %{count: payload.value})
   end
 end
 
@@ -94,9 +91,7 @@ defmodule AikidoTest.TypedRoutesTest.Store do
   use Ash.Resource.Actions.Implementation
 
   def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | received: input.arguments.data}
-    )
+    Aikido.Types.ActionResult.new(changes: %{received: input.arguments.data})
   end
 end
 
@@ -104,9 +99,7 @@ defmodule AikidoTest.TypedRoutesTest.Count do
   use Ash.Resource.Actions.Implementation
 
   def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | count: input.arguments.state.count + 1}
-    )
+    Aikido.Types.ActionResult.new(changes: %{count: input.arguments.state.count + 1})
   end
 end
 
@@ -221,12 +214,11 @@ defmodule AikidoTest.TypedRoutesTest.CaptureUnion do
   use Ash.Resource.Actions.Implementation
 
   def run(input, _opts, _context) do
-    state = %{
-      input.arguments.state
-      | received: %{union: input.arguments.data, original: input.context.aikido.signal.data}
-    }
-
-    Aikido.Types.ActionResult.new(state: state)
+    Aikido.Types.ActionResult.new(
+      changes: %{
+        received: %{union: input.arguments.data, original: input.context.aikido.signal.data}
+      }
+    )
   end
 end
 

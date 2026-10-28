@@ -13,9 +13,7 @@ defmodule Aikido.CancelScopeTest.Reducer do
       shared: input.context[:shared]
     }
 
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | status: :failed, observed: observed}
-    )
+    Aikido.Types.ActionResult.new(changes: %{status: :failed, observed: observed})
   end
 end
 

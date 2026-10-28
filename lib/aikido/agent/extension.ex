@@ -87,6 +87,7 @@ defmodule Aikido.Agent.Extension do
   }
   use Spark.Dsl.Extension,
     sections: [@agent, @schedules],
+    add_extensions: [Aikido.Notifications.Extension],
     transformers: [
       Aikido.Agent.Extension.Transformers.Build,
       Aikido.Agent.Extension.Transformers.WalkExtensions,

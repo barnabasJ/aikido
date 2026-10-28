@@ -6,7 +6,11 @@ defmodule Aikido.Team.Actions.StopMember do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
-    ActionAdapter.to_action_result(pause_member_and_descendants(signal, state, context, config))
+
+    ActionAdapter.to_action_result(
+      pause_member_and_descendants(signal, state, context, config),
+      state
+    )
   end
 
   @doc "Plan a paused member subtree and request its process stops. Performs no I/O."

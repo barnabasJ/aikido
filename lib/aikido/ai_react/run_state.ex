@@ -3,7 +3,7 @@ defmodule Aikido.AiReact.RunState do
   Initializes and settles the state of a ReAct run.
 
   Opening a run applies its configuration, prepares conversation history and
-  returns a tool-setup descriptor. Settling a reducer result consults
+  returns a tool-setup descriptor. Settling a proposed transition consults
   `Aikido.AiReact.TodoRequirements` and clears transient tools and handoff data
   only when the resulting run is completed or failed. Every operation is pure.
   """
@@ -22,14 +22,17 @@ defmodule Aikido.AiReact.RunState do
     end
   end
 
-  @doc "Resolve todo-dependent run status and discard finished-run resources in an action result."
-  def resolve_run_outcome({:ok, %{state: state, directives: []}} = unchanged, input)
+  @doc "Resolve todo-dependent run status and discard finished-run resources in a planned transition."
+  def resolve_run_outcome(result, input, options \\ [])
+
+  def resolve_run_outcome({:ok, state, []} = unchanged, input, _options)
       when state == input.arguments.state, do: unchanged
 
-  def resolve_run_outcome({:ok, %{state: %{status: :completed} = state} = result}, input) do
+  def resolve_run_outcome({:ok, %{status: :completed} = state, effects}, input, options) do
     agent_state = (input.context.aikido[:agent] && input.context.aikido.agent.state) || %{}
 
-    {state, directives} = Aikido.AiReact.TodoRequirements.plan_run_outcome(state, agent_state)
+    {state, directives} =
+      Aikido.AiReact.TodoRequirements.plan_run_outcome(state, agent_state, options)
 
     state =
       if state.options.completion == :tasks,
@@ -37,14 +40,14 @@ defmodule Aikido.AiReact.RunState do
         else: state
 
     state = clear_tools_and_handoff(state)
-    {:ok, %{result | state: state, directives: result.directives ++ directives}}
+    {:ok, state, effects ++ directives}
   end
 
-  def resolve_run_outcome({:ok, %{state: %{status: :failed} = state} = result}, _input) do
-    {:ok, %{result | state: clear_tools_and_handoff(state)}}
+  def resolve_run_outcome({:ok, %{status: :failed} = state, directives}, _input, _options) do
+    {:ok, clear_tools_and_handoff(state), directives}
   end
 
-  def resolve_run_outcome(result, _input), do: result
+  def resolve_run_outcome(result, _input, _options), do: result
 
   @doc "Discard prepared tools and pending handoff only after a run completes or fails."
   def clear_tools_and_handoff(%{status: status} = state) when status in [:completed, :failed] do
@@ -65,14 +68,27 @@ defmodule Aikido.AiReact.RunState do
       state
       |> Conversation.append_message(ReqLLM.Context.user(text))
       |> Map.update(:opening_messages, [text], &(&1 ++ [text]))
-      |> Map.merge(%{status: :running, result: nil, streaming_text: "", streaming_thinking: ""})
+      |> Map.merge(%{
+        status: :running,
+        result: nil,
+        streaming_text: "",
+        streaming_thinking: "",
+        todo_idle_reminder: nil
+      })
 
     Aikido.AiReact.HookQueue.queue_before_model_hooks(state, model_turn_directive(state))
   end
 
+  @doc "Request a model turn to consume queued messages through the existing hook pipeline."
+  def resume_queued_messages(state) do
+    state
+    |> Map.merge(%{status: :running, result: nil, streaming_text: "", streaming_thinking: ""})
+    |> request_model_turn()
+  end
+
   @doc "Describe the next model turn using this run’s prepared tools and conversation."
   def request_model_turn(state) do
-    Aikido.Types.ActionResult.new(state: state, directives: [model_turn_directive(state)])
+    {:ok, state, [model_turn_directive(state)]}
   end
 
   defp model_turn_directive(state) do
@@ -151,6 +167,8 @@ defmodule Aikido.AiReact.RunState do
     |> Map.merge(%{
       status: :setup,
       todo_continuations: 0,
+      todo_idle_reminder: nil,
+      todo_verifier_data: nil,
       todo_verification_pending: false,
       request_id: data.request_id,
       run_metadata: data[:metadata] || %{},
@@ -207,6 +225,6 @@ defmodule Aikido.AiReact.RunState do
       request_id: state.request_id
     }
 
-    Aikido.Types.ActionResult.new(state: state, directives: [directive])
+    {:ok, state, [directive]}
   end
 end

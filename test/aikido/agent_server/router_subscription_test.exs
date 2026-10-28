@@ -3,9 +3,7 @@ defmodule Aikido.RouterSubscriptionTest.Reducer do
 
   @impl true
   def run(input, _, _) do
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | count: input.arguments.state.count + 1}
-    )
+    Aikido.Types.ActionResult.new(changes: %{count: input.arguments.state.count + 1})
   end
 end
 

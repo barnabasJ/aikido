@@ -5,6 +5,17 @@ defmodule Aikido.AiReact.Actions.Cancel do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- cancel_requested_run(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp cancel_requested_run(input) do
     input
     |> cancel_matching_run()
     |> RunState.resolve_run_outcome(input)
@@ -21,16 +32,15 @@ defmodule Aikido.AiReact.Actions.Cancel do
 
     if slice.status in [:setup, :running, :waiting] &&
          (is_nil(requested) || requested == slice.request_id) do
-      Aikido.Types.ActionResult.new(
-        state:
-          slice
-          |> Map.put(:status, :failed)
-          |> Map.put(:error, :cancelled)
-          |> Map.put(:hooks_pending, %{}),
-        directives: []
-      )
+      state =
+        slice
+        |> Map.put(:status, :failed)
+        |> Map.put(:error, :cancelled)
+        |> Map.put(:hooks_pending, %{})
+
+      {:ok, state, []}
     else
-      Aikido.Types.ActionResult.new(state: slice, directives: [])
+      {:ok, slice, []}
     end
   end
 end

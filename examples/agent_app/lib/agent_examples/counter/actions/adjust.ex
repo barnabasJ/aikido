@@ -6,6 +6,6 @@ defmodule AgentExamples.Counter.Actions.Adjust do
   def run(input, _opts, _context) do
     %{state: state, data: %Ash.Union{type: direction, value: %{amount: amount}}} = input.arguments
     delta = if direction == :increase, do: amount, else: -amount
-    Aikido.Types.ActionResult.new(state: %{state | count: state.count + delta})
+    Aikido.Types.ActionResult.new(changes: %{count: state.count + delta})
   end
 end

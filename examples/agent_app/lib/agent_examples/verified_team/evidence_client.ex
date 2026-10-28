@@ -6,7 +6,10 @@ defmodule AgentExamples.VerifiedTeam.EvidenceClient do
   def generate_text("offline", _messages, _opts) do
     receive do
     after
-      800 -> AgentExamples.Scenarios.Responses.answer("Evidence checked: a background result returns through a correlated team signal.")
+      800 ->
+        AgentExamples.Scenarios.Responses.answer(
+          "Evidence checked: a background result returns through a correlated team signal."
+        )
     end
   end
 

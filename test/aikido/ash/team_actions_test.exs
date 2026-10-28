@@ -16,8 +16,8 @@ defmodule AikidoTest.AshTeamActionsTest do
     state = Ash.create!(Aikido.Team.Slice, %{})
     input = team_input(:ensure_member, state, %{member: :missing})
     assert {:ok, result} = Ash.run_action(input)
-    assert result.state.operation.status == :failed
-    error = result.state.operation.error
+    assert result.changes.operation.status == :failed
+    error = result.changes.operation.error
     assert %Ash.Error.Action.InvalidArgument{field: :member} = error
     assert AshLua.Error.to_error(error).message =~ "before activating"
   end
@@ -26,7 +26,7 @@ defmodule AikidoTest.AshTeamActionsTest do
     state = Ash.create!(Aikido.Team.Slice, %{})
     input = team_input(:add_member, state, %{member: :new_worker, template: :missing})
     assert {:ok, result} = Ash.run_action(input)
-    error = result.state.operation.error
+    error = result.changes.operation.error
     assert %Ash.Error.Action.InvalidArgument{field: :template} = error
     assert AshLua.Error.to_error(error).message =~ "configured templates"
     assert AshAi.ToToolError.to_tool_error(error) =~ ":counter"
@@ -140,7 +140,7 @@ defmodule AikidoTest.AshTeamActionsTest do
 
     assert {:ok,
             %Aikido.Types.ActionResult{
-              state: returned_state,
+              changes: nil,
               directives: [
                 %Aikido.Directives.Emit{
                   target: ^recipient,
@@ -149,8 +149,6 @@ defmodule AikidoTest.AshTeamActionsTest do
               ]
             }} = Ash.run_action(input)
 
-    fields = Enum.map(Ash.Resource.Info.attributes(Aikido.Team.Slice), & &1.name)
-    assert Map.take(returned_state, fields) == Map.take(state, fields)
     refute_received {:signal, _}
   end
 end

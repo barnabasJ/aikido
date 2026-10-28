@@ -11,7 +11,7 @@ defmodule AgentExamples.Quicksort.Actions.ScheduleChildRetry do
     cond do
       state.status != :sorting || !Map.has_key?(state.partitions, tag) ||
         Map.has_key?(state.started_children, tag) || Map.has_key?(state.results, tag) ->
-        Aikido.Types.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(changes: nil)
 
       attempt > 8 || !Aikido.Error.retryable?(input.arguments.reason) ->
         AgentExamples.Quicksort.PartitionTree.fail_partition(
@@ -21,7 +21,7 @@ defmodule AgentExamples.Quicksort.Actions.ScheduleChildRetry do
         )
 
       true ->
-        state = %{state | child_attempts: Map.put(state.child_attempts, tag, attempt)}
+        child_attempts = Map.put(state.child_attempts, tag, attempt)
 
         retry = %Aikido.Signal{
           type: "quicksort.retry_child",
@@ -30,7 +30,7 @@ defmodule AgentExamples.Quicksort.Actions.ScheduleChildRetry do
         }
 
         Aikido.Types.ActionResult.new(
-          state: state,
+          changes: %{child_attempts: child_attempts},
           directives: [
             %Aikido.Directives.Schedule{
               delay_ms: min(500 * Integer.pow(2, attempt - 1), 10_000),

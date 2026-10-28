@@ -48,7 +48,7 @@ defmodule AikidoTest.DirectiveFailure.Increment do
     [before, after_failure] = effects
 
     Aikido.Types.ActionResult.new(
-      state: %{count: count},
+      changes: %{count: count},
       directives: [before, %AikidoTest.DirectiveFailure.Raise{}, after_failure]
     )
   end

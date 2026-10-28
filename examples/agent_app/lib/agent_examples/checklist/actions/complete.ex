@@ -8,7 +8,7 @@ defmodule AgentExamples.Checklist.Actions.Complete do
 
     if item in state.items do
       Aikido.Types.ActionResult.new(
-        state: %{state | items: List.delete(state.items, item), completed: state.completed + 1}
+        changes: %{items: List.delete(state.items, item), completed: state.completed + 1}
       )
     else
       {:error, "Unknown checklist item: #{item}"}

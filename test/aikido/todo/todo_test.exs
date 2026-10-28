@@ -110,36 +110,42 @@ defmodule Aikido.TodoTest do
 
     initial = Ash.create!(Aikido.Todo.Slice, %{}, action: :create)
     added = run.(:todo_add, initial, %{id: "same", text: "original", timeout_ms: 100})
-    [original] = added.state.items
+    [original] = added.changes.items
     assert length(added.directives) == 2
-    removed = run.(:todo_remove, added.state, %{id: "same"})
+    added_state = Ash.update!(initial, added.changes, action: :update)
+    removed_result = run.(:todo_remove, added_state, %{id: "same"})
+    removed = Ash.update!(added_state, removed_result.changes, action: :update)
     stale = %{id: "same", revision: original.revision}
 
-    assert %Aikido.Types.ActionResult{state: state, directives: []} =
-             run.(:expire, removed.state, stale)
+    assert %Aikido.Types.ActionResult{changes: nil, directives: []} =
+             unchanged = run.(:expire, removed, stale)
 
-    assert state == removed.state
-    assert run.(:expire, removed.state, stale).state == state
+    assert removed.items == []
+    assert run.(:expire, removed, stale) == unchanged
 
-    reused = run.(:todo_add, removed.state, %{id: "same", text: "replacement"})
-    [replacement] = reused.state.items
+    reused_result = run.(:todo_add, removed, %{id: "same", text: "replacement"})
+    reused = Ash.update!(removed, reused_result.changes, action: :update)
+    [replacement] = reused.items
     assert replacement.revision > original.revision
 
-    assert %Aikido.Types.ActionResult{state: state, directives: []} =
-             run.(:expire, reused.state, stale)
+    assert %Aikido.Types.ActionResult{changes: nil, directives: []} =
+             run.(:expire, reused, stale)
 
-    assert state == reused.state
+    assert reused.items == [replacement]
 
-    expired = run.(:expire, reused.state, %{id: "same", revision: replacement.revision})
-    assert [%{status: :blocked, reason: :timeout}] = expired.state.items
+    expired = run.(:expire, reused, %{id: "same", revision: replacement.revision})
+    assert [%{status: :blocked, reason: :timeout}] = expired.changes.items
     assert length(expired.directives) == 1
+    assert initial.items == []
+    assert added_state.items == [original]
+    assert reused.items == [replacement]
 
     for action <- [:todo_activate, :todo_complete, :todo_block, :todo_remove] do
       input =
         Ash.ActionInput.for_action(
           Aikido.Todo.Slice,
           action,
-          %{state: removed.state, id: "same", reason: :unknown},
+          %{state: removed, id: "same", reason: :unknown},
           skip_unknown_inputs: [:*]
         )
 

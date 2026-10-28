@@ -6,7 +6,7 @@ defmodule AikidoTest.AshFixtures.Counter.Actions.Increment do
     state = input.arguments.state
 
     Aikido.Types.ActionResult.new(
-      state: %{count: state.count + input.arguments.amount},
+      changes: %{count: state.count + input.arguments.amount},
       directives: []
     )
   end
@@ -20,7 +20,7 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter.Actions.Increment do
     state = input.arguments.state
 
     Aikido.Types.ActionResult.new(
-      state: %{state | count: state.count + input.arguments.amount},
+      changes: %{count: state.count + input.arguments.amount},
       directives: []
     )
   end
@@ -34,7 +34,7 @@ defmodule AikidoTest.AshFixtures.GeneratedCounter.Actions.IncrementFromData do
     state = input.arguments.state
 
     Aikido.Types.ActionResult.new(
-      state: %{state | count: state.count + input.arguments.data.amount},
+      changes: %{count: state.count + input.arguments.data.amount},
       directives: []
     )
   end
@@ -126,7 +126,7 @@ defmodule AikidoTest.AshFixtures.CounterSlice.Actions.Increment do
   @impl true
   def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: %{count: input.arguments.state.count + Map.get(input.arguments.data, :amount, 1)}
+      changes: %{count: input.arguments.state.count + Map.get(input.arguments.data, :amount, 1)}
     )
   end
 end
@@ -136,8 +136,8 @@ defmodule AikidoTest.AshFixtures.CounterSlice.Actions.Internal do
   use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(state: input.arguments.state)
+  def run(_input, _opts, _context) do
+    Aikido.Types.ActionResult.new(changes: nil)
   end
 end
 
@@ -148,7 +148,7 @@ defmodule AikidoTest.AshFixtures.CounterSlice.Actions.Tick do
   @impl true
   def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: %{count: input.arguments.state.count + Map.get(input.arguments.data, :amount, 1)}
+      changes: %{count: input.arguments.state.count + Map.get(input.arguments.data, :amount, 1)}
     )
   end
 end
@@ -227,7 +227,6 @@ defmodule AikidoTest.AshFixtures.TaskWorker.Actions.Uppercase do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    state = input.arguments.state
     data = Map.delete(input.arguments, :state)
     result = String.upcase(data.text)
 
@@ -245,7 +244,7 @@ defmodule AikidoTest.AshFixtures.TaskWorker.Actions.Uppercase do
       }
 
     Aikido.Types.ActionResult.new(
-      state: %{state | result: result},
+      changes: %{result: result},
       directives: [Aikido.Directives.emit_to_pid(reply, data.reply_to)]
     )
   end
@@ -330,7 +329,7 @@ defmodule AikidoTest.AshFixtures.Protected do
   end
 
   policies do
-    policy action([:start, :initialize, :__aikido_initialize_state__]) do
+    policy action([:start, :initialize, :__aikido_initialize_state__, :__aikido_apply_state__]) do
       authorize_if actor_present()
     end
   end

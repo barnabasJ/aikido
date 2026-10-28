@@ -99,21 +99,24 @@ defmodule Aikido.AiReact.Directives.ToolExec do
 
     context =
       Map.merge(
-        Map.merge(Map.drop(directive.tool_context, [:actor, :tenant, :authorize?, :tracer]), inherited),
+        Map.merge(
+          Map.drop(directive.tool_context, [:actor, :tenant, :authorize?, :tracer]),
+          inherited
+        ),
         %{
-        agent_id: state.id,
-        request_id: directive.request_id,
-        tool_call_id: directive.tool_call.id,
-        deadline_at: deadline,
-        agent_resource:
-          if(
-            Spark.Dsl.is?(agent_module, Ash.Resource) &&
-              Aikido.Agent.Extension in Spark.extensions(agent_module),
-            do: agent_module
-          ),
-        aikido: state.aikido,
-        partition: Map.get(state, :partition),
-        parent: Aikido.Ownership.parent(state)
+          agent_id: state.id,
+          request_id: directive.request_id,
+          tool_call_id: directive.tool_call.id,
+          deadline_at: deadline,
+          agent_resource:
+            if(
+              Spark.Dsl.is?(agent_module, Ash.Resource) &&
+                Aikido.Agent.Extension in Spark.extensions(agent_module),
+              do: agent_module
+            ),
+          aikido: state.aikido,
+          partition: Map.get(state, :partition),
+          parent: Aikido.Ownership.parent(state)
         }
       )
 

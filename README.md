@@ -72,7 +72,7 @@ defmodule MyApp.Increment do
   @impl true
   def run(input, _opts, _context) do
     state = input.arguments.state
-    Aikido.Types.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
+    Aikido.Types.ActionResult.new(changes: %{count: state.count + input.arguments.amount})
   end
 end
 
@@ -197,7 +197,7 @@ External domain commands run through `Aikido.Agent.Commands` in `agent/commands/
 They perform runtime I/O such as starting agents and delivering signals. Inside
 the agent pipeline, reducer implementations live in their owning `actions/` folders.
 
-Reducer actions are pure: they return the next state and directives and never perform
+Reducer actions are pure: they return sparse attribute changes and directives and never perform
 side effects. Their return values are the sole channel for domain state changes.
 All side effects belong in directives: message delivery, network and database I/O,
 process creation and timers. Directives perform I/O

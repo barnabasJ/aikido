@@ -17,8 +17,10 @@ defmodule Aikido.FSM.Actions.Transition do
     if to in allowed do
       terminal_states = Map.get(slice, :terminal_states, [])
       history = Map.get(slice, :history, []) ++ [%{from: from, to: to}]
-      new_slice = %{slice | state: to, history: history, terminal?: to in terminal_states}
-      Aikido.Types.ActionResult.new(state: new_slice, directives: [])
+
+      Aikido.Types.ActionResult.new(
+        changes: %{state: to, history: history, terminal?: to in terminal_states}
+      )
     else
       {:error, "invalid FSM transition from #{inspect(from)} to #{inspect(to)}"}
     end

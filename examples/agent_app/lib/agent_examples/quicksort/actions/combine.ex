@@ -6,13 +6,15 @@ defmodule AgentExamples.Quicksort.Actions.Combine do
     state = input.arguments.state
 
     if state.status == :sorting do
-      state = %{
-        state
-        | results: Map.put(state.results, input.arguments.branch, input.arguments.numbers)
-      }
+      results = Map.put(state.results, input.arguments.branch, input.arguments.numbers)
+      state = %{state | results: results}
 
       with {:ok, result} <-
-             AgentExamples.Quicksort.PartitionTree.finish_or_wait(state, input.context.aikido) do
+             AgentExamples.Quicksort.PartitionTree.finish_or_wait(
+               state,
+               input.context.aikido,
+               %{results: results}
+             ) do
         {:ok,
          %{
            result
@@ -22,7 +24,7 @@ defmodule AgentExamples.Quicksort.Actions.Combine do
          }}
       end
     else
-      Aikido.Types.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(changes: nil)
     end
   end
 end

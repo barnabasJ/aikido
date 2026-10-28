@@ -9,6 +9,6 @@ defmodule Aikido.Team.Actions.Timeout do
 
     %{operation_id: signal.data.operation_id, reason: :timeout}
     |> TopologyOperation.fail_operation_and_pending_tasks(state, context)
-    |> ActionAdapter.to_action_result()
+    |> ActionAdapter.to_action_result(state)
   end
 end

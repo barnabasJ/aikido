@@ -22,4 +22,11 @@ config :logger,
 # Disable default console handler (OTP 21+ / Elixir 1.15+)
 config :logger, :default_handler, false
 
-config :aikido, ash_domains: [Aikido.AI.TestToolDomain, AikidoTest.AshFixtures.Domain]
+config :aikido,
+  ash_domains: [
+    Aikido.AI.TestToolDomain,
+    AikidoTest.AshFixtures.Domain,
+    AikidoTest.StopScope.Domain,
+    AikidoTest.TeamStopScope.Domain,
+    AikidoTest.Atl47Native.Domain
+  ]

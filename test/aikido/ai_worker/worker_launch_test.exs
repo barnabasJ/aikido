@@ -74,8 +74,7 @@ defmodule Aikido.WorkerLaunchTest do
              )
              |> Ash.run_action()
 
-    assert AikidoTest.SliceState.attributes(result.state) ==
-             AikidoTest.SliceState.attributes(state)
+    assert result.changes == %{}
 
     assert [directive] = result.directives
     assert directive.target == self()
@@ -130,9 +129,9 @@ defmodule Aikido.WorkerLaunchTest do
     state = Ash.create!(Aikido.AiWorker.Slice, %{queue: [missing_one, missing_two, valid]})
 
     assert {:ok, result} = run_action(:settle, %{state: state}, nil)
-    assert result.state.queue == []
-    assert result.state.pending.task_id == "valid"
-    assert result.state.completed == 2
+    assert result.changes.queue == []
+    assert result.changes.pending.task_id == "valid"
+    assert result.changes.completed == 2
 
     assert [first, second, ask] = result.directives
 
@@ -170,8 +169,8 @@ defmodule Aikido.WorkerLaunchTest do
                  configured_model
                )
 
-      assert result.state.pending.task_id == "valid"
-      assert result.state.completed == 0
+      assert result.changes.pending.task_id == "valid"
+      assert result.changes.completed == 0
       assert [ask] = result.directives
       assert ask.signal.type == "ai.react.ask"
       assert ask.signal.data.model == expected
@@ -187,8 +186,7 @@ defmodule Aikido.WorkerLaunchTest do
         ] do
       assert {:ok, result} = run_action(:accept, Map.put(params, :state, state), nil)
 
-      assert AikidoTest.SliceState.attributes(result.state) ==
-               AikidoTest.SliceState.attributes(state)
+      assert result.changes == %{}
 
       assert result.directives == []
     end

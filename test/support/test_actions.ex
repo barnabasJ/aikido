@@ -3,7 +3,7 @@ defmodule AikidoTest.TestActions.Actions.PreserveState do
   use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(input, _opts, _context), do: Aikido.Types.ActionResult.new(state: input.arguments.state)
+  def run(_input, _opts, _context), do: Aikido.Types.ActionResult.new(changes: nil)
 end
 
 defmodule AikidoTest.TestActions.Actions.ClearState do
@@ -11,7 +11,7 @@ defmodule AikidoTest.TestActions.Actions.ClearState do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
-    Aikido.Types.ActionResult.new(state: %{}, directives: [])
+    Aikido.Types.ActionResult.new(changes: %{}, directives: [])
   end
 end
 
@@ -22,7 +22,7 @@ defmodule AikidoTest.TestActions.Actions.StoreValue do
   def run(input, _opts, _context) do
     value = input.arguments.value
 
-    Aikido.Types.ActionResult.new(state: %{input.arguments.state | value: value}, directives: [])
+    Aikido.Types.ActionResult.new(changes: %{value: value}, directives: [])
   end
 end
 
@@ -33,7 +33,7 @@ defmodule AikidoTest.TestActions.Actions.ResolveOptionalValue do
   def run(input, _opts, _context) do
     value = Map.get(input.arguments, :value)
     result = if is_nil(value), do: "No params", else: value + 2
-    Aikido.Types.ActionResult.new(state: %{input.arguments.state | result: result})
+    Aikido.Types.ActionResult.new(changes: %{result: result})
   end
 end
 
@@ -47,7 +47,7 @@ defmodule AikidoTest.TestActions.Actions.AddValue do
     amount = input.arguments.amount
 
     Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | value: value + amount},
+      changes: %{value: value + amount},
       directives: []
     )
   end
@@ -57,11 +57,11 @@ defmodule AikidoTest.TestActions.Actions.EmitTestSignal do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     signal = %{type: "test.emitted", data: %{value: 42}}
 
     Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | emitted: true},
+      changes: %{emitted: true},
       directives: [Aikido.Directives.emit(signal)]
     )
   end
@@ -71,14 +71,14 @@ defmodule AikidoTest.TestActions.Actions.EmitAndSchedule do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
+  def run(_input, _opts, _context) do
     effects = [
       Aikido.Directives.emit(%{type: "event.1"}),
       Aikido.Directives.schedule(1000, :check)
     ]
 
     Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | triggered: true},
+      changes: %{triggered: true},
       directives: effects
     )
   end
@@ -89,8 +89,8 @@ defmodule AikidoTest.TestActions.Actions.RecordWorkflowResult do
   use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(state: %{input.arguments.state | primary: "result"})
+  def run(_input, _opts, _context) do
+    Aikido.Types.ActionResult.new(changes: %{primary: "result"})
   end
 end
 
@@ -103,7 +103,7 @@ defmodule AikidoTest.TestActions.Actions.RecordAuditEvent do
     if input.arguments.reject? do
       {:error, :audit_rejected}
     else
-      Aikido.Types.ActionResult.new(state: %{input.arguments.state | last_event: :touched})
+      Aikido.Types.ActionResult.new(changes: %{last_event: :touched})
     end
   end
 end
@@ -118,7 +118,7 @@ defmodule AikidoTest.TestActions.Actions.IncrementCounter do
     slice = input.arguments.state
 
     count = Map.get(slice, :counter, 0)
-    Aikido.Types.ActionResult.new(state: Map.put(slice, :counter, count + amount), directives: [])
+    Aikido.Types.ActionResult.new(changes: %{counter: count + amount}, directives: [])
   end
 end
 
@@ -132,7 +132,7 @@ defmodule AikidoTest.TestActions.Actions.DecrementCounter do
     slice = input.arguments.state
 
     count = Map.get(slice, :counter, 0)
-    Aikido.Types.ActionResult.new(state: Map.put(slice, :counter, count - amount), directives: [])
+    Aikido.Types.ActionResult.new(changes: %{counter: count - amount}, directives: [])
   end
 end
 
@@ -148,7 +148,7 @@ defmodule AikidoTest.TestActions.Actions.RecordMessage do
     message = Map.get(params, :message, params)
 
     Aikido.Types.ActionResult.new(
-      state: %{slice | messages: messages ++ [message]},
+      changes: %{messages: messages ++ [message]},
       directives: []
     )
   end

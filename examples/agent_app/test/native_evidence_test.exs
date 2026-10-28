@@ -18,16 +18,22 @@ defmodule AgentExamples.NativeEvidenceTest do
     end)
 
     VerifiedTeam
-    |> Ash.ActionInput.for_action(:todo_add,
-      %{agent: team, id: "required-check", text: "Evidence must be checked", blocking?: true}, scope)
+    |> Ash.ActionInput.for_action(
+      :todo_add,
+      %{agent: team, id: "required-check", text: "Evidence must be checked", blocking?: true},
+      scope
+    )
     |> Ash.run_action!()
 
     context = %{aikido: %{agent_resource: VerifiedTeam, agent_id: team.id, parent: nil}}
 
     assert {:error, error} =
              AgentExamples.VerifiedTeam.Tools
-             |> Ash.ActionInput.for_action(:complete_evidence, %{task_id: "required-check"},
-               scope ++ [context: context])
+             |> Ash.ActionInput.for_action(
+               :complete_evidence,
+               %{task_id: "required-check"},
+               scope ++ [context: context]
+             )
              |> Ash.run_action()
 
     assert Exception.message(error) =~ "No completed required evidence assignment"

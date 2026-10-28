@@ -11,6 +11,12 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.CounterSlice do
         allow_nil? false
         default 0
       end
+
+      attribute :tagged, :boolean do
+        description "Whether the explicitly owned tagging route has updated this slice."
+        allow_nil? false
+        default false
+      end
     end
 
     route "counter.bump", {Aikido.Dsl.SlicePathResolutionTest.CounterSlice, :bump}
@@ -43,7 +49,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.Actions.IncrementCount do
     slice = input.arguments.state
 
     Aikido.Types.ActionResult.new(
-      state: %{slice | count: (Map.get(slice, :count) || 0) + 1},
+      changes: %{count: (Map.get(slice, :count) || 0) + 1},
       directives: []
     )
   end
@@ -53,11 +59,9 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.Actions.TagState do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
-    slice = input.arguments.state
-
+  def run(_input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: Map.put(slice || %{count: 0}, :tagged, true),
+      changes: %{tagged: true},
       directives: []
     )
   end
@@ -67,9 +71,8 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.Actions.StampState do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
-    slice = input.arguments.state
-    Aikido.Types.ActionResult.new(state: Map.put(slice || %{}, :stamped, true), directives: [])
+  def run(_input, _opts, _context) do
+    Aikido.Types.ActionResult.new(changes: %{stamped: true}, directives: [])
   end
 end
 
@@ -85,6 +88,12 @@ defmodule Aikido.Dsl.SlicePathResolutionTest.ResolutionAgent do
       attribute :last_action, :atom do
         description "Most recent reducer action selected by routing."
         default nil
+      end
+
+      attribute :stamped, :boolean do
+        description "Whether an unmounted action has updated the agent's own state path."
+        allow_nil? false
+        default false
       end
     end
 
@@ -125,7 +134,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
         )
 
       assert %{count: 1} = agent.state.counter
-      assert agent.state.domain == %{last_action: nil}
+      assert agent.state.domain == %{last_action: nil, stamped: false}
     end
   end
 
@@ -153,7 +162,7 @@ defmodule Aikido.Dsl.SlicePathResolutionTest do
         )
 
       assert Map.get(agent.state.counter, :tagged) == true
-      assert agent.state.domain == %{last_action: nil}
+      assert agent.state.domain == %{last_action: nil, stamped: false}
     end
 
     test "the compiled mount table records explicit ownership" do

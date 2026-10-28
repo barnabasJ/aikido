@@ -22,7 +22,7 @@ defmodule AgentExamples.Quicksort.Actions.StartChild do
         }
 
         Aikido.Types.ActionResult.new(
-          state: state,
+          changes: %{started_children: state.started_children},
           directives: [
             AgentExamples.Quicksort.Progress.notification(state.topic, %{
               branch: state.branch <> input.arguments.tag,
@@ -37,7 +37,6 @@ defmodule AgentExamples.Quicksort.Actions.StartChild do
 
       :error ->
         Aikido.Types.ActionResult.new(
-          state: state,
           directives: [%Aikido.Directives.StopChild{tag: input.arguments.tag}]
         )
     end

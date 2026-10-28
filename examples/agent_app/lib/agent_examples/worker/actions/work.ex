@@ -15,7 +15,7 @@ defmodule AgentExamples.Worker.Actions.Work do
         )
 
       Aikido.Types.ActionResult.new(
-        state: %{state | status: :working, result: nil, error: nil},
+        changes: %{status: :working, result: nil, error: nil},
         directives: [directive]
       )
     end

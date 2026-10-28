@@ -16,8 +16,8 @@ defmodule Aikido.AiReact.RunCaller do
   end
 
   @doc "Record the opening caller’s actor and tenant on the run state."
-  def bind_run_caller({:ok, result}, input),
-    do: {:ok, %{result | state: Map.put(result.state, :run_scope, actor_and_tenant(input))}}
+  def bind_run_caller({:ok, state, directives}, input),
+    do: {:ok, Map.put(state, :run_scope, actor_and_tenant(input)), directives}
 
   def bind_run_caller(error, _input), do: error
 

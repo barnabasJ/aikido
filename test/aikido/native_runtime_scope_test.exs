@@ -81,7 +81,7 @@ defmodule Aikido.NativeRuntimeScopeTest.Slice do
 end
 
 defmodule Aikido.NativeRuntimeScopeTest.Observation do
-  def state(input, context) do
+  def changes(input, context) do
     observed = %{
       actor_id: context.actor && context.actor.id,
       tenant: context.tenant,
@@ -92,7 +92,7 @@ defmodule Aikido.NativeRuntimeScopeTest.Observation do
       agent_id: input.context.aikido.agent_id
     }
 
-    %{input.arguments.state | observed: observed}
+    %{observed: observed}
   end
 end
 
@@ -102,7 +102,7 @@ defmodule Aikido.NativeRuntimeScopeTest.Capture do
   @impl true
   def run(input, _, context) do
     Aikido.Types.ActionResult.new(
-      state: Aikido.NativeRuntimeScopeTest.Observation.state(input, context),
+      changes: Aikido.NativeRuntimeScopeTest.Observation.changes(input, context),
       directives: [
         Aikido.Directives.async_task(fn ->
           %Aikido.Signal{
@@ -123,7 +123,7 @@ defmodule Aikido.NativeRuntimeScopeTest.Spawn do
   @impl true
   def run(input, _, context) do
     Aikido.Types.ActionResult.new(
-      state: Aikido.NativeRuntimeScopeTest.Observation.state(input, context),
+      changes: Aikido.NativeRuntimeScopeTest.Observation.changes(input, context),
       directives: [Aikido.Directives.spawn_agent(Aikido.NativeRuntimeScopeTest.Resource, :child)]
     )
   end
@@ -135,7 +135,7 @@ defmodule Aikido.NativeRuntimeScopeTest.Observe do
   @impl true
   def run(input, _, context) do
     Aikido.Types.ActionResult.new(
-      state: Aikido.NativeRuntimeScopeTest.Observation.state(input, context)
+      changes: Aikido.NativeRuntimeScopeTest.Observation.changes(input, context)
     )
   end
 end
@@ -220,6 +220,10 @@ defmodule Aikido.NativeRuntimeScopeTest.Resource do
     end
 
     policy action_type(:create) do
+      authorize_if actor_attribute_equals(:allowed, true)
+    end
+
+    policy action(:__aikido_apply_state__) do
       authorize_if actor_attribute_equals(:allowed, true)
     end
   end
@@ -327,8 +331,8 @@ defmodule Aikido.NativeRuntimeScopeTest do
     refute Keyword.has_key?(saved.options, :initialization_options)
     refute inspect(saved, limit: :infinity) =~ "never-persist"
 
-    assert {:ok, _} = action(Resource, :stop, %{agent: ref})
-    assert {:ok, restored} = action(Resource, :start, %{id: ref.id})
+    assert {:ok, _} = action(Resource, :stop, %{agent: ref}, scope())
+    assert {:ok, restored} = action(Resource, :start, %{id: ref.id}, scope())
     assert :ok = Aikido.AgentServer.await_ready(restored.pid)
     refute_receive {:native_create, _, _}
 
@@ -339,13 +343,22 @@ defmodule Aikido.NativeRuntimeScopeTest do
   end
 
   test "fallback initialization consumes transient native scope before strict options validation" do
-    assert {:ok, state, {:continue, :post_init}} =
+    options = Map.new(scope())
+    expected_scope = options |> Ash.Scope.to_opts(context: options.context) |> Map.new()
+
+    assert {:ok, state, {:continue, {:post_init, activation_scope}}} =
              Aikido.AgentServer.init(
                agent_module: Resource,
                id: "fallback",
                initialization_options: scope()
              )
 
+    assert activation_scope == expected_scope
+    assert activation_scope.actor == %{id: "alice", allowed: true}
+    assert activation_scope.tenant == "workspace"
+    assert activation_scope.context == expected_scope.context
+    assert activation_scope.context.marker == "ordinary"
+    assert activation_scope.context.credential == "never-persist"
     assert state.agent.state.state.created.actor_id == "alice"
     assert state.agent.state.mounted.created.marker == "ordinary"
     assert_receive {:native_create, Resource, _}

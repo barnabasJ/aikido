@@ -36,19 +36,20 @@ defmodule Aikido.PureActionsTest do
             )
         end
 
-      if resource in [Aikido.Memory.Slice, Aikido.Thread.Slice],
-        do: assert(result.state.id == state.id)
-
-      assert result.state.created_at == state.created_at
-      assert result.state.updated_at == timestamp
+      refute Map.has_key?(result.changes, :id)
+      refute Map.has_key?(result.changes, :created_at)
+      assert result.changes.updated_at == timestamp
+      updated = Ash.update!(state, result.changes, action: :update)
+      assert updated.id == state.id
+      assert updated.created_at == state.created_at
 
       if resource == Aikido.Thread.Slice do
-        assert [first, second] = result.state.entries
+        assert [first, second] = result.changes.entries
         assert first.id != second.id
         assert first.at == timestamp
         assert second.at == timestamp
-        cleared = replay(Aikido.Thread.Slice, :clear, %{state: result.state}, signal)
-        assert cleared.state.updated_at == timestamp
+        cleared = replay(Aikido.Thread.Slice, :clear, %{state: updated}, signal)
+        assert cleared.changes.updated_at == timestamp
       end
     end
   end
@@ -60,8 +61,10 @@ defmodule Aikido.PureActionsTest do
         ] do
       state = AikidoTest.SliceState.new(resource)
       result = replay(resource, action, Map.put(params, :state, state), nil)
-      assert result.state.created_at == state.created_at
-      assert result.state.updated_at == 0
+      refute Map.has_key?(result.changes, :created_at)
+      assert result.changes.updated_at == 0
+      updated = Ash.update!(state, result.changes, action: :update)
+      assert updated.created_at == state.created_at
     end
   end
 

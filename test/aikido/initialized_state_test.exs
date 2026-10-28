@@ -41,8 +41,8 @@ defmodule Aikido.InitializedStateTest do
     first = Ash.run_action!(input)
     assert Ash.run_action!(input) == first
     assert first.directives == []
-    assert Enum.map(first.state.entries, & &1.id) == ["thread:3:0", "thread:3:1"]
-    assert Enum.all?(first.state.entries, &(&1.at == Aikido.Signal.timestamp(signal)))
-    assert first.state.updated_at == Aikido.Signal.timestamp(signal)
+    assert Enum.map(first.changes.entries, & &1.id) == ["thread:3:0", "thread:3:1"]
+    assert Enum.all?(first.changes.entries, &(&1.at == Aikido.Signal.timestamp(signal)))
+    assert first.changes.updated_at == Aikido.Signal.timestamp(signal)
   end
 end

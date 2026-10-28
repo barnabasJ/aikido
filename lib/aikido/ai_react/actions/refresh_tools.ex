@@ -4,6 +4,17 @@ defmodule Aikido.AiReact.Actions.RefreshTools do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- request_tool_refresh(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp request_tool_refresh(input) do
     with :ok <- Aikido.AiReact.RunCaller.validate_run_caller(input.arguments.state, input) do
       state = update_tool_configuration(input.arguments.state, input.arguments)
 
@@ -12,10 +23,10 @@ defmodule Aikido.AiReact.Actions.RefreshTools do
           Aikido.AiReact.RunState.request_tool_setup(state)
 
         state.status in [:setup, :running] ->
-          Aikido.Types.ActionResult.new(state: %{state | tool_refresh_pending: true})
+          {:ok, %{state | tool_refresh_pending: true}, []}
 
         true ->
-          Aikido.Types.ActionResult.new(state: state)
+          {:ok, state, []}
       end
     end
   end

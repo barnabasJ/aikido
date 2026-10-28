@@ -15,11 +15,11 @@ defmodule Aikido.Cron.Actions.RecordRegistration do
 
     cond do
       state.jobs[id] == pid && state.monitors[id] == monitor ->
-        Aikido.Types.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(changes: nil)
 
       !is_nil(generation) && (state.generations[id] != generation || Map.has_key?(state.jobs, id)) ->
         Aikido.Types.ActionResult.new(
-          state: state,
+          changes: nil,
           directives: Aikido.Cron.Registrations.release(id, pid, monitor)
         )
 
@@ -63,7 +63,18 @@ defmodule Aikido.Cron.Actions.RecordRegistration do
               }
             ]
 
-        Aikido.Types.ActionResult.new(state: next, directives: directives ++ restarted)
+        Aikido.Types.ActionResult.new(
+          changes: %{
+            jobs: next.jobs,
+            monitors: next.monitors,
+            specs: next.specs,
+            runtime_specs: next.runtime_specs,
+            generations: next.generations,
+            restart_attempts: next.restart_attempts,
+            errors: next.errors
+          },
+          directives: directives ++ restarted
+        )
     end
   end
 end

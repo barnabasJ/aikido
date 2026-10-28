@@ -10,7 +10,8 @@ defmodule Aikido.Team.Actions.TaskTimeout do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
 
     ActionAdapter.to_action_result(
-      expire_task_and_request_cancellation(signal.data, state, context, config)
+      expire_task_and_request_cancellation(signal.data, state, context, config),
+      state
     )
   end
 

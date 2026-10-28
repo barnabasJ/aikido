@@ -7,6 +7,12 @@ defmodule Aikido.Team.Actions.OperationCompleted do
     {_signal, state, context, _config} = Aikido.Team.ActionAdapter.unpack_team_action(input)
 
     {state, directives} = Aikido.Team.TopologyOperation.release_queued_operations(state, context)
-    Aikido.Types.ActionResult.new(state: state, directives: directives)
+
+    changes =
+      if state.queued_operations == input.arguments.state.queued_operations,
+        do: nil,
+        else: %{queued_operations: state.queued_operations}
+
+    Aikido.Types.ActionResult.new(changes: changes, directives: directives)
   end
 end

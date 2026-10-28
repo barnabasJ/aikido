@@ -13,26 +13,26 @@ defmodule Aikido.AiReact.HookQueue do
   alias Aikido.AiReact.ProviderPressure
 
   @doc "Queue lifecycle hooks only when an action changed its state; preserve errors and no-ops."
-  def queue_event_hooks_if_changed({:ok, %{state: state}} = result, input, event, payload)
+  def queue_event_hooks_if_changed({:ok, state, _directives} = result, input, event, payload)
       when state != input.arguments.state, do: queue_event_hooks(result, event, payload)
 
   def queue_event_hooks_if_changed(result, _input, _event, _payload), do: result
 
   @doc "Queue an event, its directive hooks and any terminal event in declaration order."
-  def queue_event_hooks({:ok, result}, event, payload) do
-    queue = event_steps(result, event, payload)
+  def queue_event_hooks({:ok, state, directives}, event, payload) do
+    queue = event_steps(state, directives, event, payload)
 
-    result.state
+    state
     |> mark_terminal_transition()
     |> enqueue_event_steps(queue)
   end
 
   def queue_event_hooks(error, _event, _payload), do: error
 
-  defp event_steps(result, event, payload) do
+  defp event_steps(state, directives, event, payload) do
     [{:event, event, payload}] ++
-      Enum.flat_map(result.directives, &hook_steps_for_effect/1) ++
-      terminal_event_steps(result.state, event)
+      Enum.flat_map(directives, &hook_steps_for_effect/1) ++
+      terminal_event_steps(state, event)
   end
 
   defp terminal_event_steps(%{status: :completed} = state, _event),
@@ -58,7 +58,7 @@ defmodule Aikido.AiReact.HookQueue do
           |> Map.put(:hooks_pending, %{token => continuation})
           |> Map.put(:status, if(status == :setup, do: :setup, else: :running))
 
-        Aikido.Types.ActionResult.new(state: state)
+        {:ok, state, []}
 
       _ ->
         state
@@ -83,7 +83,7 @@ defmodule Aikido.AiReact.HookQueue do
   @doc "Release queued effects until a synchronous hook needs to return its decision."
   def release_queued_steps(state, [], status, directives) do
     state = state |> Map.put(:status, status) |> Map.put(:hook_terminal, nil)
-    Aikido.Types.ActionResult.new(state: state, directives: directives)
+    {:ok, state, directives}
   end
 
   def release_queued_steps(state, [{:event, event, payload} | rest], status, directives) do
@@ -116,7 +116,7 @@ defmodule Aikido.AiReact.HookQueue do
         |> Map.put(:hooks_pending, Map.put(pending, token, %{queue: rest, status: status}))
         |> Map.put(:status, if(status == :setup, do: :setup, else: :running))
 
-      Aikido.Types.ActionResult.new(state: state, directives: directives ++ [effect])
+      {:ok, state, directives ++ [effect]}
     end
   end
 
@@ -128,8 +128,8 @@ defmodule Aikido.AiReact.HookQueue do
     if state.tool_refresh_pending do
       state = Map.put(state, :tools_resume, %{queue: rest, status: status})
 
-      with {:ok, result} <- Aikido.AiReact.RunState.request_tool_setup(state) do
-        {:ok, %{result | directives: directives ++ result.directives}}
+      with {:ok, state, effects} <- Aikido.AiReact.RunState.request_tool_setup(state) do
+        {:ok, state, directives ++ effects}
       end
     else
       state = ProviderPressure.prepare_request(state, effect)
@@ -150,9 +150,14 @@ defmodule Aikido.AiReact.HookQueue do
         directives
       )
       when state.tool_refresh_pending do
-    with {:ok, result} <- Aikido.AiReact.RunState.request_tool_setup(state) do
-      release_queued_steps(result.state, rest, :setup, directives ++ result.directives)
+    with {:ok, state, effects} <- Aikido.AiReact.RunState.request_tool_setup(state) do
+      release_queued_steps(state, rest, :setup, directives ++ effects)
     end
+  end
+
+  def release_queued_steps(state, [{:effect, %ToolExec{} = effect} | rest], status, directives) do
+    state = Map.put(state, :todo_idle_reminder, nil)
+    release_queued_steps(state, rest, status, directives ++ [effect])
   end
 
   def release_queued_steps(state, [{:effect, effect} | rest], status, directives),
@@ -161,6 +166,7 @@ defmodule Aikido.AiReact.HookQueue do
   @doc "Append queued user messages to the conversation and empty their queue."
   def append_queued_text_to_conversation(state) do
     messages = Enum.map(state.queued_messages, &ReqLLM.Context.user/1)
+    state = if messages == [], do: state, else: Map.put(state, :todo_idle_reminder, nil)
 
     state
     |> Aikido.AiReact.Conversation.append_messages(messages)

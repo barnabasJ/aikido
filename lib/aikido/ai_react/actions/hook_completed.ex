@@ -5,6 +5,17 @@ defmodule Aikido.AiReact.Actions.HookCompleted do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- process_hook_completion(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp process_hook_completion(input) do
     input.arguments.state
     |> apply_hook_result(Map.delete(input.arguments, :state))
   end
@@ -16,7 +27,7 @@ defmodule Aikido.AiReact.Actions.HookCompleted do
 
     cond do
       state.request_id != data.request_id ->
-        Aikido.Types.ActionResult.new(state: state)
+        {:ok, state, []}
 
       data.mode == :async ->
         state =
@@ -25,10 +36,10 @@ defmodule Aikido.AiReact.Actions.HookCompleted do
             _ -> state
           end
 
-        Aikido.Types.ActionResult.new(state: state)
+        {:ok, state, []}
 
       state.status not in [:setup, :running] || not Map.has_key?(pending, data.token) ->
-        Aikido.Types.ActionResult.new(state: state)
+        {:ok, state, []}
 
       true ->
         {continuation, pending} = Map.pop!(pending, data.token)
@@ -72,6 +83,6 @@ defmodule Aikido.AiReact.Actions.HookCompleted do
       |> Map.put(:hook_terminal, nil)
       |> Aikido.AiReact.RunState.clear_tools_and_handoff()
 
-    Aikido.Types.ActionResult.new(state: state)
+    {:ok, state, []}
   end
 end

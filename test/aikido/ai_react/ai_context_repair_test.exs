@@ -76,10 +76,10 @@ defmodule Aikido.AI.ContextRepairTest do
         )
         |> Ash.run_action!()
 
-      assert result.state.status == :setup
-      assert Enum.drop(result.state.context.messages, -1) == context.messages
-      assert List.last(result.state.context.messages) == Context.user("continue")
-      assert wire_outputs(result.state.context) == []
+      assert result.changes.status == :setup
+      assert Enum.drop(result.changes.context.messages, -1) == context.messages
+      assert List.last(result.changes.context.messages) == Context.user("continue")
+      assert wire_outputs(result.changes.context) == []
     end
   end
 

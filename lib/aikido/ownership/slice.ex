@@ -61,7 +61,7 @@ defmodule Aikido.Ownership.Slice do
 
   @doc false
   def externalize(state),
-    do: %{state | children: %{}, parent: nil, orphaned_from: nil, parent_monitor: nil}
+    do: Map.merge(state, %{children: %{}, parent: nil, orphaned_from: nil, parent_monitor: nil})
 
   @doc false
   def reinstate(state), do: externalize(state)

@@ -54,7 +54,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.Actions.RecordTick do
     ticks = Map.get(slice, :ticks, [])
 
     Aikido.Types.ActionResult.new(
-      state: %{tick_count: count + 1, ticks: ticks ++ [params]},
+      changes: %{tick_count: count + 1, ticks: ticks ++ [params]},
       directives: []
     )
   end
@@ -67,7 +67,6 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.Actions.RegisterCron do
   def run(input, _opts, _context) do
     params = Map.delete(input.arguments, :state)
 
-    slice = input.arguments.state
     cron_expr = Map.get(params, :cron)
     job_id = Map.get(params, :job_id)
     timezone = Map.get(params, :timezone)
@@ -77,7 +76,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.Actions.RegisterCron do
         %Aikido.Signal{id: nil, type: "cron.tick", data: %{}, source: "/test"}
 
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
-    Aikido.Types.ActionResult.new(state: slice, directives: [directive])
+    Aikido.Types.ActionResult.new(directives: [directive])
   end
 end
 
@@ -88,12 +87,7 @@ defmodule AikidoTest.Support.SchedulerIntegrationHarness.Actions.CancelCron do
   def run(input, _opts, _context) do
     job_id = input.arguments.job_id
 
-    slice = input.arguments.state
-
-    Aikido.Types.ActionResult.new(
-      state: slice,
-      directives: [Aikido.Directives.cron_cancel(job_id)]
-    )
+    Aikido.Types.ActionResult.new(directives: [Aikido.Directives.cron_cancel(job_id)])
   end
 end
 

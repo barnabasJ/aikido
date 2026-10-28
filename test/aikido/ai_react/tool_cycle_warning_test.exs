@@ -91,7 +91,9 @@ defmodule Aikido.ToolCycleWarningTest do
               [entry] -> {:ok, entry}
               _ -> :skip
             end
-          end, once: true)
+          end,
+          once: true
+        )
 
       options = [
         model: "offline",

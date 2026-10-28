@@ -6,7 +6,11 @@ defmodule Aikido.Team.Actions.Reconcile do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
-    ActionAdapter.to_action_result(reconcile_member_activation(signal, state, context, config))
+
+    ActionAdapter.to_action_result(
+      reconcile_member_activation(signal, state, context, config),
+      state
+    )
   end
 
   defp reconcile_member_activation(signal, state, context, config) do

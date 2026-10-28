@@ -60,7 +60,7 @@ defmodule Aikido.AiReact.AskTest do
   end
 
   test "transitions an idle slice to :setup and prepares tools before the model call" do
-    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [directive]}} =
+    {:ok, %Aikido.Types.ActionResult{changes: changes, directives: [directive]}} =
       then(ask_signal(), fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:ask, Map.put(signal.data || %{}, :state, idle_slice()),
@@ -70,33 +70,33 @@ defmodule Aikido.AiReact.AskTest do
         |> Ash.run_action()
       end)
 
-    assert new_slice.status == :setup
-    assert new_slice.request_id == "req_test_1"
-    assert new_slice.iteration == 0
-    assert new_slice.max_iterations == 4
-    assert new_slice.model == "anthropic:claude-haiku-4-5-20251001"
-    assert new_slice.tools == [:test_add]
-    assert new_slice.llm_opts == [max_tokens: 64]
-    assert new_slice.result == nil
-    assert new_slice.error == nil
-    assert new_slice.pending_tool_calls == []
-    assert new_slice.tool_results_received == []
-    assert new_slice.previous_tool_signature == nil
-    messages = Context.to_list(new_slice.context)
+    assert changes.status == :setup
+    assert changes.request_id == "req_test_1"
+    assert changes.iteration == 0
+    assert changes.max_iterations == 4
+    assert changes.model == "anthropic:claude-haiku-4-5-20251001"
+    assert changes.tools == [:test_add]
+    assert changes.llm_opts == [max_tokens: 64]
+    assert changes.result == nil
+    assert changes.error == nil
+    assert changes.pending_tool_calls == []
+    assert changes.tool_results_received == []
+    assert changes.previous_tool_signature == nil
+    messages = Context.to_list(changes.context)
     assert length(messages) == 2
     assert Enum.at(messages, 0).role == :system
     assert Enum.at(messages, 1).role == :user
 
     assert %PrepareTools{} = directive
 
-    assert directive.request_id == new_slice.request_id
-    assert directive.tools == new_slice.tools
-    assert directive.tool_options == new_slice.tool_options
-    assert new_slice.prepared_tools == nil
+    assert directive.request_id == changes.request_id
+    assert directive.tools == changes.tools
+    assert directive.tool_options == changes.tool_options
+    assert changes.prepared_tools == nil
   end
 
   test "omits the system message when no system_prompt is given" do
-    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [_]}} =
+    {:ok, %Aikido.Types.ActionResult{changes: changes, directives: [_]}} =
       then(ask_signal(%{system_prompt: nil}), fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:ask, Map.put(signal.data || %{}, :state, idle_slice()),
@@ -106,7 +106,7 @@ defmodule Aikido.AiReact.AskTest do
         |> Ash.run_action()
       end)
 
-    messages = Context.to_list(new_slice.context)
+    messages = Context.to_list(changes.context)
     assert length(messages) == 1
     assert hd(messages).role == :user
   end
@@ -124,7 +124,7 @@ defmodule Aikido.AiReact.AskTest do
         tool_results_received: [%{id: "stale"}]
       })
 
-    {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: [_]}} =
+    {:ok, %Aikido.Types.ActionResult{changes: changes, directives: [_]}} =
       then(ask_signal(), fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:ask, Map.put(signal.data || %{}, :state, slice),
@@ -134,12 +134,12 @@ defmodule Aikido.AiReact.AskTest do
         |> Ash.run_action()
       end)
 
-    assert new_slice.status == :setup
-    assert new_slice.result == nil
-    assert new_slice.error == nil
-    assert new_slice.previous_tool_signature == nil
-    assert new_slice.pending_tool_calls == []
-    assert new_slice.tool_results_received == []
+    assert changes.status == :setup
+    assert changes.result == nil
+    assert changes.error == nil
+    assert changes.previous_tool_signature == nil
+    assert changes.pending_tool_calls == []
+    assert changes.tool_results_received == []
   end
 
   test "rejects a concurrent ask while the slice is :running" do

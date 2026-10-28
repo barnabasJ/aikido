@@ -75,15 +75,15 @@ defmodule Aikido.Cron.Slice do
 
   @doc false
   def externalize(state),
-    do: %{
-      state
-      | jobs: %{},
+    do:
+      Map.merge(state, %{
+        jobs: %{},
         monitors: %{},
         runtime_specs: %{},
         restart_attempts: %{},
         generations: %{},
         errors: %{}
-    }
+      })
 
   @doc false
   def reinstate(state), do: externalize(state)

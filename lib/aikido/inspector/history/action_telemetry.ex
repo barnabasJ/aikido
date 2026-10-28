@@ -8,7 +8,9 @@ defmodule Aikido.Inspector.History.ActionTelemetry do
 
   Ash's action stop event runs in an `after` block, including on failures. Its
   duration means the action span ended, not that the action succeeded. Signal
-  errors remain available separately in the inspector.
+  errors remain available separately in the inspector. Generic actions returning
+  `Aikido.Types.ActionResult` contribute reducer observations. Other native spans
+  retain stack markers so nested projection work preserves reducer timings.
   """
   use GenServer
   @key __MODULE__
@@ -30,24 +32,26 @@ defmodule Aikido.Inspector.History.ActionTelemetry do
   end
 
   @impl true
-  def terminate(_, domains) do
+  def terminate(_, namespaces) do
     :telemetry.detach(@key)
-    Enum.each(domains, &:telemetry.detach({@key, &1}))
+    Enum.each(namespaces, &:telemetry.detach({@key, &1}))
     :ets.delete(@key)
   end
 
   @impl true
-  def handle_call({:register, domain}, _, domains) do
-    unless MapSet.member?(domains, domain) do
+  def handle_call({:register, domain}, _, namespaces) do
+    namespace = Ash.Domain.Info.short_name(domain)
+
+    unless MapSet.member?(namespaces, namespace) do
       events =
         for phase <- [:start, :stop],
-            do: [:ash, Ash.Domain.Info.short_name(domain), :action, phase]
+            do: [:ash, namespace, :action, phase]
 
-      :ok = :telemetry.attach_many({@key, domain}, events, &__MODULE__.handle_event/4, nil)
-      :ets.insert(@key, {domain})
+      :ok = :telemetry.attach_many({@key, namespace}, events, &__MODULE__.handle_event/4, nil)
     end
 
-    {:reply, :ok, MapSet.put(domains, domain)}
+    :ets.insert(@key, {domain})
+    {:reply, :ok, MapSet.put(namespaces, namespace)}
   end
 
   defp register_domain(domain) do
@@ -96,8 +100,33 @@ defmodule Aikido.Inspector.History.ActionTelemetry do
   end
 
   defp observe_action(observation, :start, _, metadata) do
+    case Ash.Resource.Info.action(metadata.resource, metadata.action) do
+      %{type: :action, returns: Aikido.Types.ActionResult} = action ->
+        observe_reducer(observation, metadata, action)
+
+      _ ->
+        Process.put(@key, %{observation | stack: [:ignored | observation.stack]})
+    end
+  end
+
+  defp observe_action(%{stack: [:ignored | rest]} = observation, :stop, _, _),
+    do: Process.put(@key, %{observation | stack: rest})
+
+  defp observe_action(%{stack: [index | rest]} = observation, :stop, measurements, _) do
+    duration = System.convert_time_unit(measurements.duration, :native, :microsecond) / 1000
+
+    entries =
+      Enum.map(observation.entries, fn entry ->
+        if entry.index == index, do: %{entry | duration_ms: duration}, else: entry
+      end)
+
+    Process.put(@key, %{observation | entries: entries, stack: rest})
+  end
+
+  defp observe_action(_, _, _, _), do: :ok
+
+  defp observe_reducer(observation, metadata, action) do
     index = observation.count + 1
-    action = Ash.Resource.Info.action(metadata.resource, metadata.action)
 
     entry = %{
       index: index,
@@ -123,17 +152,4 @@ defmodule Aikido.Inspector.History.ActionTelemetry do
         stack: [index | observation.stack]
     })
   end
-
-  defp observe_action(%{stack: [index | rest]} = observation, :stop, measurements, _) do
-    duration = System.convert_time_unit(measurements.duration, :native, :microsecond) / 1000
-
-    entries =
-      Enum.map(observation.entries, fn entry ->
-        if entry.index == index, do: %{entry | duration_ms: duration}, else: entry
-      end)
-
-    Process.put(@key, %{observation | entries: entries, stack: rest})
-  end
-
-  defp observe_action(_, _, _, _), do: :ok
 end

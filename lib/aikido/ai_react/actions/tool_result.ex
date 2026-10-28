@@ -8,6 +8,17 @@ defmodule Aikido.AiReact.Actions.ToolResult do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- process_tool_response(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp process_tool_response(input) do
     state = input.arguments.state
     data = Map.delete(input.arguments, :state)
 
@@ -23,7 +34,7 @@ defmodule Aikido.AiReact.Actions.ToolResult do
         Map.take(data, [:query, :tool_call_id, :name, :content, :reason, :metadata])
       )
     else
-      Aikido.Types.ActionResult.new(state: state)
+      {:ok, state, []}
     end
   end
 
@@ -60,10 +71,10 @@ defmodule Aikido.AiReact.Actions.ToolResult do
       state = state |> record_batch_signature() |> clear_completed_batch()
 
       if state.status == :failed,
-        do: Aikido.Types.ActionResult.new(state: state),
+        do: {:ok, state, []},
         else: Aikido.AiReact.RunState.request_model_turn(state)
     else
-      Aikido.Types.ActionResult.new(state: state)
+      {:ok, state, []}
     end
   end
 

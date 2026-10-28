@@ -6,7 +6,7 @@ defmodule Aikido.Team.Actions.EnsureMember do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
-    ActionAdapter.to_action_result(activate_member(signal, state, context, config))
+    ActionAdapter.to_action_result(activate_member(signal, state, context, config), state)
   end
 
   def activate_member(signal, state, context, config) do

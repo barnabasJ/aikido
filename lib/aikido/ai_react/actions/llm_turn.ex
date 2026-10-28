@@ -7,6 +7,17 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- process_model_response(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp process_model_response(input) do
     state = input.arguments.state
     response = input.arguments.turn
 
@@ -18,14 +29,14 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
       |> record_response_content(turn)
       |> append_model_message(response)
       |> continue_from_classified_response(turn)
-      |> RunState.resolve_run_outcome(input)
+      |> RunState.resolve_run_outcome(input, final_answer?: true)
       |> Aikido.AiReact.HookQueue.queue_event_hooks_if_changed(
         input,
         :after_model,
         model_hook_payload(input.arguments)
       )
     else
-      Aikido.Types.ActionResult.new(state: state)
+      {:ok, state, []}
     end
   end
 
@@ -70,14 +81,12 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
         max_tokens: Keyword.get(state.llm_opts, :max_tokens)
       )
 
-    Aikido.Types.ActionResult.new(state: %{state | status: :failed, result: nil, error: error})
+    {:ok, %{state | status: :failed, result: nil, error: error}, []}
   end
 
   defp continue_from_classified_response(state, %{type: :final_answer, text: text}) do
     if Map.get(state, :queued_messages, []) != [] && state.iteration < state.max_iterations do
-      state
-      |> resume_for_queued_messages()
-      |> Aikido.AiReact.RunState.request_model_turn()
+      RunState.resume_queued_messages(state)
     else
       complete_run(state, text)
     end
@@ -95,9 +104,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
         continue_from_classified_response(state, %{type: :final_answer, text: text})
 
       state.iteration >= state.max_iterations ->
-        Aikido.Types.ActionResult.new(
-          state: %{state | status: :failed, result: nil, error: :max_iterations}
-        )
+        {:ok, %{state | status: :failed, result: nil, error: :max_iterations}, []}
 
       true ->
         state
@@ -107,16 +114,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
   end
 
   defp complete_run(state, answer) do
-    Aikido.Types.ActionResult.new(state: %{state | status: :completed, result: answer})
-  end
-
-  defp resume_for_queued_messages(state) do
-    Map.merge(state, %{
-      status: :running,
-      result: nil,
-      streaming_text: "",
-      streaming_thinking: ""
-    })
+    {:ok, %{state | status: :completed, result: answer}, []}
   end
 
   defp record_pending_batch(state, calls) do
@@ -138,7 +136,7 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
         }
       end)
 
-    Aikido.Types.ActionResult.new(state: state, directives: directives)
+    {:ok, state, directives}
   end
 
   defp model_hook_payload(data) do

@@ -68,7 +68,7 @@ defmodule AikidoTest.TracePropagation.Pipeline.Actions.BeginWork do
   @impl true
   def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | status: :working},
+      changes: %{status: :working},
       directives: [
         %Aikido.Directives.AsyncTask{
           work: {AikidoTest.TracePropagation.Work, :run, [input.arguments.amount]},
@@ -88,7 +88,7 @@ defmodule AikidoTest.TracePropagation.Pipeline.Actions.AcceptResult do
     value = input.arguments.result.value
 
     Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | status: :finishing},
+      changes: %{status: :finishing},
       directives: [
         %Aikido.Directives.Schedule{
           delay_ms: 0,
@@ -110,9 +110,7 @@ defmodule AikidoTest.TracePropagation.Pipeline.Actions.Finish do
 
   @impl true
   def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | status: :completed, value: input.arguments.value}
-    )
+    Aikido.Types.ActionResult.new(changes: %{status: :completed, value: input.arguments.value})
   end
 end
 

@@ -11,6 +11,6 @@ defmodule Aikido.Cron.Actions.RetryJob do
         do: [Aikido.Cron.Registrations.start(id, spec, generation)],
         else: []
 
-    Aikido.Types.ActionResult.new(state: state, directives: directives)
+    Aikido.Types.ActionResult.new(changes: nil, directives: directives)
   end
 end

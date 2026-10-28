@@ -14,19 +14,23 @@ defmodule AikidoTest.Thread.Actions.ClearTest do
 
     signal = %Aikido.Signal{type: "aikido.thread.clear", time: "2026-10-21T12:00:00Z"}
     assert {:ok, result} = clear(state, signal)
-    assert result.state.id == state.id
-    assert result.state.metadata == state.metadata
-    assert result.state.created_at == 123
-    assert result.state.entries == []
-    assert result.state.stats.entry_count == 0
-    assert result.state.rev == 3
-    assert result.state.updated_at == Aikido.Signal.timestamp(signal)
+    refute Map.has_key?(result.changes, :id)
+    refute Map.has_key?(result.changes, :metadata)
+    refute Map.has_key?(result.changes, :created_at)
+    updated = Ash.update!(state, result.changes, action: :update)
+    assert updated.id == state.id
+    assert updated.metadata == state.metadata
+    assert updated.created_at == 123
+    assert result.changes.entries == []
+    assert result.changes.stats.entry_count == 0
+    assert result.changes.rev == 3
+    assert result.changes.updated_at == Aikido.Signal.timestamp(signal)
     assert result.directives == []
     assert length(state.entries) == 1
 
-    assert {:ok, again} = clear(result.state, signal)
-    assert again.state.rev == 4
-    assert again.state.entries == []
+    assert {:ok, again} = clear(updated, signal)
+    assert again.changes.rev == 4
+    assert again.changes.entries == []
   end
 
   defp clear(state, signal) do

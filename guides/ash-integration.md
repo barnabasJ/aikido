@@ -1,10 +1,10 @@
 # Ash domains, agents, slices, and teams
 
 Define your public API on an Ash domain. Agents are Ash resources extended by
-`Aikido.Ash.Agent`; slices are embedded Ash resources with `Aikido.Ash.Slice`;
-teams are agent resources with `Aikido.Ash.Team`.
+`Aikido.Agent.Extension`; slices are embedded Ash resources with `Aikido.Slice.Extension`;
+teams are agent resources with `Aikido.Team.Extension`.
 
-The project uses Ash 3.36 or later. Configure Ash's required string length
+The project requires Ash 3.37.2 or later in the 3.x series. Configure Ash's required string length
 behavior in your application's `config/config.exs`:
 
 ```elixir
@@ -19,7 +19,7 @@ executes them after applying the action result.
 AgentServer runs the original resource module. Its attributes, actions, slice mounts
 and middleware configuration are reused directly; no companion resource is generated.
 Own-state fields, AI flags and team configuration live in Spark and are read through
-`Aikido.Ash.Agent.Info.state_fields/1`, `ai?/1` and `team_config/1`.
+`Aikido.Agent.Info.state_fields/1`, `ai?/1` and `team_config/1`.
 
 A private `:initialize` generic action uses a shared implementation, configured
 by the transformer with the state path and slice mounts. Native create actions
@@ -45,19 +45,18 @@ native resource options and defaults to the embedded data layer.
 ## Source organization
 
 Each distinct action has its own native implementation module, such as
-`Aikido.Slices.AiReact.Actions.Ask`. Its route binds that module directly. Shared
+`Aikido.AiReact.Actions.Ask`. Its route binds that module directly. Shared
 helpers contain reusable mechanics rather than selecting another action by name.
 Signal declarations generate the native Ash actions on the existing resource;
 the implementation modules provide their callbacks without creating resources.
 
-Shared reusable implementations such as `Aikido.Actions.Broadcast` and
-`Aikido.Actions.Forward` live directly under `Aikido.Actions`.
+Shared lifecycle reducers such as `Aikido.Actions.Lifecycle.StopSelf` live under
+`Aikido.Actions.Lifecycle`.
 
-Result contracts live under `Aikido.Types`, including `ActionResult`,
-`SliceUpdate` and `Directive`.
+Result contracts live under `Aikido.Types`, including `ActionResult` and `Directive`.
 
 Finite states and modes use feature-owned `Ash.Type.Enum` modules. For example,
-`Aikido.Slices.AiReact.Types.Status` defines `idle`, `setup`, `running`, `waiting`,
+`Aikido.AiReact.Types.Status` defines `idle`, `setup`, `running`, `waiting`,
 `completed` and `failed`. The same type flows into resource attributes, generated
 reducer arguments and native storage casting. Open-ended names and paths remain atoms.
 
@@ -69,7 +68,7 @@ For example, `counter.ex`, `counter/actions/increment.ex` and
 contract together, with each filename matching its module.
 
 Library features follow the same rule: ReAct signals, hooks, execution helpers
-and directives live under `Aikido.Slices.AiReact`; runtime protocol signals live
+and directives live under `Aikido.AiReact`; runtime protocol signals live
 under `Aikido.AgentServer.Signals`. Each Ash extension owns its `Info`,
 `Transformers` and `Verifiers` modules. Shared envelopes, routing infrastructure
 and reusable directives remain in their shared subsystems.
@@ -84,7 +83,7 @@ children = [
 ]
 ```
 
-Add `Aikido.Ash.Agent` to the resource extensions:
+Add `Aikido.Agent.Extension` to the resource extensions:
 
 ```elixir
 defmodule MyApp.Signals.Add do
@@ -108,14 +107,14 @@ defmodule MyApp.Increment do
   @impl true
   def run(input, _opts, _context) do
     state = input.arguments.state
-    Aikido.Types.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
+    Aikido.Types.ActionResult.new(changes: %{count: state.count + input.arguments.amount})
   end
 end
 
 defmodule MyApp.Counter do
   use Ash.Resource,
     domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "counter"
@@ -148,11 +147,11 @@ command. Attributes carry Ash types, constraints, defaults, visibility and nil
 validation. Mounted slices become additional attributes. Internally the runtime
 groups the agent's own fields under `:state`; `path :other_name` changes that path.
 
-Each public command uses its own native implementation under `Aikido.Ash.Commands`.
-These implementations live in `lib/aikido/ash/commands/` and perform I/O at the
+Each public command uses its own native implementation under `Aikido.Agent.Commands`.
+These implementations live in `lib/aikido/agent/commands/` and perform I/O at the
 external domain boundary. Agent/slice `actions/` contain pure reducer implementations.
 The transformer attaches each command implementation directly. Shared reference resolution,
-snapshot projection and caller-scope helpers live in `lib/aikido/ash/runtime.ex`.
+snapshot projection and caller-scope helpers live in `lib/aikido/agent/command_runtime.ex`.
 
 The generated public actions are all generic Ash actions: `start`, `stop`,
 `delete`, `inspect`, `list`, and the declared signals. These public commands do
@@ -228,7 +227,7 @@ as demonstrated by `AgentExamples.AI.ask/3`.
 Use IDs for durable identity: recovery may replace a PID. Neither a receipt nor
 a snapshot establishes exactly-once external effects or a durable input inbox.
 Native state transitions return `Aikido.Types.ActionResult`, an `Ash.TypedStruct` with
-`state` and `directives`. Define directives with `use Aikido.Directive`,
+`changes` and `directives`. Define directives with `use Aikido.Directive`,
 Ash's `typed_struct` fields, and an `exec/3` behaviour callback in the same module.
 Directive modules are checked with Ash's native `:module` behaviour constraint,
 which delegates to Spark. The runtime validates every returned result before applying state
@@ -316,13 +315,13 @@ inherits the triggering signal's scope and tracing context. Subscriptions send
 ordinary process messages to their registered recipient PID.
 
 Broadcasts use `Ash.Notifier.Notification` through a notification directive,
-after the reducer's returned state has been applied. Application notifiers can
+after the reducer's returned attribute changes have been applied. Application notifiers can
 publish to Phoenix PubSub or another destination. When the notification omits
 its resource, the directive supplies the originating agent resource for native
 notifier metadata. Explicit resources and notifier selections are preserved.
 Do not return native Ash
 notifications from a reducer: Ash would dispatch them before AgentServer adopts
-the returned state. Applied state does not imply a disk checkpoint has completed.
+the returned changes. Applied state does not imply a disk checkpoint has completed.
 
 `Aikido.Signal.Router` matches the complete signal type against declared paths.
 `*` consumes one dot-separated segment; `**` consumes zero or more segments,
@@ -347,7 +346,7 @@ agent throughput guarantees. Signal delivery remains handled by directives.
 
 ```elixir
 defmodule MyApp.Agents do
-  use Ash.Domain, extensions: [Aikido.Ash.Domain]
+  use Ash.Domain, extensions: [Aikido.Domain.Extension]
 
   agents do
     agent :counter, MyApp.Counter
@@ -382,6 +381,15 @@ through startup, signals and directives. Startup scope remains transient and is
 not stored in the durable identity. Each configured initialization/create policy
 must permit the caller as well as the public start action.
 
+Explicit stop commands likewise forward the current caller's scope to the stopping
+lifecycle. Cleanup runs through normal reducers, native updates and directives;
+if it fails, the stop command returns the error and leaves the process alive.
+A reducer's Stop directive uses that signal's current scope for cleanup. The stop
+is still honored if cleanup fails, and synchronous callers receive that error.
+Callerless supervisor shutdown has no earlier actor to reuse: cleanup is best
+effort under the application's policies, and failures are logged. None of these
+paths stores caller authority for future shutdowns.
+
 The pinned Ash AI tool executor forwards actor, tenant and application context to
 its underlying Ash actions, but does not forward per-call `tracer` or `authorize?`
 options. Those tool actions retain their configured authorization. Native runtime
@@ -405,7 +413,7 @@ Slices package state and the Ash actions that operate on it:
 defmodule MyApp.CounterSlice do
   use Ash.Resource,
     data_layer: :embedded,
-    extensions: [Aikido.Ash.Slice]
+    extensions: [Aikido.Slice.Extension]
 
   slice do
     name "counter_slice"
@@ -425,7 +433,7 @@ end
 defmodule MyApp.ComposedAgent do
   use Ash.Resource,
     domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent]
+    extensions: [Aikido.Agent.Extension]
 
   agent do
     name "composed"
@@ -448,8 +456,8 @@ Slice implementations receive their current typed slice value as `state`.
 Single-signal fields such as `amount` are cast from the payload and exposed in
 `input.arguments`. List routes receive a native union in `data`; wildcard routes
 receive raw `data`.
-They return `Aikido.Types.ActionResult.new(state: new_state, directives: directives)`;
-`directives` defaults to `[]`. The agent pipeline applies the returned state
+They return `Aikido.Types.ActionResult.new(changes: attributes, directives: directives)`;
+`directives` defaults to `[]`. The agent pipeline applies the returned attribute changes
 and executes the directives. Runtime action context is available under `input.context.aikido`.
 Keep these action implementations pure.
 
@@ -484,7 +492,7 @@ A team is an agent resource that lists its member resources:
 defmodule MyApp.ReviewTeam do
   use Ash.Resource,
     domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
 
   agent do
     name "review_team"
@@ -533,14 +541,17 @@ teams; lazy members remain inactive unless required by an eager member.
 
 A restored durable identity retains its saved topology, even if startup arguments
 contain a different graph. Use `configure_topology` to change an existing team's
-graph explicitly. Root graph structure is validated before activation; startup
-failures stop the new team through the normal lifecycle.
+graph explicitly. Root graph structure is validated before activation. Startup
+failures request a stop through the normal lifecycle with the current caller's
+scope. If cleanup also fails, a native `Aikido.Agent.Errors.StartupCleanupFailed`
+error retains the root ID and both failures. The caller can inspect the live root
+and retry cleanup with appropriate authority.
 
 `send` emits an asynchronous signal to a member. Use signal subscriptions to
 observe its result. Members can return the existing emit/notify-parent directives
 to communicate through the signal pipeline. Stopping the team stops its children
-through the normal parent-death lifecycle. Startup failures stop the new team;
-process side effects cannot be rolled back as a database transaction.
+through the normal parent-death lifecycle. Process side effects cannot be rolled
+back as a database transaction.
 
 ## Native contracts and tools
 
@@ -581,3 +592,113 @@ a compact receipt after completion. Inspect explicitly when the caller needs the
 updated topology. `configure_topology` changes a running team's desired graph;
 `start` launches an agent or team using the same interface. Signals and directives
 perform the asynchronous work inside the team.
+
+### Sparse reducer changes
+
+Reducers can return only the attributes they change:
+
+```elixir
+Aikido.Types.ActionResult.new(
+  changes: %{count: state.count + input.arguments.amount},
+  directives: []
+)
+```
+
+The changes apply only to the reducer's own mounted path. Omitted keys retain
+existing values. Explicit nil is passed to Ash and rejected when the resource
+attribute disallows it. The generated input map filters unknown keys using native
+Ash map constraints; the real private update action casts and validates values.
+Embedded edits use attribute maps and follow native Ash embedded identity,
+update and replacement rules. Existing embedded structs retain native Ash's
+trusted-value behavior. Mounted slices remain mounted. Omitting `changes` or
+returning `changes: nil` leaves state unchanged and still executes returned directives.
+
+`changes: %{}` also requests no state change. The result contains attribute
+changes rather than a complete replacement state; unchanged attributes do not
+need to be copied into the result.
+
+The private update retains the reducer's scope and runs native update validations
+and policies. Applications with action-specific policies must account for
+`:__aikido_apply_state__`. It returns the updated in-memory resource without
+writing a separate data layer; DurableServer remains responsible for persistence.
+
+Native Ash notification collection spans the complete routed signal operation,
+including embedded updates. If a later reducer fails, staged state and collected
+notifications are discarded. On success, the runtime adopts the validated state
+before executing notification directives. Explicit reducer directives retain
+their declared order. A signal with no changes does not produce an update
+notification merely because it was received.
+
+### Native agent publications
+
+Aikido owns publication and subscription declarations and builds the underlying
+native Ash PubSub configuration. A resource opts into payload data with a native
+`:notification_data` calculation. Slices use the same convention. Without that
+calculation, a slice contributes nothing; attributes are never exported by default.
+
+```elixir
+calculations do
+  calculate :notification_data, :integer, expr(count)
+end
+
+notifications do
+  pubsub Phoenix.PubSub
+  pubsub_name MyApp.PubSub
+
+  publish :changed do
+    topic ["counters", :id]
+  end
+end
+```
+
+The generated aggregate calculation composes root data under the agent's own
+state path and slice data under each mount name. Two mounts of the same slice
+remain distinct. Calculation types, constraints and nullability define the
+payload contract. Calculations must declare explicit types and require no runtime
+arguments. Native Ash loads the root and nested calculations with the update's
+scope. Aikido generates `Publisher.Signals.Changed`; applications do not repeat
+its payload schema.
+
+A receiving agent declares the publication, maps publisher topic fields to its
+own attributes, and supplies an application-owned scope resolver:
+
+```elixir
+notifications do
+  scope {MyApp.AgentAuthority, :resolve, []}
+
+  subscribe MyApp.Publisher, :changed do
+    bindings id: :publisher_id
+  end
+end
+```
+
+The scope MFA receives the current immutable receiving agent before its configured
+arguments and returns `{:ok, scope_map}` or `{:error, reason}`. Resolve authority
+from trusted application data. Publisher actor, tenant and context are never
+inherited by the receiving signal. Joining a topic does not evaluate a read policy
+for every listener. Applications must authorize topic access or publish minimal
+invalidation data followed by an authorized read.
+
+Use the generated signal in an ordinary route. When its payload contains `:state`
+(the default root path), use an explicit native action accepting typed `:data`,
+or the existing signal-list route contract, to preserve the receiver's separate
+`:state` argument. A custom root path such as `:metrics` avoids this reserved-name
+collision. Publication metadata references are checked after compilation; mutually
+referencing generated signal routes still have ordinary compile dependencies.
+
+The built-in notification slice records resolved registrations. Subscription I/O
+runs in the receiving process during startup; failures prevent readiness. Graceful
+stop unsubscribes, and Phoenix PubSub removes memberships when the process exits.
+Checkpoint callbacks clear registrations so restore rebuilds them. Multiple events
+on one transport/topic share one actual subscription. Binding attributes must stay
+fixed for an activation: changed bindings reject old-topic deliveries until restart.
+
+PubSub is best effort, provides no durable replay, and asynchronous publication
+tasks may complete out of order. It does not acknowledge a DurableServer commit or
+a separate application SQL transaction. Use revisions and reconciliation when the
+application requires stronger ordering or recovery.
+
+The playground's **Native notifications** example demonstrates a counter publishing
+its calculation to a child observer. The observer adopts the typed value and sends
+an acknowledgement through a normal agent signal. The example's counter is public;
+its receiving scope does not claim to implement a private-data authorization policy.

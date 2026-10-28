@@ -35,7 +35,7 @@ defmodule Aikido.Cron.Actions.Activate do
       end)
 
     Aikido.Types.ActionResult.new(
-      state: %{state | specs: dynamic, errors: errors},
+      changes: %{specs: dynamic, errors: errors},
       directives: restored ++ schedules
     )
   end

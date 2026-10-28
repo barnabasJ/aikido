@@ -9,16 +9,27 @@ defmodule Aikido.AiWorker.Actions.Accept do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- accept_team_task(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, [:queue, :pending, :completed])
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp accept_team_task(input) do
     state = input.arguments.state
     context = input.context.aikido
     task = task_with_scope(input)
 
     cond do
       duplicate_task?(state, task.task_id) ->
-        Aikido.Types.ActionResult.new(state: state)
+        {:ok, state, []}
 
       state.pending || context.agent.state.ai.status in [:setup, :running, :waiting] ->
-        Aikido.Types.ActionResult.new(state: Map.update(state, :queue, [task], &(&1 ++ [task])))
+        {:ok, Map.update(state, :queue, [task], &(&1 ++ [task])), []}
 
       true ->
         start_ai_run_for_task(state, task, context)
@@ -58,10 +69,7 @@ defmodule Aikido.AiWorker.Actions.Accept do
 
     ask = task_request_signal(data)
 
-    Aikido.Types.ActionResult.new(
-      state: %{state | pending: pending},
-      directives: [Aikido.Directives.emit_to_pid(ask, context.agent_pid)]
-    )
+    {:ok, %{state | pending: pending}, [Aikido.Directives.emit_to_pid(ask, context.agent_pid)]}
   end
 
   defp task_request_signal(data) do

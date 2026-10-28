@@ -2,6 +2,18 @@ defmodule AgentExamples.Catalog do
   @moduledoc "The runnable examples and the descriptions shown on their LiveView pages."
   @examples [
     %{
+      slug: "notifications",
+      title: "Native notifications",
+      eyebrow: "Typed PubSub publications",
+      resource: AgentExamples.NotificationCounter,
+      kind: :notifications,
+      description:
+        "Publish an explicit calculation and watch a child agent adopt it through native Ash PubSub.",
+      detail:
+        "The generated changed signal carries only opted-in calculation data. The observer binds its publisher topic, resolves its own scope, and sends a normal acknowledgement signal. Stopping the root stops the observer and removes its subscriptions.",
+      flow: ["Native update", "Explicit calculation", "Ash PubSub", "Typed receiving action"]
+    },
+    %{
       slug: "cron",
       title: "Recurring cron",
       eyebrow: "Scheduled signals",
@@ -157,7 +169,7 @@ defmodule AgentExamples.Catalog do
       description:
         "Adjust a counter with typed signals and count every signal with a wildcard route.",
       detail:
-        "Add uses a typed public command. Increase and decrease share one handler through a native Ash union. A wildcard handler observes all three and also counts a notice with no specific handler. Each action returns the next state, which the following action receives.",
+        "Add uses a typed public command. Increase and decrease share one handler through a native Ash union. A wildcard handler observes all three and also counts a notice with no specific handler. Each action returns attribute changes. A native update validates and adopts them before the following action receives the updated state.",
       flow: ["Typed signal", "Shared union handler", "Wildcard observer", "Count + signals seen"]
     },
     %{

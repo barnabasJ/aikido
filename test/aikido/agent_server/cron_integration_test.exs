@@ -10,7 +10,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.Actions.RecordCronTick do
     ticks = Map.get(slice, :ticks, [])
 
     Aikido.Types.ActionResult.new(
-      state: %{tick_count: count + 1, ticks: ticks ++ [params]},
+      changes: %{tick_count: count + 1, ticks: ticks ++ [params]},
       directives: []
     )
   end
@@ -32,7 +32,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.Actions.RegisterCron do
 
     timezone = Map.get(params, :timezone)
     directive = Aikido.Directives.cron(cron_expr, message, job_id: job_id, timezone: timezone)
-    Aikido.Types.ActionResult.new(state: %{}, directives: [directive])
+    Aikido.Types.ActionResult.new(changes: %{}, directives: [directive])
   end
 end
 
@@ -44,7 +44,10 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.Actions.CancelCron do
     job_id =
       input.arguments.job_id
 
-    Aikido.Types.ActionResult.new(state: %{}, directives: [Aikido.Directives.cron_cancel(job_id)])
+    Aikido.Types.ActionResult.new(
+      changes: %{},
+      directives: [Aikido.Directives.cron_cancel(job_id)]
+    )
   end
 end
 
@@ -59,7 +62,7 @@ defmodule AikidoTest.AgentServer.CronIntegrationTest.CronBatch do
         cron -> Aikido.Directives.cron(cron, :tick, job_id: :ordered)
       end)
 
-    Aikido.Types.ActionResult.new(state: input.arguments.state, directives: directives)
+    Aikido.Types.ActionResult.new(directives: directives)
   end
 end
 

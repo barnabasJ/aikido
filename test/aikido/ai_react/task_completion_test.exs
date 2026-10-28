@@ -21,14 +21,15 @@ defmodule Aikido.AiReact.TaskCompletionTest do
     input = %{arguments: %{state: state}, context: %{aikido: %{agent: %{state: %{team: team}}}}}
     proposed = %{state | status: :completed, result: "Waiting for evidence"}
 
-    assert {:ok, %{state: waiting, directives: []}} =
-             RunState.resolve_run_outcome(Aikido.Types.ActionResult.new(state: proposed), input)
+    assert {:ok, waiting, []} =
+             RunState.resolve_run_outcome({:ok, proposed, []}, input)
 
     assert waiting.status == :waiting
     assert waiting.prepared_tools == state.prepared_tools
 
     assert {:error, _} = deliver(waiting, %{id: "other"})
-    assert {:ok, %{state: resumed, directives: [request]}} = deliver(waiting, %{id: "caller"})
+    assert {:ok, %{changes: changes, directives: [request]}} = deliver(waiting, %{id: "caller"})
+    resumed = Ash.update!(waiting, changes, action: :update)
     assert resumed.status == :running
     assert resumed.request_id == state.request_id
     assert resumed.deadline_at == state.deadline_at
@@ -42,8 +43,8 @@ defmodule Aikido.AiReact.TaskCompletionTest do
 
     settled = put_in(input.context.aikido.agent.state.team.tasks["child"].status, :completed)
 
-    assert {:ok, %{state: completed}} =
-             RunState.resolve_run_outcome(Aikido.Types.ActionResult.new(state: proposed), settled)
+    assert {:ok, completed, []} =
+             RunState.resolve_run_outcome({:ok, proposed, []}, settled)
 
     assert completed.status == :completed
     assert completed.prepared_tools == nil

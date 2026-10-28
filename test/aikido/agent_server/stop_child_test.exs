@@ -4,7 +4,7 @@ defmodule AikidoTest.AgentServer.StopChildTest.RecordExit do
   @impl true
   def run(input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: %{exit_tags: input.arguments.state.exit_tags ++ [input.arguments.tag]}
+      changes: %{exit_tags: input.arguments.state.exit_tags ++ [input.arguments.tag]}
     )
   end
 end

@@ -12,7 +12,7 @@ defmodule Aikido.Team.Actions.ChildExit do
 
     state
     |> record_member_exit(data, context)
-    |> ActionAdapter.to_action_result()
+    |> ActionAdapter.to_action_result(state)
   end
 
   defp record_member_exit(state, %{member: name, pid: pid} = data, context) do

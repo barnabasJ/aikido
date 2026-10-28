@@ -9,7 +9,7 @@ defmodule AikidoTest.AgentServer.IdentitySignalsTest.Actions.RecordIdentitySigna
     events = Map.get(slice, :identity_events, [])
 
     Aikido.Types.ActionResult.new(
-      state: %{slice | identity_events: events ++ [%{type: type, data: data}]},
+      changes: %{identity_events: events ++ [%{type: type, data: data}]},
       directives: []
     )
   end

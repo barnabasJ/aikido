@@ -6,7 +6,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest.Actions.EmitTestSignal do
     signal = %Aikido.Signal{id: nil, type: "test.emitted", data: %{}, source: "/test"}
 
     Aikido.Types.ActionResult.new(
-      state: %{},
+      changes: %{},
       directives: [%Aikido.Directives.Emit{signal: signal}]
     )
   end
@@ -18,7 +18,7 @@ defmodule AikidoTest.AgentServer.TelemetryTest.Actions.ScheduleTick do
   @impl true
   def run(_input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: %{},
+      changes: %{},
       directives: [%Aikido.Directives.Schedule{delay_ms: 100, message: :tick}]
     )
   end
@@ -136,6 +136,12 @@ defmodule AikidoTest.AgentServer.TelemetryTest do
       assert is_integer(measurements.duration)
       assert measurements.duration >= 0
       assert metadata.directive_count == 0
+      assert metadata.directive_types == %{}
+      signal_id = signal.id
+
+      refute_receive {:telemetry_event, [:aikido, :agent_server, :directive, :start], _,
+                      %{signal_id: ^signal_id, directive_type: "Notify"}}
+
       GenServer.stop(pid)
     end
 

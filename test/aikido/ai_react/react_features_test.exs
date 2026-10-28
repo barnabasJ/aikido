@@ -218,7 +218,9 @@ defmodule Aikido.ReactFeaturesTest do
              Aikido.AgentServer.subscribe(
                pid,
                "ai.react.tool.completed",
-               fn _runtime, event -> {:ok, event.signal} end, once: true)
+               fn _runtime, event -> {:ok, event.signal} end,
+               once: true
+             )
 
     request = Task.async(fn -> Aikido.AI.ask_sync(pid, "two tool turns", opts) end)
     assert_receive {:model, first_model, _}, 2_000

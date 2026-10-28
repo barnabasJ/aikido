@@ -152,7 +152,7 @@ defmodule Aikido.SignalContractTest do
 
     assert {:error, _} =
              Aikido.Types.ActionResult.new(
-               state: %{},
+               changes: %{},
                directives: [%Aikido.Directives.Emit{signal: %Signal{type: nil}}]
              )
   end

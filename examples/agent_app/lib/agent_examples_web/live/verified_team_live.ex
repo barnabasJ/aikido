@@ -12,7 +12,10 @@ defmodule AgentExamplesWeb.VerifiedTeamLive do
     ~H"""
     <.page {assigns}>
       <.team_topology tree_states={@team_trees} run={@run} orchestrator />
-      <.conversation run={@run} prompt="Delegate an evidence check in background mode, then explain how the result reaches the lead." />
+      <.conversation
+        run={@run}
+        prompt="Delegate an evidence check in background mode, then explain how the result reaches the lead."
+      />
     </.page>
     """
   end

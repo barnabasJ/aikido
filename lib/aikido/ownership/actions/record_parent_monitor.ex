@@ -9,14 +9,14 @@ defmodule Aikido.Ownership.Actions.RecordParentMonitor do
 
     case {state.parent, state.parent_monitor} do
       {%{pid: ^pid}, nil} ->
-        Aikido.Types.ActionResult.new(state: %{state | parent_monitor: ref})
+        Aikido.Types.ActionResult.new(changes: %{parent_monitor: ref})
 
       {%{pid: ^pid}, ^ref} ->
-        Aikido.Types.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(changes: nil)
 
       _ ->
         Aikido.Types.ActionResult.new(
-          state: state,
+          changes: nil,
           directives: [%Aikido.Directives.Demonitor{ref: ref}]
         )
     end

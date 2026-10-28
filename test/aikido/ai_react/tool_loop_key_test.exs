@@ -113,15 +113,11 @@ defmodule Aikido.ToolLoopKeyTest do
     resource = Aikido.ToolLoopKeyTest.CheckpointAgent
     pid = start_server(ctx, resource)
     durable = Aikido.durable_supervisor_name(ctx.aikido)
+    wrapper = :sys.get_state(pid).user_state
 
     assert {:ok, envelope} =
              Aikido.AgentServer.state(pid, fn runtime ->
-               {:ok,
-                Aikido.Durable.AgentServer.dump_state(%{
-                  runtime: runtime,
-                  permanent: false,
-                  options: [agent_module: resource, id: runtime.id, aikido: runtime.aikido]
-                })}
+               {:ok, Aikido.Durable.AgentServer.dump_state(%{wrapper | runtime: runtime})}
              end)
 
     {:ok, binary} = Ash.Type.cast_from_embedded(:binary, envelope["payload"])
@@ -144,12 +140,22 @@ defmodule Aikido.ToolLoopKeyTest do
     assert {:checkpoint, %{agent: legacy}} = loaded.agent
     refute Map.has_key?(legacy.state.ai.options, :tool_loop_key)
     :ok = Aikido.Durable.stop(durable, pid)
+    logical_key = loaded.options[:durable_key]
+    partition = loaded.options[:partition]
+    key = Aikido.Durable.storage_key(logical_key, partition)
+    assert :ok = Aikido.Durable.delete(durable, logical_key, partition: partition)
+    refute match?({:ok, _}, DurableServer.Supervisor.get_server_info(durable, key))
+    prefix = DurableServer.Supervisor.__get_config__(durable).prefix
+
+    assert {:error, :not_found} =
+             DurableServer.fetch_stored_state(durable, %{key: key, prefix: prefix},
+               consistent: true
+             )
 
     assert {:ok, {restored, _}} =
              DurableServer.Supervisor.start_child(
                durable,
-               {Aikido.Durable.AgentServer,
-                key: "legacy-key-#{System.unique_integer([:positive])}", initial_state: loaded}
+               {Aikido.Durable.AgentServer, key: key, initial_state: loaded}
              )
 
     on_exit(fn -> if Process.alive?(restored), do: Aikido.Durable.stop(durable, restored) end)
@@ -160,7 +166,8 @@ defmodule Aikido.ToolLoopKeyTest do
                &{:ok, &1.agent.state.ai.options}
              )
 
-    refute Map.has_key?(restored_options, :tool_loop_key)
+    assert restored_options == legacy_options
+    assert Map.get(restored_options, :tool_loop_key) == nil
     opts = options(self(), nil) |> Keyword.delete(:options)
     request = Task.async(fn -> Aikido.AI.ask_sync(restored, "work", opts) end)
     assert_receive {:model_request, model, _, [_]}, 5_000

@@ -8,7 +8,7 @@ defmodule Aikido.Memory.Actions.EnsureSpace do
     name = input.arguments.space
 
     if Map.get(state.spaces, name) do
-      Aikido.Types.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(changes: nil)
     else
       data =
         case input.arguments.default do

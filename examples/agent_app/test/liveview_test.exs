@@ -208,6 +208,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
       {"counter", AgentExamplesWeb.CounterLive},
       {"cron", AgentExamplesWeb.CronLive},
       {"checkpoint", AgentExamplesWeb.CheckpointLive},
+      {"notifications", AgentExamplesWeb.NotificationsLive},
       {"checklist", AgentExamplesWeb.ChecklistLive},
       {"notebook", AgentExamplesWeb.NotebookLive},
       {"worker", AgentExamplesWeb.WorkerLive},

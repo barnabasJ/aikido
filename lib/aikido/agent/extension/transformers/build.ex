@@ -21,9 +21,14 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
   end
 
   defp add_builtin_slices(dsl) do
-    Enum.reduce([{:cron, Aikido.Cron.Slice}, {:ownership, Aikido.Ownership.Slice}], dsl, fn {path,
-                                                                                             module},
-                                                                                            dsl ->
+    builtins = [{:cron, Aikido.Cron.Slice}, {:ownership, Aikido.Ownership.Slice}]
+
+    builtins =
+      if Aikido.Notifications.Info.subscriptions(dsl) == [],
+        do: builtins,
+        else: builtins ++ [{:notifications, Aikido.Notifications.Slice}]
+
+    Enum.reduce(builtins, dsl, fn {path, module}, dsl ->
       if Enum.any?(
            Transformer.get_entities(dsl, [:agent]),
            &match?(%Aikido.Agent.SliceMount{module: ^module}, &1)
@@ -107,6 +112,7 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
     with :ok <- ensure_embedded_mounts(mounts),
          {:ok, dsl} <- add_identity_attribute(dsl),
          {:ok, dsl} <- add_mounts(dsl, mounts, team_slice),
+         {:ok, dsl} <- Aikido.Agent.StateAction.add(dsl),
          {:ok, dsl} <- add_lifecycle_actions(dsl),
          {:ok, dsl} <- add_signals(dsl, signals),
          {:ok, dsl} <- add_initialization_action(dsl, attributes),

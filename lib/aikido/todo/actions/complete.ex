@@ -10,7 +10,7 @@ defmodule Aikido.Todo.Actions.Complete do
         {:error, "Unknown todo ID"}
 
       %{status: :completed} ->
-        Aikido.Types.ActionResult.new(state: input.arguments.state)
+        Aikido.Types.ActionResult.new(changes: nil)
 
       item ->
         Items.replace(input, %{

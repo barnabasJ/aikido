@@ -24,10 +24,12 @@ defmodule Aikido.AiReact.ReplaceContextTest do
 
     messages = [ReqLLM.Context.user("caller-supplied summary")]
 
-    assert %Aikido.Types.ActionResult{state: replaced, directives: []} =
+    assert %Aikido.Types.ActionResult{changes: changes, directives: []} =
              Aikido.AiReact.Slice
              |> Ash.ActionInput.for_action(:replace_context, %{state: state, messages: messages})
              |> Ash.run_action!()
+
+    replaced = Ash.update!(state, changes, action: :update)
 
     assert replaced.context.messages == messages
 

@@ -533,6 +533,8 @@ defmodule AgentExamples.Playground do
 
   defp create_run(key, example, options, state) do
     options = Map.merge(shared_provider_options(key, state), options)
+    scope = [actor: %{id: elem(key, 0)}, tenant: "playground"]
+    startup = Keyword.merge(scope, startup_options(example))
 
     with {:ok, attributes} <- attributes(example, options),
          attributes = with_request_callback(example, attributes, key),
@@ -540,7 +542,7 @@ defmodule AgentExamples.Playground do
          attributes = checkpoint_identity(example, attributes, key),
          {:ok, record} <-
            example.resource
-           |> Ash.ActionInput.for_action(:start, attributes, startup_options(example))
+           |> Ash.ActionInput.for_action(:start, attributes, startup)
            |> Ash.run_action() do
       close_replaced_sort_history(example, state.runs[key])
       pid = record.pid
@@ -559,7 +561,7 @@ defmodule AgentExamples.Playground do
 
       run = %{
         record: record,
-        scope: [actor: %{id: elem(key, 0)}, tenant: "playground"],
+        scope: scope,
         requests: [],
         status: :ready,
         mode: options["mode"] || "offline",
@@ -841,7 +843,7 @@ defmodule AgentExamples.Playground do
   def snapshot(state) do
     resource = state.agent_module
 
-    own = Map.get(state.agent.state, :state, %{})
+    own = Map.get(state.agent.state, Aikido.Agent.Info.agent_path!(resource), %{})
     ai = Map.get(state.agent.state, :ai, %{})
     team = Map.get(state.agent.state, :team, %{})
 

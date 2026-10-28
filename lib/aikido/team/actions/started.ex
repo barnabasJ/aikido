@@ -7,7 +7,11 @@ defmodule Aikido.Team.Actions.Started do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
-    ActionAdapter.to_action_result(adopt_started_member(signal.data, state, context, config))
+
+    ActionAdapter.to_action_result(
+      adopt_started_member(signal.data, state, context, config),
+      state
+    )
   end
 
   defp adopt_started_member(
@@ -62,12 +66,16 @@ defmodule Aikido.Team.Actions.Started do
 
   defp cleanup_late_activation(state, pid, config) do
     # A timed-out activation must not leave an untracked worker running.
+    instance = config.instance
+
     directives =
       if pid in Map.values(state.members),
         do: [],
         else: [
           Directives.async_task(
-            {Aikido.Team.MemberProcesses, :stop_member, [config.instance, pid]},
+            fn task ->
+              Aikido.Team.MemberProcesses.stop_member(instance, pid, task.input_signal)
+            end,
             success_type: "aikido.ash.team.cleanup",
             error_type: "aikido.ash.team.cleanup"
           )

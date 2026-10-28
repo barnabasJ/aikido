@@ -10,6 +10,7 @@ defmodule Aikido.Agent.Extension.Verifiers.Validate do
     :list,
     :inspect,
     :initialize,
+    :__aikido_apply_state__,
     :__aikido_initialize_state__
   ]
 

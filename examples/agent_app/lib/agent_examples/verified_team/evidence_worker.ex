@@ -11,6 +11,7 @@ defmodule AgentExamples.VerifiedTeam.EvidenceWorker do
 
   ai do
     client AgentExamples.VerifiedTeam.EvidenceClient
+
     system_prompt "Perform the requested evidence check. Return concrete findings and explicitly state any limitations."
   end
 end

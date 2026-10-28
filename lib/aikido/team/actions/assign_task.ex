@@ -12,7 +12,10 @@ defmodule Aikido.Team.Actions.AssignTask do
     signal = preserve_pending_task_mode(signal, state)
 
     with :ok <- Aikido.Team.TaskDependencies.validate_assignment(state, signal.data) do
-      ActionAdapter.to_action_result(assign_or_activate_member(signal, state, context, config))
+      ActionAdapter.to_action_result(
+        assign_or_activate_member(signal, state, context, config),
+        state
+      )
     end
   end
 

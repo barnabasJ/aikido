@@ -9,6 +9,17 @@ defmodule Aikido.AiWorker.Actions.Settle do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- settle_team_task(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, [:queue, :pending, :completed])
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp settle_team_task(input) do
     state = input.arguments.state
     context = input.context.aikido
     ai = context.agent.state.ai
@@ -22,7 +33,7 @@ defmodule Aikido.AiWorker.Actions.Settle do
         start_next_queued_task(state, context, [])
 
       true ->
-        Aikido.Types.ActionResult.new(state: state)
+        {:ok, state, []}
     end
   end
 
@@ -61,20 +72,17 @@ defmodule Aikido.AiWorker.Actions.Settle do
   defp start_next_queued_task(state, context, effects) do
     case Map.get(state, :queue, []) do
       [data | rest] ->
-        with {:ok, result} <-
+        with {:ok, state, directives} <-
                Aikido.AiWorker.Actions.Accept.start_ai_run_for_task(
                  %{state | queue: rest},
                  data,
                  context
                ) do
-          Aikido.Types.ActionResult.new(
-            state: result.state,
-            directives: effects ++ result.directives
-          )
+          {:ok, state, effects ++ directives}
         end
 
       [] ->
-        Aikido.Types.ActionResult.new(state: state, directives: effects)
+        {:ok, state, effects}
     end
   end
 end

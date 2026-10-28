@@ -68,7 +68,7 @@ defmodule Aikido.DirectiveTest do
   test "validated custom directives execute their module callback without a protocol" do
     directive = Notify.new!(recipient: self(), count: 2)
     assert {:ok, ^directive} = Aikido.Types.Directive.cast_input(directive, [])
-    assert {:ok, result} = Aikido.Types.ActionResult.new(state: %{}, directives: [directive])
+    assert {:ok, result} = Aikido.Types.ActionResult.new(changes: %{}, directives: [directive])
     assert result.directives == [directive]
     refute_received {:notified, _}
 
@@ -88,12 +88,12 @@ defmodule Aikido.DirectiveTest do
 
   test "raw directive fields are validated before effects can execute" do
     invalid = %Notify{recipient: self(), count: 0}
-    assert {:error, _} = Aikido.Types.ActionResult.new(state: %{}, directives: [invalid])
+    assert {:error, _} = Aikido.Types.ActionResult.new(changes: %{}, directives: [invalid])
     refute_received {:notified, _}
 
     assert {:error, _} =
              Aikido.Types.ActionResult.new(
-               state: %{},
+               changes: %{},
                directives: [%Aikido.Directives.Schedule{delay_ms: -1, message: :tick}]
              )
   end

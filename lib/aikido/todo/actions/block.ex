@@ -7,7 +7,7 @@ defmodule Aikido.Todo.Actions.Block do
   def run(input, _opts, _context) do
     case Items.find(input) do
       nil -> {:error, "Unknown todo ID"}
-      %{status: :completed} -> Aikido.Types.ActionResult.new(state: input.arguments.state)
+      %{status: :completed} -> Aikido.Types.ActionResult.new(changes: nil)
       item -> Items.replace(input, %{item | status: :blocked, reason: input.arguments.reason})
     end
   end

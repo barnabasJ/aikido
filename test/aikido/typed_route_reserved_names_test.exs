@@ -1,8 +1,8 @@
 defmodule AikidoTest.TypedRouteReservedNamesTest.Noop do
   use Ash.Resource.Actions.Implementation
 
-  def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(state: input.arguments.state)
+  def run(_input, _opts, _context) do
+    Aikido.Types.ActionResult.new(changes: nil)
   end
 end
 
@@ -250,7 +250,7 @@ defmodule AikidoTest.TypedRouteReservedNamesTest do
     Code.compile_string("""
     defmodule #{inspect(module)} do
       use Ash.Resource.Actions.Implementation
-      def run(input, _, _), do: Aikido.Types.ActionResult.new(state: input.arguments.state)
+      def run(_input, _, _), do: Aikido.Types.ActionResult.new(changes: nil)
     end
     """)
 

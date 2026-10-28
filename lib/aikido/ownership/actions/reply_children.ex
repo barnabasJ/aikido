@@ -16,6 +16,6 @@ defmodule Aikido.Ownership.Actions.ReplyChildren do
         %{children: children}
       )
 
-    Aikido.Types.ActionResult.new(state: input.arguments.state, directives: List.wrap(directive))
+    Aikido.Types.ActionResult.new(changes: nil, directives: List.wrap(directive))
   end
 end

@@ -17,7 +17,7 @@ defmodule AikidoTest.Signal.CallTest.Actions.ReplyToEcho do
     directives =
       if signal.data[:stop], do: directives ++ [%Aikido.Directives.Stop{}], else: directives
 
-    Aikido.Types.ActionResult.new(state: %{}, directives: directives)
+    Aikido.Types.ActionResult.new(changes: %{}, directives: directives)
   end
 end
 
@@ -26,7 +26,7 @@ defmodule AikidoTest.Signal.CallTest.Actions.IgnoreSignal do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
-    Aikido.Types.ActionResult.new(state: %{}, directives: [])
+    Aikido.Types.ActionResult.new(changes: %{}, directives: [])
   end
 end
 

@@ -77,6 +77,10 @@ defmodule AikidoTest.Memory.Actions.MutationTest do
   defp run!(state, action, params) do
     {:ok, result} = run(state, action, params)
     assert result.directives == []
-    result.state
+
+    case result.changes do
+      nil -> state
+      changes -> Ash.update!(state, changes, action: :update)
+    end
   end
 end

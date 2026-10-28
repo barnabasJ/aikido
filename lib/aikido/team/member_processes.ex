@@ -39,10 +39,11 @@ defmodule Aikido.Team.MemberProcesses do
     Keyword.put(options, :context, context)
   end
 
-  def stop_member(instance, pid) do
-    case Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), pid) do
+  def stop_member(instance, pid, scope) do
+    case Aikido.Durable.stop(Aikido.durable_supervisor_name(instance), pid, scope: scope) do
       :ok -> {:ok, :stopped}
       {:error, :not_found} -> {:ok, :stopped}
+      {:error, _} = error -> error
     end
   catch
     :exit, {:noproc, _} -> {:ok, :stopped}

@@ -10,15 +10,15 @@ defmodule Aikido.Ownership.Actions.RecordChildMonitor do
     case Map.get(state.children, tag) do
       %{pid: ^pid, ref: nil} = child ->
         Aikido.Types.ActionResult.new(
-          state: %{state | children: Map.put(state.children, tag, %{child | ref: ref})}
+          changes: %{children: Map.put(state.children, tag, %{child | ref: ref})}
         )
 
       %{pid: ^pid, ref: ^ref} ->
-        Aikido.Types.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(changes: nil)
 
       _ ->
         Aikido.Types.ActionResult.new(
-          state: state,
+          changes: nil,
           directives: [%Aikido.Directives.Demonitor{ref: ref}]
         )
     end

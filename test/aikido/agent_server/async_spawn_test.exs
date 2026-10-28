@@ -10,8 +10,8 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest.Actions.PreserveCount do
   use Ash.Resource.Actions.Implementation
 
   @impl true
-  def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(state: input.arguments.state)
+  def run(_input, _opts, _context) do
+    Aikido.Types.ActionResult.new(changes: nil)
   end
 end
 
@@ -35,10 +35,7 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest.Emit do
 
   @impl true
   def run(input, _, _) do
-    Aikido.Types.ActionResult.new(
-      state: input.arguments.state,
-      directives: [input.arguments.directive]
-    )
+    Aikido.Types.ActionResult.new(directives: [input.arguments.directive])
   end
 end
 
@@ -48,7 +45,7 @@ defmodule AikidoTest.AgentServer.AsyncSpawnTest.Orphaned do
   @impl true
   def run(input, _, _) do
     state = input.arguments.state
-    Aikido.Types.ActionResult.new(state: %{state | orphan_count: state.orphan_count + 1})
+    Aikido.Types.ActionResult.new(changes: %{orphan_count: state.orphan_count + 1})
   end
 end
 

@@ -17,29 +17,29 @@ defmodule AikidoTest.Ownership.ChildLifecycleTest do
     ref = Process.monitor(context.first)
     on_exit(fn -> Process.demonitor(ref, [:flush]) end)
     started = transition(context, context.slice, :child_started, announcement(context.first))
-    assert started.state.children.worker.ref == nil
+    assert started.record.children.worker.ref == nil
     assert [%Aikido.Ownership.Directives.MonitorChild{pid: pid}] = started.directives
     assert pid == context.first
 
     exited =
       transition(
         context,
-        started.state,
+        started.record,
         :child_exit,
         ChildExit.new!(%{tag: :worker, pid: context.first, reason: :normal, monitor_ref: ref})
       )
 
-    assert exited.state.children == %{}
+    assert exited.record.children == %{}
 
     late =
       transition(
         context,
-        exited.state,
+        exited.record,
         :child_monitored,
         ChildMonitored.new!(%{tag: :worker, pid: context.first, ref: ref})
       )
 
-    assert late.state == exited.state
+    assert late.record == exited.record
     assert [%Aikido.Directives.Demonitor{ref: ^ref}] = late.directives
   end
 
@@ -51,15 +51,15 @@ defmodule AikidoTest.Ownership.ChildLifecycleTest do
     monitored =
       transition(
         context,
-        first.state,
+        first.record,
         :child_monitored,
         ChildMonitored.new!(%{tag: :worker, pid: context.first, ref: ref})
       )
 
     replacement =
-      transition(context, monitored.state, :child_started, announcement(context.second))
+      transition(context, monitored.record, :child_started, announcement(context.second))
 
-    assert replacement.state.children.worker.pid == context.second
+    assert replacement.record.children.worker.pid == context.second
 
     assert [%Aikido.Directives.Demonitor{ref: ^ref}, %Aikido.Ownership.Directives.MonitorChild{}] =
              replacement.directives
@@ -67,20 +67,20 @@ defmodule AikidoTest.Ownership.ChildLifecycleTest do
     stale =
       transition(
         context,
-        replacement.state,
+        replacement.record,
         :child_exit,
         ChildExit.new!(%{tag: :worker, pid: context.first, reason: :killed, monitor_ref: ref})
       )
 
-    assert stale.state == replacement.state
+    assert stale.record == replacement.record
     assert stale.directives == []
-    assert Slice.externalize(replacement.state).children == %{}
+    assert Slice.externalize(replacement.record).children == %{}
   end
 
   test "a repeated startup announcement preserves the current monitor", context do
     first = transition(context, context.slice, :child_started, announcement(context.first))
-    repeated = transition(context, first.state, :child_started, announcement(context.first))
-    assert repeated.state == first.state
+    repeated = transition(context, first.record, :child_started, announcement(context.first))
+    assert repeated.record == first.record
     assert repeated.directives == []
   end
 
@@ -103,6 +103,12 @@ defmodule AikidoTest.Ownership.ChildLifecycleTest do
 
     result = Ash.run_action!(input)
     assert result == Ash.run_action!(input)
-    result
+
+    record =
+      if result.changes in [nil, %{}],
+        do: slice,
+        else: Ash.update!(slice, result.changes, action: :update)
+
+    %{record: record, directives: result.directives}
   end
 end

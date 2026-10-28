@@ -6,7 +6,11 @@ defmodule Aikido.Team.Actions.RemoveMember do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
-    ActionAdapter.to_action_result(remove_member_and_dependents(signal, state, context, config))
+
+    ActionAdapter.to_action_result(
+      remove_member_and_dependents(signal, state, context, config),
+      state
+    )
   end
 
   defp remove_member_and_dependents(signal, state, context, config) do

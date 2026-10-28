@@ -3,10 +3,11 @@ defmodule AgentExamples.VerifiedAssistant.Verification do
   use Ash.Resource, domain: AgentExamples.Agents
 
   actions do
-    action :verify, :boolean do
+    action :verify, Aikido.AiReact.TodoVerification do
       argument :answer, :term
       argument :todos, {:array, :term}
       argument :metadata, :map
+      argument :data, :term
       run AgentExamples.VerifiedAssistant.Tools.VerifyEvidence
     end
 

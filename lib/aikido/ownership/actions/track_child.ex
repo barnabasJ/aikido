@@ -26,11 +26,11 @@ defmodule Aikido.Ownership.Actions.TrackChild do
           [%Aikido.Ownership.Directives.MonitorChild{tag: data.tag, pid: data.pid}]
 
       Aikido.Types.ActionResult.new(
-        state: %{state | children: Map.put(state.children, data.tag, child)},
+        changes: %{children: Map.put(state.children, data.tag, child)},
         directives: directives
       )
     else
-      Aikido.Types.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(changes: nil)
     end
   end
 end

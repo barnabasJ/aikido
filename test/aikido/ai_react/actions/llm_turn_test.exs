@@ -46,10 +46,10 @@ defmodule Aikido.AiReact.LLMTurnTest do
         )
         |> Ash.run_action!()
 
-      assert result.state.status == :failed
-      assert %Aikido.AiReact.Errors.OutputTruncated{} = result.state.error
-      assert result.state.result == nil
-      assert result.state.prepared_tools == nil
+      assert result.changes.status == :failed
+      assert %Aikido.AiReact.Errors.OutputTruncated{} = result.changes.error
+      assert result.changes.result == nil
+      assert result.changes.prepared_tools == nil
       refute Enum.any?(result.directives, &match?(%ToolExec{}, &1))
     end
   end
@@ -82,7 +82,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
           finish_reason: if(tool_calls == [], do: :stop, else: :tool_calls)
         }
 
-      assert {:ok, %Aikido.Types.ActionResult{state: state, directives: _directives}} =
+      assert {:ok, %Aikido.Types.ActionResult{changes: state, directives: _directives}} =
                then(signal("req_1", response), fn signal ->
                  Aikido.AiReact.Slice
                  |> Ash.ActionInput.for_action(
@@ -123,7 +123,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
 
   describe("final answer turn") do
     test "appends the assistant message and settles :completed with the text" do
-      {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: directives}} =
+      {:ok, %Aikido.Types.ActionResult{changes: changes, directives: directives}} =
         then(signal("req_1", final_turn("42")), fn signal ->
           Aikido.AiReact.Slice
           |> Ash.ActionInput.for_action(
@@ -136,10 +136,10 @@ defmodule Aikido.AiReact.LLMTurnTest do
         end)
 
       assert directives == []
-      assert new_slice.status == :completed
-      assert new_slice.result == "42"
-      assert new_slice.iteration == 1
-      messages = Context.to_list(new_slice.context)
+      assert changes.status == :completed
+      assert changes.result == "42"
+      assert changes.iteration == 1
+      messages = Context.to_list(changes.context)
       assert List.last(messages).role == :assistant
     end
   end
@@ -148,7 +148,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
     test "stores pending calls, emits one ToolExec per call, increments iteration" do
       calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
 
-      {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: directives}} =
+      {:ok, %Aikido.Types.ActionResult{changes: changes, directives: directives}} =
         then(signal("req_1", tool_turn(calls)), fn signal ->
           Aikido.AiReact.Slice
           |> Ash.ActionInput.for_action(
@@ -160,15 +160,15 @@ defmodule Aikido.AiReact.LLMTurnTest do
           |> Ash.run_action()
         end)
 
-      assert new_slice.status == :running
-      assert new_slice.iteration == 1
-      assert length(new_slice.pending_tool_calls) == 1
-      assert new_slice.tool_results_received == []
+      assert changes.status == :running
+      assert changes.iteration == 1
+      assert length(changes.pending_tool_calls) == 1
+      assert changes.tool_results_received == []
       # LLMTurn does NOT update previous_tool_signature — that's ToolResult's job.
-      assert new_slice.previous_tool_signature == nil
+      assert changes.previous_tool_signature == nil
       assert [%ToolExec{tool_call: tc, registry: %{}, request_id: "req_1"}] = directives
       assert tc.id == "call_1"
-      messages = Context.to_list(new_slice.context)
+      messages = Context.to_list(changes.context)
       assistant = List.last(messages)
       assert assistant.role == :assistant
     end
@@ -179,7 +179,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
         %{id: "call_2", name: "test_add", arguments: %{"a" => 3, "b" => 4}}
       ]
 
-      {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: directives}} =
+      {:ok, %Aikido.Types.ActionResult{changes: changes, directives: directives}} =
         then(signal("req_1", tool_turn(calls)), fn signal ->
           Aikido.AiReact.Slice
           |> Ash.ActionInput.for_action(
@@ -191,7 +191,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
           |> Ash.run_action()
         end)
 
-      assert length(new_slice.pending_tool_calls) == 2
+      assert length(changes.pending_tool_calls) == 2
       assert length(directives) == 2
       assert Enum.all?(directives, &match?(%ToolExec{}, &1))
     end
@@ -200,7 +200,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
       slice = running_slice(iteration: 3, max_iterations: 4)
       calls = [%{id: "call_1", name: "test_add", arguments: %{"a" => 1, "b" => 2}}]
 
-      {:ok, %Aikido.Types.ActionResult{state: new_slice, directives: directives}} =
+      {:ok, %Aikido.Types.ActionResult{changes: changes, directives: directives}} =
         then(signal("req_1", tool_turn(calls)), fn signal ->
           Aikido.AiReact.Slice
           |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, slice),
@@ -211,12 +211,12 @@ defmodule Aikido.AiReact.LLMTurnTest do
         end)
 
       assert directives == []
-      assert new_slice.status == :failed
-      assert new_slice.error == :max_iterations
-      assert new_slice.result == nil
-      assert new_slice.iteration == 4
-      assert List.last(new_slice.context.messages).tool_calls != []
-      assert new_slice.pending_tool_calls == []
+      assert changes.status == :failed
+      assert changes.error == :max_iterations
+      assert changes.result == nil
+      assert changes.iteration == 4
+      assert List.last(changes.context.messages).tool_calls != []
+      assert changes.pending_tool_calls == []
     end
   end
 
@@ -224,7 +224,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
     test "drops a signal whose request_id doesn't match the slice" do
       slice = running_slice(request_id: "req_active")
 
-      {:ok, %Aikido.Types.ActionResult{state: returned, directives: []}} =
+      {:ok, %Aikido.Types.ActionResult{changes: changes, directives: []}} =
         then(signal("req_old", final_turn("ignored")), fn signal ->
           Aikido.AiReact.Slice
           |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, slice),
@@ -234,13 +234,13 @@ defmodule Aikido.AiReact.LLMTurnTest do
           |> Ash.run_action()
         end)
 
-      assert AikidoTest.SliceState.attributes(returned) == AikidoTest.SliceState.attributes(slice)
+      assert changes == %{}
     end
 
     test "drops a signal that arrives after the slice has already terminated" do
       slice = %{running_slice() | status: :completed, result: "earlier"}
 
-      {:ok, %Aikido.Types.ActionResult{state: returned, directives: []}} =
+      {:ok, %Aikido.Types.ActionResult{changes: changes, directives: []}} =
         then(signal("req_1", final_turn("ignored")), fn signal ->
           Aikido.AiReact.Slice
           |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, slice),
@@ -250,7 +250,7 @@ defmodule Aikido.AiReact.LLMTurnTest do
           |> Ash.run_action()
         end)
 
-      assert AikidoTest.SliceState.attributes(returned) == AikidoTest.SliceState.attributes(slice)
+      assert changes == %{}
     end
   end
 
@@ -291,26 +291,26 @@ defmodule Aikido.AiReact.LLMTurnTest do
           )
           |> Ash.run_action!()
 
-        assert result.state.iteration == 1
-        assert result.state.pending_tool_calls == []
-        assert Enum.count(result.state.context.messages, &(&1 == message)) == 1
+        assert result.changes.iteration == 1
+        assert result.changes.pending_tool_calls == []
+        assert Enum.count(result.changes.context.messages, &(&1 == message)) == 1
 
-        assert result.state.estimated_tokens ==
-                 Aikido.AiReact.Conversation.estimate_tokens(result.state.context)
+        assert result.changes.estimated_tokens ==
+                 Aikido.AiReact.Conversation.estimate_tokens(result.changes.context)
 
         refute Enum.any?(result.directives, &match?(%ToolExec{}, &1))
 
         if queued == [] do
-          assert result.state.status == :completed
-          assert result.state.result == "provider answer"
+          assert result.changes.status == :completed
+          assert result.changes.result == "provider answer"
 
           assert [%Aikido.AiReact.Directives.ExecuteHook{event: %{type: :run_completed}}] =
                    result.directives
         else
-          assert result.state.status == :running
-          assert result.state.queued_messages == []
+          assert result.changes.status == :running
+          assert result.changes.queued_messages == []
           assert [%Aikido.AiReact.Directives.LLMCall{iteration: 2}] = result.directives
-          assert List.last(result.state.context.messages) == Context.user("follow up")
+          assert List.last(result.changes.context.messages) == Context.user("follow up")
         end
       end
     end

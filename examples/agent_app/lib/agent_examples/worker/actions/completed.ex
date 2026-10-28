@@ -4,8 +4,6 @@ defmodule AgentExamples.Worker.Actions.Completed do
 
   @impl true
   def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | status: :completed, result: input.arguments.result}
-    )
+    Aikido.Types.ActionResult.new(changes: %{status: :completed, result: input.arguments.result})
   end
 end

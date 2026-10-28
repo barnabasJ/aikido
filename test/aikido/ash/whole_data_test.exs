@@ -3,7 +3,7 @@ defmodule AikidoTest.AshWholeDataTest.Reducer do
 
   @impl true
   def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(state: %{received: input.arguments.data})
+    Aikido.Types.ActionResult.new(changes: %{received: input.arguments.data})
   end
 end
 

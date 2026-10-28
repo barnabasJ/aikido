@@ -5,12 +5,11 @@ defmodule Aikido.Todo.Actions.Expire do
 
   @impl true
   def run(input, _opts, _context) do
-    state = input.arguments.state
     item = Items.find(input)
 
     if is_nil(item) || item.revision != input.arguments.revision ||
          item.status not in [:pending, :active] do
-      Aikido.Types.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(changes: nil)
     else
       Items.replace(input, %{item | status: :blocked, reason: :timeout})
     end

@@ -4,6 +4,17 @@ defmodule Aikido.AiReact.Actions.Stream do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- append_stream_chunk(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, [:stream_attempt, :streaming_text, :streaming_thinking])
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp append_stream_chunk(input) do
     data = input.arguments
     state = data.state
 
@@ -22,9 +33,9 @@ defmodule Aikido.AiReact.Actions.Stream do
             if(reset?, do: "", else: Map.get(state, :streaming_thinking, "")) <> data.thinking
         })
 
-      Aikido.Types.ActionResult.new(state: state)
+      {:ok, state, []}
     else
-      Aikido.Types.ActionResult.new(state: state)
+      {:ok, state, []}
     end
   end
 end

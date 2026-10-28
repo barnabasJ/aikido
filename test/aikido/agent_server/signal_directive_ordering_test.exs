@@ -2,13 +2,11 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Actions.MarkActionA
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
-    slice = input.arguments.state
-    slice = slice || %{}
+  def run(_input, _opts, _context) do
     followup = %Aikido.Signal{id: nil, type: "step1.followup", source: "/test", data: %{}}
 
     Aikido.Types.ActionResult.new(
-      state: Map.put(slice, :step1_action_ran, true),
+      changes: %{step1_action_ran: true},
       directives: [Aikido.Directives.emit(followup)]
     )
   end
@@ -18,12 +16,9 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Actions.MarkFollowu
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
-    slice = input.arguments.state
-    slice = slice || %{}
-
+  def run(_input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: Map.put(slice, :step1_followup_ran, true),
+      changes: %{step1_followup_ran: true},
       directives: []
     )
   end
@@ -39,7 +34,7 @@ defmodule AikidoTest.AgentServer.SignalDirectiveOrderingTest.Actions.ObservePrio
     saw_action = Map.get(slice, :step1_action_ran, false)
 
     Aikido.Types.ActionResult.new(
-      state: Map.put(slice, :step2_saw_action_ran, saw_action),
+      changes: %{step2_saw_action_ran: saw_action},
       directives: []
     )
   end

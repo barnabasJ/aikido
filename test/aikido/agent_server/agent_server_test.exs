@@ -4,7 +4,7 @@ defmodule AikidoTest.AgentServerTest.Actions.RequestStop do
   @impl true
   def run(_input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: %{},
+      changes: %{},
       directives: [%Aikido.Directives.Stop{reason: :normal}]
     )
   end
@@ -52,7 +52,7 @@ defmodule AikidoTest.AgentServerTest.Actions.MarkScheduled do
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(_input, _opts, _context) do
-    Aikido.Types.ActionResult.new(state: %{scheduled: true}, directives: [])
+    Aikido.Types.ActionResult.new(changes: %{scheduled: true}, directives: [])
   end
 end
 
@@ -220,7 +220,7 @@ defmodule AikidoTest.AgentServerTest do
         @impl true
         def run(_input, _opts, _context) do
           AikidoTest.CpuWork.sum_steps(80)
-          Aikido.Types.ActionResult.new(state: %{slow_done: true}, directives: [])
+          Aikido.Types.ActionResult.new(changes: %{slow_done: true}, directives: [])
         end
       end
 
@@ -290,10 +290,9 @@ defmodule AikidoTest.AgentServerTest do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
-        def run(input, _opts, _context) do
-          slice = input.arguments.state
+        def run(_input, _opts, _context) do
           AikidoTest.CpuWork.sum_steps(120)
-          Aikido.Types.ActionResult.new(state: Map.put(slice, :slow_done, true), directives: [])
+          Aikido.Types.ActionResult.new(changes: %{slow_done: true}, directives: [])
         end
       end
 
@@ -306,7 +305,7 @@ defmodule AikidoTest.AgentServerTest do
           counter = Map.get(slice, :counter, 0)
 
           Aikido.Types.ActionResult.new(
-            state: Map.put(slice, :counter, counter + 1),
+            changes: %{counter: counter + 1},
             directives: []
           )
         end
@@ -601,14 +600,11 @@ defmodule AikidoTest.AgentServerTest do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
-        def run(input, _opts, _context) do
-          slice = input.arguments.state
-
+        def run(_input, _opts, _context) do
           scheduled =
             %Aikido.Signal{id: nil, type: "scheduled.ping", data: %{}, source: "/test"}
 
           Aikido.Types.ActionResult.new(
-            state: slice,
             directives: [%Aikido.Directives.Schedule{delay_ms: 50, message: scheduled}]
           )
         end
@@ -621,7 +617,7 @@ defmodule AikidoTest.AgentServerTest do
         def run(input, _opts, _context) do
           slice = input.arguments.state
           pings = Map.get(slice, :pings, 0)
-          Aikido.Types.ActionResult.new(state: %{pings: pings + 1}, directives: [])
+          Aikido.Types.ActionResult.new(changes: %{pings: pings + 1}, directives: [])
         end
       end
 
@@ -689,16 +685,14 @@ defmodule AikidoTest.AgentServerTest do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
-        def run(input, _opts, _context) do
-          slice = input.arguments.state
-
+        def run(_input, _opts, _context) do
           directives =
             for i <- 1..3 do
               sig = %Aikido.Signal{id: nil, type: "tick", data: %{n: i}, source: "/test"}
               %Aikido.Directives.Schedule{delay_ms: i * 20, message: sig}
             end
 
-          Aikido.Types.ActionResult.new(state: slice, directives: directives)
+          Aikido.Types.ActionResult.new(directives: directives)
         end
       end
 
@@ -711,7 +705,7 @@ defmodule AikidoTest.AgentServerTest do
 
           slice = input.arguments.state
           events = Map.get(slice, :events, [])
-          Aikido.Types.ActionResult.new(state: %{events: events ++ [params.n]}, directives: [])
+          Aikido.Types.ActionResult.new(changes: %{events: events ++ [params.n]}, directives: [])
         end
       end
 
@@ -776,11 +770,8 @@ defmodule AikidoTest.AgentServerTest do
         @moduledoc false
         use Ash.Resource.Actions.Implementation
         @impl true
-        def run(input, _opts, _context) do
-          slice = input.arguments.state
-
+        def run(_input, _opts, _context) do
           Aikido.Types.ActionResult.new(
-            state: slice,
             directives: [%Aikido.Directives.Schedule{delay_ms: 10, message: :timeout}]
           )
         end
@@ -793,7 +784,7 @@ defmodule AikidoTest.AgentServerTest do
         def run(input, _opts, _context) do
           params = Map.delete(input.arguments, :state)
 
-          Aikido.Types.ActionResult.new(state: %{received: params.message}, directives: [])
+          Aikido.Types.ActionResult.new(changes: %{received: params.message}, directives: [])
         end
       end
 
@@ -983,7 +974,7 @@ defmodule AikidoTest.AgentServerTest do
         @impl true
         def run(_input, _opts, _context) do
           AikidoTest.CpuWork.sum_steps(20)
-          Aikido.Types.ActionResult.new(state: %{processed: true}, directives: [])
+          Aikido.Types.ActionResult.new(changes: %{processed: true}, directives: [])
         end
       end
 

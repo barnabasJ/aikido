@@ -41,6 +41,7 @@ config :agent_examples, :store,
   gc_interval: 30_000
 
 config :aikido, :durable,
+  scope_adapter: AgentExamples.DurableScope,
   backend: {DurableServer.Backends.EKVStore, name: AgentExamples.Store, timeout: 60_000}
 
 config :ash, default_string_length_count: :codepoints

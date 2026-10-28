@@ -8,7 +8,7 @@ defmodule AikidoTest.Integration.SchedulerIntegrationTest.Actions.RecordSliceTic
     ticks = Map.get(slice, :ticks, [])
 
     Aikido.Types.ActionResult.new(
-      state: %{tick_count: count + 1, ticks: ticks ++ [%{source: :slice_schedule}]},
+      changes: %{tick_count: count + 1, ticks: ticks ++ [%{source: :slice_schedule}]},
       directives: []
     )
   end

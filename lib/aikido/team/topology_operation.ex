@@ -181,8 +181,11 @@ defmodule Aikido.Team.TopologyOperation do
   end
 
   defp request_member_stop(state, name, pid, config) do
+    instance = config.instance
+
     effect =
-      Directives.async_task({Aikido.Team.MemberProcesses, :stop_member, [config.instance, pid]},
+      Directives.async_task(
+        fn task -> Aikido.Team.MemberProcesses.stop_member(instance, pid, task.input_signal) end,
         success_type: "aikido.ash.team.stopped",
         error_type: "aikido.ash.team.failed",
         payload: %{member: name, operation_id: state.operation.id, pid: pid}

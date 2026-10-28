@@ -5,6 +5,17 @@ defmodule Aikido.AiReact.Actions.HandoffFailed do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- process_handoff_failure(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp process_handoff_failure(input) do
     input.arguments.state
     |> fail_pending_handoff(Map.delete(input.arguments, :state))
   end
@@ -22,14 +33,14 @@ defmodule Aikido.AiReact.Actions.HandoffFailed do
         |> Aikido.AiReact.RunState.clear_tools_and_handoff()
 
       HookQueue.queue_event_hooks(
-        Aikido.Types.ActionResult.new(state: state),
+        {:ok, state, []},
         :run_failed,
         %{
           reason: state.error
         }
       )
     else
-      Aikido.Types.ActionResult.new(state: state)
+      {:ok, state, []}
     end
   end
 end

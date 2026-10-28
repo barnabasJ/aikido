@@ -204,7 +204,7 @@ defmodule AikidoTest.AshTest do
   end
 
   test "the default runtime needs no instance option" do
-    start_supervised!(Aikido)
+    start_supervised!({Aikido, durable: AikidoTest.Case.durable_options()})
 
     assert {:ok, record} =
              snapshot_result(AikidoTest.AshFixtures.Domain.default_counter_start(%{count: "5"}))
@@ -412,7 +412,7 @@ defmodule AikidoTest.AshTest do
     signal = Aikido.Signal.new!("slice.increment", %{amount: 3}, source: "/test")
     state = %{count: 2}
 
-    assert {:ok, %Aikido.Types.ActionResult{state: %{count: 5}, directives: []}} =
+    assert {:ok, %Aikido.Types.ActionResult{changes: %{count: 5}, directives: []}} =
              then(signal, fn signal ->
                AikidoTest.AshFixtures.CounterSlice
                |> Ash.ActionInput.for_action(

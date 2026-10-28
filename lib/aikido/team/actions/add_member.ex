@@ -6,7 +6,7 @@ defmodule Aikido.Team.Actions.AddMember do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
-    ActionAdapter.to_action_result(add_member_and_activate(signal, state, context, config))
+    ActionAdapter.to_action_result(add_member_and_activate(signal, state, context, config), state)
   end
 
   defp add_member_and_activate(signal, state, context, config) do

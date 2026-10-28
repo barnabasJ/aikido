@@ -51,7 +51,7 @@ defmodule AikidoTest.FSMTest do
       input =
         Ash.ActionInput.for_action(Aikido.FSM.Slice, :transition, %{state: state, to: "working"})
 
-      assert {:ok, %Aikido.Types.ActionResult{state: next, directives: []}} =
+      assert {:ok, %Aikido.Types.ActionResult{changes: next, directives: []}} =
                Ash.run_action(input)
 
       assert next.state == "working"
@@ -126,10 +126,10 @@ defmodule AikidoTest.FSMTest do
         input =
           Ash.ActionInput.for_action(Aikido.FSM.Slice, :transition, %{state: state, to: to})
 
-        assert {:ok, %Aikido.Types.ActionResult{state: next, directives: []}} =
+        assert {:ok, %Aikido.Types.ActionResult{changes: next, directives: []}} =
                  Ash.run_action(input)
 
-        next
+        Ash.update!(state, next, action: :update)
       end)
 
     assert final.history == [

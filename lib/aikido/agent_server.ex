@@ -797,9 +797,19 @@ defmodule Aikido.AgentServer do
   end
 
   @doc false
-  def prepare_stop(server, reason \\ :normal) do
+  def prepare_stop(server, reason \\ :normal, scope \\ %{}) do
+    options =
+      case scope do
+        %{context: context} -> Ash.Scope.to_opts(scope, context: context)
+        _ -> Ash.Scope.to_opts(scope)
+      end
+
+    signal =
+      LifecycleStopping.new!(%{reason: reason}, scope: Map.new(options))
+      |> Aikido.Signal.capture_tracing()
+
     with {:ok, pid} <- resolve(server) do
-      GenServer.call(pid, {:prepare_stop, reason})
+      GenServer.call(pid, {:prepare_stop, signal})
     end
   end
 
@@ -815,6 +825,14 @@ defmodule Aikido.AgentServer do
       end
 
     {initialization_options, opts} = Keyword.pop(opts, :initialization_options, [])
+    initialization_options = Map.new(initialization_options)
+
+    initialization_options =
+      Ash.Scope.to_opts(initialization_options,
+        context: Map.get(initialization_options, :context, %{})
+      )
+
+    activation_scope = Map.new(initialization_options)
     {restored_agent, opts} = Keyword.pop(opts, :restored_agent)
 
     with {:ok, options} <- Options.new(opts),
@@ -830,13 +848,16 @@ defmodule Aikido.AgentServer do
       ownership =
         Aikido.Ownership.Signals.Configure.new!(
           %{parent: options.parent, on_parent_death: options.on_parent_death},
-          source: "/agent/#{state.id}"
+          source: "/agent/#{state.id}",
+          scope: activation_scope
         )
+        |> Aikido.Signal.capture_tracing()
 
-      with {:ok, state, _} <- process_signal(state, ownership) do
-        state = emit_through_chain(state, lifecycle_starting_signal(state))
-        state = emit_through_chain(state, partition_assigned_signal(state))
-        {:ok, state, {:continue, :post_init}}
+      with {:ok, state, _} <- process_signal(state, ownership),
+           {:ok, state, _} <-
+             process_signal(state, lifecycle_starting_signal(state, activation_scope)) do
+        state = emit_through_chain(state, partition_assigned_signal(state, activation_scope))
+        {:ok, state, {:continue, {:post_init, activation_scope}}}
       else
         {:error, _, reason} -> {:stop, reason}
         {:stop, reason, _} -> {:stop, reason}
@@ -852,25 +873,39 @@ defmodule Aikido.AgentServer do
     |> Ash.run_action!(initialization_options)
   end
 
-  defp lifecycle_starting_signal(%State{} = state) do
-    LifecycleStarting.new!(%{}, source: "/agent/#{state.id}")
+  defp lifecycle_starting_signal(%State{} = state, scope) do
+    LifecycleStarting.new!(%{}, source: "/agent/#{state.id}", scope: scope)
+    |> Aikido.Signal.capture_tracing()
   end
 
-  defp lifecycle_ready_signal(%State{} = state) do
-    LifecycleReady.new!(%{}, source: "/agent/#{state.id}")
+  defp lifecycle_ready_signal(%State{} = state, scope) do
+    LifecycleReady.new!(%{}, source: "/agent/#{state.id}", scope: scope)
+    |> Aikido.Signal.capture_tracing()
+  end
+
+  defp lifecycle_stopping_signal(%State{} = state, reason, %Signal{} = input) do
+    LifecycleStopping.new!(%{reason: reason},
+      source: "/agent/#{state.id}",
+      scope: Signal.ctx(input),
+      tracer_context: Signal.tracer_context(input)
+    )
   end
 
   defp lifecycle_stopping_signal(%State{} = state, reason) do
     LifecycleStopping.new!(%{reason: reason}, source: "/agent/#{state.id}")
   end
 
-  defp partition_assigned_signal(%State{} = state) do
-    PartitionAssigned.new!(%{partition: state.partition}, source: "/agent/#{state.id}")
+  defp partition_assigned_signal(%State{} = state, scope) do
+    PartitionAssigned.new!(%{partition: state.partition},
+      source: "/agent/#{state.id}",
+      scope: scope
+    )
+    |> Aikido.Signal.capture_tracing()
   end
 
   @impl true
-  def handle_continue(:post_init, state) do
-    state = emit_through_chain(state, lifecycle_ready_signal(state))
+  def handle_continue({:post_init, scope}, state) do
+    state = emit_through_chain(state, lifecycle_ready_signal(state, scope))
     state = %{state | status: :idle}
 
     emit_telemetry(
@@ -902,12 +937,15 @@ defmodule Aikido.AgentServer do
           {:reply, {:error, reason}, committed_state}
 
         {:stop, stop_reason, executed_state} ->
-          # A directive returned :stop. Run the selector against the
-          # post-directive state so the caller still gets a tagged tuple,
-          # then stop after replying.
-          executed_state = prepare_graceful_stop(executed_state, stop_reason)
-          reply = invoke_selector(selector, executed_state)
-          {:stop, stop_reason, reply, executed_state}
+          stopping = lifecycle_stopping_signal(executed_state, stop_reason, signal)
+
+          case prepare_graceful_stop(executed_state, stop_reason, stopping) do
+            {:ok, stopped_state} ->
+              {:stop, stop_reason, invoke_selector(selector, stopped_state), stopped_state}
+
+            {:error, committed_state, reason} ->
+              {:stop, stop_reason, {:error, reason}, %{committed_state | status: :stopping}}
+          end
       end
     catch
       kind, reason ->
@@ -928,8 +966,13 @@ defmodule Aikido.AgentServer do
     {:reply, invoke_selector(selector, state), state}
   end
 
-  def handle_call({:prepare_stop, reason}, _from, %State{} = state) do
-    {:reply, :ok, prepare_graceful_stop(state, reason)}
+  def handle_call({:prepare_stop, %Signal{} = signal}, _from, %State{} = state) do
+    signal = %{signal | source: "/agent/#{state.id}"}
+
+    case prepare_graceful_stop(state, signal.data.reason, signal) do
+      {:ok, stopped_state} -> {:reply, :ok, stopped_state}
+      {:error, committed_state, reason} -> {:reply, {:error, reason}, committed_state}
+    end
   end
 
   def handle_call({:set_debug, enabled}, _from, %State{} = state) do
@@ -1061,9 +1104,14 @@ defmodule Aikido.AgentServer do
 
   def handle_cast({:signal, %Signal{} = signal}, state) do
     case process_signal(state, signal) do
-      {:ok, new_state, _directives} -> {:noreply, new_state}
-      {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, prepare_graceful_stop(new_state, reason)}
+      {:ok, new_state, _directives} ->
+        {:noreply, new_state}
+
+      {:error, committed_state, _reason} ->
+        {:noreply, committed_state}
+
+      {:stop, reason, new_state} ->
+        {:stop, reason, finish_signal_stop(new_state, reason, signal)}
     end
   end
 
@@ -1074,9 +1122,14 @@ defmodule Aikido.AgentServer do
   @impl true
   def handle_info({:scheduled_signal, %Signal{} = signal}, state) do
     case process_signal(state, signal) do
-      {:ok, new_state, _directives} -> {:noreply, new_state}
-      {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, prepare_graceful_stop(new_state, reason)}
+      {:ok, new_state, _directives} ->
+        {:noreply, new_state}
+
+      {:error, committed_state, _reason} ->
+        {:noreply, committed_state}
+
+      {:stop, reason, new_state} ->
+        {:stop, reason, finish_signal_stop(new_state, reason, signal)}
     end
   end
 
@@ -1094,33 +1147,70 @@ defmodule Aikido.AgentServer do
 
   def handle_info({:signal, %Signal{} = signal}, state) do
     case process_signal(state, signal) do
-      {:ok, new_state, _directives} -> {:noreply, new_state}
-      {:error, committed_state, _reason} -> {:noreply, committed_state}
-      {:stop, reason, new_state} -> {:stop, reason, prepare_graceful_stop(new_state, reason)}
+      {:ok, new_state, _directives} ->
+        {:noreply, new_state}
+
+      {:error, committed_state, _reason} ->
+        {:noreply, committed_state}
+
+      {:stop, reason, new_state} ->
+        {:stop, reason, finish_signal_stop(new_state, reason, signal)}
     end
   end
 
-  def handle_info(_msg, state) do
-    {:noreply, state}
+  def handle_info(message, state) do
+    case Aikido.Notifications.Receiver.receive_message(message, state.agent) do
+      {:ok, signal} ->
+        handle_info({:signal, signal}, state)
+
+      :ignore ->
+        {:noreply, state}
+
+      {:error, reason} ->
+        Logger.error("Agent #{state.id} rejected notification: #{inspect(reason)}")
+        {:noreply, state}
+    end
   end
 
   @impl true
   def terminate(reason, state) do
-    # External supervisor shutdowns cannot return updated callback state. Their
-    # cleanup is best effort; explicit stops prepare it before final persistence.
-    _state = prepare_graceful_stop(state, reason)
+    # Callerless shutdown has no authority to borrow from an earlier activation.
+    # It can only perform cleanup permitted by the application's current policies.
+    stopping = lifecycle_stopping_signal(state, reason)
+    _state = finish_stop(state, reason, stopping)
     :ok
   end
 
-  defp prepare_graceful_stop(%State{status: :stopping} = state, _reason), do: state
+  defp finish_signal_stop(state, reason, signal) do
+    finish_stop(state, reason, lifecycle_stopping_signal(state, reason, signal))
+  end
 
-  defp prepare_graceful_stop(state, reason) do
-    state =
-      if clean_shutdown?(reason),
-        do: emit_through_chain(state, lifecycle_stopping_signal(state, reason)),
-        else: state
+  defp finish_stop(state, reason, stopping) do
+    case prepare_graceful_stop(state, reason, stopping) do
+      {:ok, stopped_state} ->
+        stopped_state
 
-    %{state | status: :stopping}
+      {:error, committed_state, error} ->
+        Logger.error("Agent #{state.id} stop cleanup failed: #{inspect(error)}")
+        %{committed_state | status: :stopping}
+    end
+  end
+
+  defp prepare_graceful_stop(%State{status: :stopping} = state, _reason, _signal),
+    do: {:ok, state}
+
+  defp prepare_graceful_stop(state, reason, signal) do
+    if clean_shutdown?(reason) do
+      case process_signal(state, signal) do
+        {:ok, committed_state, _directives} -> {:ok, %{committed_state | status: :stopping}}
+        {:stop, _reason, committed_state} -> {:ok, %{committed_state | status: :stopping}}
+        {:error, committed_state, error} -> {:error, committed_state, error}
+      end
+    else
+      {:ok, %{state | status: :stopping}}
+    end
+  catch
+    kind, error -> {:error, state, {:stop_cleanup_failed, kind, error}}
   end
 
   defp clean_shutdown?(:normal) do
@@ -1554,23 +1644,47 @@ defmodule Aikido.AgentServer do
 
   @doc false
   def apply_actions(%Signal{} = signal, ctx, targets) do
-    Enum.reduce_while(targets, {:ok, ctx, []}, fn target, accumulated ->
-      case apply_action_at_mounted_paths(target, signal, accumulated) do
-        {:ok, _, _} = result -> {:cont, result}
-        {:error, reason} -> {:halt, {:error, ctx, reason}}
-      end
-    end)
+    case Ash.transact(ctx.agent_module, fn -> stage_actions!(signal, ctx, targets) end,
+           return_notifications?: true,
+           tenant: Map.get(ctx, :tenant)
+         ) do
+      {:ok, {proposed, notifications, directives}, nested_notifications} ->
+        notices =
+          Enum.flat_map(nested_notifications ++ notifications, fn
+            %Ash.Notifier.Notification{for: []} -> []
+            notification -> [%Aikido.Directives.Notify{notification: notification}]
+          end)
+
+        {:ok, proposed, notices ++ directives}
+
+      {:error, error} ->
+        {:error, ctx, error}
+    end
   rescue
     error -> {:error, ctx, Ash.Error.to_error_class(error)}
   end
 
-  defp apply_action_at_mounted_paths({reference, params}, signal, {:ok, ctx, effects}) do
+  defp stage_actions!(signal, ctx, targets) do
+    targets
+    |> Enum.reduce_while({:ok, ctx, [], []}, fn target, accumulated ->
+      case apply_action_at_mounted_paths(target, signal, accumulated) do
+        {:ok, _, _, _} = result -> {:cont, result}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, proposed, notifications, directives} -> {proposed, notifications, directives}
+      {:error, reason} -> raise Ash.Error.to_error_class(reason)
+    end
+  end
+
+  defp apply_action_at_mounted_paths({reference, params}, signal, {:ok, ctx, _, _} = accumulated) do
     ctx.agent_module
     |> action_mount_paths(reference)
-    |> Enum.reduce_while({:ok, ctx, effects}, fn path, {:ok, current, effects} ->
-      with {:ok, result} <- run_action(reference, params, signal, current, path) do
-        {:cont,
-         {:ok, adopt_action_state(current, result.state, path), effects ++ result.directives}}
+    |> Enum.reduce_while(accumulated, fn path, {:ok, current, notifications, effects} ->
+      with {:ok, result} <- run_action(reference, params, signal, current, path),
+           {:ok, current, notices} <- adopt_action_result(current, result, path, signal) do
+        {:cont, {:ok, current, notifications ++ notices, effects ++ result.directives}}
       else
         {:error, _} = error -> {:halt, error}
       end
@@ -1583,14 +1697,26 @@ defmodule Aikido.AgentServer do
     |> Map.get(reference, [Spark.Dsl.Extension.get_opt(agent_module, [:agent], :path)])
   end
 
-  defp adopt_action_state(ctx, %Aikido.Ownership.Slice{} = slice, path) do
-    ctx
-    |> put_in([Access.key(:agent), Access.key(:state), path], slice)
-    |> Map.merge(%{parent: slice.parent, orphaned_from: slice.orphaned_from})
-  end
+  defp adopt_action_result(ctx, result, path, signal) do
+    if is_nil(result.changes) || result.changes == %{} do
+      {:ok, ctx, []}
+    else
+      context = Map.put(Map.get(ctx, :context) || %{}, :aikido, Map.put(ctx, :signal, signal))
+      scope = Ash.Scope.to_opts(ctx, context: context)
 
-  defp adopt_action_state(ctx, slice, path) do
-    put_in(ctx.agent.state, Map.put(ctx.agent.state, path, slice))
+      with {:ok, agent, notifications} <-
+             Aikido.Agent.StateChanges.apply_changes(ctx.agent, path, result.changes, scope) do
+        adopted = %{ctx | agent: agent}
+
+        adopted =
+          Map.merge(adopted, %{
+            parent: Aikido.Ownership.parent(adopted),
+            orphaned_from: Aikido.Ownership.orphaned_from(adopted)
+          })
+
+        {:ok, adopted, notifications}
+      end
+    end
   end
 
   defp run_action({resource, name} = reference, params, signal, ctx, path) do

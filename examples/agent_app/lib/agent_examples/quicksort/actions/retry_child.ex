@@ -17,6 +17,6 @@ defmodule AgentExamples.Quicksort.Actions.RetryChild do
         do: [AgentExamples.Quicksort.PartitionTree.spawn_partition(state, tag)],
         else: []
 
-    Aikido.Types.ActionResult.new(state: state, directives: directives)
+    Aikido.Types.ActionResult.new(directives: directives)
   end
 end

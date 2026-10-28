@@ -4,7 +4,7 @@ defmodule Aikido.Agent.Commands.Stop do
   alias Aikido.Agent.CommandRuntime
 
   @impl true
-  def run(input, _opts, _context) do
+  def run(input, _opts, context) do
     resource = input.resource
     agent = input.arguments.agent
 
@@ -13,7 +13,8 @@ defmodule Aikido.Agent.Commands.Stop do
            :ok <-
              Aikido.Durable.stop(
                Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource)),
-               pid
+               pid,
+               scope: CommandRuntime.command_context(input, context)
              ) do
         {:ok, %{id: id, resource: resource, status: :stopped}}
       end

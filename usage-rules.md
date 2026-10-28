@@ -5,14 +5,14 @@ Build reliable multi-agent systems by keeping decision logic pure and runtime ef
 <!-- package.aikido.pure_actions package.aikido.runtime_separation -->
 
 ## The Bright Line
-- **Actions are pure.** They return the next state and directives and must never perform side effects. The action's return value is the **sole channel** for `agent.state` writes.
+- **Actions are pure.** They return sparse attribute changes and directives and must never perform side effects. The action's return value is the **sole channel** for `agent.state` writes.
 - **Side effects belong only in directives.** They mutate **no** state — neither domain (`agent.state`) nor runtime (`%AgentServer.State{}`). Results, if any, return as signals that re-enter the pipeline.
 - **Type-system enforced.** `Aikido.Directive.exec/3` has no state slot in its return shape (`:ok | {:stop, term()}`).
 
 Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/effect separation rules in this file are canonical.
 
 ## Core Contracts
-- Define reducers as native Ash actions returning `Aikido.Types.ActionResult`.
+- Define reducers as native Ash actions returning `Aikido.Types.ActionResult`. Set `changes` to a map for the action's own mounted resource; omitted keys are unchanged, and `nil` or `%{}` means no change. The native update action validates and adopts supplied attributes before directives execute.
 - Native ReqLLM normalization of caller-supplied replacement history may generate tool-call IDs as an explicitly accepted exception for now; this does not authorize other reducer effects.
 - Give distinct actions dedicated owner-local implementation modules, bound directly from their declarations. Share pure mechanics without a central action-name, signal-type or selector dispatcher; intentional union actions and wildcard observers still use one implementation each.
 - Keep agent logic pure. Actions must not send messages, perform network or database I/O, spawn processes, or schedule timers. Return directives for all side effects; directives never mutate state of any kind.

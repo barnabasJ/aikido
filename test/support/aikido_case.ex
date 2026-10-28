@@ -143,6 +143,7 @@ defmodule AikidoTest.Case do
 
     [
       data_dir: directory,
+      scope_adapter: AikidoTest.DurableScopeAuthority,
       durable_options: [discovery_interval_ms: 100, initial_discovery_delay_ms: 0]
     ]
   end

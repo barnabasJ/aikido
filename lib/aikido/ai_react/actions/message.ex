@@ -5,6 +5,17 @@ defmodule Aikido.AiReact.Actions.Message do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- process_incoming_message(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp process_incoming_message(input) do
     with :ok <- RunCaller.validate_run_caller(input.arguments.state, input) do
       queue_message_or_resume_run(input)
     end
@@ -24,7 +35,7 @@ defmodule Aikido.AiReact.Actions.Message do
           &(&1 ++ [input.arguments.text])
         )
 
-      Aikido.Types.ActionResult.new(state: state)
+      {:ok, state, []}
     end
   end
 end

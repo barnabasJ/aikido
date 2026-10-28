@@ -485,3 +485,24 @@ read-only: it never replays network calls or rewinds running agents. Structured
 credential fields and conversation contexts are redacted, executable values are
 omitted, and oversized values are explicitly truncated. It records future events;
 there is no reconstruction of events from before capture began.
+
+### Playground scope during durable activation
+
+The playground starts each browser run with its existing browser actor
+(`%{id: browser_id}`) and the `"playground"` tenant. The same native Ash scope
+is used for subsequent commands and inherited child activation. Anonymous examples
+remain anonymous; the adapter does not create an actor for them.
+
+`AgentExamples.DurableScope` uses the endpoint's existing Phoenix signing trust
+to issue a credential bound to the resource, runtime instance, logical agent ID,
+partition, durable supervisor and durable key. The token contains the browser ID
+and tenant, not an actor struct, raw caller scope or provider API key. It restores
+the same browser actor after a saved activation. Unsupported actor shapes,
+application context, disabled authorization and transient tracers are rejected
+rather than silently converted into another scope.
+
+This is a local playground trust model, not an application authorization service.
+Tokens expire after 30 days; changing the endpoint signing secret invalidates
+existing tokens. Individual credential revocation is not implemented. Production
+applications should authenticate their own execution credential and resolve current
+permissions through their own configured durable scope adapter.

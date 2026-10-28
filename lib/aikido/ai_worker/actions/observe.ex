@@ -22,11 +22,11 @@ defmodule Aikido.AiWorker.Actions.Observe do
         }
 
       Aikido.Types.ActionResult.new(
-        state: state,
+        changes: %{},
         directives: [Aikido.Directives.emit_to_pid(observe, context.agent_pid)]
       )
     else
-      Aikido.Types.ActionResult.new(state: state, directives: [])
+      Aikido.Types.ActionResult.new(changes: %{})
     end
   end
 end

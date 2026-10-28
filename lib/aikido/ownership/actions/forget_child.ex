@@ -13,12 +13,12 @@ defmodule Aikido.Ownership.Actions.ForgetChild do
           Aikido.Ownership.Monitors.release(child) ++ notify_team(child, input.context.aikido)
 
         Aikido.Types.ActionResult.new(
-          state: %{state | children: Map.delete(state.children, tag)},
+          changes: %{children: Map.delete(state.children, tag)},
           directives: directives
         )
 
       _ ->
-        Aikido.Types.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(changes: nil)
     end
   end
 

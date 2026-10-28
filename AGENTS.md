@@ -4,7 +4,7 @@
 Build reliable agent systems by separating pure decision logic from runtime side-effect execution.
 
 ## The Bright Line
-- **Actions are pure.** They return the next state and directives and must never perform side effects. The action's return value is the **sole channel** for `agent.state` (domain) writes.
+- **Actions are pure.** They return sparse attribute changes and directives and must never perform side effects. The runtime validates and adopts those changes through the native update action before executing directives. The action's return value is the **sole channel** for `agent.state` (domain) writes.
 - **Directives are pure I/O.** They emit signals, spawn processes, schedule messages — and **mutate no state**: not domain (`agent.state`), not runtime (`%AgentServer.State{}`), nothing. Their results, if any, come back as signals that re-enter the pipeline.
 - **Type-system enforced.** `Aikido.Directive.exec/3` returns `:ok | {:stop, term()}` — there is no state slot in the return shape, so a directive author cannot accidentally write one.
 
@@ -35,15 +35,15 @@ does not permit other runtime effects inside reducers.
 - `mix docs` (local docs)
 
 ## Architecture Snapshot
-- `Aikido.Agent`: immutable identity/state struct and a convenience macro over `Ash.Resource` with `Aikido.Ash.Agent`
-- `Aikido.Ash.Agent`: resource extension that compiles state declarations into attributes and exposes generic lifecycle/signal actions
-- `Aikido.Ash.Domain`: domain interfaces named `<agent>_<action>`; start returns a reference, signal commands return processing receipts, and inspect/list explicitly read live state
-- `Aikido.Ash.Commands`: dedicated native I/O implementations for public lifecycle, inspection, list and signal commands; `Aikido.Ash.Runtime` contains only shared helpers
-- `Aikido.Ash.Slice`: embedded resource extension; slices own their attributes, native reducer actions and routes
-- `Aikido.Ash.Team`: topology and coordination on an agent resource, including nested teams and dynamic workers
+- `Aikido.Agent`: immutable identity/state struct and a convenience macro over `Ash.Resource` with `Aikido.Agent.Extension`
+- `Aikido.Agent.Extension`: resource extension that compiles state declarations into attributes and exposes generic lifecycle/signal actions
+- `Aikido.Domain.Extension`: domain interfaces named `<agent>_<action>`; start returns a reference, signal commands return processing receipts, and inspect/list explicitly read live state
+- `Aikido.Agent.Commands`: dedicated native I/O implementations for public lifecycle, inspection, list and signal commands; `Aikido.Agent.CommandRuntime` contains only shared helpers
+- `Aikido.Slice.Extension`: embedded resource extension; slices own their attributes, native reducer actions and routes
+- `Aikido.Team.Extension`: topology and coordination on an agent resource, including nested teams and dynamic workers
 - `Aikido.AgentServer`: signal routing, native Ash reducer execution, directive execution and runtime bookkeeping, hosted by DurableServer
 - `Aikido.Directive`: Spark/Ash typed-struct host and execution behaviour; concrete descriptors live under `Aikido.Directives` or their owning feature
-- `Aikido.Types.ActionResult`: typed reducer result containing next state and validated directives
+- `Aikido.Types.ActionResult`: typed reducer result containing sparse attribute changes and validated directives
 - `Aikido.Durable`: keyed activation and persistence through DurableServer; the default backend is local EKV
 
 ## Native Ash and Spark Contracts
@@ -56,7 +56,7 @@ does not permit other runtime effects inside reducers.
 - Supply AI tools as Ash AI tool names plus native `tool_options`. Tool setup builds descriptions and registry once per run. Prepared callbacks are transient and are rebuilt for a new run.
 - Internal messages use `Aikido.Signal`; define typed payloads with its Spark `signal`/`schema` DSL. Scope and native tracer context travel directly on the envelope. Pure reducers return literals; constructors that generate IDs or timestamps belong at I/O boundaries. Deliver to agents directly; publish native Ash notifications through directives after state adoption.
 - The purity rules apply to agent/slice state reducers. Public lifecycle/signal adapters and tool implementations are I/O boundaries, not reducers; invoke tools through directives or supervised work rather than from a reducer.
-- Put external domain command implementations in `Aikido.Ash.Commands` and `ash/commands/`. Their runtime I/O stays outside the reducer pipeline; agent/slice `Actions` and `actions/` contain reducers. Tool implementations remain separate I/O boundaries.
+- Put external domain command implementations in `Aikido.Agent.Commands` and `agent/commands/`. Their runtime I/O stays outside the reducer pipeline; agent/slice `Actions` and `actions/` contain reducers. Tool implementations remain separate I/O boundaries.
 
 ## Persistence and Completion
 - DurableServer is the sole persistence/activation path. Do not introduce parallel storage adapters or an instance manager.
@@ -72,7 +72,7 @@ does not permit other runtime effects inside reducers.
 - Place example resources beside their own implementation and signal files. Keep source-viewer paths and categories aligned with the declared native contracts when files move.
 
 ## Standards
-- Keep Ash reducer actions pure: the same input returns the same state and directives
+- Keep Ash reducer actions pure: the same input returns the same attribute changes and directives
 - Directives mutate **no** state — neither `agent.state` (domain) nor `%AgentServer.State{}` (runtime). State changes flow through the action's return value; runtime bookkeeping flows through GenServer callbacks and `process_signal/2` cascade callbacks
 - Use **Ash types** for data contracts and **Spark.Options** for DSL/configuration validation
 - Define fixed statuses, modes and policies with feature-owned `Ash.Type.Enum` modules and reuse them across contracts. Keep extensible names, paths and tags as atoms.

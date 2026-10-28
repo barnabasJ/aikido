@@ -34,11 +34,12 @@ defmodule Aikido do
 
   ## Core Concepts
 
-  Aikido agents hold immutable state. Native Ash actions return the next state
-  and directives; AgentServer applies that state and executes the directives.
+  Aikido agents hold immutable state. Native Ash actions return sparse attribute
+  changes and directives; AgentServer validates and adopts those changes through
+  a native update action, then executes the directives.
 
   - **Agents** — Immutable state containers updated by native Ash actions
-  - **Actions** — Pure functions that return the next agent state and directives; never perform side effects
+  - **Actions** — Pure functions that return attribute changes and directives; never perform side effects
   - **Directives** — Descriptions of side effects, executed by the runtime without mutating state
 
   Side effects belong only in directives. Actions must not send messages, perform

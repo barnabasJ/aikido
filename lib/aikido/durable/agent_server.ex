@@ -4,7 +4,19 @@ defmodule Aikido.Durable.AgentServer do
   alias Aikido.AgentServer
 
   @impl true
+  def dump_state(%{require_existing?: true}) do
+    raise Aikido.Durable.ScopeAdapter.Error, operation: :restore, reason: :saved_state_missing
+  end
+
   def dump_state(%{runtime: runtime} = state) do
+    credential =
+      Aikido.Durable.ScopeAdapter.checkpoint(
+        state[:scope_adapter],
+        state[:credential],
+        runtime.agent,
+        Aikido.Durable.ScopeAdapter.identity(state.options)
+      )
+
     agent =
       Aikido.Durable.Codec.transform_agent(runtime.agent, runtime.agent_module, :externalize)
 
@@ -12,19 +24,20 @@ defmodule Aikido.Durable.AgentServer do
       options: Aikido.Durable.Snapshot.boot_options(state.options),
       parent: parent_binding(Aikido.Ownership.parent(runtime)) || state[:unresolved_parent],
       permanent: state.permanent,
+      credential: credential,
       agent: serialize_agent(agent, runtime.agent_module)
     })
   end
 
   # DurableServer re-dumps a loaded envelope while claiming its initialization
-  # lock, before init/1 has reconstructed the runtime. Its codecs already ran.
+  # lock, before initialization has reconstructed the runtime. Its codecs already ran.
   def dump_state(%{agent: _, options: _, permanent: _} = saved), do: encode(saved)
 
-  def dump_state(%{options: options} = initial) do
+  def dump_state(%{options: _} = initial), do: dump_initial_state(initial, [])
+
+  defp dump_initial_state(%{options: options} = initial, initialization_options) do
     module = Keyword.fetch!(options, :agent_module)
     Code.ensure_loaded!(module)
-
-    initialization_options = Keyword.get(options, :initialization_options, [])
 
     agent =
       module
@@ -51,12 +64,51 @@ defmodule Aikido.Durable.AgentServer do
     do: Aikido.Durable.Snapshot.load(envelope)
 
   @impl true
-  def init(saved) do
-    saved_parent = Map.get(saved, :parent, saved.options[:parent])
+  def init(saved), do: init(saved, %{})
 
+  @impl true
+  def init(saved, info) do
+    saved_parent = Map.get(saved, :parent, saved.options[:parent])
+    saved_options = Aikido.Durable.Snapshot.boot_options(saved.options)
+
+    adapter = get_in(info, [:aikido_config, :scope_adapter])
+    identity = Aikido.Durable.ScopeAdapter.identity(saved_options)
+
+    with :ok <- validate_claim(saved_options, info),
+         {:ok, scope} <-
+           Aikido.Durable.ScopeAdapter.restore(
+             adapter,
+             saved[:credential],
+             saved.agent,
+             identity
+           ) do
+      initialize_authenticated(saved, saved_options, saved_parent, adapter, scope)
+    else
+      {:error, reason} ->
+        raise Aikido.Durable.ScopeAdapter.Error, operation: :restore, reason: reason
+    end
+  end
+
+  defp validate_claim(options, %{key: claimed_key, supervisor: claimed_pool} = info) do
+    configured_instance = get_in(info, [:aikido_config, :aikido])
+
+    if options[:durable_server] == claimed_pool &&
+         Aikido.Durable.storage_key(options[:durable_key], options[:partition]) == claimed_key &&
+         Aikido.Durable.agent_id(options[:durable_key]) == options[:id] &&
+         options[:aikido] == configured_instance do
+      :ok
+    else
+      {:error, :durable_identity_mismatch}
+    end
+  end
+
+  defp validate_claim(_options, _info), do: {:error, :missing_durable_claim}
+
+  defp initialize_authenticated(saved, saved_options, saved_parent, adapter, scope) do
     options =
-      saved.options
+      saved_options
       |> Keyword.put(:parent, saved_parent)
+      |> Keyword.put(:initialization_options, scope)
       |> restore_parent()
 
     unresolved_parent =
@@ -64,25 +116,13 @@ defmodule Aikido.Durable.AgentServer do
            options[:on_parent_death] not in [:continue, :emit_orphan],
          do: saved_parent
 
-    options =
-      if saved[:agent],
-        do:
-          Keyword.put(
-            options,
-            :restored_agent,
-            saved.agent
-            |> restore_agent(options[:agent_module])
-            |> restore_mounted_slices(options[:agent_module])
-            |> restore_cron_mount(options[:agent_module], Map.get(saved, :cron_specs, %{}))
-          ),
-        else: options
+    {options, restored?} = activation_state(saved, options)
 
     case AgentServer.init(options) do
       {:ok, runtime, {:continue, continue}} ->
         send(
           self(),
-          {:aikido_durable_continue, continue,
-           Map.has_key?(saved, :agent) && !Map.get(saved, :initial?, false)}
+          {:aikido_durable_continue, continue, restored?}
         )
 
         if unresolved_parent, do: send(self(), :aikido_missing_parent)
@@ -90,7 +130,9 @@ defmodule Aikido.Durable.AgentServer do
         {:ok,
          %{
            runtime: runtime,
-           options: saved.options,
+           options: saved_options,
+           scope_adapter: adapter,
+           credential: saved[:credential],
            permanent: saved.permanent,
            unresolved_parent: unresolved_parent
          },
@@ -100,12 +142,37 @@ defmodule Aikido.Durable.AgentServer do
          meta: %{
            key: runtime.durable_key,
            partition: runtime.partition,
-           restored?: Map.has_key?(saved, :agent) && !Map.get(saved, :initial?, false)
+           restored?: restored?
          }}
 
       {:stop, reason} ->
         raise "Cannot initialize durable agent: #{inspect(reason)}"
     end
+  end
+
+  defp activation_state(%{agent: {:uninitialized, attributes}} = saved, options) do
+    attributes =
+      Aikido.Durable.Codec.reinstate_initial(
+        attributes,
+        options[:agent_module],
+        Map.get(saved, :bootstrap_codecs, [])
+      )
+
+    {Keyword.put(options, :initial_state, attributes), false}
+  end
+
+  defp activation_state(saved, options) do
+    agent =
+      saved.agent
+      |> restore_agent(options[:agent_module], options[:initialization_options])
+      |> restore_mounted_slices(options[:agent_module], options[:initialization_options])
+      |> restore_cron_mount(
+        options[:agent_module],
+        Map.get(saved, :cron_specs, %{}),
+        options[:initialization_options]
+      )
+
+    {Keyword.put(options, :restored_agent, agent), !Map.get(saved, :initial?, false)}
   end
 
   @impl true
@@ -122,9 +189,9 @@ defmodule Aikido.Durable.AgentServer do
     do: wrap_runtime_reply(AgentServer.handle_cast(request, state.runtime), state)
 
   @impl true
-  def handle_info({:aikido_durable_continue, continue, restored?}, state) do
+  def handle_info({:aikido_durable_continue, {:post_init, scope} = continue, restored?}, state) do
     result = AgentServer.handle_continue(continue, state.runtime)
-    if restored?, do: enqueue_team_reconciliation(state.runtime)
+    if restored?, do: enqueue_team_reconciliation(state.runtime, scope)
     wrap_runtime_reply(result, state)
   end
 
@@ -250,8 +317,8 @@ defmodule Aikido.Durable.AgentServer do
     end
   end
 
-  defp restore_agent({:checkpoint, checkpoint}, agent_module) do
-    case agent_module.restore(checkpoint, %{}) do
+  defp restore_agent({:checkpoint, checkpoint}, agent_module, scope) do
+    case agent_module.restore(checkpoint, %{scope: Map.new(scope)}) do
       {:ok, %Aikido.Agent{} = agent} ->
         Aikido.Durable.Codec.transform_agent(agent, agent_module, :reinstate)
 
@@ -261,15 +328,16 @@ defmodule Aikido.Durable.AgentServer do
     end
   end
 
-  defp restore_agent({:agent, agent}, agent_module),
+  defp restore_agent({:agent, agent}, agent_module, _scope),
     do: Aikido.Durable.Codec.transform_agent(agent, agent_module, :reinstate)
 
-  defp restore_mounted_slices(agent, resource) do
+  defp restore_mounted_slices(agent, resource, scope) do
     state =
       Enum.reduce(Aikido.Agent.Info.slice_instances(resource), agent.state, fn instance, state ->
         if Map.has_key?(state, instance.path),
           do: state,
-          else: Map.put(state, instance.path, Ash.create!(instance.module, instance.config))
+          else:
+            Map.put(state, instance.path, Ash.create!(instance.module, instance.config, scope))
       end)
 
     %{agent | state: state}
@@ -277,25 +345,29 @@ defmodule Aikido.Durable.AgentServer do
 
   # Read legacy manifests at the persistence boundary. New snapshots retain
   # definitions only inside the slice; the removed runtime fields stay removed.
-  defp restore_cron_mount(agent, resource, legacy_specs) do
+  defp restore_cron_mount(agent, resource, legacy_specs, scope) do
     mount =
       Enum.find(Aikido.Agent.Info.slice_instances(resource), &(&1.module == Aikido.Cron.Slice))
 
-    cron = Map.get(agent.state, mount.path) || Ash.create!(Aikido.Cron.Slice, %{})
+    cron = Map.get(agent.state, mount.path) || Ash.create!(Aikido.Cron.Slice, %{}, scope)
 
     cron =
       if map_size(legacy_specs) == 0,
         do: cron,
-        else: Ash.update!(cron, %{specs: Map.merge(cron.specs, legacy_specs)})
+        else: Ash.update!(cron, %{specs: Map.merge(cron.specs, legacy_specs)}, scope)
 
     %{agent | state: Map.put(agent.state, mount.path, cron)}
   end
 
-  defp enqueue_team_reconciliation(runtime) do
+  defp enqueue_team_reconciliation(runtime, scope) do
     resource = runtime.agent_module
 
     if Aikido.Agent.Info.team_config(resource) do
-      send(self(), {:signal, Aikido.Signal.new!("aikido.ash.team.reconcile", %{})})
+      signal =
+        Aikido.Signal.new!("aikido.ash.team.reconcile", %{}, scope: scope)
+        |> Aikido.Signal.capture_tracing()
+
+      send(self(), {:signal, signal})
     end
   end
 end

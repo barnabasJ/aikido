@@ -33,6 +33,7 @@ defmodule AgentExamplesWeb.Router do
       live("/examples/verified-team", VerifiedTeamLive)
       live("/examples/resilience", ResilienceLive)
       live("/examples/recovery", RecoveryLive)
+      live("/examples/notifications", NotificationsLive)
       live("/examples/counter", CounterLive)
       live("/examples/cron", CronLive)
       live("/examples/checkpoint", CheckpointLive)

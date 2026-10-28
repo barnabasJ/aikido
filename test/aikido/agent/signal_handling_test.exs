@@ -23,7 +23,6 @@ defmodule AikidoTest.Agent.SignalHandlingTest.Actions.EmitTestSignal do
       %Aikido.Signal{id: nil, type: "test.emitted", data: %{from: "agent"}, source: "/test"}
 
     Aikido.Types.ActionResult.new(
-      state: input.arguments.state,
       directives: [%Aikido.Directives.Emit{signal: signal, target: input.arguments.recipient}]
     )
   end
@@ -66,7 +65,7 @@ defmodule AikidoTest.Agent.SignalHandlingTest do
   1. Signals arrive at AgentServer
   2. AgentServer routes signals to native Ash actions
   3. Ash validates and executes the actions
-  4. AgentServer accepts the returned state and executes its directives
+  4. AgentServer applies the returned changes and executes its directives
   """
   use AikidoTest.Case, async: true
 

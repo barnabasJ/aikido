@@ -237,6 +237,57 @@ defmodule Aikido.HookRequestsTest do
     assert_receive {:observed_request, "pick.color"}
   end
 
+  test "stored capture strings are rejected as fresh hook input before writing and the identity remains reusable",
+       ctx do
+    resource = Aikido.HookRequestsTest.Agent
+    supervisor = Aikido.durable_supervisor_name(ctx.aikido)
+    id = unique_id("invalid-hook-capture")
+    callback = &Callbacks.configured/2
+
+    assert {:ok, stored_capture} =
+             Ash.Type.dump_to_embedded(:function, callback, mfa: true, arity: 2)
+
+    invalid_hook = %{
+      name: "question",
+      event: :before_model,
+      mode: :sync,
+      script: @script,
+      request: stored_capture
+    }
+
+    assert {:error, {:invalid_bootstrap_path, Aikido.AiReact.Slice, :ai}} =
+             start_test_agent(ctx, resource,
+               id: id,
+               initial_state: %{
+                 ai: %{
+                   hooks: [invalid_hook],
+                   model: "offline",
+                   client: Aikido.HookRequestsTest.Client
+                 }
+               }
+             )
+
+    assert :error = Aikido.Durable.lookup(supervisor, id)
+    key = Aikido.Durable.storage_key(id, nil)
+    prefix = DurableServer.Supervisor.__get_config__(supervisor).prefix
+
+    assert {:error, :not_found} =
+             DurableServer.fetch_stored_state(supervisor, %{key: key, prefix: prefix},
+               consistent: true
+             )
+
+    pid =
+      start_server(ctx, resource,
+        id: id,
+        initial_state: %{
+          ai: %{hooks: [hook(callback)], model: "offline", client: Aikido.HookRequestsTest.Client}
+        }
+      )
+
+    assert {:ok, answer} = Aikido.AI.ask_sync(pid, "work", metadata: %{value: "native capture"})
+    assert answer =~ "Lua received native capture"
+  end
+
   test "portable callbacks survive initial Durable startup and checkpoint reactivation", ctx do
     callback = &Callbacks.configured/2
     id = unique_id("portable-hook")

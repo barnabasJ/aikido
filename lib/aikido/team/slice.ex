@@ -114,14 +114,18 @@ defmodule Aikido.Team.Slice do
 
   @doc false
   def externalize(state) do
-    %{
-      state
-      | queued_operations: [],
-        members: %{},
-        incarnations: %{},
-        operation: Ash.Resource.Info.attribute(__MODULE__, :operation).default
-    }
+    Map.merge(state, %{
+      queued_operations: [],
+      members: %{},
+      incarnations: %{},
+      operation: Ash.Resource.Info.attribute(__MODULE__, :operation).default
+    })
   end
+
+  @doc false
+  def reinstate(state, %{fresh?: true}), do: externalize(state)
+
+  def reinstate(state, %{fresh?: false}), do: reinstate(state)
 
   @doc false
   def reinstate(state) do
@@ -137,7 +141,7 @@ defmodule Aikido.Team.Slice do
       |> Map.get(:pending_tasks, %{})
       |> Map.new(fn {id, data} -> {id, pending_task_record(id, data)} end)
 
-    %{state | tasks: Map.merge(state.tasks, tasks)}
+    Map.put(state, :tasks, Map.merge(Map.get(state, :tasks, %{}), tasks))
   end
 
   defp pending_task_record(id, data) do

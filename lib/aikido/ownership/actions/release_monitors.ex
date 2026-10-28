@@ -11,7 +11,7 @@ defmodule Aikido.Ownership.Actions.ReleaseMonitors do
         end)
 
     Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | children: %{}, parent_monitor: nil},
+      changes: %{children: %{}, parent_monitor: nil},
       directives: directives
     )
   end

@@ -5,6 +5,17 @@ defmodule Aikido.AiReact.Actions.Ask do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- prepare_requested_run(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp prepare_requested_run(input) do
     input
     |> start_run()
     |> RunCaller.bind_run_caller(input)

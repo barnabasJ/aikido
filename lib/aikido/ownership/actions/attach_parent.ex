@@ -9,11 +9,11 @@ defmodule Aikido.Ownership.Actions.AttachParent do
     context = input.context.aikido
 
     if input.arguments.initial_only? and (state.parent || state.orphaned_from) do
-      Aikido.Types.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(changes: nil)
     else
       with {:ok, state} <- ParentBinding.attach(state, input.arguments.parent, context.agent_pid) do
         Aikido.Types.ActionResult.new(
-          state: state,
+          changes: %{parent: state.parent, orphaned_from: nil, parent_monitor: nil},
           directives: ParentBinding.monitor(state) ++ ParentBinding.announce(state, context)
         )
       end

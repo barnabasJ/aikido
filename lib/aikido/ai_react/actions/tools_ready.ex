@@ -6,6 +6,17 @@ defmodule Aikido.AiReact.Actions.ToolsReady do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- process_prepared_tools(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp process_prepared_tools(input) do
     state = input.arguments.state
 
     if state.request_id == input.arguments.request_id && state.status == :setup &&
@@ -38,7 +49,7 @@ defmodule Aikido.AiReact.Actions.ToolsReady do
           HookQueue.release_queued_steps(state, [{:effect, directive} | queue], status, [])
       end
     else
-      Aikido.Types.ActionResult.new(state: state)
+      {:ok, state, []}
     end
   end
 end

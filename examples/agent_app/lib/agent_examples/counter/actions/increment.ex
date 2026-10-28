@@ -4,6 +4,6 @@ defmodule AgentExamples.Counter.Actions.Increment do
   @impl true
   def run(input, _opts, _context) do
     state = input.arguments.state
-    Aikido.Types.ActionResult.new(state: %{state | count: state.count + input.arguments.amount})
+    Aikido.Types.ActionResult.new(changes: %{count: state.count + input.arguments.amount})
   end
 end

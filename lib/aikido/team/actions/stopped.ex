@@ -6,7 +6,11 @@ defmodule Aikido.Team.Actions.Stopped do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
-    ActionAdapter.to_action_result(remove_stopped_member(signal.data, state, context, config))
+
+    ActionAdapter.to_action_result(
+      remove_stopped_member(signal.data, state, context, config),
+      state
+    )
   end
 
   defp remove_stopped_member(%{member: name, operation_id: id}, state, context, config) do

@@ -2,12 +2,9 @@ defmodule AikidoTest.AgentServer.StateAtomicityTest.Actions.SetMultipleKeys do
   @moduledoc false
   use Ash.Resource.Actions.Implementation
   @impl true
-  def run(input, _opts, _context) do
-    slice = input.arguments.state
-    slice = slice || %{}
-
+  def run(_input, _opts, _context) do
     Aikido.Types.ActionResult.new(
-      state: Map.merge(slice, %{action_ran: true, key_a: true, key_b: true, key_c: true}),
+      changes: %{action_ran: true, key_a: true, key_b: true, key_c: true},
       directives: []
     )
   end
@@ -28,7 +25,7 @@ defmodule AikidoTest.AgentServer.StateAtomicityTest.Actions.ObserveStateKeys do
       saw_c: Map.get(slice, :key_c, false)
     }
 
-    Aikido.Types.ActionResult.new(state: Map.merge(slice, observation), directives: [])
+    Aikido.Types.ActionResult.new(changes: observation, directives: [])
   end
 end
 

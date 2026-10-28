@@ -12,7 +12,7 @@ defmodule Aikido.RuntimeNativeContractTest.RawResult do
   def run(_input, _opts, _context) do
     {:ok,
      %Aikido.Types.ActionResult{
-       state: %{count: 99},
+       changes: %{count: 99},
        directives: [%Aikido.Directives.Schedule{delay_ms: -1, message: :tick}]
      }}
   end
@@ -48,7 +48,7 @@ defmodule Aikido.RuntimeNativeContractTest.ScopedWorker do
   end
 
   policies do
-    policy action([:start, :initialize, :__aikido_initialize_state__]) do
+    policy action([:start, :initialize, :__aikido_initialize_state__, :__aikido_apply_state__]) do
       authorize_if actor_present()
     end
   end

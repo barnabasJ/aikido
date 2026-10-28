@@ -38,8 +38,8 @@ defmodule Aikido.Agent.Info do
     |> Enum.uniq()
   end
 
-  @doc "Returns the list of slice instances attached to this agent."
-  @spec slice_instances(module()) :: [Aikido.Slice.Instance.t()]
+  @doc "Returns slice instances from a compiled agent or its Spark DSL state."
+  @spec slice_instances(module() | Spark.Dsl.t()) :: [Aikido.Slice.Instance.t()]
   def slice_instances(module),
     do: Extension.get_persisted(module, :slice_instances, [])
 

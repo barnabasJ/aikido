@@ -13,6 +13,7 @@ defmodule Aikido.Durable do
     name: [type: :atom, required: true],
     agent: [type: :atom],
     agent_opts: [type: :keyword_list, default: []],
+    scope_adapter: [type: :module],
     aikido: [type: :atom],
     partition: [type: :any],
     permanent: [type: :boolean, default: true],
@@ -83,6 +84,7 @@ defmodule Aikido.Durable do
   defp activation_defaults(opts) do
     %{
       agent: opts[:agent],
+      scope_adapter: opts[:scope_adapter],
       agent_opts: Keyword.get(opts, :agent_opts, []),
       aikido:
         Keyword.get(
@@ -100,7 +102,16 @@ defmodule Aikido.Durable do
     do: activate(name, key, opts, start_options, :start_child)
 
   def ensure_started(name, key, opts \\ [], start_options \\ []),
-    do: activate(name, key, opts, start_options, :ensure_started_child)
+    do: ensure_activation(name, key, opts, start_options)
+
+  defp ensure_activation(name, key, opts, start_options) do
+    validate_activation_context!(start_options)
+
+    case lookup(name, key, opts) do
+      {:ok, pid} -> {:ok, pid}
+      :error -> activate(name, key, opts, start_options, :ensure_started_child)
+    end
+  end
 
   defp activate(name, key, opts, start_options, operation) do
     config = config(name)
@@ -112,29 +123,130 @@ defmodule Aikido.Durable do
       |> Keyword.merge(Keyword.get(opts, :agent_opts, []))
       |> Keyword.merge(
         agent_module: agent,
-        id: id(key),
+        id: agent_id(key),
         aikido: config.aikido,
         partition: partition,
-        initial_state: Keyword.get(opts, :initial_state, %{}),
+        initial_state: Keyword.get(opts, :initial_state, %{}) || %{},
         durable_server: name,
         durable_key: key
       )
 
-    initial = %{options: agent_opts, permanent: Keyword.get(opts, :permanent, config.permanent)}
+    {initialization_options, agent_opts} = Keyword.pop(agent_opts, :initialization_options, [])
+    initialization_options = Map.new(initialization_options)
 
-    spec = {Aikido.Durable.AgentServer, key: key(key, partition), initial_state: initial}
+    initialization_options =
+      Ash.Scope.to_opts(initialization_options,
+        context: Map.get(initialization_options, :context, %{})
+      )
 
-    case apply(DurableServer.Supervisor, operation, [name, spec, start_options]) do
-      {:ok, {pid, _}} -> {:ok, pid}
-      {:error, {:already_started, {pid, _}}} -> {:error, {:already_started, pid}}
-      {:error, _} = error -> error
+    validate_activation_context!(start_options)
+    start_options = Keyword.delete(start_options, :init_context)
+    identity = Aikido.Durable.ScopeAdapter.identity(agent_opts)
+
+    with {:ok, initial} <-
+           activation_input(name, key, config, agent_opts, initialization_options, identity, opts) do
+      spec =
+        {Aikido.Durable.AgentServer, key: storage_key(key, partition), initial_state: initial}
+
+      case apply(DurableServer.Supervisor, operation, [name, spec, start_options]) do
+        {:ok, {pid, _}} -> {:ok, pid}
+        {:error, {:already_started, {pid, _}}} -> {:error, {:already_started, pid}}
+        {:error, _} = error -> error
+      end
+    end
+  end
+
+  defp activation_input(name, key, config, options, scope, identity, opts) do
+    native = DurableServer.Supervisor.__get_config__(name)
+    request = %{key: storage_key(key, options[:partition]), prefix: native.prefix}
+
+    case DurableServer.fetch_stored_state(name, request, consistent: true) do
+      {:ok, %DurableServer.StoredState{meta: %{module: Aikido.Durable.AgentServer} = meta}} ->
+        if DurableServer.Meta.deleting?(meta),
+          do: prepare_activation(config, options, scope, identity, opts),
+          else: {:ok, %{require_existing?: true}}
+
+      {:ok, _other_resource} ->
+        {:error, :different_resource}
+
+      {:error, :not_found} ->
+        prepare_activation(config, options, scope, identity, opts)
+
+      {:error, reason} ->
+        {:error, {:snapshot_read_failed, reason}}
+    end
+  end
+
+  defp prepare_activation(config, options, scope, identity, opts) do
+    if is_nil(options[:agent_module]),
+      do: {:error, :agent_module_required},
+      else: prepare_fresh_activation(config, options, scope, identity, opts)
+  end
+
+  defp prepare_fresh_activation(config, options, scope, identity, opts) do
+    permanent = Keyword.get(opts, :permanent, config.permanent)
+
+    if adapter = config.scope_adapter do
+      with {:ok, attributes, credential} <-
+             adapter.prepare(options[:initial_state], scope, identity),
+           {:ok, attributes, paths} <-
+             Aikido.Durable.Codec.externalize_initial(attributes, options[:agent_module], true) do
+        {:ok,
+         %{
+           options: Aikido.Durable.Snapshot.boot_options(options),
+           parent: bootstrap_parent(options[:parent]),
+           permanent: permanent,
+           agent: {:uninitialized, attributes},
+           bootstrap_codecs: paths,
+           initial?: true,
+           credential: credential
+         }}
+      end
+    else
+      if Keyword.get(scope, :actor) || Keyword.get(scope, :tenant) ||
+           scope[:context] not in [nil, %{}] do
+        {:error, :scope_adapter_required}
+      else
+        with {:ok, attributes, paths} <-
+               Aikido.Durable.Codec.externalize_initial(
+                 options[:initial_state],
+                 options[:agent_module]
+               ) do
+          {:ok,
+           %{
+             options: Aikido.Durable.Snapshot.boot_options(options),
+             parent: bootstrap_parent(options[:parent]),
+             permanent: permanent,
+             agent: {:uninitialized, attributes},
+             bootstrap_codecs: paths,
+             initial?: true,
+             credential: nil
+           }}
+        end
+      end
+    end
+  end
+
+  defp bootstrap_parent(nil), do: nil
+  defp bootstrap_parent(parent), do: Map.take(parent, [:id, :partition, :tag, :meta])
+
+  defp validate_activation_context!(options) do
+    case Keyword.fetch(options, :init_context) do
+      {:ok, value} when not is_map(value) ->
+        raise ArgumentError, ":init_context must be a map"
+
+      {:ok, _value} ->
+        raise ArgumentError, "Use a configured durable scope adapter for activation authority"
+
+      :error ->
+        :ok
     end
   end
 
   def lookup(name, key, opts \\ []) do
     partition = Keyword.get(opts, :partition, config(name).partition)
 
-    case DurableServer.Supervisor.lookup(name, key(key, partition)) do
+    case DurableServer.Supervisor.lookup(name, storage_key(key, partition)) do
       {pid, _} -> {:ok, pid}
       nil -> :error
     end
@@ -144,7 +256,7 @@ defmodule Aikido.Durable do
   def restored?(name, key, opts \\ []) do
     partition = Keyword.get(opts, :partition, config(name).partition)
 
-    case DurableServer.Supervisor.lookup(name, key(key, partition)) do
+    case DurableServer.Supervisor.lookup(name, storage_key(key, partition)) do
       {_pid, %{restored?: restored?}} -> restored?
       _ -> false
     end
@@ -153,14 +265,14 @@ defmodule Aikido.Durable do
   @doc "Stop by logical key or PID, retaining or deleting the snapshot according to the agent's persistence setting."
   def stop(name, key_or_pid, opts \\ [])
 
-  def stop(_name, pid, _opts) when is_pid(pid) do
+  def stop(_name, pid, opts) when is_pid(pid) do
     with {:ok, {supervisor, key, partition, keep_snapshot?}} <-
            Aikido.AgentServer.state(pid, fn runtime ->
              {:ok,
               {runtime.durable_server, runtime.durable_key, runtime.partition,
                keep_snapshot?(runtime.agent_module)}}
            end),
-         :ok <- Aikido.AgentServer.prepare_stop(pid) do
+         :ok <- Aikido.AgentServer.prepare_stop(pid, :normal, Keyword.get(opts, :scope, %{})) do
       if keep_snapshot?,
         do: DurableServer.Supervisor.terminate_child_permanent(supervisor, pid),
         else: delete(supervisor, key, partition: partition)
@@ -178,7 +290,7 @@ defmodule Aikido.Durable do
   def delete(name, logical_key, opts \\ []) do
     config = config(name)
     partition = Keyword.get(opts, :partition, config.partition)
-    storage_key = key(logical_key, partition)
+    storage_key = storage_key(logical_key, partition)
 
     with :ok <- validate_delete_target(name, storage_key, opts[:agent]) do
       DurableServer.Supervisor.terminate_and_delete_child(name, storage_key)
@@ -190,7 +302,7 @@ defmodule Aikido.Durable do
     partition = Keyword.get(opts, :partition, config(name).partition)
 
     with {:ok, info} <-
-           DurableServer.Supervisor.get_server_info(name, key(logical_key, partition)),
+           DurableServer.Supervisor.get_server_info(name, storage_key(logical_key, partition)),
          saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state),
          %{id: parent_id} = parent <- Map.get(saved, :parent) do
       {:ok,
@@ -240,12 +352,14 @@ defmodule Aikido.Durable do
 
   defp config(name), do: DurableServer.Supervisor.__get_config__(name).init_info.aikido_config
 
-  defp key(key, partition),
+  @doc false
+  def storage_key(key, partition),
     do: "agent/" <> Base.url_encode64(:erlang.term_to_binary({partition, key}), padding: false)
 
-  defp id(key) when is_binary(key), do: key
+  @doc false
+  def agent_id(key) when is_binary(key), do: key
 
-  defp id(key),
+  def agent_id(key),
     do:
       "key_" <>
         Base.url_encode64(:crypto.hash(:sha256, :erlang.term_to_binary(key)), padding: false)

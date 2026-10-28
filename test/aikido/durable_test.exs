@@ -30,6 +30,25 @@ defmodule AikidoTest.DurableTest.CodecSlice do
   end
 end
 
+defmodule AikidoTest.DurableTest.WaitForInitialization do
+  use Ash.Resource.Change
+
+  @impl true
+  def change(changeset, _, _) do
+    Ash.Changeset.before_action(changeset, fn changeset ->
+      if observer = Process.whereis(AikidoTest.DurableTest.FreshObserver) do
+        send(observer, {:fresh_native_initialize, self()})
+
+        receive do
+          :resume_native_initialize -> :ok
+        end
+      end
+
+      changeset
+    end)
+  end
+end
+
 defmodule AikidoTest.DurableTest.CodecAgent do
   use Aikido.Agent
 
@@ -57,6 +76,10 @@ defmodule AikidoTest.DurableTest.CodecAgent do
 
   def reinstate(%{encoded: value}) do
     %{value: String.to_integer(value)}
+  end
+
+  changes do
+    change AikidoTest.DurableTest.WaitForInitialization, on: [:create]
   end
 
   @impl true
@@ -87,7 +110,10 @@ defmodule AikidoTest.DurableTest do
       Path.join(System.tmp_dir!(), "aikido-durable-#{System.unique_integer([:positive])}")
 
     instance = AikidoTest.DurableInstance
-    start_supervised!({Aikido, name: instance, durable: []})
+
+    start_supervised!(
+      {Aikido, name: instance, durable: [data_dir: Path.join(directory, "default")]}
+    )
 
     opts = [
       name: AikidoTest.DurableSupervisor,
@@ -241,7 +267,17 @@ defmodule AikidoTest.DurableTest do
         agent: AikidoTest.DurableTest.ThreadAgent
       )
 
-    assert {:ok, ^thread} = Aikido.AgentServer.state(second, &{:ok, &1.agent.state.thread})
+    assert {:ok, restored_thread} =
+             Aikido.AgentServer.state(second, &{:ok, &1.agent.state.thread})
+
+    assert Ash.Type.equal?(Aikido.Thread.Slice, restored_thread, thread),
+           inspect(
+             %{before: Map.from_struct(thread), after: Map.from_struct(restored_thread)},
+             structs: false,
+             limit: :infinity,
+             printable_limit: :infinity,
+             pretty: true
+           )
 
     assert {:ok, %{entries: entries, rev: 2}} =
              Aikido.AgentServer.call(
@@ -441,6 +477,18 @@ defmodule AikidoTest.DurableTest do
   test "initialization lock preserves the encoded state and logical parent before restore completes",
        %{durable: durable} do
     {:ok, parent} = Aikido.Durable.ensure_started(durable, "lock-parent")
+
+    {:ok, previous} =
+      Aikido.Durable.ensure_started(durable, "lock-child",
+        agent: AikidoTest.DurableTest.CodecAgent,
+        permanent: false,
+        initial_state: %{domain: %{value: 91}},
+        agent_opts: [
+          parent: %{pid: parent, id: "lock-parent", tag: :child, partition: nil, meta: %{}}
+        ]
+      )
+
+    assert :ok = Aikido.Durable.stop(durable, previous)
     Process.register(self(), AikidoTest.DurableTest.InitObserver)
 
     activation =
@@ -465,7 +513,7 @@ defmodule AikidoTest.DurableTest do
     saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
     assert {:checkpoint, %{custom_state: %{domain: %{encoded: "91"}}}} = saved.agent
     assert saved.parent == %{id: "lock-parent", tag: :child, partition: nil, meta: %{}}
-    assert saved.initial?
+    refute Map.get(saved, :initial?, false)
 
     redumped =
       saved
@@ -477,6 +525,77 @@ defmodule AikidoTest.DurableTest do
     assert {:ok, ^child} = Task.await(activation)
     Process.unregister(AikidoTest.DurableTest.InitObserver)
     assert {:ok, 91} = Aikido.AgentServer.state(child, &{:ok, &1.agent.state.domain.value})
+  end
+
+  test "fresh lock stores codec-safe bootstrap before native initialization", %{durable: durable} do
+    {:ok, parent} = Aikido.Durable.ensure_started(durable, "bootstrap-parent")
+    Process.register(self(), AikidoTest.DurableTest.FreshObserver)
+
+    activation =
+      Task.async(fn ->
+        Aikido.Durable.ensure_started(durable, "bootstrap-child",
+          agent: AikidoTest.DurableTest.CodecAgent,
+          permanent: false,
+          initial_state: %{domain: %{value: 91, credential: "first-claim-secret"}},
+          agent_opts: [
+            parent: %{pid: parent, id: "bootstrap-parent", tag: :child, partition: nil, meta: %{}}
+          ]
+        )
+      end)
+
+    assert_receive {:fresh_native_initialize, child}, 5_000
+    on_exit(fn -> send(child, :resume_native_initialize) end)
+
+    storage_key =
+      "agent/" <>
+        Base.url_encode64(:erlang.term_to_binary({nil, "bootstrap-child"}), padding: false)
+
+    assert {:ok, info} = DurableServer.Supervisor.get_server_info(durable, storage_key)
+    saved = Aikido.Durable.AgentServer.load_state(info.vsn, info.user_state)
+    assert {:uninitialized, %{domain: %{encoded: "91"}}} = saved.agent
+    assert saved.bootstrap_codecs == [:domain]
+    assert saved.initial?
+    assert saved.parent == %{id: "bootstrap-parent", tag: :child, partition: nil, meta: %{}}
+    refute inspect(saved, limit: :infinity) =~ "first-claim-secret"
+
+    redumped =
+      saved
+      |> Aikido.Durable.AgentServer.dump_state()
+      |> then(&Aikido.Durable.AgentServer.load_state(1, &1))
+
+    assert saved == redumped
+    send(child, :resume_native_initialize)
+    assert {:ok, ^child} = Task.await(activation)
+    Process.unregister(AikidoTest.DurableTest.FreshObserver)
+    assert {:ok, 91} = Aikido.AgentServer.state(child, &{:ok, &1.agent.state.domain.value})
+    assert :ok = Aikido.Durable.stop(durable, child)
+
+    assert {:ok, restored} =
+             Aikido.Durable.ensure_started(durable, "bootstrap-child",
+               agent: AikidoTest.DurableTest.CodecAgent
+             )
+
+    assert {:ok, 91} = Aikido.AgentServer.state(restored, &{:ok, &1.agent.state.domain.value})
+  end
+
+  test "an unsafe partial bootstrap fails without writing its raw fallback", %{durable: durable} do
+    result =
+      Aikido.Durable.ensure_started(durable, "unsafe-bootstrap",
+        agent: AikidoTest.DurableTest.CodecAgent,
+        initial_state: %{domain: %{credential: "must-never-reach-bootstrap-storage"}}
+      )
+
+    assert result ==
+             {:error, {:bootstrap_codec_failed, AikidoTest.DurableTest.CodecAgent, :domain}}
+
+    refute inspect(result) =~ "must-never-reach-bootstrap-storage"
+    assert :error = Aikido.Durable.lookup(durable, "unsafe-bootstrap")
+
+    key =
+      "agent/" <>
+        Base.url_encode64(:erlang.term_to_binary({nil, "unsafe-bootstrap"}), padding: false)
+
+    refute match?({:ok, _}, DurableServer.Supervisor.get_server_info(durable, key))
   end
 
   test("the default Aikido lifecycle uses DurableServer", %{directory: directory}) do

@@ -33,7 +33,7 @@ defmodule AikidoTest.ObserverSafety.Reducer do
       end
 
     Aikido.Types.ActionResult.new(
-      state: %{count: input.arguments.state.count + 1},
+      changes: %{count: input.arguments.state.count + 1},
       directives: directives
     )
   end

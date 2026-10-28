@@ -12,10 +12,10 @@ defmodule Aikido.Team.Actions.BackgroundTask do
         task =
           Map.merge(task, %{mode: :background, notify: task[:notify] || task[:requester] || :self})
 
-        Aikido.Types.ActionResult.new(state: put_in(state.tasks[id], task))
+        Aikido.Types.ActionResult.new(changes: %{tasks: Map.put(state.tasks, id, task)})
 
       {:ok, _settled} ->
-        Aikido.Types.ActionResult.new(state: state)
+        Aikido.Types.ActionResult.new(changes: nil)
 
       :error ->
         background_pending_assignment(state, id)
@@ -28,7 +28,9 @@ defmodule Aikido.Team.Actions.BackgroundTask do
         task =
           Map.merge(task, %{mode: :background, notify: task[:notify] || task[:requester] || :self})
 
-        Aikido.Types.ActionResult.new(state: put_in(state.pending_tasks[id], task))
+        Aikido.Types.ActionResult.new(
+          changes: %{pending_tasks: Map.put(state.pending_tasks, id, task)}
+        )
 
       :error ->
         {:error,

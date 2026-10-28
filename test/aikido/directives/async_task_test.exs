@@ -22,10 +22,7 @@ defmodule Aikido.Directives.AsyncTaskTest.Actions.RunWork do
 
   @impl true
   def run(input, _, _) do
-    Aikido.Types.ActionResult.new(
-      state: input.arguments.state,
-      directives: [input.arguments.directive]
-    )
+    Aikido.Types.ActionResult.new(directives: [input.arguments.directive])
   end
 end
 
@@ -34,9 +31,7 @@ defmodule Aikido.Directives.AsyncTaskTest.Actions.RecordResult do
 
   @impl true
   def run(input, _, _) do
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | value: Map.delete(input.arguments.data, :directive)}
-    )
+    Aikido.Types.ActionResult.new(changes: %{value: Map.delete(input.arguments.data, :directive)})
   end
 end
 

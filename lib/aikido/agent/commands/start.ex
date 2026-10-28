@@ -2,6 +2,7 @@ defmodule Aikido.Agent.Commands.Start do
   @moduledoc "External Ash command boundary. Starts a durable agent through native scoped initialization and completes its initial team topology."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Agent.CommandRuntime
+  alias Aikido.Agent.Errors.StartupCleanupFailed
 
   @impl true
   def run(input, _opts, context) do
@@ -92,8 +93,23 @@ defmodule Aikido.Agent.Commands.Start do
       {:ok, CommandRuntime.reference(resource, input.arguments.id, pid)}
     else
       error ->
-        Aikido.Durable.stop(pool, pid)
-        error
+        cleanup =
+          CommandRuntime.catch_runtime_exit(fn ->
+            Aikido.Durable.stop(pool, pid, scope: CommandRuntime.command_context(input, context))
+          end)
+
+        case cleanup do
+          :ok ->
+            error
+
+          {:error, cleanup_error} ->
+            {:error,
+             StartupCleanupFailed.exception(
+               agent_id: input.arguments.id,
+               startup: error,
+               cleanup: cleanup_error
+             )}
+        end
     end
   end
 

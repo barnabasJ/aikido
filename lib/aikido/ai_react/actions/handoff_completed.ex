@@ -8,6 +8,17 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- process_handoff_document(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp process_handoff_document(input) do
     input.arguments.state
     |> adopt_handoff_and_resume(Map.delete(input.arguments, :state))
   end
@@ -38,7 +49,7 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
           end
       end
     else
-      Aikido.Types.ActionResult.new(state: state)
+      {:ok, state, []}
     end
   end
 
@@ -98,6 +109,11 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
       last_input_tokens: nil,
       opening_messages: original.opening_messages ++ original.queued_messages,
       queued_messages: [],
+      todo_idle_reminder:
+        if(original.queued_messages == [],
+          do: Map.get(replacement, :todo_idle_reminder),
+          else: nil
+        ),
       streaming_text: "",
       streaming_thinking: ""
     })
@@ -128,6 +144,6 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
       llm_opts: state.llm_opts
     }
 
-    Aikido.Types.ActionResult.new(state: state, directives: [directive])
+    {:ok, state, [directive]}
   end
 end

@@ -139,19 +139,19 @@ defmodule Aikido.HooksTest do
 
     state = state(hooks)
     model = %LLMCall{model: "offline", request_id: "run", context: state.context}
-    {:ok, result} = Aikido.Types.ActionResult.new(state: state, directives: [model])
+    result = {:ok, state, [model]}
 
-    {:ok, %{state: waiting, directives: [gate]}} =
-      Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :run_started, %{})
+    {:ok, waiting, [gate]} =
+      Aikido.AiReact.HookQueue.queue_event_hooks(result, :run_started, %{})
 
     assert %ExecuteHook{} = gate
 
-    {:ok, %{state: waiting, directives: [second]}} =
+    {:ok, waiting, [second]} =
       complete(waiting, gate, ExecuteHook.evaluate_lua_hook(gate.hook, gate.event, self(), "run"))
 
     assert %ExecuteHook{} = second
 
-    {:ok, %{state: ready, directives: [%LLMCall{} = released]}} =
+    {:ok, ready, [%LLMCall{} = released]} =
       complete(
         waiting,
         second,
@@ -171,7 +171,7 @@ defmodule Aikido.HooksTest do
     assert text =~ "first"
     assert text =~ "second"
 
-    {:ok, %{state: unchanged, directives: []}} =
+    {:ok, unchanged, []} =
       complete(ready, second, {:ok, %Decision{decision: :continue}})
 
     assert unchanged == ready
@@ -181,16 +181,13 @@ defmodule Aikido.HooksTest do
     for response <- [{:ok, %Decision{decision: :deny, message: "blocked"}}, {:error, "broken"}] do
       state = state([hook("return nil")])
 
-      {:ok, result} =
-        Aikido.Types.ActionResult.new(
-          state: state,
-          directives: [%LLMCall{model: "offline", request_id: "run", context: state.context}]
-        )
+      result =
+        {:ok, state, [%LLMCall{model: "offline", request_id: "run", context: state.context}]}
 
-      {:ok, %{state: waiting, directives: [gate]}} =
-        Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :run_started, %{})
+      {:ok, waiting, [gate]} =
+        Aikido.AiReact.HookQueue.queue_event_hooks(result, :run_started, %{})
 
-      {:ok, %{state: failed, directives: []}} = complete(waiting, gate, response)
+      {:ok, failed, []} = complete(waiting, gate, response)
       assert failed.status == :failed
       assert failed.hooks_pending == %{}
     end
@@ -226,7 +223,7 @@ defmodule Aikido.HooksTest do
   test "late context and gate results cannot affect a different run" do
     state = state([])
 
-    {:ok, %{state: unchanged}} =
+    {:ok, unchanged, _directives} =
       Aikido.AiReact.Actions.HookContext.queue_context_for_matching_run(state, %{
         request_id: "older",
         text: "late"
@@ -234,7 +231,7 @@ defmodule Aikido.HooksTest do
 
     assert AikidoTest.SliceState.attributes(unchanged) == AikidoTest.SliceState.attributes(state)
 
-    {:ok, %{state: unchanged}} =
+    {:ok, unchanged, _directives} =
       Aikido.AiReact.Actions.HookCompleted.apply_hook_result(state, %{
         request_id: "older",
         token: 1,
@@ -267,18 +264,14 @@ defmodule Aikido.HooksTest do
   test "cancellation invalidates gates and a duplicate completion cannot release an effect" do
     state = state([hook("return nil")])
 
-    {:ok, result} =
-      Aikido.Types.ActionResult.new(
-        state: state,
-        directives: [%LLMCall{model: "offline", request_id: "run", context: state.context}]
-      )
+    result = {:ok, state, [%LLMCall{model: "offline", request_id: "run", context: state.context}]}
 
-    {:ok, %{state: waiting, directives: [gate]}} =
-      Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :run_started, %{})
+    {:ok, waiting, [gate]} =
+      Aikido.AiReact.HookQueue.queue_event_hooks(result, :run_started, %{})
 
     signal = Aikido.Signal.new!("ai.react.cancel", %{request_id: "run"})
 
-    {:ok, %Aikido.Types.ActionResult{state: cancelled, directives: []}} =
+    {:ok, %Aikido.Types.ActionResult{changes: changes, directives: []}} =
       then(signal, fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:cancel, Map.put(signal.data || %{}, :state, waiting),
@@ -288,9 +281,10 @@ defmodule Aikido.HooksTest do
         |> Ash.run_action()
       end)
 
+    cancelled = Ash.update!(waiting, changes, action: :update)
     assert cancelled.status == :failed
 
-    {:ok, %{state: unchanged, directives: []}} =
+    {:ok, unchanged, []} =
       complete(cancelled, gate, {:ok, %Decision{decision: :continue}})
 
     assert AikidoTest.SliceState.attributes(unchanged) ==
@@ -300,16 +294,12 @@ defmodule Aikido.HooksTest do
   test "async observers do not hold up effects and their errors remain observable" do
     state = state([hook("error('observer failed')", mode: :async)])
 
-    {:ok, result} =
-      Aikido.Types.ActionResult.new(
-        state: state,
-        directives: [%LLMCall{model: "offline", request_id: "run", context: state.context}]
-      )
+    result = {:ok, state, [%LLMCall{model: "offline", request_id: "run", context: state.context}]}
 
-    {:ok, %{state: ready, directives: [observer, %LLMCall{}]}} =
-      Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :run_started, %{})
+    {:ok, ready, [observer, %LLMCall{}]} =
+      Aikido.AiReact.HookQueue.queue_event_hooks(result, :run_started, %{})
 
-    {:ok, %{state: recorded, directives: []}} =
+    {:ok, recorded, []} =
       complete(ready, observer, {:error, "observer failed"})
 
     assert recorded.status == :running
@@ -339,10 +329,10 @@ defmodule Aikido.HooksTest do
 
   test "terminal hooks finish before completion is published and ignore late model results" do
     state = state([hook("return nil", event: :run_completed)]) |> Map.put(:status, :completed)
-    {:ok, result} = Aikido.Types.ActionResult.new(state: state)
+    result = {:ok, state, []}
 
-    {:ok, %{state: waiting, directives: [gate]}} =
-      Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :after_model, %{})
+    {:ok, waiting, [gate]} =
+      Aikido.AiReact.HookQueue.queue_event_hooks(result, :after_model, %{})
 
     assert waiting.status == :running
     assert waiting.hook_terminal == :completed
@@ -358,7 +348,7 @@ defmodule Aikido.HooksTest do
 
     signal = Aikido.Signal.new!("ai.react.llm.completed", %{request_id: "run", turn: turn})
 
-    {:ok, %Aikido.Types.ActionResult{state: unchanged, directives: []}} =
+    {:ok, %Aikido.Types.ActionResult{changes: unchanged, directives: []}} =
       then(signal, fn signal ->
         Aikido.AiReact.Slice
         |> Ash.ActionInput.for_action(:llm_turn, Map.put(signal.data || %{}, :state, waiting),
@@ -368,10 +358,9 @@ defmodule Aikido.HooksTest do
         |> Ash.run_action()
       end)
 
-    assert AikidoTest.SliceState.attributes(unchanged) ==
-             AikidoTest.SliceState.attributes(waiting)
+    assert unchanged == %{}
 
-    {:ok, %{state: completed, directives: []}} =
+    {:ok, completed, []} =
       complete(waiting, gate, {:ok, %Decision{decision: :continue}})
 
     assert completed.status == :completed
@@ -381,7 +370,7 @@ defmodule Aikido.HooksTest do
   test "async context waits for a model boundary and is consumed once" do
     state = state([hook("return nil", mode: :async, event: :after_tool)])
 
-    {:ok, %{state: queued}} =
+    {:ok, queued, _directives} =
       Aikido.AiReact.Actions.HookContext.queue_context_for_matching_run(state, %{
         request_id: "run",
         text: "later evidence",
@@ -391,14 +380,11 @@ defmodule Aikido.HooksTest do
     assert queued.context == state.context
     assert [%{text: "later evidence"}] = queued.hook_context
 
-    {:ok, result} =
-      Aikido.Types.ActionResult.new(
-        state: queued,
-        directives: [%LLMCall{model: "offline", request_id: "run", context: state.context}]
-      )
+    result =
+      {:ok, queued, [%LLMCall{model: "offline", request_id: "run", context: state.context}]}
 
-    {:ok, %{state: ready, directives: [%LLMCall{} = call]}} =
-      Aikido.AiReact.HookQueue.queue_event_hooks({:ok, result}, :run_started, %{})
+    {:ok, ready, [%LLMCall{} = call]} =
+      Aikido.AiReact.HookQueue.queue_event_hooks(result, :run_started, %{})
 
     assert ready.hook_context == []
 

@@ -8,7 +8,8 @@ defmodule Aikido.Team.Actions.Start do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
 
     ActionAdapter.to_action_result(
-      configure_topology_and_activate(signal, state, context, config)
+      configure_topology_and_activate(signal, state, context, config),
+      state
     )
   end
 

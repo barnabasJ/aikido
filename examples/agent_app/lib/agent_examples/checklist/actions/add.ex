@@ -4,6 +4,6 @@ defmodule AgentExamples.Checklist.Actions.Add do
   @impl true
   def run(input, _opts, _context) do
     state = input.arguments.state
-    Aikido.Types.ActionResult.new(state: %{state | items: state.items ++ [input.arguments.item]})
+    Aikido.Types.ActionResult.new(changes: %{items: state.items ++ [input.arguments.item]})
   end
 end

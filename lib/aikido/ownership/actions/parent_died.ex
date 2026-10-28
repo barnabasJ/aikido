@@ -17,13 +17,13 @@ defmodule Aikido.Ownership.Actions.ParentDied do
         input.context.aikido
       )
     else
-      Aikido.Types.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(changes: nil)
     end
   end
 
-  defp apply_parent_death_policy(%{on_parent_death: :stop} = state, _, reason, _) do
+  defp apply_parent_death_policy(%{on_parent_death: :stop}, _, reason, _) do
     Aikido.Types.ActionResult.new(
-      state: state,
+      changes: nil,
       directives: [%Aikido.Directives.Stop{reason: {:shutdown, {:parent_down, reason}}}]
     )
   end
@@ -35,7 +35,7 @@ defmodule Aikido.Ownership.Actions.ParentDied do
         else: []
 
     Aikido.Types.ActionResult.new(
-      state: %{state | parent: nil, orphaned_from: former_parent, parent_monitor: nil},
+      changes: %{parent: nil, orphaned_from: former_parent, parent_monitor: nil},
       directives: Aikido.Ownership.Monitors.release(%{ref: state.parent_monitor}) ++ directives
     )
   end

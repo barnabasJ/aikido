@@ -85,6 +85,8 @@ defmodule AgentExamples.Agents do
     agent :reviewer, AgentExamples.Reviewer
     agent :research_team, AgentExamples.ResearchTeam
     agent :research_squad, AgentExamples.ResearchSquad
+    agent :notification_counter, AgentExamples.NotificationCounter
+    agent :notification_observer, AgentExamples.NotificationCounter.Observer
     agent :counter, AgentExamples.Counter
     agent :cron_clock, AgentExamples.CronClock
     agent :checkpoint_counter, AgentExamples.CheckpointCounter

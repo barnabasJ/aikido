@@ -37,7 +37,7 @@ defmodule Aikido.Todo.Items do
     }
 
     Aikido.Types.ActionResult.new(
-      state: %{state | items: items, revision: state.revision + 1},
+      changes: %{items: items, revision: state.revision + 1},
       directives: [
         Aikido.Directives.emit_to_pid(signal, input.context.aikido.agent_pid) | effects
       ]

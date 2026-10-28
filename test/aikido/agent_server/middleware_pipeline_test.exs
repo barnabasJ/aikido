@@ -14,9 +14,8 @@ defmodule AikidoTest.AgentServer.MiddlewarePipelineTest.Actions.CaptureMiddlewar
   use Ash.Resource.Actions.Implementation
   @impl true
   def run(input, _opts, _context) do
-    slice = input.arguments.state
     ctx = input.context.aikido
-    Aikido.Types.ActionResult.new(state: %{slice | last_tags: ctx[:tags] || []}, directives: [])
+    Aikido.Types.ActionResult.new(changes: %{last_tags: ctx[:tags] || []}, directives: [])
   end
 end
 

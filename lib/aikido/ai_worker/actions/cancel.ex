@@ -7,7 +7,18 @@ defmodule Aikido.AiWorker.Actions.Cancel do
   """
   use Ash.Resource.Actions.Implementation
 
-  def run(input, _, _) do
+  def run(input, _opts, _context) do
+    with {:ok, state, directives} <- cancel_team_task(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, [:queue, :pending])
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp cancel_team_task(input) do
     state = input.arguments.state
     id = input.arguments.task_id
     state = Map.put(state, :queue, Enum.reject(Map.get(state, :queue, []), &(&1.task_id == id)))
@@ -21,12 +32,10 @@ defmodule Aikido.AiWorker.Actions.Cancel do
           source: "/aikido"
         }
 
-      Aikido.Types.ActionResult.new(
-        state: %{state | pending: nil},
-        directives: [Aikido.Directives.emit_to_pid(signal, input.context.aikido.agent_pid)]
-      )
+      {:ok, %{state | pending: nil},
+       [Aikido.Directives.emit_to_pid(signal, input.context.aikido.agent_pid)]}
     else
-      Aikido.Types.ActionResult.new(state: state)
+      {:ok, state, []}
     end
   end
 end

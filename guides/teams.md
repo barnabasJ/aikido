@@ -1,6 +1,6 @@
 # Teams
 
-A team is an Ash agent resource with `Aikido.Ash.Team`. It can run its own actions
+A team is an Ash agent resource with `Aikido.Team.Extension`. It can run its own actions
 and AI turns while managing named agents and nested teams through the same
 Ash domain interface.
 
@@ -8,7 +8,7 @@ Ash domain interface.
 defmodule MyApp.ResearchTeam do
   use Ash.Resource,
     domain: MyApp.Agents,
-    extensions: [Aikido.Ash.Agent, Aikido.Ash.Team, Aikido.Ash.AI]
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension, Aikido.AI.Extension]
 
   agent do
     name "research_team"

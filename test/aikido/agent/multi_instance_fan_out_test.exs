@@ -23,7 +23,7 @@ defmodule Aikido.Agent.MultiInstanceFanOutTest.SendAction do
       {:error, {:planned_failure, ctx[:slice_path]}}
     else
       Aikido.Types.ActionResult.new(
-        state: %{messages: messages ++ ["#{token}: #{msg}"]},
+        changes: %{messages: messages ++ ["#{token}: #{msg}"]},
         directives: directives
       )
     end

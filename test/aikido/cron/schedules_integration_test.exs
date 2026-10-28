@@ -32,7 +32,7 @@ defmodule AikidoTest.Agent.SchedulesIntegrationTest.Actions.CountTick do
   def run(input, _opts, _context) do
     slice = input.arguments.state
     count = Map.get(slice, :tick_count, 0)
-    Aikido.Types.ActionResult.new(state: %{tick_count: count + 1}, directives: [])
+    Aikido.Types.ActionResult.new(changes: %{tick_count: count + 1}, directives: [])
   end
 end
 

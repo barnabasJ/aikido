@@ -8,7 +8,7 @@ defmodule Aikido.Todo.Actions.AcceptDelivery do
     if input.arguments[:todo] && receives_delivered_work?(input.context.aikido) do
       append_delivered_item(input)
     else
-      Aikido.Types.ActionResult.new(state: input.arguments.state)
+      Aikido.Types.ActionResult.new(changes: nil)
     end
   end
 

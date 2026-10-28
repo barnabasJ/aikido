@@ -61,7 +61,7 @@ defmodule AikidoTest.Thread.SliceTest do
 
       assert %Ash.Union{value: ^entries} = input.arguments.entry
       assert {:ok, result} = Ash.run_action(input)
-      assert result.state.rev == length(List.wrap(entries))
+      assert result.changes.rev == length(List.wrap(entries))
     end
 
     input = Ash.ActionInput.for_action(Aikido.Thread.Slice, :append, %{entry: 42})

@@ -31,7 +31,7 @@ defmodule Aikido.Signal.Call do
       # Action handling "my.agent.ping"
       def run(input, _opts, _context) do
         emit = Aikido.Signal.Call.reply(input.context.aikido.signal, "my.agent.ping.reply", %{ok: true})
-        Aikido.Types.ActionResult.new(state: input.arguments.state, directives: List.wrap(emit))
+        Aikido.Types.ActionResult.new(changes: nil, directives: List.wrap(emit))
       end
 
   ## Why not `Aikido.AgentServer.call/4`?
@@ -127,8 +127,8 @@ defmodule Aikido.Signal.Call do
   lets action code be flexible:
 
       case Aikido.Signal.Call.reply(input.context.aikido.signal, "my.reply", %{value: 42}) do
-        nil -> Aikido.Types.ActionResult.new(state: input.arguments.state)
-        emit -> Aikido.Types.ActionResult.new(state: input.arguments.state, directives: [emit])
+        nil -> Aikido.Types.ActionResult.new(changes: nil)
+        emit -> Aikido.Types.ActionResult.new(changes: nil, directives: [emit])
       end
   """
   @spec reply(Signal.t() | nil, String.t(), map()) :: Emit.t() | nil

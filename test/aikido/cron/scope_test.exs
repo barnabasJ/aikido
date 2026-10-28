@@ -4,7 +4,6 @@ defmodule Aikido.CronScopeTest.Register do
   @impl true
   def run(input, _, _context) do
     Aikido.Types.ActionResult.new(
-      state: input.arguments.state,
       directives: [
         %Aikido.Cron.Directives.Register{
           cron: "@yearly",
@@ -31,7 +30,7 @@ defmodule Aikido.CronScopeTest.Observe do
     }
 
     Aikido.Types.ActionResult.new(
-      state: %{observations: input.arguments.state.observations ++ [observation]}
+      changes: %{observations: input.arguments.state.observations ++ [observation]}
     )
   end
 end

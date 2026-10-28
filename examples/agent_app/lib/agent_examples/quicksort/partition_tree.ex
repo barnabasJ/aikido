@@ -37,17 +37,18 @@ defmodule AgentExamples.Quicksort.PartitionTree do
     }
   end
 
-  def finish_or_wait(state, context) do
+  @doc "Adds completion changes and effects to the attributes changed by the calling action."
+  def finish_or_wait(state, context, changes) do
     if map_size(state.results) == map_size(state.partitions) do
       result = Map.get(state.results, "L", []) ++ state.equal ++ Map.get(state.results, "R", [])
       state = %{state | status: :completed, result: result}
 
       Aikido.Types.ActionResult.new(
-        state: state,
+        changes: Map.merge(changes, %{status: :completed, result: result}),
         directives: [progress(state, context) | reply_to_parent(state, context)]
       )
     else
-      Aikido.Types.ActionResult.new(state: state, directives: [progress(state, context)])
+      Aikido.Types.ActionResult.new(changes: changes, directives: [progress(state, context)])
     end
   end
 
@@ -107,9 +108,12 @@ defmodule AgentExamples.Quicksort.PartitionTree do
             []
         end
 
-      Aikido.Types.ActionResult.new(state: state, directives: [notify | replies])
+      Aikido.Types.ActionResult.new(
+        changes: %{status: :failed, error: state.error},
+        directives: [notify | replies]
+      )
     else
-      Aikido.Types.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(changes: nil)
     end
   end
 end

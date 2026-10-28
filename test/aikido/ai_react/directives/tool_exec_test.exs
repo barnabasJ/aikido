@@ -19,10 +19,9 @@ defmodule Aikido.AiReact.Directives.ToolExecTest.Actions.RunTool do
   @impl true
   def run(input, _, _) do
     Aikido.Types.ActionResult.new(
-      state: %{
-        input.arguments.state
-        | status: :running,
-          request_id: input.arguments.directive.request_id
+      changes: %{
+        status: :running,
+        request_id: input.arguments.directive.request_id
       },
       directives: [input.arguments.directive]
     )
@@ -35,10 +34,9 @@ defmodule Aikido.AiReact.Directives.ToolExecTest.Actions.RecordResult do
   @impl true
   def run(input, _, _) do
     Aikido.Types.ActionResult.new(
-      state: %{
-        input.arguments.state
-        | status: :completed,
-          last_signal: input.context.aikido.signal
+      changes: %{
+        status: :completed,
+        last_signal: input.context.aikido.signal
       }
     )
   end

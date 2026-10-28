@@ -108,6 +108,12 @@ defmodule AikidoTest.Ownership.ParentLifecycleTest do
 
     result = Ash.run_action!(input)
     assert result == Ash.run_action!(input)
-    result
+
+    state =
+      if result.changes in [nil, %{}],
+        do: slice,
+        else: Ash.update!(slice, result.changes, action: :update)
+
+    %{state: state, directives: result.directives}
   end
 end

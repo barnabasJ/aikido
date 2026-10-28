@@ -19,10 +19,9 @@ defmodule Aikido.AiReact.Directives.LLMCallTest.Actions.RunModel do
   @impl true
   def run(input, _, _) do
     Aikido.Types.ActionResult.new(
-      state: %{
-        input.arguments.state
-        | status: :running,
-          request_id: input.arguments.directive.request_id
+      changes: %{
+        status: :running,
+        request_id: input.arguments.directive.request_id
       },
       directives: [input.arguments.directive]
     )
@@ -35,10 +34,9 @@ defmodule Aikido.AiReact.Directives.LLMCallTest.Actions.RecordTurn do
   @impl true
   def run(input, _, _) do
     Aikido.Types.ActionResult.new(
-      state: %{
-        input.arguments.state
-        | status: :completed,
-          last_signal: input.context.aikido.signal
+      changes: %{
+        status: :completed,
+        last_signal: input.context.aikido.signal
       }
     )
   end
@@ -50,7 +48,7 @@ defmodule Aikido.AiReact.Directives.LLMCallTest.Actions.RecordFailure do
   @impl true
   def run(input, _, _) do
     Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | status: :failed, last_signal: input.context.aikido.signal}
+      changes: %{status: :failed, last_signal: input.context.aikido.signal}
     )
   end
 end
@@ -61,10 +59,9 @@ defmodule Aikido.AiReact.Directives.LLMCallTest.Actions.RecordHandoff do
   @impl true
   def run(input, _, _) do
     Aikido.Types.ActionResult.new(
-      state: %{
-        input.arguments.state
-        | status: :completed,
-          last_signal: input.context.aikido.signal
+      changes: %{
+        status: :completed,
+        last_signal: input.context.aikido.signal
       }
     )
   end

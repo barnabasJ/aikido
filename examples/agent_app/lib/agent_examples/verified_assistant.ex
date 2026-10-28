@@ -16,7 +16,7 @@ defmodule AgentExamples.VerifiedAssistant do
 
     options %{
       completion: :todos,
-      todo_continuation: :continue,
+      todo_continuation: :nudge_once,
       max_todo_continuations: 2,
       todo_verifier: {AgentExamples.VerifiedAssistant.Verification, :verify}
     }

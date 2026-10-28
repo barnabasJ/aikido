@@ -14,9 +14,16 @@ defmodule Aikido.Cron.Actions.HandleJobExit do
            do: Aikido.Cron.Registrations.retry(next, id, reason),
            else: {next, []}
 
-      Aikido.Types.ActionResult.new(state: next, directives: directives)
+      Aikido.Types.ActionResult.new(
+        changes: %{
+          jobs: next.jobs,
+          monitors: next.monitors,
+          restart_attempts: next.restart_attempts
+        },
+        directives: directives
+      )
     else
-      Aikido.Types.ActionResult.new(state: state)
+      Aikido.Types.ActionResult.new(changes: nil)
     end
   end
 end

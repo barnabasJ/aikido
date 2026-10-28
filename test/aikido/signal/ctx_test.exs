@@ -6,7 +6,7 @@ defmodule AikidoTest.SignalCtxTest.Actions.CaptureContext do
     ctx = input.context.aikido
 
     Aikido.Types.ActionResult.new(
-      state: %{workflow_id: Map.get(ctx, :workflow_id), user: Map.get(ctx, :user)},
+      changes: %{workflow_id: Map.get(ctx, :workflow_id), user: Map.get(ctx, :user)},
       directives: []
     )
   end

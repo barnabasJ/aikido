@@ -12,6 +12,17 @@ defmodule Aikido.AiReact.Actions.Deliver do
 
   @impl true
   def run(input, _opts, _context) do
+    with {:ok, state, directives} <- accept_incoming_delivery(input) do
+      changes =
+        if state == input.arguments.state,
+          do: %{},
+          else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
+
+      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+    end
+  end
+
+  defp accept_incoming_delivery(input) do
     with :ok <- RunCaller.validate_run_caller(input.arguments.state, input) do
       result =
         case input.arguments.state.status do
@@ -25,10 +36,10 @@ defmodule Aikido.AiReact.Actions.Deliver do
   end
 
   defp validate_incoming_todo_mount(
-         {:ok, result} = accepted,
+         {:ok, state, _directives} = accepted,
          %{arguments: %{todo: %Aikido.Todo.Item{}}} = input
        ) do
-    path = result.state.options.todo_path
+    path = state.options.todo_path
 
     case Map.get(input.context.aikido.agent.state, path) do
       %Aikido.Todo.Slice{} -> accepted
@@ -48,7 +59,7 @@ defmodule Aikido.AiReact.Actions.Deliver do
     input.arguments.state
     |> queue_text_for_next_model_request(input.arguments.text)
     |> record_incoming_message_metadata(input.arguments)
-    |> then(&Aikido.Types.ActionResult.new(state: &1))
+    |> then(&{:ok, &1, []})
   end
 
   defp queue_text_for_next_model_request(state, text) do
@@ -64,7 +75,7 @@ defmodule Aikido.AiReact.Actions.Deliver do
   end
 
   defp start_run_from_incoming_text(input) do
-    with {:ok, result} <-
+    with {:ok, state, directives} <-
            RunState.begin_run(
              %{
                query: input.arguments.text,
@@ -73,7 +84,7 @@ defmodule Aikido.AiReact.Actions.Deliver do
              },
              input.arguments.state
            ) do
-      {:ok, result}
+      {:ok, state, directives}
       |> RunCaller.bind_run_caller(input)
       |> HookQueue.queue_event_hooks(:run_started, %{query: input.arguments.text})
     end

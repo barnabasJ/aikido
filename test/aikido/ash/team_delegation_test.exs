@@ -85,25 +85,25 @@ defmodule AikidoTest.TeamDelegationTest do
       |> Map.merge(%{id: "ab", notify: nil, metadata: %{deadline: 123}, attempt: "incarnation"})
 
     state = Ash.create!(Aikido.Team.Slice, %{tasks: %{"ab" => original}})
-    assert {:ok, result} = background(state, "ab")
-    task = result.state.tasks["ab"]
+    assert {:ok, result, backgrounded} = background(state, "ab")
+    task = backgrounded.tasks["ab"]
     assert task == %{original | mode: :background, notify: :a}
     assert result.directives == []
 
     assert :ok =
-             TaskDependencies.validate_assignment(result.state, %{
+             TaskDependencies.validate_assignment(backgrounded, %{
                requester: :b,
                member: :a,
                mode: :foreground
              })
 
-    assert {:ok, repeated} = background(result.state, "ab")
-    assert repeated.state == result.state
+    assert {:ok, _repeated, repeated} = background(backgrounded, "ab")
+    assert repeated == backgrounded
 
     finished = put_in(state.tasks["ab"].status, :completed)
-    assert {:ok, unchanged} = background(finished, "ab")
-    fields = Enum.map(Ash.Resource.Info.attributes(Aikido.Team.Slice), & &1.name)
-    assert Map.take(unchanged.state, fields) == Map.take(finished, fields)
+    assert {:ok, unchanged, settled} = background(finished, "ab")
+    assert unchanged.changes == nil
+    assert settled == finished
     assert {:error, error} = background(state, "missing")
     assert Exception.message(error) =~ "Unknown delegated task missing"
   end
@@ -111,10 +111,10 @@ defmodule AikidoTest.TeamDelegationTest do
   test "a foreground assignment can be backgrounded while its worker is activating" do
     pending = Map.delete(task(:a, :b), :status)
     state = Ash.create!(Aikido.Team.Slice, %{tasks: %{}, pending_tasks: %{"ab" => pending}})
-    assert {:ok, result} = background(state, "ab")
-    assert result.state.pending_tasks["ab"].mode == :background
-    assert result.state.pending_tasks["ab"].notify == :a
-    assert result.state.tasks == %{}
+    assert {:ok, result, backgrounded} = background(state, "ab")
+    assert result.changes.pending_tasks["ab"].mode == :background
+    assert result.changes.pending_tasks["ab"].notify == :a
+    assert backgrounded.tasks == %{}
   end
 
   test "a delayed activation replay cannot undo backgrounding or dispatch a second identity" do
@@ -143,10 +143,10 @@ defmodule AikidoTest.TeamDelegationTest do
       )
 
     assert {:ok, result} = Ash.run_action(input)
-    assert result.state.tasks["ab"].mode == :background
-    assert result.state.tasks["ab"].notify == :a
-    assert result.state.pending_tasks == %{}
-    assert map_size(result.state.tasks) == 1
+    assert result.changes.tasks["ab"].mode == :background
+    assert result.changes.tasks["ab"].notify == :a
+    assert result.changes.pending_tasks == %{}
+    assert map_size(result.changes.tasks) == 1
     refute_received {:signal, _}
   end
 
@@ -154,8 +154,17 @@ defmodule AikidoTest.TeamDelegationTest do
     do: %{requester: requester, member: member, status: :dispatched, mode: :foreground}
 
   defp background(state, id) do
-    Aikido.Team.Slice
-    |> Ash.ActionInput.for_action(:background_task, %{state: state, task_id: id})
-    |> Ash.run_action()
+    input =
+      Ash.ActionInput.for_action(Aikido.Team.Slice, :background_task, %{state: state, task_id: id})
+
+    with {:ok, result} <- Ash.run_action(input) do
+      if result.changes in [nil, %{}] do
+        {:ok, result, state}
+      else
+        with {:ok, updated} <- Ash.update(state, result.changes, action: :update) do
+          {:ok, result, updated}
+        end
+      end
+    end
   end
 end

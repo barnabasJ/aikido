@@ -47,6 +47,20 @@ defmodule Aikido.AiReact.Slice do
         allow_nil? false
       end
 
+      attribute :todo_idle_reminder, :map do
+        description "Transient todo revision and accepted model iteration already given an idle-work reminder."
+
+        constraints fields: [
+                      revision: [type: :integer, allow_nil?: false],
+                      iteration: [type: :integer, allow_nil?: false]
+                    ]
+      end
+
+      attribute :todo_verifier_data, :term do
+        description "Transient application-owned data returned by the current scoped todo verifier."
+        sensitive? true
+      end
+
       attribute :todo_verification_pending, :boolean do
         description "Whether a scoped verifier is checking the current proposed answer."
         default false
@@ -455,6 +469,8 @@ defmodule Aikido.AiReact.Slice do
         prepared_tools: nil,
         opening_messages: [],
         todo_verification_pending: false,
+        todo_idle_reminder: nil,
+        todo_verifier_data: nil,
         tool_refresh_pending: false,
         tools_resume: nil,
         hooks_pending: %{},
@@ -466,14 +482,21 @@ defmodule Aikido.AiReact.Slice do
 
   @doc false
   @impl true
+  def reinstate(state, %{fresh?: true}),
+    do: Aikido.AiReact.Conversation.replace_context(externalize(state), Map.get(state, :context))
+
+  def reinstate(state, %{fresh?: false}), do: reinstate(state)
+
+  @doc false
+  @impl true
   def reinstate(state) do
     state =
-      if state.status in [:setup, :running, :waiting],
+      if Map.get(state, :status) in [:setup, :running, :waiting],
         do: Map.merge(state, %{status: :failed, error: :interrupted}),
         else: state
 
     context =
-      if(state.context,
+      if(Map.get(state, :context),
         do: Aikido.AiReact.Conversation.append_interrupted_tool_results(state.context)
       )
 
@@ -484,6 +507,8 @@ defmodule Aikido.AiReact.Slice do
       prepared_tools: nil,
       opening_messages: [],
       todo_verification_pending: false,
+      todo_idle_reminder: nil,
+      todo_verifier_data: nil,
       tool_refresh_pending: false,
       tools_resume: nil,
       hooks_pending: %{},

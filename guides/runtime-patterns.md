@@ -1,8 +1,8 @@
 # Choosing a Runtime Pattern
 
-Use Ash agent resources (`Aikido.Ash.Agent`) for typed agent state and domain actions.
-Add `Aikido.Ash.Team` when an agent manages a named topology of workers or nested
-teams. Add `Aikido.Ash.AI` for model turns and dynamically supplied tools.
+Use Ash agent resources (`Aikido.Agent.Extension`) for typed agent state and domain actions.
+Add `Aikido.Team.Extension` when an agent manages a named topology of workers or nested
+teams. Add `Aikido.AI.Extension` for model turns and dynamically supplied tools.
 
 The default `Aikido` supervision tree uses DurableServer for activation, snapshots,
 and recovery. Configure its backend with `durable: [...]`. Use `Aikido.Durable`
@@ -329,8 +329,8 @@ options %{
 }
 ```
 
-Options use the `Aikido.Slices.AiReact.Options` typed struct. Hook decisions likewise use
-`Aikido.Slices.AiReact.Hooks.Decision`; neither requires a resource or create action. Hook
+Options use the `Aikido.AiReact.Options` typed struct. Hook decisions likewise use
+`Aikido.AiReact.Hooks.Decision`; neither requires a resource or create action. Hook
 configuration retains its embedded resource so native casting handles an
 omitted or nil `:function` request callback correctly.
 A per-request options value
@@ -384,7 +384,7 @@ calls, Lua VMs and tool side effects are not replayed automatically.
 
 ### Optional todos
 
-Mount `slice :todos, Aikido.Slices.Todo` to expose `todo_add`, `todo_activate`,
+Mount `slice :todos, Aikido.Todo.Slice` to expose `todo_add`, `todo_activate`,
 `todo_complete`, `todo_block` and `todo_remove` on the domain interface. Each
 item has a caller-supplied stable ID, text, blocking flag, metadata, status and
 completion result. Repeated completion does not replace existing evidence.
@@ -400,6 +400,55 @@ the application; Aikido carries arbitrary `metadata` without interpreting it.
 
 Open `/examples/conversation` to try streaming, retained history and todo-gated
 completion without a provider key.
+
+Set `todo_continuation: :nudge_once` to send one reminder naming open blocking
+todos when a final answer leaves work unfinished. A later consecutive idle final
+answer for the same todo revision fails with
+`Aikido.AiReact.Errors.CompletedUnclosed`. Actual tool dispatch after before-tool
+gates, newly consumed messages and pending relevant delegated work interrupt that
+idle window. Announcing a tool call or having it denied does not reset it.
+`max_todo_continuations`, model iteration limits and the original deadline still
+bound the run. `:wait` retains manual waiting; `:continue` retains its existing
+bounded continuation behavior.
+
+An application can configure `todo_verifier: {VerificationResource, :verify}`.
+The native action receives `:answer`, `:todos` and `:metadata`. Existing boolean
+results remain supported. For corrective feedback and per-run application data,
+declare an optional `:data` argument and return a native embedded result:
+
+```elixir
+action :verify, Aikido.AiReact.TodoVerification do
+  argument :answer, :term
+  argument :todos, {:array, :term}
+  argument :metadata, :map
+  argument :data, :term
+  run MyApp.Verification.CheckEvidence
+end
+
+# Inside the application-owned verification implementation:
+Aikido.AiReact.TodoVerification.new(%{
+  accepted?: false,
+  feedback: "Record evidence for the outstanding items before completing.",
+  data: %{attempts: 1}
+})
+```
+
+Only a verdict matching the current run, iteration and todo revision can adopt
+feedback or data. New queued evidence is consumed before another answer can be
+accepted. Rejected feedback enters the model conversation; opaque `data` is only
+passed to the next verifier invocation if its action declares `:data`. Typed
+results replace that value, including clearing it with nil; boolean results keep
+the prior value. The native sensitive attribute protects data in inspection. Data
+is excluded from checkpoints and cleared on new runs and restoration. Application errors retain their
+native typed failure path. Relevant self-notifying delegated tasks and pending
+activation hold verification and completion until their results arrive.
+
+Verifier action context exposes actual runtime facts under `context.aikido`:
+`agent_pid`, `agent_id`, `agent_resource`, `aikido`, `partition` and `request_id`.
+These facts override caller-supplied identity metadata. They identify the receiver;
+authorization still uses the current native Ash scope and application policies.
+The isolated verified-assistant example demonstrates this verifier contract
+without requiring a provider key.
 
 ### Native Ash AI tool configuration
 
@@ -452,3 +501,79 @@ from the same per-agent shared context, as Makewright does. Supply that context
 through `tool_context.context.shared` or the caller's Ash context. Aikido
 preserves actor, tenant and configured application context when invoking the
 native tools; Lua's inner Ash actions still perform their own authorization.
+
+
+## Authenticated durable activation
+
+Configure the application's credential boundary on the shared runtime:
+
+```elixir
+{Aikido,
+ durable: [scope_adapter: MyApp.AgentComposition.CheckpointIdentity]}
+```
+
+The adapter implements `Aikido.Durable.ScopeAdapter`. `prepare/3` receives initial
+attributes, native Ash caller options, and the SDK identity map (`agent_module`,
+`id`, `aikido`, `partition`, `durable_server`, `durable_key`). It returns
+`{:ok, sanitized_attributes, opaque_credential}`. Resolve the receiving agent's
+own authority, including a child's own identity and grants; do not reuse a parent
+actor as the child. Keep application Accounts calls outside the pure agent domain.
+
+DurableServer encodes and claims the fresh bootstrap without running native
+initialization. `restore/3` then authenticates the credential against the expected
+identity and current permissions, returning `{:ok, native_ash_scope}`. Its saved
+value is `{:uninitialized, encoded_attributes}`, `{:agent, agent}`, or the existing
+`{:checkpoint, checkpoint}` tuple. Paired path codecs may have encoded the supplied
+attributes. A new agent then runs the normal native Initialize action; a saved
+agent uses its restored record. Native Configure, lifecycle signals and effects
+receive the authenticated scope. An already running `ensure_started` returns its
+existing PID without replacing its authority or initializing it again. A stopped
+saved identity is detected through DurableServer's native error-preserving read
+for every pool, including anonymous pools without a configured agent module. It
+does not require fresh attributes or mint a new credential. Irrelevant fresh
+attributes are ignored when restoring an existing saved identity. The eventual
+claimed row is authoritative. If it disappears before the claim, an existing-only
+start rejects instead of resurrecting stale state or writing an empty bootstrap.
+The saved logical identity must match the actual claimed supervisor, key and
+partition before the adapter is invoked.
+
+`checkpoint/3` receives the live agent, previous opaque credential and SDK identity
+before path codecs clear transient values. Return `{:ok, current_credential}` only
+when its complete binding matches the live identity. To rebind an idle agent,
+issue the replacement credential at the authenticated application boundary and
+adopt it with the identity in one native reducer result. Keep that attribute
+sensitive, exclude it from tools and public inspection, and remove it in the
+resource's pure checkpoint or path codec. The envelope retains the opaque
+credential separately. A sensitive flag alone is not an inspection access policy.
+
+Fresh supplied paths use their existing `externalize/1` and `reinstate/1` callbacks
+without creating records before the claim. Owners with crash-recovery settlement
+can also implement `reinstate/2`, receiving `%{fresh?: true}` for fresh input and
+`%{fresh?: false}` for saved state. Fresh decoding must not mark never-started work
+as interrupted. The one-argument callback remains required and compatible. Callbacks should accept partial input
+maps as well as their initialized values. If an explicit path cannot be safely
+encoded, activation returns `{:error, {:bootstrap_codec_failed, owner, path}}`;
+it does not persist an unencoded fallback. Unknown inputs are discarded with
+native constrained Ash maps derived recursively from resource, typed struct,
+array and constrained map metadata. Undeclared nested fields are omitted while
+unconstrained maps and terms retain their data. Native resource creation, defaults
+and semantic validation remain after the claim.
+A checkpoint-only serializer cannot sanitize partial input without initializing
+it first. Supplied paths without a paired codec therefore return
+`{:error, {:bootstrap_preparation_required, owner, path}}` unless the configured
+adapter has explicitly prepared safe attributes. This is an explicit restriction
+on checkpoint-only startup input, not permission to store raw secrets. Defaults
+are still applied by native initialization after the claim. Declared portable
+function inputs are validated through their native Ash function type before
+encoding. Native function codecs make those captures portable in the bootstrap
+transport; internal codec bookkeeping records only conversions actually made.
+Restoration reverses those conversions before the owning path's `reinstate`
+callback, leaving a custom codec's own encoded strings untouched. The explicit initial snapshot helper retains its
+existing codec contract, and normal resource checkpoint/restore callbacks still
+return two-element tuples.
+
+Without an adapter, anonymous scope-free agents retain normal activation. A
+scoped durable activation requires an adapter rather than persisting its raw
+actor, tenant or application context. Adapter errors must never contain a token,
+raw authority or secret input. Test revocation and current policy changes as well
+as a successful restart. Local storage must survive for either case to recover.

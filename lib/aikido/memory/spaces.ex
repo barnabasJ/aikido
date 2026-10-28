@@ -23,11 +23,10 @@ defmodule Aikido.Memory.Spaces do
     state = input.arguments.state
 
     Aikido.Types.ActionResult.new(
-      state: %{
-        state
-        | spaces: spaces,
-          rev: state.rev + 1,
-          updated_at: Aikido.Signal.timestamp(get_in(input.context, [:aikido, :signal]))
+      changes: %{
+        spaces: spaces,
+        rev: state.rev + 1,
+        updated_at: Aikido.Signal.timestamp(get_in(input.context, [:aikido, :signal]))
       }
     )
   end

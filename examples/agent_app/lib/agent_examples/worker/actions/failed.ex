@@ -4,8 +4,6 @@ defmodule AgentExamples.Worker.Actions.Failed do
 
   @impl true
   def run(input, _opts, _context) do
-    Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | status: :failed, error: input.arguments.reason}
-    )
+    Aikido.Types.ActionResult.new(changes: %{status: :failed, error: input.arguments.reason})
   end
 end

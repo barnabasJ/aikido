@@ -14,7 +14,6 @@ defmodule AikidoTest.TestAgents.NotificationPublisher.Actions.Publish do
     }
 
     Aikido.Types.ActionResult.new(
-      state: input.arguments.state,
       directives: [%Aikido.Directives.Notify{notification: notification}]
     )
   end

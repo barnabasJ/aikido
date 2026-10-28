@@ -48,7 +48,7 @@ defmodule Aikido.NativeNotificationsTest.Reducer do
     }
 
     Aikido.Types.ActionResult.new(
-      state: %{input.arguments.state | count: input.arguments.state.count + 1},
+      changes: %{count: input.arguments.state.count + 1},
       directives: [%Aikido.Directives.Notify{notification: notification}]
     )
   end

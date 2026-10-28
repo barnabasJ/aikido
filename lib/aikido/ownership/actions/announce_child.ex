@@ -5,7 +5,7 @@ defmodule Aikido.Ownership.Actions.AnnounceChild do
   @impl true
   def run(input, _, _) do
     Aikido.Types.ActionResult.new(
-      state: input.arguments.state,
+      changes: nil,
       directives:
         Aikido.Ownership.ParentBinding.announce(input.arguments.state, input.context.aikido)
     )

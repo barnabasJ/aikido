@@ -6,8 +6,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest.Actions.WriteValue do
     v =
       input.arguments.value
 
-    slice = input.arguments.state
-    Aikido.Types.ActionResult.new(state: %{slice | value: v, status: :written}, directives: [])
+    Aikido.Types.ActionResult.new(changes: %{value: v, status: :written}, directives: [])
   end
 end
 

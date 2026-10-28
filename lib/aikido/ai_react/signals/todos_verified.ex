@@ -21,8 +21,14 @@ defmodule Aikido.AiReact.Signals.TodosVerified do
         allow_nil? false
       end
 
-      attribute :result, :boolean do
-        description "Whether the verifier accepted the proposed answer and work."
+      attribute :final_answer?, :boolean do
+        description "Whether the verdict originates from a newly adopted model final answer."
+        default false
+        allow_nil? false
+      end
+
+      attribute :result, Aikido.AiReact.Types.TodoVerificationResult do
+        description "Native boolean verdict or typed application verification feedback and private data."
         allow_nil? false
       end
     end
