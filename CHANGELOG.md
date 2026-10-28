@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Preserve durable scope refusals as native typed forbidden errors through the
+  generated public start action. Expose only the operation and an atom refusal
+  reason, replacing opaque reasons with a generic code and excluding the original
+  startup stack or authority data. Direct durable activation errors retain their
+  existing transport shape.
+
 - Preserve optional nil callback fields across fresh bootstrap projection and
   paired codecs. Before final native create, omit nil only for embedded Function
   attributes whose declared default is nil and which allow nil. Retain native

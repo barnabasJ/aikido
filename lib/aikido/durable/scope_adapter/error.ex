@@ -1,6 +1,6 @@
 defmodule Aikido.Durable.ScopeAdapter.Error do
   @moduledoc "Authentication failure at a durable scope boundary."
-  defexception [:operation, :reason]
+  use Splode.Error, class: :forbidden, fields: [:operation, :reason]
 
   @impl true
   def message(%{operation: operation, reason: reason}) when is_atom(reason),

@@ -3,6 +3,7 @@ defmodule Aikido.Agent.Commands.Start do
   use Ash.Resource.Actions.Implementation
   alias Aikido.Agent.CommandRuntime
   alias Aikido.Agent.Errors.StartupCleanupFailed
+  alias Aikido.Durable.ScopeAdapter.Error, as: ScopeRefusal
 
   @impl true
   def run(input, _opts, context) do
@@ -58,11 +59,32 @@ defmodule Aikido.Agent.Commands.Start do
         {:error, {:already_started, _pid}} ->
           {:error, {:already_started, input.arguments.id}}
 
+        {:error, {%ScopeRefusal{} = refusal, stacktrace}} when is_list(stacktrace) ->
+          {:error, public_scope_refusal(refusal)}
+
+        {:error, %ScopeRefusal{} = refusal} ->
+          {:error, public_scope_refusal(refusal)}
+
         {:error, _} = error ->
           error
       end
     end)
   end
+
+  defp public_scope_refusal(refusal) do
+    ScopeRefusal.exception(
+      operation: scope_refusal_operation(refusal.operation),
+      reason: scope_refusal_reason(refusal.reason)
+    )
+  end
+
+  defp scope_refusal_operation(operation) when operation in [:prepare, :restore, :checkpoint],
+    do: operation
+
+  defp scope_refusal_operation(_operation), do: :activation
+
+  defp scope_refusal_reason(reason) when is_atom(reason), do: reason
+  defp scope_refusal_reason(_reason), do: :scope_rejected
 
   defp inherited_sync(nil), do: %Aikido.Durable.SyncPolicy{}
 

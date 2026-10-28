@@ -537,6 +537,15 @@ start rejects instead of resurrecting stale state or writing an empty bootstrap.
 The saved logical identity must match the actual claimed supervisor, key and
 partition before the adapter is invoked.
 
+When durable startup returns an `Aikido.Durable.ScopeAdapter.Error`, the generated
+public `:start` action preserves it inside the native `Ash.Error.Forbidden` error
+tree. Its public fields contain a bounded operation and the adapter's atom refusal
+reason; opaque non-atom reasons become `:scope_rejected`. The original startup
+stack and exception metadata are excluded. Applications can inspect the typed
+error instead of parsing its message. Direct `Aikido.Durable` calls retain their
+existing error transport; unrelated startup failures and `:noproc` are not
+reclassified as authorization refusals.
+
 `checkpoint/3` receives the live agent, previous opaque credential and SDK identity
 before path codecs clear transient values. Return `{:ok, current_credential}` only
 when its complete binding matches the live identity. To rebind an idle agent,
