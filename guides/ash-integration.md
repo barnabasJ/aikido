@@ -399,6 +399,16 @@ rather than replacing their action or filtering engines.
 Use normal Ash `tracer:` options to follow the chain across processes; see
 [native Ash tracing](runtime-patterns.md#native-ash-tracing).
 
+### Runtime failures
+
+External commands return native Ash error aggregates when runtime access fails.
+`Aikido.Agent.Errors.RuntimeUnavailable` retains the original exit in `reason`;
+an absent agent ID uses `:not_running`. A timeout is not evidence that the agent
+has stopped, and this error does not establish that retrying an operation is
+safe. Inspect and AI/Lua error projections omit the original reason because call
+exit terms can contain private request data. Trusted callers can inspect the
+structured cause directly without parsing the displayed message.
+
 ## Embedded slice resources
 
 Slice `config_schema` fields use Ash types and constraints. Defaults apply when a

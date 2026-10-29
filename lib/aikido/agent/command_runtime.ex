@@ -6,6 +6,7 @@ defmodule Aikido.Agent.CommandRuntime do
   translates process exits at the public command boundary. These helpers may
   perform runtime I/O and are separate from pure agent and slice reducers.
   """
+  alias Aikido.Agent.Errors.RuntimeUnavailable
   alias Aikido.AgentServer
 
   def command_context(input, context) do
@@ -25,7 +26,7 @@ defmodule Aikido.Agent.CommandRuntime do
            Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource)),
            id
          ) do
-      :error -> {:error, "Agent #{id} is not running"}
+      :error -> {:error, RuntimeUnavailable.exception(reason: :not_running)}
       {:ok, pid} -> resolve(resource, pid)
     end
   end
@@ -67,6 +68,6 @@ defmodule Aikido.Agent.CommandRuntime do
   def catch_runtime_exit(fun) do
     fun.()
   catch
-    :exit, reason -> {:error, "Agent runtime unavailable: #{inspect(reason)}"}
+    :exit, reason -> {:error, RuntimeUnavailable.exception(reason: reason)}
   end
 end
