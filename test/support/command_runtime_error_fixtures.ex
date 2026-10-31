@@ -1,4 +1,6 @@
 defmodule Aikido.CommandRuntimeErrorTest.Counter do
+  @moduledoc "Private native counter for typed command-runtime regression tests."
+
   use Ash.Resource,
     domain: Aikido.CommandRuntimeErrorTest.Domain,
     extensions: [Aikido.Agent.Extension]
@@ -17,6 +19,8 @@ defmodule Aikido.CommandRuntimeErrorTest.Counter do
 end
 
 defmodule Aikido.CommandRuntimeErrorTest.Protected do
+  @moduledoc "Native fixture that requires an actor before agent initialization."
+
   use Ash.Resource,
     domain: Aikido.CommandRuntimeErrorTest.Domain,
     extensions: [Aikido.Agent.Extension],
@@ -35,6 +39,8 @@ defmodule Aikido.CommandRuntimeErrorTest.Protected do
 end
 
 defmodule Aikido.CommandRuntimeErrorTest.Domain do
+  @moduledoc "Test-only generated interfaces for command-runtime regression fixtures."
+
   use Ash.Domain, otp_app: :aikido, extensions: [Aikido.Domain.Extension]
 
   agents do
