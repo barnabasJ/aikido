@@ -11,6 +11,8 @@ defmodule Aikido.AiReact.Directives.ToolExec do
   error JSON inside the same `tool.completed` envelope. Tool failures are conversational
   data, not run failures, so the LLM can read the error and recover. A
   tool failure never produces an `"ai.react.failed"` signal.
+
+  Runtime diagnostics: [runtime patterns](../../../../guides/runtime-patterns.md#tool-runtime-diagnostics).
   """
 
   use Aikido.Directive
@@ -53,8 +55,10 @@ defmodule Aikido.AiReact.Directives.ToolExec do
   end
 
   alias Aikido.AgentServer
-  alias Aikido.Signal
   alias Aikido.AiReact.Directives.ToolExec
+  alias Aikido.Inspector.History
+  alias Aikido.Signal
+  alias Aikido.Telemetry.Formatter
 
   @impl true
   def exec(%ToolExec{} = directive, input_signal, state) do
@@ -214,7 +218,10 @@ defmodule Aikido.AiReact.Directives.ToolExec do
   defp explain_runtime_failure(reason, name) do
     reference = Ash.UUIDv7.generate()
     kind = if is_exception(reason), do: inspect(reason.__struct__), else: "runtime failure"
-    Logger.error("Tool #{name} failed (#{kind}); reference #{reference}")
+
+    Logger.error(
+      "Tool #{name} failed (#{kind}); reference #{reference}; reason #{runtime_failure_reason(reason)}"
+    )
 
     Jason.encode!(%{
       error:
@@ -222,6 +229,16 @@ defmodule Aikido.AiReact.Directives.ToolExec do
       code: "tool_runtime_failure",
       reference: reference
     })
+  end
+
+  defp runtime_failure_reason(reason) do
+    reason
+    |> History.project_state()
+    |> Formatter.safe_inspect(1_000)
+  rescue
+    _ -> "<reason unavailable>"
+  catch
+    _, _ -> "<reason unavailable>"
   end
 
   defp execute_registered_tool_call(%{name: name, arguments: args}, registry, context) do
