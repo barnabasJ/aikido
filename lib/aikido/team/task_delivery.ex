@@ -76,9 +76,14 @@ defmodule Aikido.Team.TaskDelivery do
     end
   end
 
-  defp describe_task_result(%{status: :failed, result: error}) do
-    inspect(error, limit: 100, printable_limit: 4_000) <>
-      ". Inspect the task and worker state, correct the reported cause, and check completed effects before retrying."
+  defp describe_task_result(%{status: :failed, result: :no_model}) do
+    "The worker has no model configured. Configure a model before assigning new work; " <>
+      "do not retry the same assignment without correcting its configuration."
+  end
+
+  defp describe_task_result(%{status: :failed}) do
+    "The worker failed without a public error description. Inspect the task and " <>
+      "worker state, correct the cause, and check completed effects before retrying."
   end
 
   defp describe_task_result(task),

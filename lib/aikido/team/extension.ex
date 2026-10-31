@@ -100,15 +100,22 @@ defmodule Aikido.Team.Extension do
 
   defp expose_operation_failure({:ok, _} = result), do: result
 
-  defp expose_operation_failure({:error, %Ash.Error.Action.InvalidArgument{}} = error),
-    do: error
+  defp expose_operation_failure({:error, error} = result) when is_exception(error),
+    do: result
+
+  defp expose_operation_failure({:error, {tag, _} = reason})
+       when tag in [:server_stopped, :waiter_stopped] do
+    {:error, Aikido.Agent.Errors.RuntimeUnavailable.exception(reason: reason)}
+  end
 
   defp expose_operation_failure({:error, reason}) do
-    {:error,
-     Ash.Error.Action.InvalidArgument.exception(
-       field: :member,
-       message: operation_failure_message(reason)
-     )}
+    case operation_failure_message(reason) do
+      nil ->
+        {:error, Aikido.Team.Errors.OperationFailed.exception(reason: reason)}
+
+      message ->
+        {:error, Ash.Error.Action.InvalidArgument.exception(field: :member, message: message)}
+    end
   end
 
   defp operation_failure_message({:member_exists, name}),
@@ -149,7 +156,5 @@ defmodule Aikido.Team.Extension do
     do:
       "Team activation timed out. Inspect the roster before retrying; a member may already have started."
 
-  defp operation_failure_message(_reason),
-    do:
-      "The team lifecycle operation failed. Inspect member status and runtime logs before retrying; do not assume the requested member was started or stopped."
+  defp operation_failure_message(_reason), do: nil
 end

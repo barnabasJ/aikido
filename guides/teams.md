@@ -1,8 +1,8 @@
 # Teams
 
-A team is an Ash agent resource with `Aikido.Team.Extension`. It can run its own actions
-and AI turns while managing named agents and nested teams through the same
-Ash domain interface.
+A team is an Ash agent resource with `Aikido.Team.Extension`. It can run its own
+actions and AI turns while managing named agents and nested teams through the
+same Ash domain interface.
 
 ```elixir
 defmodule MyApp.ResearchTeam do
@@ -30,31 +30,48 @@ Dynamic names are strings and never become atoms. `owner` records hierarchy;
 its descendants. Dependencies require an explicit cascade when removing them.
 `stop_member` preserves the desired entry; `remove_member` removes it.
 
-`send`, `broadcast`, and `assign_task` route work through signals. Team and agent
-resources share the domain interface. AI agents receive dynamic tools at creation;
-AshAI and AshLua can expose the team's management actions as tools. The research
-team example demonstrates orchestrators, fixed workers, dynamically spawned
-workers, workers spawning helpers, and nested teams.
+`send`, `broadcast`, and `assign_task` route work through signals. Team and
+agent resources share the domain interface. AI agents receive dynamic tools at
+creation; AshAI and AshLua can expose the team's management actions as tools.
+The research team example demonstrates orchestrators, fixed workers, dynamically
+spawned workers, workers spawning helpers, and nested teams.
 
 The default Aikido runtime uses DurableServer. Team snapshots retain desired
-topology; recovery rebuilds process membership and monitors, and reconciles eager
-members. Agent and slice serialization callbacks remain supported. Local EKV
-storage survives restarts when its disk remains available; configure a shared
-DurableServer backend for machine failover. See [runtime patterns](runtime-patterns.md).
+topology; recovery rebuilds process membership and monitors, and reconciles
+eager members. Agent and slice serialization callbacks remain supported. Local
+EKV storage survives restarts when its disk remains available; configure a
+shared DurableServer backend for machine failover. See
+[runtime patterns](runtime-patterns.md).
 
 Run `examples/agent_app` and visit `/examples/nested-teams` and
-`/examples/research-team` for interactive trees and expandable source definitions.
+`/examples/research-team` for interactive trees and expandable source
+definitions.
 
 ### Delegation and result delivery
 
 `assign_task` activates a predefined lazy member before dispatching its work.
 The optional `notify` argument names an orchestrator member, or `:self` for an
-AI-equipped team. Terminal task results are delivered through `ai.react.deliver`:
-an idle orchestrator starts a turn; an active one queues the result. Set
-`metadata` to carry application-owned correlation data such as a workflow step ID.
-The receiving AI run exposes structured task data in `run_metadata.task`.
-Deliveries queued during an active run retain their correlation data in
-`run_metadata.deliveries`.
+AI-equipped team. Terminal task results are delivered through
+`ai.react.deliver`: an idle orchestrator starts a turn; an active one queues the
+result. Set `metadata` to carry application-owned correlation data such as a
+workflow step ID. The receiving AI run exposes structured task data in
+`run_metadata.task`. Deliveries queued during an active run retain their
+correlation data in `run_metadata.deliveries`.
+
+Failed-task message text uses recognized recovery descriptions or an authored
+`AshAi.ToToolError` implementation. Unknown failures produce fixed guidance
+rather than raw term inspection. The task ledger and notification metadata still
+retain original results; this text projection does not sanitize the whole
+envelope.
+
+Generated public topology commands await their correlated lifecycle operation.
+Native typed failures retain their class, runtime-loss failures use
+`Aikido.Agent.Errors.RuntimeUnavailable`, and unknown operation failures use
+`Aikido.Team.Errors.OperationFailed`. Their private `reason` fields preserve
+causes; public displays and tool projections omit those fields. Existing
+topology validation and timeout messages remain unchanged. Inspect the roster
+before retrying: a failure or timeout does not establish whether a requested
+member started or stopped.
 
 AiWorker queues concurrent task deliveries and processes them in order. A team
 tracks the task deadline (30 seconds by default); a timeout cancels queued or
