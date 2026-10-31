@@ -78,6 +78,8 @@ end
 defmodule Aikido.AiReact.Directives.ToolExecTest do
   use AikidoTest.Case, async: true
 
+  import ExUnit.CaptureLog, only: [with_log: 2]
+
   alias Aikido.AiReact.Directives.ToolExec
   @receive_timeout 5_000
 
@@ -219,6 +221,83 @@ defmodule Aikido.AiReact.Directives.ToolExecTest do
     assert content["error"] =~ "Inspect the target state before retrying"
     assert content["reference"]
     refute signal.data.content =~ "secret-api-key"
+  end
+
+  test "runtime exceptions log their reason with the delivered reference", context do
+    task = %{
+      directive()
+      | registry: %{"test_add" => fn _, _ -> raise "tool runtime diagnostic sentinel" end},
+        tool_context: %{context: %{api_key: "context-credential-sentinel"}}
+    }
+
+    {signal, log} = with_log([level: :error], fn -> run_tool(context, task) end)
+    content = Jason.decode!(signal.data.content)
+
+    assert signal.data.error?
+    assert content["code"] == "tool_runtime_failure"
+    assert log =~ "Tool test_add failed (RuntimeError)"
+    assert log =~ "reference #{content["reference"]}; reason "
+    assert log =~ "tool runtime diagnostic sentinel"
+    assert length(Regex.scan(~r/Tool test_add failed/, log)) == 1
+    refute signal.data.content =~ "tool runtime diagnostic sentinel"
+    refute log =~ "context-credential-sentinel"
+  end
+
+  test "non-exception runtime reasons retain diagnostics and redact credential fields", context do
+    task = %{
+      directive()
+      | registry: %{
+          "test_add" => fn _, _ ->
+            exit(
+              {:tool_runtime_probe,
+               %{message: "exit diagnostic sentinel", api_key: "private-key"}}
+            )
+          end
+        }
+    }
+
+    {signal, log} = with_log([level: :error], fn -> run_tool(context, task) end)
+    content = Jason.decode!(signal.data.content)
+
+    assert signal.data.error?
+    assert content["code"] == "tool_runtime_failure"
+    assert log =~ "Tool test_add failed (runtime failure)"
+    assert log =~ "reference #{content["reference"]}; reason "
+    assert log =~ "tool_runtime_probe"
+    assert log =~ "exit diagnostic sentinel"
+    assert log =~ "[redacted]"
+    refute log =~ "private-key"
+    refute signal.data.content =~ "exit diagnostic sentinel"
+  end
+
+  test "runtime diagnostics bound large reasons without changing the completion", context do
+    task = %{
+      directive()
+      | registry: %{"test_add" => fn _, _ -> throw(String.duplicate("diagnostic", 2_000)) end}
+    }
+
+    {signal, log} = with_log([level: :error], fn -> run_tool(context, task) end)
+    content = Jason.decode!(signal.data.content)
+
+    assert content["code"] == "tool_runtime_failure"
+    assert log =~ "reference #{content["reference"]}; reason "
+    assert log =~ "diagnostic"
+    assert byte_size(log) < 1_300
+  end
+
+  test "malformed runtime reasons fall back while preserving their reference", context do
+    task = %{
+      directive()
+      | registry: %{"test_add" => fn _, _ -> throw([:diagnostic | :improper_tail]) end}
+    }
+
+    {signal, log} = with_log([level: :error], fn -> run_tool(context, task) end)
+    content = Jason.decode!(signal.data.content)
+
+    assert signal.data.error?
+    assert content["code"] == "tool_runtime_failure"
+    assert log =~ "reference #{content["reference"]}; reason <reason unavailable>"
+    refute signal.data.content =~ "improper_tail"
   end
 
   test "opaque native errors identify the tool and discourage blind retries", context do
