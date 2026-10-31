@@ -6,10 +6,11 @@
   preserving exit causes while omitting private request data from error displays
   and AI/Lua tool projections. Missing agent identities use the same error type.
 
-- Log a bounded, projected tool-runtime failure reason with the existing tool
+- Log a bounded, payload-free tool-runtime diagnostic with the existing tool
   name and reference at error level. Preserve the opaque model-facing error
-  envelope. Use native history redaction for structured credential/runtime
-  fields and a safe fallback if diagnostic projection fails.
+  envelope and original internal error. Report fixed kinds, recognized structural
+  codes and exception modules; include argument-free runtime frames only when
+  available. Omit arbitrary messages, private causes, arguments and source paths.
 
 - Preserve durable scope refusals as native typed forbidden errors through the
   generated public start action. Expose only the operation and an atom refusal

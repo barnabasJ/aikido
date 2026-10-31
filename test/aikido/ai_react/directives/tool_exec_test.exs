@@ -75,6 +75,64 @@ defmodule Aikido.AiReact.Directives.ToolExecTest.Agent do
   end
 end
 
+defmodule Aikido.AiReact.Directives.ToolExecTest.TransferFailureTracer do
+  @moduledoc "Fails actual tool-attempt context transfer after the outer tool span starts."
+  @behaviour Ash.Tracer
+
+  @span {__MODULE__, :span}
+  @parents {__MODULE__, :parents}
+
+  @impl true
+  def start_span(type, _name) do
+    Process.put(@parents, [Process.get(@span) | Process.get(@parents, [])])
+    Process.put(@span, if(type == {:custom, :aikido_tool_call}, do: :tool_call, else: :other))
+    :ok
+  end
+
+  @impl true
+  def stop_span do
+    case Process.get(@parents, []) do
+      [parent | rest] ->
+        Process.put(@span, parent)
+        Process.put(@parents, rest)
+
+      [] ->
+        Process.delete(@span)
+    end
+
+    :ok
+  end
+
+  @impl true
+  def get_span_context do
+    case Process.get(@span) do
+      :tool_call -> {:tool_call, self()}
+      span -> span
+    end
+  end
+
+  @impl true
+  def set_span_context({:tool_call, starter}) do
+    if List.first(Process.get(:"$callers", [])) == starter do
+      raise "tool transfer stack probe"
+    end
+
+    Process.put(@span, :other)
+    :ok
+  end
+
+  def set_span_context(span) do
+    Process.put(@span, span)
+    :ok
+  end
+
+  @impl true
+  def set_metadata(_type, _metadata), do: :ok
+
+  @impl true
+  def set_error(_error, _options), do: :ok
+end
+
 defmodule Aikido.AiReact.Directives.ToolExecTest do
   use AikidoTest.Case, async: true
 
@@ -223,10 +281,11 @@ defmodule Aikido.AiReact.Directives.ToolExecTest do
     refute signal.data.content =~ "secret-api-key"
   end
 
-  test "runtime exceptions log their reason with the delivered reference", context do
+  test "runtime exceptions log a payload-free classification with the delivered reference",
+       context do
     task = %{
       directive()
-      | registry: %{"test_add" => fn _, _ -> raise "tool runtime diagnostic sentinel" end},
+      | registry: %{"test_add" => fn _, _ -> raise "synthetic-credential-in-runtime-message" end},
         tool_context: %{context: %{api_key: "context-credential-sentinel"}}
     }
 
@@ -237,13 +296,14 @@ defmodule Aikido.AiReact.Directives.ToolExecTest do
     assert content["code"] == "tool_runtime_failure"
     assert log =~ "Tool test_add failed (RuntimeError)"
     assert log =~ "reference #{content["reference"]}; reason "
-    assert log =~ "tool runtime diagnostic sentinel"
+    assert log =~ "kind=exception code=exception exception=RuntimeError stack=stack_unavailable"
+    refute log =~ "synthetic-credential-in-runtime-message"
     assert length(Regex.scan(~r/Tool test_add failed/, log)) == 1
-    refute signal.data.content =~ "tool runtime diagnostic sentinel"
+    refute signal.data.content =~ "synthetic-credential-in-runtime-message"
     refute log =~ "context-credential-sentinel"
   end
 
-  test "non-exception runtime reasons retain diagnostics and redact credential fields", context do
+  test "runtime exits retain classification without arbitrary reason fields", context do
     task = %{
       directive()
       | registry: %{
@@ -263,9 +323,9 @@ defmodule Aikido.AiReact.Directives.ToolExecTest do
     assert content["code"] == "tool_runtime_failure"
     assert log =~ "Tool test_add failed (runtime failure)"
     assert log =~ "reference #{content["reference"]}; reason "
-    assert log =~ "tool_runtime_probe"
-    assert log =~ "exit diagnostic sentinel"
-    assert log =~ "[redacted]"
+    assert log =~ "kind=exit code=unknown_runtime_failure exception=none stack=stack_unavailable"
+    refute log =~ "tool_runtime_probe"
+    refute log =~ "exit diagnostic sentinel"
     refute log =~ "private-key"
     refute signal.data.content =~ "exit diagnostic sentinel"
   end
@@ -273,7 +333,11 @@ defmodule Aikido.AiReact.Directives.ToolExecTest do
   test "runtime diagnostics bound large reasons without changing the completion", context do
     task = %{
       directive()
-      | registry: %{"test_add" => fn _, _ -> throw(String.duplicate("diagnostic", 2_000)) end}
+      | registry: %{
+          "test_add" => fn _, _ ->
+            throw(String.duplicate("synthetic-private-throw-text", 2_000))
+          end
+        }
     }
 
     {signal, log} = with_log([level: :error], fn -> run_tool(context, task) end)
@@ -281,7 +345,9 @@ defmodule Aikido.AiReact.Directives.ToolExecTest do
 
     assert content["code"] == "tool_runtime_failure"
     assert log =~ "reference #{content["reference"]}; reason "
-    assert log =~ "diagnostic"
+    assert log =~ "kind=throw code=unknown_runtime_failure exception=none stack=stack_unavailable"
+    refute log =~ "synthetic-private-throw-text"
+    refute signal.data.content =~ "synthetic-private-throw-text"
     assert byte_size(log) < 1_300
   end
 
@@ -296,8 +362,84 @@ defmodule Aikido.AiReact.Directives.ToolExecTest do
 
     assert signal.data.error?
     assert content["code"] == "tool_runtime_failure"
-    assert log =~ "reference #{content["reference"]}; reason <reason unavailable>"
+    assert log =~ "reference #{content["reference"]}; reason "
+    assert log =~ "kind=throw code=unknown_runtime_failure exception=none stack=stack_unavailable"
+    refute log =~ "improper_tail"
     refute signal.data.content =~ "improper_tail"
+  end
+
+  test "private typed runtime causes stay internal despite the diagnostic projection", context do
+    task = %{
+      directive()
+      | registry: %{
+          "test_add" => fn _, _ ->
+            raise Aikido.Agent.Errors.RuntimeUnavailable,
+              reason:
+                {:timeout,
+                 {GenServer, :call, [self(), %{input: "synthetic-private-runtime-cause"}, 5_000]}}
+          end
+        }
+    }
+
+    {signal, log} = with_log([level: :error], fn -> run_tool(context, task) end)
+    content = Jason.decode!(signal.data.content)
+
+    assert signal.data.error?
+    assert content["code"] == "tool_runtime_failure"
+    assert log =~ "reference #{content["reference"]}; reason "
+    assert log =~ "exception=Aikido.Agent.Errors.RuntimeUnavailable"
+    assert log =~ "stack=stack_unavailable"
+    assert length(Regex.scan(~r/Tool test_add failed/, log)) == 1
+    refute log =~ "synthetic-private-runtime-cause"
+    refute signal.data.content =~ "synthetic-private-runtime-cause"
+  end
+
+  test "known structural exit codes omit their supplied payload", context do
+    task = %{
+      directive()
+      | registry: %{
+          "test_add" => fn _, _ ->
+            exit({:badmatch, %{input: "synthetic-private-badmatch-payload"}})
+          end
+        }
+    }
+
+    {signal, log} = with_log([level: :error], fn -> run_tool(context, task) end)
+    content = Jason.decode!(signal.data.content)
+
+    assert signal.data.error?
+    assert log =~ "reference #{content["reference"]}; reason "
+    assert log =~ "kind=exit code=badmatch exception=none stack=stack_unavailable"
+    refute log =~ "synthetic-private-badmatch-payload"
+    refute signal.data.content =~ "synthetic-private-badmatch-payload"
+  end
+
+  test "an actual attempt transfer crash supplies argument-free runtime stack frames", context do
+    options = Aikido.AiReact.Options.new!(%{tool_max_retries: 0})
+    task = directive(options: options)
+
+    input =
+      Aikido.Signal.new!("input", %{})
+      |> Aikido.Signal.put_ctx(%{tracer: __MODULE__.TransferFailureTracer})
+
+    {signal, log} = with_log([level: :error], fn -> run_tool(context, task, input) end)
+    content = Jason.decode!(signal.data.content)
+
+    diagnostic =
+      log
+      |> String.split("\n")
+      |> Enum.find(&String.contains?(&1, "reference #{content["reference"]}; reason "))
+
+    assert signal.data.error?
+    assert content["code"] == "tool_runtime_failure"
+    assert is_binary(diagnostic)
+    assert diagnostic =~ "kind=exception code=exception exception=RuntimeError stack=["
+    assert diagnostic =~ "TransferFailureTracer.set_span_context/1"
+    assert length(Regex.scan(~r/Tool test_add failed/, log)) == 1
+    refute diagnostic =~ "tool transfer stack probe"
+    refute diagnostic =~ "tool_call}"
+    refute diagnostic =~ ".ex:"
+    refute signal.data.content =~ "tool transfer stack probe"
   end
 
   test "opaque native errors identify the tool and discourage blind retries", context do

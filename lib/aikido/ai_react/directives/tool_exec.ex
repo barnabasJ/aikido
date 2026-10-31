@@ -56,9 +56,7 @@ defmodule Aikido.AiReact.Directives.ToolExec do
 
   alias Aikido.AgentServer
   alias Aikido.AiReact.Directives.ToolExec
-  alias Aikido.Inspector.History
   alias Aikido.Signal
-  alias Aikido.Telemetry.Formatter
 
   @impl true
   def exec(%ToolExec{} = directive, input_signal, state) do
@@ -231,14 +229,96 @@ defmodule Aikido.AiReact.Directives.ToolExec do
     })
   end
 
+  # This projection emits classifications and source atoms, never error payloads.
+  # Caught attempts do not retain their stack; only a Task DOWN error envelope
+  # can supply frames here. This does not authenticate arbitrary supplied terms.
   defp runtime_failure_reason(reason) do
-    reason
-    |> History.project_state()
-    |> Formatter.safe_inspect(1_000)
+    {kind, code, exception, stack} = runtime_failure_facts(reason)
+
+    "kind=#{kind} code=#{code} exception=#{diagnostic_exception(exception)} " <>
+      "stack=#{diagnostic_stack(stack)}"
   rescue
-    _ -> "<reason unavailable>"
+    _ -> "kind=runtime code=unknown_runtime_failure exception=none stack=stack_unavailable"
   catch
-    _, _ -> "<reason unavailable>"
+    _, _ -> "kind=runtime code=unknown_runtime_failure exception=none stack=stack_unavailable"
+  end
+
+  defp runtime_failure_facts(error) when is_exception(error),
+    do: {:exception, :exception, error.__struct__, nil}
+
+  defp runtime_failure_facts({error, stack}) when is_exception(error) and is_list(stack),
+    do: {:exception, :exception, error.__struct__, stack}
+
+  defp runtime_failure_facts({kind, reason}) when kind in [:error, :exit, :throw],
+    do: {kind, diagnostic_code(reason), nil, nil}
+
+  defp runtime_failure_facts(reason),
+    do: {:runtime, diagnostic_code(reason), nil, nil}
+
+  defp diagnostic_code(reason)
+       when reason in [
+              :badarg,
+              :badarith,
+              :undef,
+              :function_clause,
+              :noproc,
+              :noconnection,
+              :killed,
+              :normal,
+              :shutdown,
+              :system_limit
+            ],
+       do: reason
+
+  defp diagnostic_code({code, _payload})
+       when code in [:badmatch, :case_clause, :try_clause, :badfun, :badarity],
+       do: code
+
+  defp diagnostic_code(_reason), do: :unknown_runtime_failure
+
+  defp diagnostic_exception(nil), do: "none"
+  defp diagnostic_exception(module), do: diagnostic_atom(module)
+
+  defp diagnostic_stack(stack) when is_list(stack) do
+    frames = stack |> Enum.take(4) |> Enum.flat_map(&diagnostic_frame/1)
+    if frames == [], do: "stack_unavailable", else: "[" <> Enum.join(frames, ", ") <> "]"
+  end
+
+  defp diagnostic_stack(_stack), do: "stack_unavailable"
+
+  defp diagnostic_frame({module, function, arguments, _location})
+       when is_atom(module) and is_atom(function) do
+    case diagnostic_arity(arguments) do
+      nil -> []
+      arity -> [diagnostic_atom(module) <> "." <> diagnostic_atom(function) <> "/#{arity}"]
+    end
+  end
+
+  defp diagnostic_frame(_frame), do: []
+
+  defp diagnostic_arity(arity) when is_integer(arity) and arity >= 0 and arity <= 255,
+    do: arity
+
+  defp diagnostic_arity(arguments) when is_list(arguments),
+    do: diagnostic_argument_count(arguments, 0)
+
+  defp diagnostic_arity(_arguments), do: nil
+
+  defp diagnostic_argument_count([], count), do: count
+
+  defp diagnostic_argument_count([_argument | rest], count) when count < 255,
+    do: diagnostic_argument_count(rest, count + 1)
+
+  defp diagnostic_argument_count(_arguments, _count), do: nil
+
+  defp diagnostic_atom(atom) do
+    name = atom |> Atom.to_string() |> String.trim_leading("Elixir.")
+
+    name
+    |> binary_part(0, min(byte_size(name), 96))
+    |> :binary.bin_to_list()
+    |> Enum.map(fn byte -> if byte >= 32 and byte <= 126, do: byte, else: ?? end)
+    |> List.to_string()
   end
 
   defp execute_registered_tool_call(%{name: name, arguments: args}, registry, context) do

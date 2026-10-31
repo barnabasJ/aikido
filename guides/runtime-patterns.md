@@ -591,16 +591,25 @@ as a successful restart. Local storage must survive for either case to recover.
 
 `Aikido.AiReact.Directives.ToolExec.exec/3` schedules prepared tool execution
 through `Aikido.AiReact.CancellableTask.run_cancellable_attempts/5`. A generic
-runtime failure produces one error-level operator log with the tool name,
-reference UUID, and a bounded reason. The reason passes through
-`Aikido.Inspector.History.project_state/1` for native credential/runtime-field
-redaction, then `Aikido.Telemetry.Formatter.safe_inspect/2` with a
-1,000-character limit. Projection failures retain the reference and use
-`<reason unavailable>`. Only the reason is projected; execution arguments and
-context are not attached. Free-form messages retain their diagnostic text, so
-callers must keep secrets in sensitive structured fields rather than interpolate
-credentials into messages.
+runtime failure produces one error-level operator diagnostic with the tool name
+and the same reference UUID delivered to the model. The diagnostic contains a
+fixed failure kind, a recognized structural code (or `unknown_runtime_failure`),
+and the exception module when the captured term is an exception. It does not
+print error messages, private causes, arbitrary reason fields, arguments, scope,
+context or source paths. This is a payload-free projection, not arbitrary-text
+secret detection.
+
+Caught work exceptions and throws/exits currently do not retain their stack in
+`CancellableTask`; their diagnostic explicitly reports `stack_unavailable`.
+A Task DOWN error that supplies the native `{exception, stacktrace}` shape can
+contribute at most four argument-free module/function/arity frames. Names are
+bounded; source locations and argument values are omitted. Unrecognized or
+malformed shapes never fall back to inspecting their payload. The shape is not
+an authenticated provenance contract, and this projection does not alter other
+OTP, dependency or application loggers.
 
 `Aikido.AgentServer.cast/2` delivers the existing `ai.react.tool.completed`
 envelope with the same reference and opaque recovery guidance. The diagnostic
-does not change retries, timeout/cancellation outcomes, or native tool errors.
+does not change retries, timeout/cancellation outcomes, native tool errors or
+the original internal error term. A reference is not evidence that retrying a
+partly completed effect is safe.
