@@ -594,11 +594,12 @@ through `Aikido.AiReact.CancellableTask.run_cancellable_attempts/5`. A generic
 runtime failure produces one error-level operator log with the tool name,
 reference UUID, and a bounded reason. The reason passes through
 `Aikido.Inspector.History.project_state/1` for native credential/runtime-field
-redaction, then `Aikido.Telemetry.Formatter.safe_inspect/2` with a 1,000-character
-limit. Projection failures retain the reference and use `<reason unavailable>`.
-Only the reason is projected; execution arguments and context are not attached.
-Free-form messages retain their diagnostic text, so callers must keep secrets
-in sensitive structured fields rather than interpolate credentials into messages.
+redaction, then `Aikido.Telemetry.Formatter.safe_inspect/2` with a
+1,000-character limit. Projection failures retain the reference and use
+`<reason unavailable>`. Only the reason is projected; execution arguments and
+context are not attached. Free-form messages retain their diagnostic text, so
+callers must keep secrets in sensitive structured fields rather than interpolate
+credentials into messages.
 
 `Aikido.AgentServer.cast/2` delivers the existing `ai.react.tool.completed`
 envelope with the same reference and opaque recovery guidance. The diagnostic
