@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Give the AI attempt's subscribe handshake the attempt's remaining deadline.
+  `Aikido.AiReact.CancellableTask` opens every attempt with a synchronous
+  subscribe into the owning agent's mailbox, so a saturated owner queue could
+  expire the 5 s default call budget before the tool's own budget ran and fail
+  the attempt with `{:error, {:owner_unavailable, {:timeout, ...}}}`. The
+  handshake now carries the attempt's remaining tool deadline, and
+  `AgentServer.subscribe/4` accepts an optional `:timeout` that bounds the
+  registration call. The default stays 5 s where no budget is given.
+
 - Preserve durable scope refusals as native typed forbidden errors through the
   generated public start action. Expose only the operation and an atom refusal
   reason, replacing opaque reasons with a generic code and excluding the original

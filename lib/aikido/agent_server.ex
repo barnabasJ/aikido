@@ -501,6 +501,8 @@ defmodule Aikido.AgentServer do
 
   - `:target` — recipient PID (default `self()`)
   - `:once` — boolean, if true unsubscribe after first non-`:skip` fire (default `false`)
+  - `:timeout` — ms to wait for the registration reply
+    (default `Defaults.agent_server_call_timeout_ms/0`)
 
   ## Returns
 
@@ -514,12 +516,17 @@ defmodule Aikido.AgentServer do
     with {:ok, options} <-
            Spark.Options.validate(opts,
              target: [type: :pid, default: self()],
-             once: [type: :boolean, default: false]
+             once: [type: :boolean, default: false],
+             timeout: [
+               type: :non_neg_integer,
+               default: Defaults.agent_server_call_timeout_ms()
+             ]
            ),
          {:ok, pid} <- resolve(server) do
       GenServer.call(
         pid,
-        {:subscribe, pattern, selector, options[:target], self(), options[:once]}
+        {:subscribe, pattern, selector, options[:target], self(), options[:once]},
+        options[:timeout]
       )
     end
   end

@@ -24,22 +24,32 @@ defmodule Aikido.AiReact.CancellableTask do
          end), do: :skip, else: {:error, :cancelled}
     end
 
-    with {:ok, subscription} <-
-           Aikido.AgentServer.subscribe(owner, "ai.react.**", selector, once: true) do
-      monitor = Process.monitor(owner)
+    case remaining_timeout(opts) do
+      0 ->
+        {:error, :timeout}
 
-      try do
-        case Aikido.AgentServer.state(owner, &{:ok, selector.(&1)}) do
-          {:ok, :skip} ->
-            execute_attempt(owner, supervisor, work, opts, subscription, monitor, 0)
+      budget ->
+        with {:ok, subscription} <-
+               Aikido.AgentServer.subscribe(owner, "ai.react.**", selector,
+                 once: true,
+                 timeout: budget
+               ) do
+          monitor = Process.monitor(owner)
 
-          _ ->
-            {:error, :cancelled}
+          try do
+            case Aikido.AgentServer.state(owner, &{:ok, selector.(&1)}) do
+              {:ok, :skip} ->
+                execute_attempt(owner, supervisor, work, opts, subscription, monitor, 0)
+
+              _ ->
+                {:error, :cancelled}
+            end
+          after
+            Process.demonitor(monitor, [:flush])
+
+            if Process.alive?(owner), do: Aikido.AgentServer.unsubscribe(owner, subscription)
+          end
         end
-      after
-        Process.demonitor(monitor, [:flush])
-        if Process.alive?(owner), do: Aikido.AgentServer.unsubscribe(owner, subscription)
-      end
     end
   catch
     :exit, reason -> {:error, {:owner_unavailable, reason}}
