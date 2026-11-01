@@ -589,8 +589,14 @@ as a successful restart. Local storage must survive for either case to recover.
 
 ## Tool runtime diagnostics
 
-`Aikido.AiReact.Directives.ToolExec.exec/3` schedules prepared tool execution
-through `Aikido.AiReact.CancellableTask.run_cancellable_attempts/5`. A generic
+Prepared tool execution starts in the directive callback:
+
+```elixir
+Aikido.AiReact.Directives.ToolExec.exec(directive, input_signal, state)
+```
+
+The callback schedules execution through
+`Aikido.AiReact.CancellableTask.run_cancellable_attempts/5`. A generic
 runtime failure produces one error-level operator diagnostic with the tool name
 and the same reference UUID delivered to the model. The diagnostic contains a
 fixed failure kind, a recognized structural code (or `unknown_runtime_failure`),

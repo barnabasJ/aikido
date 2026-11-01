@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Deliver terminal task results without a top-level inherited deadline. Preserve
+  the original deadline inside task correlation metadata while allowing an idle
+  receiver to start under its own execution policy. Existing active runs retain
+  their current deadline.
+
 - Give the AI attempt's subscribe handshake the attempt's remaining deadline.
   `Aikido.AiReact.CancellableTask` opens every attempt with a synchronous
   subscribe into the owning agent's mailbox, so a saturated owner queue could

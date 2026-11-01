@@ -133,6 +133,42 @@ defmodule Aikido.AiReact.Directives.ToolExecTest.TransferFailureTracer do
   def set_error(_error, _options), do: :ok
 end
 
+defmodule Aikido.AiReact.Directives.ToolExecTest.ImproperTransferFailureTracer do
+  @moduledoc "Exits actual attempt context transfer with a malformed stack-shaped reason."
+  @behaviour Ash.Tracer
+
+  alias Aikido.AiReact.Directives.ToolExecTest.TransferFailureTracer
+
+  @impl true
+  defdelegate start_span(type, name), to: TransferFailureTracer
+  @impl true
+  defdelegate stop_span(), to: TransferFailureTracer
+  @impl true
+  defdelegate get_span_context(), to: TransferFailureTracer
+
+  @impl true
+  def set_span_context({:tool_call, starter} = span) do
+    if List.first(Process.get(:"$callers", [])) == starter do
+      exit({
+        %RuntimeError{message: "private-exception-message"},
+        [
+          {__MODULE__, :transfer, ["private-stack-argument"], [file: "private-path"]}
+          | :private_stack_tail
+        ]
+      })
+    end
+
+    TransferFailureTracer.set_span_context(span)
+  end
+
+  def set_span_context(span), do: TransferFailureTracer.set_span_context(span)
+
+  @impl true
+  defdelegate set_metadata(type, metadata), to: TransferFailureTracer
+  @impl true
+  defdelegate set_error(error, options), to: TransferFailureTracer
+end
+
 defmodule Aikido.AiReact.Directives.ToolExecTest do
   use AikidoTest.Case, async: true
 
@@ -440,6 +476,42 @@ defmodule Aikido.AiReact.Directives.ToolExecTest do
     refute diagnostic =~ "tool_call}"
     refute diagnostic =~ ".ex:"
     refute signal.data.content =~ "tool transfer stack probe"
+  end
+
+  test "an improper attempt exit stack preserves safe classification without its payload",
+       context do
+    task = directive(options: Aikido.AiReact.Options.new!(%{tool_max_retries: 0}))
+
+    input =
+      Aikido.Signal.new!("input", %{})
+      |> Aikido.Signal.put_ctx(%{tracer: __MODULE__.ImproperTransferFailureTracer})
+
+    {signal, log} = with_log([level: :error], fn -> run_tool(context, task, input) end)
+    content = Jason.decode!(signal.data.content)
+
+    diagnostic =
+      log
+      |> String.split("\n")
+      |> Enum.find(&String.contains?(&1, "reference #{content["reference"]}; reason "))
+
+    assert signal.data.error?
+    assert content["code"] == "tool_runtime_failure"
+    assert is_binary(diagnostic)
+
+    assert diagnostic =~
+             "kind=exception code=exception exception=RuntimeError stack=stack_unavailable"
+
+    assert length(Regex.scan(~r/Tool test_add failed/, log)) == 1
+
+    for private <- [
+          "private-exception-message",
+          "private-stack-argument",
+          "private-path",
+          "private_stack_tail"
+        ] do
+      refute diagnostic =~ private
+      refute signal.data.content =~ private
+    end
   end
 
   test "opaque native errors identify the tool and discourage blind retries", context do

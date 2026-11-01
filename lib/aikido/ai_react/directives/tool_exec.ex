@@ -237,10 +237,6 @@ defmodule Aikido.AiReact.Directives.ToolExec do
 
     "kind=#{kind} code=#{code} exception=#{diagnostic_exception(exception)} " <>
       "stack=#{diagnostic_stack(stack)}"
-  rescue
-    _ -> "kind=runtime code=unknown_runtime_failure exception=none stack=stack_unavailable"
-  catch
-    _, _ -> "kind=runtime code=unknown_runtime_failure exception=none stack=stack_unavailable"
   end
 
   defp runtime_failure_facts(error) when is_exception(error),
@@ -279,12 +275,27 @@ defmodule Aikido.AiReact.Directives.ToolExec do
   defp diagnostic_exception(nil), do: "none"
   defp diagnostic_exception(module), do: diagnostic_atom(module)
 
-  defp diagnostic_stack(stack) when is_list(stack) do
-    frames = stack |> Enum.take(4) |> Enum.flat_map(&diagnostic_frame/1)
-    if frames == [], do: "stack_unavailable", else: "[" <> Enum.join(frames, ", ") <> "]"
+  defp diagnostic_stack(stack) do
+    case diagnostic_frames(stack, 4, []) do
+      {:ok, [_ | _] = frames} -> "[" <> Enum.join(frames, ", ") <> "]"
+      _ -> "stack_unavailable"
+    end
   end
 
-  defp diagnostic_stack(_stack), do: "stack_unavailable"
+  defp diagnostic_frames(_stack, 0, frames), do: {:ok, Enum.reverse(frames)}
+  defp diagnostic_frames([], _remaining, frames), do: {:ok, Enum.reverse(frames)}
+
+  defp diagnostic_frames([frame | rest], remaining, frames) do
+    frames =
+      case diagnostic_frame(frame) do
+        [] -> frames
+        [safe_frame] -> [safe_frame | frames]
+      end
+
+    diagnostic_frames(rest, remaining - 1, frames)
+  end
+
+  defp diagnostic_frames(_malformed, _remaining, _frames), do: :invalid
 
   defp diagnostic_frame({module, function, arguments, _location})
        when is_atom(module) and is_atom(function) do

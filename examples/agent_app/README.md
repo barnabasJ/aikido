@@ -110,9 +110,6 @@ when starting through `Playground`, regardless of submitted toggle values.
 | `/examples/reviewer` | Try the review role independently |
 | `/examples/research-team` | Run orchestration and watch dynamic workers appear |
 
-See [the Makewright scenario checklist](MAKEWRIGHT.md) for prescribed offline flows
-and their integration tests.
-
 The nested-teams page builds one mixed ownership tree. Choose an agent or team
 in **Parent node**, choose **Agent** or **Team**, and spawn a child. Repeat at
 any depth: for example, `lead → helper → branch → inner` mixes a fixed agent,

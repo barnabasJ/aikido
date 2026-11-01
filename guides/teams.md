@@ -58,6 +58,11 @@ workflow step ID. The receiving AI run exposes structured task data in
 `run_metadata.task`. Deliveries queued during an active run retain their
 correlation data in `run_metadata.deliveries`.
 
+Terminal result notifications omit the top-level `aikido_deadline_at` field so
+an idle receiver does not adopt an expired task budget. The original deadline
+remains nested in the task's metadata for correlation. Delivery into an active
+or waiting run retains that run's existing deadline.
+
 Failed-task message text uses recognized recovery descriptions or an authored
 `AshAi.ToToolError` implementation. Unknown failures produce fixed guidance
 rather than raw term inspection. The task ledger and notification metadata still
