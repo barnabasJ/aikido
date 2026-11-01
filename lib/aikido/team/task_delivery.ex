@@ -38,10 +38,11 @@ defmodule Aikido.Team.TaskDelivery do
       data: %{
         text: text,
         request_id: "task-result/" <> task.id,
-        metadata:
-          (Map.get(task, :metadata) || %{})
-          |> Map.take([:aikido_deadline_at])
-          |> Map.put(:task, Map.take(task, [:id, :member, :status, :result, :metadata]))
+        # Correlation only: the task is terminal, so its deadline carries no
+        # remaining budget for the receiving run to adopt.
+        metadata: %{
+          task: Map.take(task, [:id, :member, :status, :result, :metadata])
+        }
       },
       source: "/aikido"
     }
