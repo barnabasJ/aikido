@@ -189,8 +189,8 @@ defmodule Aikido.AgentServer do
   require Logger
 
   alias Aikido.AgentServer.{Options, SignalRouter, State}
-  alias Aikido.Ownership.ParentRef
   alias Aikido.Ownership.Child
+  alias Aikido.Ownership.ParentRef
 
   alias Aikido.AgentServer.Signals.{
     LifecycleReady,
@@ -501,6 +501,8 @@ defmodule Aikido.AgentServer do
 
   - `:target` — recipient PID (default `self()`)
   - `:once` — boolean, if true unsubscribe after first non-`:skip` fire (default `false`)
+  - `:timeout` — ms to wait for the registration reply
+    (default `Defaults.agent_server_call_timeout_ms/0`)
 
   ## Returns
 
@@ -514,12 +516,17 @@ defmodule Aikido.AgentServer do
     with {:ok, options} <-
            Spark.Options.validate(opts,
              target: [type: :pid, default: self()],
-             once: [type: :boolean, default: false]
+             once: [type: :boolean, default: false],
+             timeout: [
+               type: :non_neg_integer,
+               default: Defaults.agent_server_call_timeout_ms()
+             ]
            ),
          {:ok, pid} <- resolve(server) do
       GenServer.call(
         pid,
-        {:subscribe, pattern, selector, options[:target], self(), options[:once]}
+        {:subscribe, pattern, selector, options[:target], self(), options[:once]},
+        options[:timeout]
       )
     end
   end
@@ -926,36 +933,34 @@ defmodule Aikido.AgentServer do
   @impl true
   def handle_call({:signal_with_selector, %Signal{} = signal, selector}, _from, state)
       when is_function(selector, 1) do
-    try do
-      case process_signal(state, signal) do
-        {:ok, new_state, _directives} ->
-          {:reply, invoke_selector(selector, new_state), new_state}
+    case process_signal(state, signal) do
+      {:ok, new_state, _directives} ->
+        {:reply, invoke_selector(selector, new_state), new_state}
 
-        {:error, committed_state, reason} ->
-          # A chain error short-circuits selector evaluation;
-          # reason is delivered to the caller verbatim.
-          {:reply, {:error, reason}, committed_state}
+      {:error, committed_state, reason} ->
+        # A chain error short-circuits selector evaluation;
+        # reason is delivered to the caller verbatim.
+        {:reply, {:error, reason}, committed_state}
 
-        {:stop, stop_reason, executed_state} ->
-          stopping = lifecycle_stopping_signal(executed_state, stop_reason, signal)
+      {:stop, stop_reason, executed_state} ->
+        stopping = lifecycle_stopping_signal(executed_state, stop_reason, signal)
 
-          case prepare_graceful_stop(executed_state, stop_reason, stopping) do
-            {:ok, stopped_state} ->
-              {:stop, stop_reason, invoke_selector(selector, stopped_state), stopped_state}
+        case prepare_graceful_stop(executed_state, stop_reason, stopping) do
+          {:ok, stopped_state} ->
+            {:stop, stop_reason, invoke_selector(selector, stopped_state), stopped_state}
 
-            {:error, committed_state, reason} ->
-              {:stop, stop_reason, {:error, reason}, %{committed_state | status: :stopping}}
-          end
-      end
-    catch
-      kind, reason ->
-        stacktrace = __STACKTRACE__
-        Logger.error("Signal call failed for #{state.id}: #{inspect(kind)} #{inspect(reason)}
+          {:error, committed_state, reason} ->
+            {:stop, stop_reason, {:error, reason}, %{committed_state | status: :stopping}}
+        end
+    end
+  catch
+    kind, reason ->
+      stacktrace = __STACKTRACE__
+      Logger.error("Signal call failed for #{state.id}: #{inspect(kind)} #{inspect(reason)}
 " <> Exception.format_stacktrace(stacktrace))
 
-        # Return a clean error to the caller; agent stays alive.
-        {:reply, {:error, reason}, state}
-    end
+      # Return a clean error to the caller; agent stays alive.
+      {:reply, {:error, reason}, state}
   end
 
   def handle_call({:read_state_with_selector, selector}, _from, %State{} = state)

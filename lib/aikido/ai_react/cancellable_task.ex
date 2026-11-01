@@ -12,34 +12,47 @@ defmodule Aikido.AiReact.CancellableTask do
   @doc "Run bounded I/O attempts, retry eligible failures, and cancel when the owning run ends."
   def run_cancellable_attempts(owner, request_id, supervisor, work, opts) do
     selector = fn runtime ->
-      if Enum.any?(runtime.agent.state, fn
-           {_, %{request_id: ^request_id, status: status} = slice}
-           when status in [:setup, :running] ->
-             Map.get(slice, :hook_terminal) not in [:completed, :failed] &&
-               (is_nil(opts[:generation]) ||
-                  Map.get(slice, :tools_generation) == opts[:generation])
-
-           _ ->
-             false
-         end), do: :skip, else: {:error, :cancelled}
-    end
-
-    with {:ok, subscription} <-
-           Aikido.AgentServer.subscribe(owner, "ai.react.**", selector, once: true) do
-      monitor = Process.monitor(owner)
-
-      try do
-        case Aikido.AgentServer.state(owner, &{:ok, selector.(&1)}) do
-          {:ok, :skip} ->
-            execute_attempt(owner, supervisor, work, opts, subscription, monitor, 0)
+      run_active? =
+        Enum.any?(runtime.agent.state, fn
+          {_, %{request_id: ^request_id, status: status} = slice}
+          when status in [:setup, :running] ->
+            Map.get(slice, :hook_terminal) not in [:completed, :failed] &&
+              (is_nil(opts[:generation]) ||
+                 Map.get(slice, :tools_generation) == opts[:generation])
 
           _ ->
-            {:error, :cancelled}
+            false
+        end)
+
+      if run_active?, do: :skip, else: {:error, :cancelled}
+    end
+
+    case remaining_timeout(opts) do
+      0 ->
+        {:error, :timeout}
+
+      budget ->
+        with {:ok, subscription} <-
+               Aikido.AgentServer.subscribe(owner, "ai.react.**", selector,
+                 once: true,
+                 timeout: budget
+               ) do
+          monitor = Process.monitor(owner)
+
+          try do
+            case Aikido.AgentServer.state(owner, &{:ok, selector.(&1)}) do
+              {:ok, :skip} ->
+                execute_attempt(owner, supervisor, work, opts, subscription, monitor, 0)
+
+              _ ->
+                {:error, :cancelled}
+            end
+          after
+            Process.demonitor(monitor, [:flush])
+
+            if Process.alive?(owner), do: Aikido.AgentServer.unsubscribe(owner, subscription)
+          end
         end
-      after
-        Process.demonitor(monitor, [:flush])
-        if Process.alive?(owner), do: Aikido.AgentServer.unsubscribe(owner, subscription)
-      end
     end
   catch
     :exit, reason -> {:error, {:owner_unavailable, reason}}
