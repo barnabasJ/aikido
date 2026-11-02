@@ -18,13 +18,17 @@ defmodule AgentExamples.Playground do
 
   def get(owner, slug), do: GenServer.call(__MODULE__, {:get, owner, slug})
 
+  @doc "Enable or detach inspector capture while preserving the run's recorded history."
+  def set_capture(owner, slug, enabled) when is_boolean(enabled),
+    do: GenServer.call(__MODULE__, {:capture, owner, slug, enabled}, 30_000)
+
   def start(owner, slug, options),
     do: GenServer.call(__MODULE__, {:start, owner, slug, options}, 15_000)
 
   def command(owner, slug, action, input),
     do: GenServer.call(__MODULE__, {:command, owner, slug, action, input}, 15_000)
 
-  @doc "The example app's request callback. Only this caller waits; LiveView stays responsive."
+  @doc "Wait for an application approval response without blocking LiveView."
   def request(key, request, context, timeout \\ 120_000),
     do: GenServer.call(__MODULE__, {:request, key, request, context, timeout}, :infinity)
 
@@ -77,6 +81,48 @@ defmodule AgentExamples.Playground do
   end
 
   def handle_call({:get, owner, slug}, _, state), do: {:reply, state.runs[{owner, slug}], state}
+
+  def handle_call({:capture, owner, slug, enabled}, _, state) do
+    key = {owner, slug}
+
+    case state.runs[key] do
+      nil ->
+        {:reply, {:error, "Start the example first."}, state}
+
+      %{capture_enabled: ^enabled} ->
+        {:reply, :ok, state}
+
+      run ->
+        result =
+          cond do
+            !enabled ->
+              if run.inspection_ref, do: Aikido.Inspector.detach(run.inspection_ref)
+              {:ok, nil}
+
+            run.status == :stopped ->
+              {:ok, nil}
+
+            true ->
+              attach_inspection(run.record.pid, true)
+          end
+
+        case result do
+          {:ok, ref} ->
+            run = %{
+              run
+              | capture_enabled: enabled,
+                inspection_ref: ref,
+                inspection_baselines: %{},
+                inspection_offset: run.inspection.sequence
+            }
+
+            {:reply, :ok, broadcast_and_store_run(state, key, run)}
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
+        end
+    end
+  end
 
   def handle_call({:start, owner, slug, options}, _, state) do
     key = {owner, slug}
@@ -402,11 +448,25 @@ defmodule AgentExamples.Playground do
   end
 
   def handle_info({:aikido_inspection, ref, batch}, state) do
+    batch = latest_inspection_batch(ref, batch)
+
     case Enum.find(state.runs, fn {_, run} -> run[:inspection_ref] == ref end) do
       nil ->
         {:noreply, state}
 
       {key, run} ->
+        offset = run.inspection_offset
+
+        batch = %{
+          batch
+          | sequence: batch.sequence + offset,
+            entries:
+              Enum.map(
+                batch.entries,
+                &Map.update!(&1, :sequence, fn sequence -> sequence + offset end)
+              )
+        }
+
         inspection =
           Enum.reduce(batch.entries, run.inspection, fn
             %{result: {:ok, snapshot}} = entry, history ->
@@ -446,6 +506,18 @@ defmodule AgentExamples.Playground do
     do: {:noreply, reply_and_remove_request(state, id, {:error, :timeout})}
 
   def handle_info(_, state), do: {:noreply, state}
+
+  defp latest_inspection_batch(ref, batch) do
+    receive do
+      {:aikido_inspection, ^ref, newer} ->
+        latest_inspection_batch(ref, %{
+          newer
+          | entries: Enum.take(batch.entries ++ newer.entries, -100)
+        })
+    after
+      0 -> batch
+    end
+  end
 
   defp resolve_provider_key(_owner, %{mode: "offline"}, _params), do: {:ok, nil}
 
@@ -533,11 +605,11 @@ defmodule AgentExamples.Playground do
 
   defp create_run(key, example, options, state) do
     options = Map.merge(shared_provider_options(key, state), options)
+    capture_enabled = Map.get(state.runs[key] || %{}, :capture_enabled, true)
     scope = [actor: %{id: elem(key, 0)}, tenant: "playground"]
     startup = Keyword.merge(scope, startup_options(example))
 
     with {:ok, attributes} <- attributes(example, options),
-         attributes = with_request_callback(example, attributes, key),
          attributes = restore_example_identity(example, attributes, state.runs[key]),
          attributes = checkpoint_identity(example, attributes, key),
          {:ok, record} <-
@@ -550,7 +622,7 @@ defmodule AgentExamples.Playground do
       {:ok, ref, snapshot} = subscribe_snapshot(pid)
 
       {:ok, inspection_ref} =
-        Aikido.Inspector.attach(pid, &__MODULE__.snapshot/2, include_children?: true)
+        attach_inspection(pid, capture_enabled)
 
       state = %{
         state
@@ -569,7 +641,9 @@ defmodule AgentExamples.Playground do
         snapshot: snapshot,
         inspection: Aikido.Inspector.History.new(),
         inspection_ref: inspection_ref,
-        inspection_baselines: %{record.id => snapshot.inspected_state},
+        capture_enabled: capture_enabled,
+        inspection_offset: 0,
+        inspection_baselines: inspection_baseline(pid, record.id, capture_enabled),
         events: [],
         error: nil
       }
@@ -577,6 +651,20 @@ defmodule AgentExamples.Playground do
       {:reply, {:ok, run}, broadcast_and_store_run(state, key, run)}
     else
       {:error, reason} -> {:reply, {:error, error_text(reason)}, state}
+    end
+  end
+
+  defp attach_inspection(_pid, false), do: {:ok, nil}
+
+  defp attach_inspection(pid, true),
+    do: Aikido.Inspector.attach(pid, &__MODULE__.snapshot/2, include_children?: true)
+
+  defp inspection_baseline(_pid, _id, false), do: %{}
+
+  defp inspection_baseline(pid, id, true) do
+    case Aikido.AgentServer.state(pid, &__MODULE__.snapshot/1) do
+      {:ok, snapshot} -> %{id => snapshot.inspected_state}
+      _ -> %{}
     end
   end
 
@@ -642,9 +730,12 @@ defmodule AgentExamples.Playground do
   end
 
   defp subscribe_snapshot(pid) do
-    with {:ok, ref} <- Aikido.AgentServer.subscribe(pid, "**", &__MODULE__.snapshot/2) do
+    with {:ok, ref} <-
+           Aikido.AgentServer.subscribe(pid, "**", &__MODULE__.display_snapshot/2,
+             capture_actions?: false
+           ) do
       try do
-        case Aikido.AgentServer.state(pid, &__MODULE__.snapshot/1) do
+        case Aikido.AgentServer.state(pid, &__MODULE__.display_snapshot/1) do
           {:ok, snapshot} ->
             {:ok, ref, snapshot}
 
@@ -708,22 +799,6 @@ defmodule AgentExamples.Playground do
         end
     end
   end
-
-  @doc "Portable hook callback; per-run browser identity arrives in event metadata."
-  def request(
-        request,
-        %{event: %{metadata: %{playground: %{owner: owner, slug: slug}}}} = context
-      ) do
-    request({owner, slug}, request, context)
-  end
-
-  defp with_request_callback(%{resource: AgentExamples.InteractiveAssistant}, attributes, _key) do
-    callback = &__MODULE__.request/2
-    hooks = Ash.Resource.Info.attribute(AgentExamples.InteractiveAssistant, :hooks).default
-    Map.put(attributes, :hooks, Enum.map(hooks, &Map.put(&1, :request, callback)))
-  end
-
-  defp with_request_callback(_, attributes, _key), do: attributes
 
   defp attributes(example, options) do
     if Catalog.ai?(example) do
@@ -841,6 +916,21 @@ defmodule AgentExamples.Playground do
 
   @doc false
   def snapshot(state) do
+    with {:ok, snapshot} <- display_snapshot(state) do
+      {:ok,
+       Map.put(
+         snapshot,
+         :inspected_state,
+         Aikido.Inspector.History.project_agent_state(state.agent.state, state.agent_module)
+       )}
+    end
+  end
+
+  @doc false
+  def display_snapshot(state, _event), do: display_snapshot(state)
+
+  @doc false
+  def display_snapshot(state) do
     resource = state.agent_module
 
     own = Map.get(state.agent.state, Aikido.Agent.Info.agent_path!(resource), %{})
@@ -850,7 +940,6 @@ defmodule AgentExamples.Playground do
     {:ok,
      %{
        id: state.id,
-       inspected_state: Aikido.Inspector.History.project_agent_state(state.agent.state, resource),
        resource: resource,
        team?: resource && !is_nil(Aikido.Agent.Info.team_config(resource)),
        children: %{},

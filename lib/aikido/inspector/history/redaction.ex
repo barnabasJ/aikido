@@ -71,6 +71,9 @@ defmodule Aikido.Inspector.History.Redaction do
   def typed_value(%module{} = value, _type, constraints, depth),
     do: typed_value(Map.from_struct(value), module, constraints, depth)
 
+  def typed_value(value, _type, _constraints, _depth) when is_map(value) and map_size(value) == 0,
+    do: value
+
   def typed_value(value, type, constraints, depth) when is_map(value) do
     fields = schema_fields(type, constraints)
     redact_fields(value, fields, depth)
@@ -150,6 +153,9 @@ defmodule Aikido.Inspector.History.Redaction do
       Map.new(Keyword.put(opts, :name, name))
     end)
   end
+
+  defp redact_fields(value, [], depth) when is_map(value),
+    do: Map.new(value, fn {key, child} -> {key, typed_value(child, nil, [], depth + 1)} end)
 
   defp redact_fields(value, fields, depth) when is_map(value) do
     fields = Map.new(fields, &{to_string(&1.name), &1})

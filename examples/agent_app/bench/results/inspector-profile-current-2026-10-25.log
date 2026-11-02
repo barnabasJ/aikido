@@ -1,0 +1,77 @@
+
+16:58:39.319 [notice]     :alarm_handler: {:set, {:system_memory_high_watermark, []}}
+
+16:58:39.328 [notice]     :alarm_handler: {:set, {{:disk_almost_full, ~c"/media/joba/Data"}, []}}
+
+16:58:40.087 [info] [EKV AgentExamples.Store] started (shards=8)
+
+16:58:41.738 [info] starting Aikido.Default.DurableAgents: %{name: Aikido.Default.DurableAgents, prefix: "aikido/Elixir.Aikido.Default.DurableAgents/", hibernate_after: nil, ets_table: :"durable_supervisor_Elixir.Aikido.Default.DurableAgents", storage_backend: DurableServer.Backends.EKVStore, heartbeat_backend: DurableServer.Backends.EKVStore, supervisor_shutdown_timeout_ms: 60000, heartbeat_reconcile_interval_ms: 30000, heartbeat_tracking_mode: :subscribe, initial_discovery_delay_ms: {1000, 6000}, max_singleflight_waiters_per_key_module: 50000, placement_erpc_timeout_same_region_ms: 3000, placement_erpc_timeout_cross_region_ms: 8000, placement_region: nil, discovery_interval_ms: 3000, discovery_shuffle_batch_size: 20000, parallel_restart_batch_size: 50, restart_start_timeout_ms: 30000, restart_claim_preferred_fanout: 2, restart_claim_expanded_fanout: 4, restart_claim_gate_expand_after_ms: 30000, restart_claim_gate_disable_after_ms: 120000, heartbeat_interval_ms: 10000, heartbeat_staleness_threshold_ms: 30000, heartbeat_future_skew_tolerance_ms: 5000, delete_tombstone_delete_request_margin_ms: 30000, discovery_burst_count: 3, graceful_shutdown_timeout_ms: 30000, graceful_shutdown_total_timeout_ms: 55000, graceful_shutdown_concurrency: 50, dead_node_threshold_ms: 300000, sticky_placement_history_limit: 5}
+
+16:58:41.758 [info] [Group Aikido.Default.DurableAgents] started (shards=8)
+
+16:58:41.760 [debug] Aikido.Default.DurableAgents: Node heartbeat written successfully in 2ms
+
+16:58:41.761 [debug] Aikido.Default.DurableAgents: Refreshed heartbeat cache with 1 nodes in 1ms
+FUNCTION                                                                          CALLS  TIME (us)  PER CALL  [    %]
+'Elixir.Aikido.Inspector.History':'private?'/1                                   739740    1786070      2.41  [28.95]
+'Elixir.Aikido.Inspector.History':'-sanitize/2-fun-1-'/1                         738717     890178      1.21  [14.43]
+'Elixir.Aikido.Inspector.History.Redaction':schema_fields/2                      415621     516778      1.24  [ 8.38]
+'Elixir.Aikido.Inspector.History':sanitize/2                                     986043     515377      0.52  [ 8.35]
+'Elixir.Aikido.Inspector.History.Bounds':limit/2                                 106238     319954      3.01  [ 5.19]
+'Elixir.Aikido.Inspector.History.Redaction':'-redact_fields/3-fun-1-'/3          858506     243274      0.28  [ 3.94]
+'Elixir.Aikido.Inspector.History.Redaction':redact_fields/3                      379826     225813      0.59  [ 3.66]
+'Elixir.Aikido.Inspector':record_projection/4                                     11619     202418     17.42  [ 3.28]
+'Elixir.Aikido.Inspector.History':key_name/1                                    1479480     197333      0.13  [ 3.20]
+'Elixir.Aikido.Inspector.History':'-sanitize/2-fun-0-'/2                         738717     187180      0.25  [ 3.03]
+'Elixir.Aikido.Inspector.History.Redaction':typed_value/4                       1295219     144824      0.11  [ 2.35]
+'Elixir.Aikido.Inspector.History.Redaction':'-signal_data/2-fun-2-'/2            348540     121226      0.35  [ 1.96]
+'Elixir.Aikido.Inspector':attachments/0                                           11619     103861      8.94  [ 1.68]
+'Elixir.Aikido.Inspector.History.Redaction':'-redact_fields/3-fun-0-'/1          516116      83146      0.16  [ 1.35]
+'Elixir.Aikido.Inspector.History.ActionTelemetry':observe_action/4                19884      72223      3.63  [ 1.17]
+'Elixir.Aikido.Inspector.History.Redaction':constrained_fields/1                 331962      52217      0.16  [ 0.85]
+'Elixir.Aikido.Inspector.History.Redaction':'-constrained_fields/1-fun-0-'/1     169062      42370      0.25  [ 0.69]
+'Elixir.Aikido.Inspector':project/3                                               11619      37295      3.21  [ 0.60]
+'Elixir.Aikido.Inspector.History.Redaction':'-signal_data/2-fun-3-'/4             34854      37128      1.07  [ 0.60]
+'Elixir.Aikido.Inspector.History.Redaction':project_list/4                        59167      28201      0.48  [ 0.46]
+'Elixir.Aikido.Inspector.History':project_event/2                                 11618      27158      2.34  [ 0.44]
+'Elixir.Aikido.Inspector.History.ActionTelemetry':handle_event/4                  47208      25233      0.53  [ 0.41]
+'Elixir.Aikido.Inspector':'member?'/3                                             11619      24605      2.12  [ 0.40]
+'Elixir.Aikido.Inspector.History':directive/1                                     13293      24485      1.84  [ 0.40]
+'Elixir.Aikido.Inspector':member_pids/1                                           11619      21513      1.85  [ 0.35]
+'Elixir.Aikido.Inspector.History':project_state/1                                 94619      20548      0.22  [ 0.33]
+'Elixir.Aikido.Inspector.History.Redaction':agent_state/2                         11619      19084      1.64  [ 0.31]
+'Elixir.Aikido.Inspector':'-remember_members/2-fun-0-'/2                          17398      17509      1.01  [ 0.28]
+'Elixir.Aikido.Inspector':flush/2                                                    14      15744   1124.57  [ 0.26]
+'Elixir.Aikido.Inspector.History.Redaction':'-project_list/4-fun-0-'/4           208889      14448      0.07  [ 0.23]
+'Elixir.Aikido.Inspector.History':'-sanitize/2-fun-2-'/2                         196771      13818      0.07  [ 0.22]
+'Elixir.Aikido.Inspector.History.Redaction':signal_data/2                         11618      12786      1.10  [ 0.21]
+'Elixir.Aikido.Inspector':'-observe/2-fun-0-'/4                                   11619      12560      1.08  [ 0.20]
+'Elixir.Aikido.Inspector':observe/2                                               11619      11845      1.02  [ 0.19]
+'Elixir.Aikido.Inspector.History.Redaction':redacted_names/1                      53324      11300      0.21  [ 0.18]
+'Elixir.Aikido.Inspector.History':sanitize/1                                     106238       9087      0.09  [ 0.15]
+'Elixir.Aikido.Inspector.History':'-project_event/2-fun-0-'/2                     58090       8899      0.15  [ 0.14]
+'Elixir.Aikido.Inspector.History.Bounds':limit/1                                 106238       8854      0.08  [ 0.14]
+'Elixir.Aikido.Inspector.History.ActionTelemetry':register_domain/1               17104       7770      0.45  [ 0.13]
+'Elixir.Aikido.Inspector.History.Redaction':'-agent_state/2-fun-1-'/4             34857       7164      0.21  [ 0.12]
+'Elixir.Aikido.Inspector.History.Redaction':typed_value/1                         94619       6868      0.07  [ 0.11]
+'Elixir.Aikido.Inspector.History':project_agent_state/2                           11619       4884      0.42  [ 0.08]
+'Elixir.Aikido.Inspector':remember_members/2                                      11619       4589      0.39  [ 0.07]
+'Elixir.Aikido.Inspector.History.Redaction':typed_value/2                         47864       4396      0.09  [ 0.07]
+'Elixir.Aikido.Inspector':'-member_pids/1-fun-1-'/1                               34857       4213      0.12  [ 0.07]
+'Elixir.Aikido.Inspector.History.ActionTelemetry':actions/1                       11618       3968      0.34  [ 0.06]
+'Elixir.Aikido.Inspector.History.Redaction':'-agent_state/2-fun-0-'/1             23238       3004      0.13  [ 0.05]
+'Elixir.Aikido.Inspector.History.Redaction':'-redacted_names/1-fun-0-'/1          29457       2910      0.10  [ 0.05]
+'Elixir.Aikido.Inspector.History.Redaction':error/2                               11618       2888      0.25  [ 0.05]
+'Elixir.Aikido.Inspector.History.ActionTelemetry':'-observe_action/4-fun-0-'/1     9942       2709      0.27  [ 0.04]
+'Elixir.Aikido.Inspector.History.ActionTelemetry':'-observe_action/4-fun-1-'/3    11333       2394      0.21  [ 0.04]
+'Elixir.Aikido.Inspector.History.Redaction':'-signal_data/2-fun-1-'/3             13007       1982      0.15  [ 0.03]
+'Elixir.Aikido.Inspector.History':error_message/1                                 11618       1466      0.13  [ 0.02]
+'Elixir.Aikido.Inspector.History.Redaction':redact_error/2                        11618       1380      0.12  [ 0.02]
+'Elixir.Aikido.Inspector':'-member_pids/1-fun-0-'/1                                5779        824      0.14  [ 0.01]
+'Elixir.Aikido.Inspector':'-flush/2-fun-1-'/2                                      1400        157      0.11  [ 0.00]
+'Elixir.Aikido.Inspector':'-flush/2-fun-2-'/1                                      1400        139      0.10  [ 0.00]
+'Elixir.Aikido.Inspector':'-flush/2-fun-0-'/1                                      1400         92      0.07  [ 0.00]
+'Elixir.Aikido.Inspector':handle_info/2                                              14         62      4.43  [ 0.00]
+                                                                                           6170201            [100.0]
+[os_mon] memory supervisor port (memsup): Erlang has closed
+[os_mon] cpu supervisor port (cpu_sup): Erlang has closed

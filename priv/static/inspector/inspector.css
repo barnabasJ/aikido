@@ -73,3 +73,6 @@
 .inspector-toolbar .inspector-live[aria-pressed=true]{color:var(--success);border-color:var(--success)}
 .inspector-readonly{margin-left:0}
 .inspector-failure{padding:10px 12px;margin:0 0 12px;border-left:3px solid var(--accent);background:var(--danger-surface);font-size:11px;line-height:1.55;overflow-wrap:anywhere}.inspector-failure>strong{color:var(--accent)}.inspector-failure p{margin:6px 0}.inspector-failure-message{white-space:pre-wrap;color:var(--text)}.inspector-failure-status{color:var(--muted)}.inspector-failure-links{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.inspector-failure-links button{background:var(--panel);color:var(--signal);border:1px solid var(--line);border-radius:3px;padding:3px 7px;font:inherit}.inspector-failure-details{margin-top:8px}.inspector-failure-details>summary{cursor:pointer;color:var(--muted)}
+
+
+.inspector-timeline > .inspector-empty{margin:0;padding:12px 10px;color:var(--muted)}

@@ -38,78 +38,95 @@ defmodule Aikido.Durable.Codec do
   defp transform_saved_path(module, value, :reinstate),
     do: reinstate_value(module, value, false)
 
-  defp transform_saved_path(module, value, :externalize), do: module.externalize(value)
+  defp transform_saved_path(module, value, :externalize),
+    do: module.externalize(value)
 
   @doc false
   def externalize_initial(attributes, agent_module, prepared? \\ false) do
     paths = paths(agent_module)
     known = Enum.map(paths, &elem(&1, 1))
 
-    attributes =
-      if map_size(attributes) > 0 && !Enum.any?(Map.keys(attributes), &(&1 in known)),
-        do: %{Aikido.Agent.Info.agent_path!(agent_module) => attributes},
-        else: attributes
+    privacy = %{
+      prepared?: prepared?,
+      checkpoint?: function_exported?(agent_module, :checkpoint, 2)
+    }
 
-    with {:ok, attributes} <- retain_fields(attributes, known) do
-      privacy = %{
-        prepared?: prepared?,
-        checkpoint?: function_exported?(agent_module, :checkpoint, 2)
-      }
-
+    with {:ok, mounted} <- retain_fields(attributes, known),
+         attributes =
+           if(mounted == %{} && attributes != %{},
+             do: %{Aikido.Agent.Info.agent_path!(agent_module) => attributes},
+             else: mounted
+           ),
+         {:ok, attributes} <- normalize_initial_paths(attributes, paths, agent_module),
+         :ok <- require_prepared_bootstrap(attributes, agent_module, privacy) do
       Enum.reduce_while(paths, {:ok, attributes, []}, fn {module, path}, result ->
-        externalize_supplied_path(module, path, agent_module, result, privacy)
+        externalize_supplied_path(module, path, result, privacy)
       end)
     end
   end
 
-  defp externalize_supplied_path(module, path, agent_module, {:ok, state, encoded}, privacy) do
+  defp normalize_initial_paths(attributes, paths, agent_module) do
+    Enum.reduce_while(paths, {:ok, attributes}, fn {module, path}, {:ok, state} ->
+      case Map.fetch(state, path) do
+        {:ok, value} when not is_nil(value) ->
+          fields = Enum.map(path_attributes(module, agent_module), & &1.name)
+
+          with {:ok, value} <- Ash.Type.cast_input(:map, value),
+               {:ok, value} <- retain_fields(value, fields) do
+            {:cont, {:ok, Map.put(state, path, value)}}
+          else
+            _ -> {:halt, {:error, {:invalid_bootstrap_path, module, path}}}
+          end
+
+        _ ->
+          {:cont, {:ok, state}}
+      end
+    end)
+  end
+
+  defp require_prepared_bootstrap(attributes, resource, privacy) do
+    if privacy.checkpoint? && !privacy.prepared? && !paired?(resource) &&
+         Enum.any?(attributes, fn {_path, value} -> value not in [nil, %{}] end) do
+      {:error,
+       {:bootstrap_preparation_required, resource, Aikido.Agent.Info.agent_path!(resource)}}
+    else
+      :ok
+    end
+  end
+
+  defp externalize_supplied_path(module, path, {:ok, state, encoded}, privacy) do
     case Map.fetch(state, path) do
-      {:ok, value} when is_map(value) and map_size(value) > 0 ->
-        attributes = path_attributes(module, agent_module)
-
-        case Aikido.Durable.BootstrapShape.project(value, attributes) do
-          {:ok, value} ->
-            externalize_initial_path(module, path, value, state, encoded, privacy, attributes)
-
-          {:error, _} ->
-            {:halt, {:error, {:invalid_bootstrap_path, module, path}}}
+      {:ok, value} when not is_nil(value) ->
+        with {:ok, value, encoded} <- encode_initial_path(module, path, value, encoded, privacy),
+             {:ok, stored} <- Ash.Type.dump_to_embedded(:term, value),
+             {:ok, value} <- Ash.Type.cast_from_embedded(:term, stored) do
+          {:cont, {:ok, Map.put(state, path, value), encoded}}
+        else
+          {:error, {:bootstrap_preparation_required, _, _}} = error -> {:halt, error}
+          _ -> {:halt, {:error, {:bootstrap_codec_failed, module, path}}}
         end
-
-      {:ok, value} when not is_map(value) and not is_nil(value) ->
-        {:halt, {:error, {:invalid_bootstrap_path, module, path}}}
 
       _ ->
         {:cont, {:ok, state, encoded}}
     end
-  end
-
-  defp externalize_initial_path(module, path, value, state, encoded, privacy, attributes) do
-    projection =
-      cond do
-        map_size(value) == 0 ->
-          {:ok, value, encoded}
-
-        paired?(module) ->
-          {:ok, module.externalize(value), [path | encoded]}
-
-        privacy.checkpoint? && !privacy.prepared? ->
-          {:error, {:bootstrap_preparation_required, module, path}}
-
-        true ->
-          {:ok, value, encoded}
-      end
-
-    with {:ok, value, encoded} <- projection,
-         {:ok, value, locations} <-
-           Aikido.Durable.BootstrapCallbacks.externalize(value, attributes) do
-      encoded = if locations == [], do: encoded, else: [{:callbacks, path, locations} | encoded]
-      {:cont, {:ok, Map.put(state, path, value), encoded}}
-    else
-      {:error, {:bootstrap_preparation_required, _, _}} = error -> {:halt, error}
-      {:error, _} -> {:halt, {:error, {:bootstrap_codec_failed, module, path}}}
-    end
   rescue
     _error -> {:halt, {:error, {:bootstrap_codec_failed, module, path}}}
+  end
+
+  defp encode_initial_path(_module, _path, value, encoded, _privacy) when map_size(value) == 0,
+    do: {:ok, value, encoded}
+
+  defp encode_initial_path(module, path, value, encoded, privacy) do
+    cond do
+      paired?(module) ->
+        {:ok, module.externalize(value), [path | encoded]}
+
+      privacy.checkpoint? && !privacy.prepared? ->
+        {:error, {:bootstrap_preparation_required, module, path}}
+
+      true ->
+        {:ok, value, encoded}
+    end
   end
 
   defp path_attributes(module, agent_module) do
@@ -132,36 +149,19 @@ defmodule Aikido.Durable.Codec do
 
   @doc false
   def reinstate_initial(attributes, agent_module, encoded) do
+    Enum.each(encoded, fn
+      {:callbacks, _, _} ->
+        raise ArgumentError,
+              "Uninitialized snapshot uses retired callback bookkeeping. Delete the saved identity and start it again with its owning codec; initialized snapshots remain supported."
+
+      _ ->
+        :ok
+    end)
+
     Enum.reduce(paths(agent_module), attributes, fn {module, path}, state ->
-      case Map.fetch(state, path) do
-        {:ok, value} ->
-          locations =
-            Enum.find_value(encoded, [], fn
-              {:callbacks, ^path, locations} -> locations
-              _ -> nil
-            end)
-
-          case Aikido.Durable.BootstrapCallbacks.reinstate(value, locations) do
-            {:ok, value} ->
-              value = if path in encoded, do: reinstate_value(module, value, true), else: value
-
-              case Aikido.Durable.BootstrapCallbacks.normalize_optional_nil(
-                     value,
-                     module,
-                     path_attributes(module, agent_module)
-                   ) do
-                {:ok, value} -> Map.put(state, path, value)
-                {:error, _} -> raise ArgumentError, "Cannot normalize bootstrap callbacks"
-              end
-
-            {:error, _} ->
-              raise ArgumentError,
-                    "Cannot restore bootstrap callbacks at #{inspect(module)} #{inspect(path)}"
-          end
-
-        :error ->
-          state
-      end
+      if path in encoded,
+        do: Map.update!(state, path, &reinstate_value(module, &1, true)),
+        else: state
     end)
   end
 

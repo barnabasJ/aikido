@@ -14,15 +14,9 @@ defmodule Aikido.AiReact.Hooks.Hook do
   application actions. These selectors are serializable configuration; the live
   actor, tenant and application context come from the triggering signal.
 
-  Both modes can call `aikido.request(type, payload)` and receive a response
-  inside Lua. Supply an external capture such as `request: &MyApp.Hooks.request/2`.
-  The callback receives `%{type: type, payload: payload}` and context containing
-  `hook`, `request_id`, and the lifecycle `event`. It runs in the Lua task and
-  may return `{:ok, response}` or `{:error, reason}`. The application owns any
-  waiting, deadlines, cancellation and UI communication. Callbacks must be portable
-  external captures without a captured environment; put serializable per-run
-  configuration in `event.metadata`. The callback survives checkpoint and restore.
-  Without a callback, `aikido.request` returns an error to Lua.
+  Application operations are exposed through `lua_options` and the normal AshLua
+  action surface. Hooks contain Lua source and serializable settings only; they
+  do not accept Elixir callbacks. Native action scope and policies govern calls.
   """
   use Ash.Resource, data_layer: :embedded
 
@@ -77,13 +71,6 @@ defmodule Aikido.AiReact.Hooks.Hook do
                       type: Aikido.AiReact.Hooks.Types.ForbiddenFieldPolicy
                     ]
                   ]
-    end
-
-    attribute :request, :function do
-      constraints arity: 2, mfa: true
-      public? true
-
-      description "Portable external callback for Lua requests; returns {:ok, response} or {:error, reason}."
     end
 
     attribute :max_instructions, :integer do

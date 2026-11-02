@@ -91,11 +91,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp pin_inspected_event(socket, _), do: socket
 
-    attr :history, :map, default: nil
-    attr :selected, :any, default: nil
-    attr :view, :string, default: "diff"
-    attr :format, :string, default: "tree"
-    attr :filter, :string, default: ""
+    attr(:history, :map, default: nil)
+    attr(:selected, :any, default: nil)
+    attr(:view, :string, default: "diff")
+    attr(:format, :string, default: "tree")
+    attr(:filter, :string, default: "")
+
+    slot(:controls, doc: "Application-owned capture controls in the inspector toolbar.")
 
     def inspector(assigns) do
       entries = if assigns.history, do: assigns.history.entries, else: []
@@ -125,6 +127,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <header class="inspector-toolbar">
           <h2>Aikido inspector</h2>
           <span>{length(@entries)} / 100 signals</span>
+          {render_slot(@controls)}
           <button
             type="button"
             class="inspector-live"
@@ -220,7 +223,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
-    attr :entry, :map, required: true
+    attr(:entry, :map, required: true)
 
     def signal_failure(assigns) do
       title =
@@ -279,9 +282,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
-    attr :label, :string, required: true
-    attr :value, :any, required: true
-    attr :depth, :integer, default: 0
+    attr(:label, :string, required: true)
+    attr(:value, :any, required: true)
+    attr(:depth, :integer, default: 0)
 
     def value_tree(assigns) do
       assigns = assign(assigns, :children, children(assigns.value))
@@ -345,8 +348,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp event_content(entry, "directives"), do: entry.execution.directives
     defp event_content(entry, "actions"), do: entry.execution[:actions] || []
 
-    attr :event, :map, required: true
-    attr :selected, :any, default: nil
+    attr(:event, :map, required: true)
+    attr(:selected, :any, default: nil)
 
     def event_row(assigns) do
       ~H"""
@@ -370,7 +373,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
-    attr :event, :map, required: true
+    attr(:event, :map, required: true)
 
     def event_identity(assigns) do
       ~H"""
@@ -397,8 +400,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
-    attr :view, :string, required: true
-    attr :sequence, :any, default: nil
+    attr(:view, :string, required: true)
+    attr(:sequence, :any, default: nil)
 
     def detail_tabs(assigns) do
       ~H"""
@@ -424,8 +427,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
-    attr :format, :string, required: true
-    attr :sequence, :any, default: nil
+    attr(:format, :string, required: true)
+    attr(:sequence, :any, default: nil)
 
     def format_tabs(assigns) do
       ~H"""
@@ -442,7 +445,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
-    attr :changes, :list, required: true
+    attr(:changes, :list, required: true)
 
     def state_diff(assigns) do
       ~H"""

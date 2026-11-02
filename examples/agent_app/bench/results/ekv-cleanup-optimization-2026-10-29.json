@@ -1,0 +1,256 @@
+{
+  "date": "2026-10-29",
+  "sdk_commit": "dd4d1aa3bb27a641523aa8415ac21cbc8540b019",
+  "ekv_preimage": {
+    "preimage_sha256": "bc2956c848498a8149ae6c1b101c6c88e233eaea09457867e675dd0a9aaf379b",
+    "candidate_sha256": "c451fbf40e673ecfe5cf871f5898853a3d5c2f5014a52cea13023880cfe27540",
+    "sdk_source_unchanged": true,
+    "legacy_orphan_handling": "Reconciled using the original orphan predicate before store readiness; ordinary hard-delete cleanup and targeted replay truncation retain their cleanup paths."
+  },
+  "native_semantics": {
+    "rows": {
+      "kv": [
+        [
+          "boundary-cas",
+          100,
+          null
+        ],
+        [
+          "boundary-tombstone",
+          null,
+          100
+        ],
+        [
+          "expired-lww",
+          10,
+          null
+        ],
+        [
+          "future-cas",
+          1000,
+          null
+        ],
+        [
+          "live",
+          null,
+          null
+        ],
+        [
+          "young-tombstone",
+          null,
+          1000
+        ]
+      ],
+      "paxos": [
+        [
+          "boundary-cas",
+          0,
+          0
+        ],
+        [
+          "future-cas",
+          0,
+          0
+        ],
+        [
+          "live",
+          0,
+          0
+        ],
+        [
+          "orphan-accepted",
+          0,
+          1
+        ],
+        [
+          "orphan-promised",
+          1,
+          0
+        ]
+      ],
+      "keyrefs": [
+        [
+          "boundary-cas",
+          0
+        ],
+        [
+          "boundary-tombstone",
+          0
+        ],
+        [
+          "expired-lww",
+          0
+        ],
+        [
+          "future-cas",
+          0
+        ],
+        [
+          "live",
+          0
+        ],
+        [
+          "pinned-expired-cas",
+          1
+        ],
+        [
+          "young-tombstone",
+          0
+        ]
+      ]
+    },
+    "same_final_rows": true,
+    "fixture_cases": 13
+  },
+  "validation_commands": [
+    {
+      "name": "semantics",
+      "exit": 0,
+      "elapsed_total_s": 0.664837380987592,
+      "log": "/mnt/storage/sandbox/jido/tmp/quicksort-writers-2026-10-29/ekv-candidate/semantics.log"
+    },
+    {
+      "name": "shutdown",
+      "exit": 0,
+      "elapsed_total_s": 3.63410018599825,
+      "log": "/mnt/storage/sandbox/jido/tmp/quicksort-writers-2026-10-29/ekv-candidate/shutdown.log"
+    },
+    {
+      "name": "aged-50k",
+      "exit": 0,
+      "elapsed_total_s": 93.95481208298588,
+      "log": "/mnt/storage/sandbox/jido/tmp/quicksort-writers-2026-10-29/ekv-candidate/aged-50k.log"
+    }
+  ],
+  "method": "One 50k run on the same accumulated private store after reproducing the original failure with a 30-second GC interval. Eight normal schedulers and eight data shards, a separate heartbeat store, and periodic 30-second saves. Only native EKV.Store cleanup SQL, its index, and redundant cleanup work changed. Caches and store contents differed after the preceding failure; this verifies correctness and per-operation behavior, not a controlled elapsed-time comparison.",
+  "result": {
+    "ekv_gc_interval_ms": 30000,
+    "canary_errors": [],
+    "heartbeat_isolated": true,
+    "canary_writes": 299,
+    "agents_started": 50000,
+    "remaining_agents": 0,
+    "sorted_correctly": true,
+    "result_summary": {
+      "status": "ok",
+      "values": 50000
+    },
+    "errors": [],
+    "child_retirement_ms": 0.003,
+    "local_agents": 0,
+    "root_stop_ms": 89.699,
+    "canary_max_ms": 1796.847,
+    "peak_writer_queue": 1022,
+    "saved_agent_snapshots": 0,
+    "root_id": "01a186a7-9604-723f-9857-9ce0741a1947",
+    "display_completed": 50000,
+    "ekv_shards": 8,
+    "inspector": false,
+    "schedulers": 8,
+    "heartbeat_store": "AgentExamples.Quicksort.Bench.Scale.HeartbeatStore",
+    "display_failed": 0,
+    "heartbeat_unavailable_samples": 0,
+    "peak_memory_bytes": 1936524064,
+    "display_nodes": 50000,
+    "heartbeat_max_put_ms": 176,
+    "io": {
+      "cancelled_write_bytes": 0,
+      "rchar": 7717590568,
+      "read_bytes": 255315792,
+      "syscr": 2130900,
+      "syscw": 7106356,
+      "wchar": 15102227162,
+      "write_bytes": 14614577836
+    },
+    "sort_ms": 50749.995,
+    "size": 50000,
+    "children_at_result": 0,
+    "heartbeat_max_age_ms": 10073,
+    "seed": [
+      42,
+      43,
+      44
+    ],
+    "ekv_candidate": true,
+    "sync": {
+      "mode": "periodic",
+      "interval_ms": 30000
+    }
+  },
+  "maintenance": {
+    "{EKV.Store, :find_expired, 2}": {
+      "calls": 8,
+      "max_ms": 0.551,
+      "summed_wall_ms": 1.622
+    },
+    "{EKV.Store, :purge_tombstones, 2}": {
+      "calls": 8,
+      "max_ms": 4.411,
+      "summed_wall_ms": 10.911999999999999
+    },
+    "{EKV.Store, :purge_expired, 2}": {
+      "calls": 8,
+      "max_ms": 4.451,
+      "summed_wall_ms": 12.800999999999998
+    },
+    "{EKV.Store, :purge_orphan_paxos, 1}": {
+      "calls": 8,
+      "max_ms": 2.819,
+      "summed_wall_ms": 4.203
+    },
+    "{EKV.Store, :truncate_oplog_batch, 3}": {
+      "calls": 209,
+      "max_ms": 1219.047,
+      "summed_wall_ms": 25410.975000000017
+    }
+  },
+  "deployment": "Activated in the localhost:4042 preview on 2026-10-29. Startup verification confirms the candidate EKV.Store source, eight schedulers, eight data shards, and an isolated heartbeat store. Pinned SDK source and dependency ranges remain unchanged.",
+  "remaining": "Replication oplog batches reached 1,219 ms, so storage latency remains. The strict Argus gate still reports three reviewed architecture warnings; none were suppressed.",
+  "upstream_patch": {
+    "repository": "https://github.com/barnabasJ/ekv",
+    "base_commit": "ce86257fa5973bf18dd926aa5670fe8bfebb4e97",
+    "local_branch": "codex/indexed-maintenance",
+    "source_patch": "ekv-cleanup-optimization-2026-10-29.patch",
+    "new_regression_tests": "Two native EKV regression tests passed: public CAS/LWW TTL cleanup with ballot retention, and legacy key-reference reconciliation with replay retention.",
+    "published": true,
+    "fork_commit": "648a3db4e1f788acde88a75a3f59c4f55213e58c",
+    "review_url": "https://github.com/barnabasJ/ekv/pull/1",
+    "merged": false
+  },
+  "preview_configuration": {
+    "schedulers": 8,
+    "data_store": "AgentExamples.Store",
+    "heartbeat_store": "AgentExamples.HeartbeatStore",
+    "heartbeat_isolated": true,
+    "data_shards": 8,
+    "heartbeat_shards": 1,
+    "watchdog_deadline_ms": 28000,
+    "ekv_cleanup_source": "/mnt/storage/sandbox/jido/tmp/quicksort-writers-2026-10-29/ekv-candidate/store.ex"
+  },
+  "live_preview_run": {
+    "size": 50000,
+    "elapsed_s": 63.905,
+    "completed_nodes": 50000,
+    "sorting_nodes": 0,
+    "depth": 39,
+    "all_rendered_values_verified": true,
+    "first_value": 1,
+    "last_value": 50000,
+    "capture_enabled": false,
+    "processing_exceptions": 0,
+    "directive_exceptions": 0,
+    "active_processes_after": 8,
+    "baseline_active_processes": 7,
+    "async_tasks_after": 0,
+    "llm_requests_in_flight_after": 0,
+    "completed_root_left_open": true,
+    "screenshot": "/mnt/storage/sandbox/jido/tmp/quicksort-writers-2026-10-29/preview-50k-completed.png"
+  },
+  "dependency_selection": {
+    "library": "optional released EKV ~> 0.4",
+    "example": "fork commit 648a3db4e1f788acde88a75a3f59c4f55213e58c",
+    "mix_deps_get_exit": 0,
+    "format_check_exit": 0,
+    "note": "Preserved the existing elixir_make 0.10.0 lock instead of retaining the resolver incidental 0.10.1 upgrade. Full upstream EKV suite remains pending."
+  }
+}

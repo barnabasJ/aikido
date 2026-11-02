@@ -76,7 +76,7 @@ defmodule Aikido.Durable.Snapshot do
 
     %{
       "format" => @format,
-      "resource" => Atom.to_string(resource),
+      "resource" => transform!(:dump_to_embedded, :atom, resource, [], :resource),
       "payload" =>
         stored
         |> then(&transform!(:dump_to_embedded, :term, &1, [], :payload))
@@ -87,7 +87,7 @@ defmodule Aikido.Durable.Snapshot do
   @doc "Load a typed envelope after loading the resource that declares its field types."
   def load(%{"format" => format, "resource" => resource_name, "payload" => payload})
       when format in [@format, "ash-embedded-v1"] do
-    resource = String.to_existing_atom(resource_name)
+    resource = transform!(:cast_from_embedded, :atom, resource_name, [], :resource)
     Code.ensure_loaded!(resource)
     paths = path_types(resource)
     load_declared_implementations(paths)

@@ -20,7 +20,7 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
     end
 
     field :request_id, :string do
-      description "AI run identity carried into hook callbacks and completion signals."
+      description "AI run identity carried into hook execution and completion signals."
       allow_nil? false
     end
   end
@@ -56,7 +56,6 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
     |> hook_vm_options(source_signal)
     |> AshLua.new()
     |> Lua.set!([:event], AshLua.Encoder.encode_result(event))
-    |> expose_request_callback(hook, event, request_id)
     |> expose_async_signal_functions(hook, pid, request_id, source_signal)
     |> evaluate_script(hook.script)
     |> cast_hook_return(hook.mode)
@@ -165,32 +164,4 @@ defmodule Aikido.AiReact.Directives.ExecuteHook do
   end
 
   defp expose_async_signal_functions(lua, _hook, _pid, _request_id, _source_signal), do: lua
-
-  defp expose_request_callback(lua, hook, event, request_id) do
-    Lua.set!(lua, [:aikido, :request], fn args, vm ->
-      [type, payload] = Lua.decode_list!(vm, args)
-      payload = AshLua.Encoder.decode_input(payload)
-      true = is_binary(type) and is_map(payload)
-
-      result =
-        if hook.request do
-          hook.request.(%{type: type, payload: payload}, %{
-            hook: hook.name,
-            request_id: request_id,
-            event: event
-          })
-        else
-          {:error, :request_callback_not_configured}
-        end
-
-      values =
-        case result do
-          {:ok, response} -> [AshLua.Encoder.encode_result(response), nil]
-          {:error, reason} -> [nil, %{message: inspect(reason)}]
-          other -> [nil, %{message: "Invalid request callback result: #{inspect(other)}"}]
-        end
-
-      Lua.encode_list!(vm, values)
-    end)
-  end
 end

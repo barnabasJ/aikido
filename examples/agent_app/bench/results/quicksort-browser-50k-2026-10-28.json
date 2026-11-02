@@ -1,0 +1,40 @@
+{
+  "size": 50000,
+  "elapsed_ms": 127604,
+  "values": {
+    "correct": true,
+    "count": 50000
+  },
+  "metrics_before_reload": "50000 agents spawned\n0 sorting\n50000 completed\nDepth 35\n127.604s to result",
+  "metrics_after_reload": "50000 agents spawned\n0 sorting\n50000 completed\nDepth 35\n127.604s to result",
+  "progress": [
+    {
+      "time": 1793214802460,
+      "metrics": "0 agents spawned\n0 sorting\n0 completed\nDepth 0\nWaiting for result"
+    },
+    {
+      "time": 1793214838348,
+      "metrics": "16807 agents spawned\n6255 sorting\n10552 completed\nDepth 24\nWaiting for result"
+    },
+    {
+      "time": 1793214960862,
+      "metrics": "50000 agents spawned\n0 sorting\n50000 completed\nDepth 35\n127.604s to result"
+    }
+  ],
+  "telemetry": {
+    "local_agents": 2,
+    "registered_agents": 2,
+    "io_tasks": 0,
+    "processing_exceptions": 0,
+    "directive_exceptions": 0,
+    "remaining_resources": [
+      "AgentExamples.Quicksort",
+      "AgentExamples.Quicksort"
+    ],
+    "remaining_ids": [
+      "01a18391-1096-789f-803b-b0375b3b72b6",
+      "01a183ee-5821-7c9a-a656-45dbb25de86f"
+    ],
+    "note": "Both remaining processes are completed roots. The earlier root predates this run and was preserved. No children remain."
+  }
+}

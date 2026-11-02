@@ -15,17 +15,17 @@ defmodule AgentExamples.InspectorRedactionTest do
     use Ash.Resource, data_layer: :embedded
 
     actions do
-      defaults create: [:ordinary, :visible]
+      defaults(create: [:ordinary, :visible])
     end
 
     attributes do
       attribute :ordinary, :string do
-        description "Sensitive content whose name is not a credential hint."
-        sensitive? true
+        description("Sensitive content whose name is not a credential hint.")
+        sensitive?(true)
       end
 
       attribute :visible, :string do
-        description "Public content retained by the projection."
+        description("Public content retained by the projection.")
       end
     end
   end
@@ -34,12 +34,12 @@ defmodule AgentExamples.InspectorRedactionTest do
     use Ash.Resource, data_layer: :embedded, extensions: [Aikido.Slice.Extension]
 
     slice do
-      name "inspector_vault"
+      name("inspector_vault")
 
       schema do
         attribute :ordinary, :string do
-          description "Sensitive mounted state."
-          sensitive? true
+          description("Sensitive mounted state.")
+          sensitive?(true)
         end
       end
     end
@@ -49,16 +49,16 @@ defmodule AgentExamples.InspectorRedactionTest do
     use Aikido.Signal
 
     signal do
-      type "inspector.submitted"
+      type("inspector.submitted")
 
       schema do
         attribute :ordinary, :string do
-          description "Sensitive signal argument."
-          sensitive? true
+          description("Sensitive signal argument.")
+          sensitive?(true)
         end
 
         attribute :details, {:array, Details} do
-          description "Nested resource values in a typed signal."
+          description("Nested resource values in a typed signal.")
         end
       end
     end
@@ -68,50 +68,50 @@ defmodule AgentExamples.InspectorRedactionTest do
     use Aikido.Agent
 
     agent do
-      name "inspector_redaction"
-      path :local
+      name("inspector_redaction")
+      path(:local)
 
       schema do
         attribute :ordinary, :string do
-          description "Sensitive own-state attribute."
-          sensitive? true
+          description("Sensitive own-state attribute.")
+          sensitive?(true)
         end
 
         attribute :details, {:array, Details} do
-          description "Nested embedded resource values."
+          description("Nested embedded resource values.")
         end
       end
 
-      slice :vault, Vault
-      route Submitted, AgentExamples.InspectorRedactionTest.PreserveState, public?: false
-      route "inspector.native", :native, public?: false
-      route "inspector.whole", :whole, public?: false
+      slice(:vault, Vault)
+      route(Submitted, AgentExamples.InspectorRedactionTest.PreserveState, public?: false)
+      route("inspector.native", :native, public?: false)
+      route("inspector.whole", :whole, public?: false)
     end
 
     actions do
       action :whole, Aikido.Types.ActionResult do
         argument :state, :map do
-          description "State passed to the explicit native reducer."
+          description("State passed to the explicit native reducer.")
         end
 
         argument :data, :map do
-          description "Sensitive whole-payload contract."
-          sensitive? true
+          description("Sensitive whole-payload contract.")
+          sensitive?(true)
         end
 
-        run AgentExamples.InspectorRedactionTest.PreserveState
+        run(AgentExamples.InspectorRedactionTest.PreserveState)
       end
 
       action :native, Aikido.Types.ActionResult do
         argument :state, :map do
-          description "State passed to the explicit native reducer contract."
+          description("State passed to the explicit native reducer contract.")
         end
 
         argument :ordinary, :string do
-          sensitive? true
+          sensitive?(true)
         end
 
-        run AgentExamples.InspectorRedactionTest.PreserveState
+        run(AgentExamples.InspectorRedactionTest.PreserveState)
       end
     end
   end

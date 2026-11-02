@@ -42,7 +42,29 @@ only when no domain is specified. Domain inclusion uses Ash's normal validation;
 register application agents in their domain. `use Aikido.Slice` likewise forwards
 native resource options and defaults to the embedded data layer.
 
+Slice initialization uses the generated native create action. For defaults that
+depend on other attributes, configure an Ash change instead of redeclaring it:
+
+```elixir
+slice do
+  name "fsm"
+  initialize Aikido.FSM.Changes.Initialize
+end
+```
+
+`initialize` accepts a change module or `{Module, options}`. It runs with the
+create action’s caller scope, validations and authorization. It does not run on
+updates. A resource that explicitly declares `create :create` owns that action
+and its changes instead.
+
 ## Source organization
+
+Built-in features use one folder and namespace. For example, `Aikido.FSM.Slice`
+lives at `lib/aikido/fsm/slice.ex`, beside `actions/transition.ex`,
+`signals/transition.ex` and `changes/initialize.ex`. AI and team extensions live
+at `Aikido.AI.Extension` and `Aikido.Team.Extension`; their supporting modules stay
+within the same feature folders. Agent, slice and domain extensions follow the
+same `Extension` convention.
 
 Each distinct action has its own native implementation module, such as
 `Aikido.AiReact.Actions.Ask`. Its route binds that module directly. Shared
@@ -372,6 +394,12 @@ or a map restricted to `fields`. `list` explicitly enumerates live snapshots and
 accepts `filter`, `sort`, `offset` and `limit`. Snapshots are taken independently;
 they do not provide a transaction across processes. Native Ash defaults apply to
 arguments, including defaulted values passed as nil.
+
+Inspect/list materialize snapshots through native Ash argument casting, retaining
+resource types for mounted slices and readonly attributes. They do not run create
+changes or write records to the resource's independent data layer. The public
+command authorizes the read; its private projection retains caller scope without
+introducing another authorization boundary.
 
 The public command runs in the caller's process and sends a signal to the agent.
 The reducer runs as a separate native Ash action inside AgentServer. Each is an

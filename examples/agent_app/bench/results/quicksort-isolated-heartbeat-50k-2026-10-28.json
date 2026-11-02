@@ -1,0 +1,53 @@
+{
+  "sdk_commit": "dd4d1aa3bb27a641523aa8415ac21cbc8540b019",
+  "date": "2026-10-28",
+  "method": "One real 50000-agent run, capture disabled, four schedulers, periodic 30s saves, eight data shards and a separate native one-shard heartbeat store. Data store is a consistent SQLite backup of the accumulated playground store, containing 479093 deletion tombstones before the run. A separate benchmark prefix avoids activating existing stored agents. Heartbeat timings sampled once per second through native LifecycleManager metrics; maxima describe sampled completed writes, not every write. No watchdog deadlines changed.",
+  "result": {
+    "io": {
+      "cancelled_write_bytes": 0,
+      "rchar": 7363167672,
+      "read_bytes": 224403456,
+      "syscr": 2259939,
+      "syscw": 6957664,
+      "wchar": 14741801301,
+      "write_bytes": 13986018420
+    },
+    "size": 50000,
+    "sync": {
+      "mode": "periodic",
+      "interval_ms": 30000
+    },
+    "schedulers": 4,
+    "seed": [
+      42,
+      43,
+      44
+    ],
+    "errors": [],
+    "inspector": false,
+    "ekv_shards": 8,
+    "root_id": "01a18464-5e4d-703d-b83b-85614707ff57",
+    "sorted_correctly": true,
+    "sort_ms": 91991.578,
+    "child_retirement_ms": 91.099,
+    "root_stop_ms": 126.969,
+    "children_at_result": 2,
+    "agents_started": 50000,
+    "display_nodes": 50000,
+    "display_completed": 50000,
+    "display_failed": 0,
+    "remaining_agents": 0,
+    "saved_agent_snapshots": 0,
+    "local_agents": 0,
+    "peak_memory_bytes": 1998233552,
+    "peak_writer_queue": 912,
+    "heartbeat_isolated": true,
+    "heartbeat_store": "AgentExamples.Quicksort.Bench.Scale.HeartbeatStore",
+    "heartbeat_max_age_ms": 10025,
+    "heartbeat_max_put_ms": 90,
+    "heartbeat_unavailable_samples": 0,
+    "canary_writes": 497,
+    "canary_max_ms": 2985.784,
+    "canary_errors": []
+  }
+}

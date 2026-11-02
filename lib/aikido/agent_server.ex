@@ -501,8 +501,8 @@ defmodule Aikido.AgentServer do
 
   - `:target` — recipient PID (default `self()`)
   - `:once` — boolean, if true unsubscribe after first non-`:skip` fire (default `false`)
-  - `:timeout` — ms to wait for the registration reply
-    (default `Defaults.agent_server_call_timeout_ms/0`)
+  - `:timeout` — milliseconds to wait for registration (default 5,000)
+  - `:capture_actions?` — retain native action spans for execution inspection (default `true`); set false for display-only subscriptions
 
   ## Returns
 
@@ -517,15 +517,14 @@ defmodule Aikido.AgentServer do
            Spark.Options.validate(opts,
              target: [type: :pid, default: self()],
              once: [type: :boolean, default: false],
-             timeout: [
-               type: :non_neg_integer,
-               default: Defaults.agent_server_call_timeout_ms()
-             ]
+             capture_actions?: [type: :boolean, default: true],
+             timeout: [type: :non_neg_integer, default: Defaults.agent_server_call_timeout_ms()]
            ),
          {:ok, pid} <- resolve(server) do
       GenServer.call(
         pid,
-        {:subscribe, pattern, selector, options[:target], self(), options[:once]},
+        {:subscribe, pattern, selector, options[:target], self(), options[:once],
+         options[:capture_actions?]},
         options[:timeout]
       )
     end
@@ -1002,7 +1001,7 @@ defmodule Aikido.AgentServer do
   end
 
   def handle_call(
-        {:subscribe, pattern, selector, target, caller_pid, once?},
+        {:subscribe, pattern, selector, target, caller_pid, once?, capture_actions?},
         _from,
         %State{} = state
       )
@@ -1019,7 +1018,8 @@ defmodule Aikido.AgentServer do
           selector: selector,
           target: target,
           monitor_ref: monitor_ref,
-          once: once?
+          once: once?,
+          capture_actions?: capture_actions?
         }
 
         {:reply, {:ok, sub_ref},
@@ -1474,6 +1474,11 @@ defmodule Aikido.AgentServer do
 
   defp build_signal_metadata(state, signal) do
     %{
+      capture_actions?:
+        Aikido.Inspector.capturing?(state) ||
+          Enum.any?(state.signal_subscribers, fn {_, entry} ->
+            Map.get(entry, :capture_actions?, true)
+          end),
       agent_id: state.id,
       agent_module: state.agent_module,
       signal_type: signal.type,

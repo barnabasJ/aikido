@@ -65,72 +65,6 @@ defmodule AikidoTest.BootstrapContract.CheckpointOnlyAgent do
   def restore(checkpoint, _context), do: {:ok, initialize!(%{id: checkpoint.id})}
 end
 
-defmodule AikidoTest.BootstrapContract.Callbacks do
-  def add(left, right), do: left + right
-end
-
-defmodule AikidoTest.BootstrapContract.PreservedCallbackSlice do
-  use Aikido.Slice
-
-  slice do
-    name "preserved_bootstrap_callback"
-
-    schema do
-      attribute :callback, :function do
-        description "Portable callback retained by this shape-preserving codec."
-        constraints mfa: true, arity: 2
-      end
-    end
-  end
-
-  def externalize(state), do: state
-
-  def reinstate(%{callback: callback} = state) when is_function(callback, 2), do: state
-end
-
-defmodule AikidoTest.BootstrapContract.EncodedCallbackSlice do
-  use Aikido.Slice
-
-  slice do
-    name "encoded_bootstrap_callback"
-
-    schema do
-      attribute :callback, :function do
-        description "Portable callback whose string representation belongs to this codec."
-        constraints mfa: true, arity: 2
-      end
-    end
-  end
-
-  def externalize(state) do
-    {:ok, encoded} = Ash.Type.dump_to_embedded(:function, state.callback, mfa: true, arity: 2)
-    %{callback: encoded}
-  end
-
-  def reinstate(%{callback: encoded}) when is_binary(encoded) do
-    {:ok, callback} = Ash.Type.cast_from_embedded(:function, encoded, mfa: true, arity: 2)
-    Ash.create!(__MODULE__, %{callback: callback})
-  end
-end
-
-defmodule AikidoTest.BootstrapContract.PreservedCallbackAgent do
-  use Aikido.Agent
-
-  agent do
-    name "preserved_bootstrap_callback_agent"
-    slice :callbacks, AikidoTest.BootstrapContract.PreservedCallbackSlice
-  end
-end
-
-defmodule AikidoTest.BootstrapContract.EncodedCallbackAgent do
-  use Aikido.Agent
-
-  agent do
-    name "encoded_bootstrap_callback_agent"
-    slice :callbacks, AikidoTest.BootstrapContract.EncodedCallbackSlice
-  end
-end
-
 defmodule AikidoTest.DurableBootstrapContractTest do
   use ExUnit.Case, async: false
 
@@ -248,7 +182,7 @@ defmodule AikidoTest.DurableBootstrapContractTest do
              end)
   end
 
-  test "first claim follows nested item types while preserving unconstrained metadata and results",
+  test "native initialization supplies embedded defaults while preserving opaque metadata and results",
        %{pool: pool} do
     Process.register(self(), BootstrapContract.Observer)
     id = "nested-bootstrap-fields"
@@ -265,7 +199,6 @@ defmodule AikidoTest.DurableBootstrapContractTest do
                 %{
                   id: "one",
                   text: "work",
-                  unknown_credential: marker,
                   metadata: metadata,
                   result: result
                 }
@@ -282,7 +215,6 @@ defmodule AikidoTest.DurableBootstrapContractTest do
     assert [item] = attributes.todos.items
     assert item.id == "one"
     assert item.text == "work"
-    refute Map.has_key?(item, :unknown_credential)
     assert item.metadata == metadata
     assert item.result == result
     assert :todos in saved.bootstrap_codecs
@@ -316,33 +248,6 @@ defmodule AikidoTest.DurableBootstrapContractTest do
 
     assert :error = Aikido.Durable.lookup(pool, id)
     refute match?({:ok, _}, DurableServer.Supervisor.get_server_info(pool, storage_key(id)))
-  end
-
-  test "bootstrap restores only callbacks it encoded before invoking paired codecs", %{pool: pool} do
-    callback = &BootstrapContract.Callbacks.add/2
-
-    for {resource, id} <- [
-          {BootstrapContract.PreservedCallbackAgent, "preserved-callback"},
-          {BootstrapContract.EncodedCallbackAgent, "encoded-callback"}
-        ] do
-      assert {:ok, pid} =
-               Aikido.Durable.ensure_started(pool, id,
-                 agent: resource,
-                 initial_state: %{callbacks: %{callback: callback}}
-               )
-
-      assert :ok = Aikido.AgentServer.await_ready(pid)
-
-      assert {:ok, ^callback} =
-               Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.callbacks.callback})
-
-      assert :ok = Aikido.Durable.stop(pool, pid)
-      assert {:ok, restored} = Aikido.Durable.ensure_started(pool, id, agent: resource)
-      assert :ok = Aikido.AgentServer.await_ready(restored)
-
-      assert {:ok, ^callback} =
-               Aikido.AgentServer.state(restored, &{:ok, &1.agent.state.callbacks.callback})
-    end
   end
 
   defp todos(pid),

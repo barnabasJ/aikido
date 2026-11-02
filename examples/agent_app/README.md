@@ -2,7 +2,15 @@
 
 A standalone OTP app using the Aikido checkout two directories above it. Its
 `AgentExamples.Agents` Ash domain is the public interface to agent and team resources.
-No database, network services, or model API keys are required.
+No external database, network services, or model API keys are required.
+
+The example app directly selects the EKV cleanup optimization from
+[`barnabasJ/ekv`](https://github.com/barnabasJ/ekv/pull/1), commit
+`648a3db4e1f788acde88a75a3f59c4f55213e58c`. This is an unmerged fork change
+for review; it avoids the periodic cleanup scans measured in the large Quicksort
+runs. Aikido itself retains an optional released EKV version range. To compare
+against released EKV, replace the example app's Git dependency with
+`{:ekv, "~> 0.4", override: true}` and resolve dependencies again.
 
 Start the browser playground from this directory:
 
@@ -118,11 +126,7 @@ spawn dynamic workers in the same tree. The nearest team's `add_member` action
 manages creation, with the selected agent recorded as `owner`. Agents need no
 spawning slice or additional signal declaration. Stopping the root stops every descendant.
 
-The hook-request page uses the portable `&AgentExamples.Playground.request/2`
-callback. Each ask supplies the browser/run identity in `metadata`; the callback
-reads `context.event.metadata` to route the card. Checkpoints retain the exported
-function reference without capturing browser state. Pending UI cards and waiting
-Lua executions remain temporary application state.
+Lua hooks call the application-owned `approvals.review` AshLua action. The action uses the native actor scope for browser ownership and waits in the hook task. Hooks persist Lua source and serializable surface configuration only, with no Elixir callback field.
 
 Runs belong to a signed browser session and survive navigation and reloads.
 They are held in memory until you stop them or stop the server. The Stop button

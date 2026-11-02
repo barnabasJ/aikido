@@ -1,5 +1,7 @@
 defmodule AgentExamples.VerifiedTeam.EvidenceWorker do
   @moduledoc "Checks a focused assignment and returns evidence to its coordinating team."
+  require AgentExamples.VerifiedTeam.EvidenceClient
+
   use Ash.Resource,
     domain: AgentExamples.Agents,
     extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]

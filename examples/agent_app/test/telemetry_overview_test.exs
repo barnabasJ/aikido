@@ -24,6 +24,31 @@ defmodule AgentExamples.TelemetryOverviewTest do
     assert render(page) =~ "Retained while this application is running"
   end
 
+  test "signal charts retain throughput and bounded duration quantiles from native agent telemetry" do
+    agent = AgentExamples.Agents.counter_start!()
+    on_exit(fn -> AgentExamples.Agents.counter_stop(agent) end)
+    for _ <- 1..5, do: AgentExamples.Agents.counter_add!(agent, %{amount: 1})
+    send(Observations, :sample_signals)
+    snapshot = Observations.snapshot()
+    assert List.last(snapshot.signal_series).throughput > 0
+    assert is_number(List.last(snapshot.signal_series).median_ms)
+    assert is_number(List.last(snapshot.signal_series).p95_ms)
+    for _ <- 1..130, do: send(Observations, :sample_signals)
+    assert length(Observations.snapshot().signal_series) == 120
+    {:ok, page, _} = live(build_conn(), "/dashboard/aikido")
+    assert has_element?(page, "#signal-throughput-chart svg[role=img]")
+    assert has_element?(page, "#signal-duration-chart", "Median (upper bound)")
+    assert has_element?(page, "#signal-duration-chart", "p95 (upper bound)")
+  end
+
+  test "duration quantiles distinguish idle intervals and values outside the supported range" do
+    alias AgentExamples.Telemetry.SignalSeries
+    assert SignalSeries.quantile(%{}, 0.5) == nil
+    assert SignalSeries.quantile(%{100 => 50, 1000 => 45, :overflow => 5}, 0.5) == 0.1
+    assert SignalSeries.quantile(%{100 => 50, 1000 => 45, :overflow => 5}, 0.95) == 1.0
+    assert SignalSeries.quantile(%{:overflow => 1}, 0.5) == nil
+  end
+
   test "native request telemetry retains durations and usage while excluding payloads and keys" do
     before = Observations.snapshot()
     context = request_context()
@@ -104,5 +129,11 @@ defmodule AgentExamples.TelemetryOverviewTest do
       api_key: "private-provider-key",
       messages: [ReqLLM.Context.user("private-request-prompt")]
     )
+  end
+
+  test "the connected dashboard schedules updates within one second" do
+    socket = %Phoenix.LiveView.Socket{transport_pid: self(), assigns: %{__changed__: %{}}}
+    assert {:ok, _socket} = AgentExamplesWeb.TelemetryPage.mount(%{}, %{}, socket)
+    assert_receive :refresh_aikido, 1_500
   end
 end

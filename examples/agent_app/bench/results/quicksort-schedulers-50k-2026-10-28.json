@@ -1,0 +1,245 @@
+{
+  "sdk_commit": "dd4d1aa3bb27a641523aa8415ac21cbc8540b019",
+  "date": "2026-10-28",
+  "method": "Two sequential fixed-seed50000-agent sorts in one VM with8total normal schedulers, changing schedulers_online4then8. Captureoff; isolated native heartbeat store; native periodic30s; eight data shards. The private accumulated data store started as a consistent copy of the playground store and had already completed one isolation validation. Native msacc covers each sort; one-second samples include scheduler wall-time deltas, processed-signal totals, run queues, data writer queues and heartbeat timings.",
+  "limits": [
+    "Single sequential comparison; caches and store metadata accumulate. No statistically stable scaling claim.",
+    "Normal schedulers busy includes BEAM execution, GC and runtime work; microstate categories are native aggregate thread accounting, not per-function call traces.",
+    "The user-observed earlier live dip was not sampled with these instruments; these runs establish scheduler saturation and storage stalls but do not identify its exact cause.",
+    "Native store-canary deadline failures remain failures; the8scheduler overall health gate failed despite correct agent completion."
+  ],
+  "elapsed_reduction_percent": 29.507705356382765,
+  "runs": [
+    {
+      "io": {
+        "cancelled_write_bytes": 0,
+        "rchar": 7532026817,
+        "read_bytes": 147780960,
+        "syscr": 2289146,
+        "syscw": 6927431,
+        "wchar": 14715582632,
+        "write_bytes": 13921974676
+      },
+      "size": 50000,
+      "sync": {
+        "mode": "periodic",
+        "interval_ms": 30000
+      },
+      "schedulers": 4,
+      "seed": [
+        42,
+        43,
+        44
+      ],
+      "errors": [],
+      "inspector": false,
+      "ekv_shards": 8,
+      "root_id": "01a1846d-0298-7c5b-a65b-c4662973873d",
+      "sorted_correctly": true,
+      "sort_ms": 93116.329,
+      "child_retirement_ms": 0.002,
+      "root_stop_ms": 126.841,
+      "children_at_result": 0,
+      "agents_started": 50000,
+      "display_nodes": 50000,
+      "display_completed": 50000,
+      "display_failed": 0,
+      "remaining_agents": 0,
+      "saved_agent_snapshots": 0,
+      "local_agents": 0,
+      "peak_memory_bytes": 2130097528,
+      "peak_writer_queue": 856,
+      "heartbeat_isolated": true,
+      "heartbeat_store": "AgentExamples.Quicksort.Bench.Scale.HeartbeatStore",
+      "heartbeat_max_age_ms": 10097,
+      "heartbeat_max_put_ms": 318,
+      "heartbeat_unavailable_samples": 0,
+      "canary_writes": 483,
+      "canary_max_ms": 2826.869,
+      "canary_errors": [],
+      "microstate_percentages": {
+        "async": {
+          "emulator": 0.0,
+          "port": 0.0,
+          "aux": 0.0,
+          "check_io": 0.0,
+          "gc": 0.0,
+          "other": 0.0,
+          "sleep": 100.0
+        },
+        "aux": {
+          "emulator": 0.0,
+          "port": 0.0,
+          "aux": 0.5017,
+          "check_io": 0.5389,
+          "gc": 0.0,
+          "other": 0.0005,
+          "sleep": 98.9588
+        },
+        "dirty_cpu_scheduler": {
+          "emulator": 0.001,
+          "port": 0.0,
+          "aux": 0.0,
+          "check_io": 0.0,
+          "gc": 0.182,
+          "other": 0.0895,
+          "sleep": 99.7276
+        },
+        "dirty_io_scheduler": {
+          "emulator": 21.6185,
+          "port": 0.0,
+          "aux": 0.0,
+          "check_io": 0.0,
+          "gc": 0.0,
+          "other": 11.3907,
+          "sleep": 66.9908
+        },
+        "poll": {
+          "emulator": 0.0,
+          "port": 0.0,
+          "aux": 0.0,
+          "check_io": 0.0,
+          "gc": 0.0,
+          "other": 0.0,
+          "sleep": 100.0
+        },
+        "scheduler": {
+          "emulator": 87.8549,
+          "port": 0.0,
+          "aux": 0.8035,
+          "check_io": 0.558,
+          "gc": 8.9451,
+          "other": 0.9751,
+          "sleep": 0.8634
+        }
+      },
+      "benchmark_health_gate_passed": true
+    },
+    {
+      "io": {
+        "cancelled_write_bytes": 0,
+        "rchar": 9271828597,
+        "read_bytes": 643908388,
+        "syscr": 2615387,
+        "syscw": 6690917,
+        "wchar": 14178858365,
+        "write_bytes": 13669808132
+      },
+      "size": 50000,
+      "sync": {
+        "mode": "periodic",
+        "interval_ms": 30000
+      },
+      "schedulers": 8,
+      "seed": [
+        42,
+        43,
+        44
+      ],
+      "errors": [],
+      "inspector": false,
+      "ekv_shards": 8,
+      "root_id": "01a1846e-7253-7a1d-a9e1-85f5e5665efa",
+      "sorted_correctly": true,
+      "sort_ms": 65639.837,
+      "child_retirement_ms": 59.631,
+      "root_stop_ms": 109.429,
+      "children_at_result": 1,
+      "agents_started": 50000,
+      "display_nodes": 50000,
+      "display_completed": 50000,
+      "display_failed": 0,
+      "remaining_agents": 0,
+      "saved_agent_snapshots": 0,
+      "local_agents": 0,
+      "peak_memory_bytes": 1840851680,
+      "peak_writer_queue": 704,
+      "heartbeat_isolated": true,
+      "heartbeat_store": "AgentExamples.Quicksort.Bench.Scale.HeartbeatStore",
+      "heartbeat_max_age_ms": 10059,
+      "heartbeat_max_put_ms": 113,
+      "heartbeat_unavailable_samples": 0,
+      "canary_writes": 399,
+      "canary_max_ms": 3001.053,
+      "canary_errors": [
+        {
+          "shard": 6,
+          "outcome": "{:probe_failure, :exit, {:timeout, {GenServer, :call, [AgentExamples.Quicksort.Bench.Scale.Store_ekv_replica_6, {:update, \"scale-canary/6/5\", #Function<9.30967084/1 in EKV.put/4>, [timeout: 2000]}, 3000]}}}",
+          "latency_ms": 3001.053
+        },
+        {
+          "shard": 7,
+          "outcome": "{:probe_failure, :exit, {:timeout, {GenServer, :call, [AgentExamples.Quicksort.Bench.Scale.Store_ekv_replica_7, {:update, \"scale-canary/7/12\", #Function<9.30967084/1 in EKV.put/4>, [timeout: 2000]}, 3000]}}}",
+          "latency_ms": 3000.953
+        },
+        {
+          "shard": 6,
+          "outcome": "{:probe_failure, :exit, {:timeout, {GenServer, :call, [AgentExamples.Quicksort.Bench.Scale.Store_ekv_replica_6, {:update, \"scale-canary/6/5\", #Function<9.30967084/1 in EKV.put/4>, [timeout: 2000]}, 3000]}}}",
+          "latency_ms": 3001.012
+        },
+        {
+          "shard": 7,
+          "outcome": "{:probe_failure, :exit, {:timeout, {GenServer, :call, [AgentExamples.Quicksort.Bench.Scale.Store_ekv_replica_7, {:update, \"scale-canary/7/12\", #Function<9.30967084/1 in EKV.put/4>, [timeout: 2000]}, 3000]}}}",
+          "latency_ms": 3000.941
+        }
+      ],
+      "microstate_percentages": {
+        "async": {
+          "emulator": 0.0,
+          "port": 0.0,
+          "aux": 0.0,
+          "check_io": 0.0,
+          "gc": 0.0,
+          "other": 0.0,
+          "sleep": 100.0
+        },
+        "aux": {
+          "emulator": 0.0,
+          "port": 0.0,
+          "aux": 0.693,
+          "check_io": 0.4537,
+          "gc": 0.0,
+          "other": 0.065,
+          "sleep": 98.7883
+        },
+        "dirty_cpu_scheduler": {
+          "emulator": 0.0015,
+          "port": 0.0,
+          "aux": 0.0,
+          "check_io": 0.0,
+          "gc": 0.2666,
+          "other": 0.1278,
+          "sleep": 99.604
+        },
+        "dirty_io_scheduler": {
+          "emulator": 49.0167,
+          "port": 0.0,
+          "aux": 0.0,
+          "check_io": 0.0,
+          "gc": 0.0,
+          "other": 11.1827,
+          "sleep": 39.8006
+        },
+        "poll": {
+          "emulator": 0.0,
+          "port": 0.0,
+          "aux": 0.0,
+          "check_io": 0.0,
+          "gc": 0.0,
+          "other": 0.0,
+          "sleep": 100.0
+        },
+        "scheduler": {
+          "emulator": 67.1106,
+          "port": 0.0,
+          "aux": 0.8074,
+          "check_io": 0.4194,
+          "gc": 6.681,
+          "other": 4.2872,
+          "sleep": 20.6944
+        }
+      },
+      "benchmark_health_gate_passed": false
+    }
+  ]
+}

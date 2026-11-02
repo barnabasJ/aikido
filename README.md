@@ -178,6 +178,10 @@ use a stable directory for deployment, for example
 `{Aikido, durable: [data_dir: "priv/agent-state"]}`. Local storage requires the
 same disk to remain available.
 
+EKV is an optional dependency of Aikido. Applications using the default local
+backend should declare `{:ekv, "~> 0.4"}` in their dependencies. Applications
+using another DurableServer backend can omit EKV.
+
 With `persistence :permanent` (the default), `stop` retains the snapshot and
 starting the same ID restores it. `persistence :temporary` deletes it on stop.
 Both checkpoint while running. Synchronization defaults to periodic dirty-state saves

@@ -1,0 +1,23 @@
+Recorded baseline  to /mnt/storage/sandbox/jido/examples/agent_app/bench/results/quicksort-ownership-100k-2026-10-25.jsonl
+
+14:51:25.840 [warning] [EKV Elixir.AgentExamples.Store] shard 0 WAL checkpoint is starved wal_bytes=4773230152 log_frames=1158551 checkpointed_frames=1158541 busy=0
+
+14:52:53.199 [warning] [EKV Elixir.AgentExamples.Store] shard 0 WAL checkpoint is starved wal_bytes=6069340952 log_frames=1473141 checkpointed_frames=1473140 busy=0
+
+14:53:16.265 [warning] [EKV Elixir.AgentExamples.Store] shard 0 WAL checkpoint is starved wal_bytes=6419763432 log_frames=1558195 checkpointed_frames=1558186 busy=0
+
+14:53:30.242 [warning] [EKV Elixir.AgentExamples.Store] shard 0 WAL checkpoint is starved wal_bytes=6641361752 log_frames=1611981 checkpointed_frames=1611963 busy=0
+
+14:56:20.890 [warning] [EKV Elixir.AgentExamples.Store] shard 0 WAL checkpoint is starved wal_bytes=9131226072 log_frames=2216317 checkpointed_frames=2216305 busy=0
+
+14:56:31.441 [warning] [EKV Elixir.AgentExamples.Store] shard 0 WAL checkpoint is starved wal_bytes=9300084272 log_frames=2257302 checkpointed_frames=2257286 busy=0
+
+14:56:42.866 [warning] [EKV Elixir.AgentExamples.Store] shard 0 WAL checkpoint is starved wal_bytes=9444416112 log_frames=2292334 checkpointed_frames=2292313 busy=0
+** (exit) exited in: GenServer.call(AgentExamples.Playground, {:stop, "quicksort-benchmark:01a17350-06d7-74d2-b3b6-3a8acb8c60e7", "quicksort"}, 15000)
+    ** (EXIT) time out
+    (elixir 1.19.5) lib/gen_server.ex:1142: GenServer.call/3
+    bench/quicksort_repeated.exs:66: AgentExamples.Quicksort.Bench.Repeated."-run/1-after$^2/0-0-"/4
+    bench/quicksort_repeated.exs:42: AgentExamples.Quicksort.Bench.Repeated.run/1
+    bench/quicksort_repeated.exs:359: (file)
+[os_mon] memory supervisor port (memsup): Erlang has closed
+[os_mon] cpu supervisor port (cpu_sup): Erlang has closed

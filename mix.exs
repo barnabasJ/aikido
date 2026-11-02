@@ -41,27 +41,7 @@ defmodule Aikido.MixProject do
       ],
       argus: [
         analyses: [:all],
-        engine: :require,
-        ignore: [
-          findings: [
-            # One selected durable PID serializes its own state. Caller-module
-            # fan-in is not a global shared-PID or latency measurement. This
-            # exclusion also hides future blocking defects at handle_call/3;
-            # reassess it if dispatch ownership or synchronous work changes.
-            {:blocking, {Aikido.AgentServer, :handle_call, 3}},
-            # Original DurableServer traps exits and hosts this delegated callback.
-            # Forced kill, failed boot and shutdown time limits are not covered.
-            # This hides future shutdown findings here; recheck if hosting or
-            # the termination delegation chain changes.
-            {:shutdown, {Aikido.AgentServer, :terminate, 2}},
-            # This sink generates interfaces from trusted compile-time Spark DSL
-            # names and resource action declarations. It is not a request parser.
-            # This hides future unsafe-input findings in this function; remove
-            # the exclusion before adding untrusted or runtime DSL authoring.
-            {:unsafe_input,
-             {Aikido.Domain.Extension.Transformers.Build, :public_action_interface, 2}}
-          ]
-        ]
+        engine: :require
       ]
     ]
   end
@@ -158,7 +138,7 @@ defmodule Aikido.MixProject do
   defp deps do
     [
       {:durable_server, "~> 0.1.6"},
-      {:ekv, "~> 0.4"},
+      {:ekv, "~> 0.4", optional: true},
       # Aikido Deps
       {:ash, "~> 3.37 and >= 3.37.2"},
       {:ash_ai, "~> 1.3"},

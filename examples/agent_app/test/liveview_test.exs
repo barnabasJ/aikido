@@ -30,6 +30,81 @@ defmodule AgentExamplesWeb.LiveViewTest do
     %{conn: build_conn() |> Plug.Test.init_test_session(%{browser_id: owner})}
   end
 
+  test "capture can detach and resume without losing history or stopping the example", %{
+    conn: conn
+  } do
+    {:ok, view, _} = live(conn, "/examples/counter")
+    owner = start(view, "counter")
+    assert :ok = Playground.command(owner, "counter", :add, %{amount: 1})
+
+    await(
+      owner,
+      "counter",
+      &Enum.any?(&1.inspection.entries, fn entry ->
+        entry.execution.signal.type == "counter.add"
+      end)
+    )
+
+    view |> element("button[phx-click=toggle_inspection_capture]") |> render_click()
+    render_async(view, 15_000)
+    disabled = Playground.get(owner, "counter")
+    refute disabled.capture_enabled
+    assert disabled.inspection_ref == nil
+    assert has_element?(view, "button", "Enable capture")
+    assert disabled.inspection.entries != []
+
+    {:ok, off_ref} =
+      Aikido.AgentServer.subscribe(
+        disabled.record.pid,
+        "counter.add",
+        fn _runtime, event ->
+          {:ok, Aikido.Inspector.History.ActionTelemetry.actions(event.signal.id)}
+        end,
+        once: true,
+        capture_actions?: false
+      )
+
+    captures = [
+      {Aikido.Inspector.History, :project_agent_state, 2},
+      {Aikido.Inspector.History, :project_event, 2}
+    ]
+
+    for mfa <- captures, do: :erlang.trace_pattern(mfa, true, [:call_count])
+
+    try do
+      assert :ok = Playground.command(owner, "counter", :add, %{amount: 2})
+
+      assert_receive {:aikido_subscription, ^off_ref, %{result: {:ok, %{count: 0, entries: []}}}},
+                     5000
+
+      for mfa <- captures, do: assert(:erlang.trace_info(mfa, :call_count) == {:call_count, 0})
+    after
+      for mfa <- captures, do: :erlang.trace_pattern(mfa, false, [:call_count])
+    end
+
+    await(owner, "counter", &(&1.snapshot.own.count == 3))
+    assert Playground.get(owner, "counter").inspection == disabled.inspection
+    refute Map.has_key?(Playground.get(owner, "counter").snapshot, :inspected_state)
+
+    GenServer.stop(view.pid)
+    {:ok, view, _} = live(conn, "/examples/counter")
+    assert has_element?(view, "button", "Enable capture")
+    view |> element("button[phx-click=toggle_inspection_capture]") |> render_click()
+    render_async(view, 15_000)
+    assert Playground.get(owner, "counter").inspection_ref
+    assert :ok = Playground.command(owner, "counter", :add, %{amount: 4})
+    await(owner, "counter", &(&1.inspection.sequence > disabled.inspection.sequence))
+    assert Playground.get(owner, "counter").snapshot.own.count == 7
+    assert hd(Playground.get(owner, "counter").inspection.entries).execution.action_count > 0
+    assert has_element?(view, "button", "Disable capture")
+
+    :ok = Playground.set_capture(owner, "counter", false)
+    :ok = Playground.stop(owner, "counter")
+    {:ok, restarted} = Playground.start(owner, "counter", %{})
+    refute restarted.capture_enabled
+    assert restarted.inspection_ref == nil
+  end
+
   test "Lua controls match each example's supported tool modes", %{conn: conn} do
     optional = ~w(assistant hooks conversation hook-requests researcher reviewer)
     required = ~w(research-team lua-permissions)
@@ -589,7 +664,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
   test "a Lua request can be answered from LiveView and the same script continues", %{conn: conn} do
     {:ok, view, html} = live(conn, "/examples/hook-requests")
-    assert html =~ "aikido.request"
+    assert html =~ "approvals.review"
     owner = start(view, "hook-requests", %{mode: "offline", lua: "true"})
     view |> form("#prompt-form", %{query: "Signals carry results"}) |> render_submit()
     await(owner, "hook-requests", &(&1.requests != [] && &1.snapshot.ai.iteration == 0))
@@ -645,7 +720,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     refute has_element?(view, "#hook-requests button[phx-click=respond]")
   end
 
-  test "the application callback owns timeouts and caller-exit cleanup", %{conn: conn} do
+  test "the application action owns timeouts and caller-exit cleanup", %{conn: conn} do
     {:ok, view, _} = live(conn, "/examples/hook-requests")
     owner = start(view, "hook-requests", %{mode: "offline"})
     view |> form("#prompt-form", %{query: "Wait for a response"}) |> render_submit()
@@ -677,7 +752,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     await(owner, "hook-requests", &(length(&1.requests) == 1))
   end
 
-  test "stopping the example closes its callback's pending UI card", %{conn: conn} do
+  test "stopping the example closes its action's pending UI card", %{conn: conn} do
     {:ok, view, _} = live(conn, "/examples/hook-requests")
     owner = start(view, "hook-requests", %{mode: "offline"})
     view |> form("#prompt-form", %{query: "Wait for a response"}) |> render_submit()
@@ -1184,6 +1259,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     view |> form("#quicksort-form", %{size: "32"}) |> render_submit()
     await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
     assert Playground.get(owner, "quicksort").snapshot.own.result == Enum.to_list(1..32)
+    await_sort_count(view, Playground.get(owner, "quicksort").snapshot.own.topic, 32)
     assert has_element?(view, "#sorting-tree #sort-metrics")
     assert has_element?(view, ".sort-visualization .sort-sidebar > #sort-depth-breakdown")
     assert has_element?(view, ".sort-sidebar > #sort-depth-breakdown + #signal-activity")
@@ -1204,7 +1280,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     GenServer.stop(view.pid)
     {:ok, reconnected, _} = live(conn, "/examples/quicksort")
     render_async(reconnected, 15_000)
-    assert has_element?(reconnected, "#sort-spawned", "32 agents spawned")
+    await_sort_count(reconnected, Playground.get(owner, "quicksort").snapshot.own.topic, 32)
     assert has_element?(reconnected, ".sort-diagram circle[data-status=completed]")
 
     old_id = Playground.get(owner, "quicksort").record.id
@@ -1230,11 +1306,10 @@ defmodule AgentExamplesWeb.LiveViewTest do
 
     send(
       reconnected.pid,
-      {:quicksort_progress, old_topic, %{branch: "stale", status: :completed}}
+      {:quicksort_progress_batch, old_topic, [%{branch: "stale", status: :completed}]}
     )
 
-    send(reconnected.pid, :flush_quicksort_progress)
-    assert has_element?(reconnected, "#sort-spawned", "32 agents spawned")
+    await_sort_count(reconnected, Playground.get(owner, "quicksort").snapshot.own.topic, 32)
   end
 
   test "quicksort can restart after its root has already stopped", %{conn: conn} do
@@ -1301,6 +1376,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     view |> form("#quicksort-form", %{size: "32"}) |> render_submit()
     await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
     assert Playground.get(owner, "quicksort").snapshot.own.result == Enum.to_list(1..32)
+    await_sort_count(view, Playground.get(owner, "quicksort").snapshot.own.topic, 32)
   end
 
   test "quicksort coalesces progress bursts without regressing terminal nodes", %{conn: conn} do
@@ -1310,15 +1386,30 @@ defmodule AgentExamplesWeb.LiveViewTest do
     await(owner, "quicksort", &(&1.snapshot.own.status == :completed), 15_000)
     topic = Playground.get(owner, "quicksort").snapshot.own.topic
     node = %{branch: "rootL", id: "display-test", status: :completed, count: 1, pivot: 1}
-    send(view.pid, {:quicksort_progress, topic, node})
-    for _ <- 1..1000, do: send(view.pid, {:quicksort_progress, topic, %{node | status: :idle}})
-    send(view.pid, :flush_quicksort_progress)
+
+    send(
+      view.pid,
+      {:quicksort_progress_batch, topic,
+       [%{node | branch: "root"}, node | List.duplicate(%{node | status: :idle}, 1000)]}
+    )
+
     assert has_element?(view, "#sort-spawned", "2 agents spawned")
 
     assert has_element?(
              view,
              ".sort-diagram g[phx-value-branch=rootL] circle[data-status=completed]"
            )
+  end
+
+  defp await_sort_count(view, topic, count) do
+    Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
+
+    if has_element?(view, "#sort-spawned", "#{count} agents spawned") do
+      :ok
+    else
+      assert_receive {:quicksort_progress_batch, ^topic, _nodes}, 5_000
+      await_sort_count(view, topic, count)
+    end
   end
 
   defp start(view, slug, options \\ %{}) do

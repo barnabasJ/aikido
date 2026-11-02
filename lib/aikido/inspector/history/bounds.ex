@@ -3,11 +3,11 @@ defmodule Aikido.Inspector.History.Bounds do
   @marker "[size limit]"
 
   def limit(value, budget \\ 32_768) do
-    if byte_size(Jason.encode!(value)) <= budget, do: value, else: trim(value, budget)
+    if encoded_size(value) <= budget, do: value, else: trim(value, budget)
   end
 
   defp trim(value, budget) when is_map(value) do
-    overhead = value |> Map.new(fn {key, _} -> {key, nil} end) |> Jason.encode!() |> byte_size()
+    overhead = value |> Map.new(fn {key, _} -> {key, nil} end) |> encoded_size()
 
     if budget < overhead + map_size(value) * 16 do
       @marker
@@ -30,4 +30,6 @@ defmodule Aikido.Inspector.History.Bounds do
     do: String.slice(value, 0, div(budget - 24, 6)) <> "… [truncated]"
 
   defp trim(_value, _budget), do: @marker
+
+  defp encoded_size(value), do: value |> Jason.encode_to_iodata!() |> IO.iodata_length()
 end

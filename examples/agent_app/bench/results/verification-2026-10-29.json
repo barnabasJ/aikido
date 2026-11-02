@@ -1,0 +1,165 @@
+{
+  "root-tests": [
+    {
+      "cwd": "/mnt/storage/sandbox/jido",
+      "command": [
+        "mix",
+        "test"
+      ],
+      "env": "test",
+      "exit": 0,
+      "elapsed_s": 162.94075979001354,
+      "log": "/mnt/storage/sandbox/jido/tmp/full-qa-2026-10-29/root-tests-0.log"
+    }
+  ],
+  "example-tests": [
+    {
+      "cwd": "/mnt/storage/sandbox/jido/examples/agent_app",
+      "command": [
+        "mix",
+        "test"
+      ],
+      "env": "test",
+      "exit": 0,
+      "elapsed_s": 45.34087043098407,
+      "log": "/mnt/storage/sandbox/jido/tmp/full-qa-2026-10-29/example-tests-0.log"
+    }
+  ],
+  "date": "2026-10-29",
+  "root_suite": {
+    "passed": 1036,
+    "failed": 0,
+    "exclusions": []
+  },
+  "example_suite": {
+    "passed": 165,
+    "failed": 0,
+    "exclusions": []
+  },
+  "example_fixes": [
+    "Register VerifiedTeam and its EvidenceWorker through the existing native agent-domain DSL.",
+    "Remove a stale route-list expectation for a NotificationsLive module absent from this checkout; actual mounted route/catalog coverage is unchanged.",
+    "Align the cycle-guard expectation with the documented native {period,limit} error contract."
+  ],
+  "remaining_checks": [],
+  "maintenance_profile": "The accumulated-store failure and successful patched 50k run are recorded separately in quicksort-maintenance-failure-2026-10-29.json and ekv-cleanup-optimization-2026-10-29.json.",
+  "quality": [
+    {
+      "cwd": "/mnt/storage/sandbox/jido",
+      "command": [
+        "mix",
+        "format",
+        "/mnt/storage/sandbox/jido/examples/agent_app/bench/quicksort.exs",
+        "/mnt/storage/sandbox/jido/examples/agent_app/test/liveview_test.exs",
+        "/mnt/storage/sandbox/jido/test/aikido/ai_react/context_handoff_test.exs",
+        "/mnt/storage/sandbox/jido/examples/agent_app/test/native_evidence_test.exs",
+        "/mnt/storage/sandbox/jido/examples/agent_app/lib/agent_examples/verified_team/evidence_client.ex",
+        "/mnt/storage/sandbox/jido/examples/agent_app/lib/agent_examples/catalog.ex",
+        "/mnt/storage/sandbox/jido/test/aikido/ai_react/tool_scope_isolation_test.exs",
+        "/mnt/storage/sandbox/jido/examples/agent_app/lib/agent_examples/verified_team/client.ex",
+        "/mnt/storage/sandbox/jido/examples/agent_app/lib/agent_examples/verified_team/evidence_worker.ex",
+        "/mnt/storage/sandbox/jido/examples/agent_app/lib/agent_examples/verified_team/commands/request_evidence.ex",
+        "/mnt/storage/sandbox/jido/examples/agent_app/bench/support/quicksort_storage_trace.exs",
+        "/mnt/storage/sandbox/jido/lib/aikido/ai_react/directives/tool_exec.ex",
+        "/mnt/storage/sandbox/jido/test/aikido/ai_react/todo_continuation_test.exs",
+        "/mnt/storage/sandbox/jido/examples/agent_app/lib/agent_examples/verified_team/commands/complete_evidence.ex"
+      ],
+      "env": "test",
+      "exit": 0,
+      "elapsed_s": 0.5648431869922206,
+      "log": "/mnt/storage/sandbox/jido/tmp/full-qa-2026-10-29/quality-0.log"
+    },
+    {
+      "cwd": "/mnt/storage/sandbox/jido",
+      "command": [
+        "mix",
+        "format",
+        "--check-formatted"
+      ],
+      "env": "test",
+      "exit": 0,
+      "elapsed_s": 1.0657258049759548,
+      "log": "/mnt/storage/sandbox/jido/tmp/full-qa-2026-10-29/quality-1.log"
+    },
+    {
+      "cwd": "/mnt/storage/sandbox/jido",
+      "command": [
+        "mix",
+        "compile",
+        "--warnings-as-errors"
+      ],
+      "env": "dev",
+      "exit": 0,
+      "elapsed_s": 117.26350756600732,
+      "log": "/mnt/storage/sandbox/jido/tmp/full-qa-2026-10-29/quality-2.log"
+    },
+    {
+      "cwd": "/mnt/storage/sandbox/jido",
+      "command": [
+        "mix",
+        "credo",
+        "--min-priority",
+        "high"
+      ],
+      "env": "dev",
+      "exit": 0,
+      "elapsed_s": 1.8169108139991295,
+      "log": "/mnt/storage/sandbox/jido/tmp/full-qa-2026-10-29/quality-3.log"
+    },
+    {
+      "cwd": "/mnt/storage/sandbox/jido",
+      "command": [
+        "mix",
+        "argus",
+        "--all",
+        "--fail-above",
+        "0"
+      ],
+      "env": "dev",
+      "exit": 1,
+      "elapsed_s": 47.95153352699708,
+      "log": "/mnt/storage/sandbox/jido/tmp/full-qa-2026-10-29/quality-4.log"
+    },
+    {
+      "cwd": "/mnt/storage/sandbox/jido",
+      "command": [
+        "mix",
+        "dialyzer"
+      ],
+      "env": "dev",
+      "exit": 0,
+      "elapsed_s": 245.48261494399048,
+      "log": "/mnt/storage/sandbox/jido/tmp/full-qa-2026-10-29/quality-5.log"
+    }
+  ],
+  "argus_review": [
+    {
+      "finding": "High synchronous fan-in",
+      "review": "AgentServer is a callback implementation hosted once per durable agent. Callers address distinct PIDs. Native 50k runs demonstrate independent processes; module-level fan-in does not establish a singleton bottleneck."
+    },
+    {
+      "finding": "terminate skipped without trap_exit",
+      "review": "DurableServer.init enables trap_exit and delegates termination. The focused four-case native suite passed, including external runtime shutdown and exactly one cleanup delivery."
+    },
+    {
+      "finding": "Dynamic atom generation",
+      "review": "Name generation is inside the native Spark domain transformer, from validated DSL agent and Ash action names during compilation; no request payload reaches this path. No suppression or gate weakening was applied."
+    }
+  ],
+  "external_shutdown_regression": {
+    "passed": 4,
+    "failed": 0,
+    "includes": "Actual runtime supervisor shutdown with a trap_exit assertion and exactly one lifecycle cleanup delivery."
+  },
+  "quality_gate": "Argus exits 1 on three reviewed warnings; every other executed gate passed. No suppression was added.",
+  "final_format_check": {
+    "command": "mix format --check-formatted",
+    "exit": 0,
+    "date": "2026-10-29"
+  },
+  "ekv_cleanup_regressions": {
+    "passed": 2,
+    "failed": 0,
+    "log": "tmp/quicksort-writers-2026-10-29/ekv-upstream/cleanup-regression.log"
+  }
+}

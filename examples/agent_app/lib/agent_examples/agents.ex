@@ -5,6 +5,7 @@ defmodule AgentExamples.Agents do
     extensions: [Aikido.Domain.Extension, AshAi, AshLua.Domain]
 
   resources do
+    resource AgentExamples.InteractiveAssistant.Approvals
     resource AgentExamples.LuaAssistant.Tools
     resource AgentExamples.AdaptiveAssistant.ToolPreparation
     resource AgentExamples.VerifiedAssistant.Verification
@@ -15,6 +16,10 @@ defmodule AgentExamples.Agents do
   end
 
   lua do
+    namespace "approvals" do
+      action :review, AgentExamples.InteractiveAssistant.Approvals, :review, labels: [:approvals]
+    end
+
     namespace "session" do
       action :whoami, AgentExamples.LuaAssistant.Tools, :whoami
     end
@@ -74,7 +79,7 @@ defmodule AgentExamples.Agents do
     agent :adaptive, AgentExamples.AdaptiveAssistant
     agent :verified, AgentExamples.VerifiedAssistant
     agent :verified_team, AgentExamples.VerifiedTeam
-    agent :evidence_worker, AgentExamples.VerifiedTeam.EvidenceWorker
+    agent :team_evidence_worker, AgentExamples.VerifiedTeam.EvidenceWorker
     agent :resilient, AgentExamples.ResilientAssistant
     agent :recoverable, AgentExamples.RecoverableAssistant
     agent :conversation, AgentExamples.ConversationAssistant

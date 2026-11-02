@@ -4,7 +4,7 @@ defmodule Aikido.Inspector.History do
 
   Project live state with `project_agent_state/2` and execution events with
   `project_event/2` inside an observer selector. These functions apply native
-  resource sensitivity metadata, redact credential and runtime fields, and
+  resource sensitivity metadata, redact exact known credential and runtime keys, and
   bound retained values. Native Ash action spans are captured through telemetry.
 
   `record/6` appends a transition to a history from `new/0`. Its snapshot contains
@@ -13,7 +13,7 @@ defmodule Aikido.Inspector.History do
   100 transitions; applications own its lifetime and selected-event state.
   """
   @limit 100
-  @private ~w(api_key authorization password secret access_token refresh_token actor tenant context __meta__ __metadata__ tracer_context prepared_tools tool_context run_scope tools_resume action_input changeset query private_vars)
+  @private ~w(api_key apikey authorization password secret access_token refresh_token execution_credential actor tenant context __meta__ __metadata__ tracer_context prepared_tools tool_context run_scope tools_resume action_input changeset query private_vars)
   @private_names MapSet.new(@private)
 
   def project_state(state) do
@@ -181,8 +181,5 @@ defmodule Aikido.Inspector.History do
   defp key_name(key) when is_binary(key) or is_atom(key), do: to_string(key)
   defp key_name(key), do: inspect(key, limit: 5)
 
-  defp private?(name) do
-    MapSet.member?(@private_names, String.downcase(name)) ||
-      Regex.match?(~r/api.?key|secret|password|authorization|credential|(^|_)token($|_)/i, name)
-  end
+  defp private?(name), do: MapSet.member?(@private_names, String.downcase(name))
 end

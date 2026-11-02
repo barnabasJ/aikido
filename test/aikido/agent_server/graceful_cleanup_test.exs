@@ -114,6 +114,16 @@ defmodule AikidoTest.GracefulCleanupTest do
     assert %{cleanups: 0} = Domain.cleanup_inspect!(replacement)
   end
 
+  test "runtime supervisor shutdown reaches the delegated cleanup callback" do
+    agent = Domain.cleanup_start!(%{})
+    assert Process.info(agent.pid, :trap_exit) == {:trap_exit, true}
+    subscription = observe_cleanup(agent.pid)
+
+    assert :ok = Aikido.stop()
+    LifecycleWait.await_down(agent.pid)
+    assert_single_cleanup(subscription)
+  end
+
   defp observe_cleanup(pid) do
     {:ok, subscription} =
       Aikido.AgentServer.subscribe(pid, "aikido.agent.lifecycle.stopping", fn runtime ->

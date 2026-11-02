@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-29",
+  "sdk_commit": "dd4d1aa3bb27a641523aa8415ac21cbc8540b019",
+  "method": "Native50k workload on the private accumulated store,8schedulers8datawriters, isolatedheartbeat, periodic30ssaves and actualplayground30000msEKVmaintenance. NativeBEAMcall/return wall-clock spans captured afterbootstrap; strictverification failed and retainedthefailure.",
+  "sorted_correctly": false,
+  "started": 50000,
+  "completed_nodes": 49500,
+  "elapsed_ms": 71898.467,
+  "processing_or_activation_error_events": 5367,
+  "canary_failures": 54,
+  "remaining_benchmark_snapshots": 2734,
+  "remaining_live_agents": 0,
+  "heartbeat_max_put_ms": 135,
+  "peak_data_writer_queue": 1820,
+  "maintenance": {
+    "{EKV.Store, :find_expired, 2}": {
+      "calls": 16,
+      "max_ms": 0.699,
+      "summed_wall_ms": 2.9919999999999995
+    },
+    "{EKV.Store, :purge_orphan_keyrefs, 1}": {
+      "calls": 32,
+      "max_ms": 3898.393,
+      "summed_wall_ms": 31257.791000000005
+    },
+    "{EKV.Store, :purge_tombstones, 2}": {
+      "calls": 16,
+      "max_ms": 3899.81,
+      "summed_wall_ms": 29692.332000000006
+    },
+    "{EKV.Store, :purge_expired, 2}": {
+      "calls": 16,
+      "max_ms": 9684.152,
+      "summed_wall_ms": 76227.252
+    },
+    "{EKV.Store, :purge_orphan_paxos, 1}": {
+      "calls": 16,
+      "max_ms": 9522.797,
+      "summed_wall_ms": 74867.49499999998
+    },
+    "{EKV.Store, :truncate_oplog_batch, 3}": {
+      "calls": 246,
+      "max_ms": 468.879,
+      "summed_wall_ms": 24761.946000000007
+    }
+  },
+  "conclusion": "Repeated cleanup scans monopolized individual data writers forseconds, while the independentheartbeat remainedresponsive. ExpiryDELETEusesKVprimary-keylookupsdrivenbyallCASkeys instead of the existingexpiryindex; inactiveCAScleanupscansrowstorage; orphanreferencesarescannedtwicepermaintenancecycle. A candidateSQL/index/no-opcleanuppatchispreparedbutnotyetvalidated/deployed."
+}

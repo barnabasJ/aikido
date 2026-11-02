@@ -1,0 +1,182 @@
+{
+  "date": "2026-10-25",
+  "url": "http://localhost:4043/examples/quicksort",
+  "store": "/mnt/storage/sandbox/jido/examples/agent_app/_build/browser-100k-eight-20261025",
+  "shards": 8,
+  "recursive_inspector": true,
+  "runs": [
+    {
+      "root_id": "01a173a2-1c44-71e0-88fa-6621d1d4880f",
+      "spawned": 100000,
+      "completed": 100000,
+      "sorting": 0,
+      "depth": 43,
+      "seconds_to_result": 131.583,
+      "live_agents_after": 1,
+      "io_tasks_after": 0,
+      "saved_agent_snapshots_after": 1,
+      "screenshot": "/tmp/aikido-browser-100k-completed.png"
+    },
+    {
+      "root_id": "01a173a5-1521-786a-900e-f059626fc2d5",
+      "spawned": 100000,
+      "completed": 100000,
+      "sorting": 0,
+      "depth": 39,
+      "seconds_to_result": 134.729,
+      "live_agents_after": 1,
+      "io_tasks_after": 0,
+      "screenshot": "/tmp/aikido-browser-100k-second-completed.png"
+    }
+  ],
+  "restart_ready_observed_within_ms": 7555,
+  "after_second": {
+    "call_cast_dispatches": 599996,
+    "signals_processed": 1670263,
+    "signal_errors": 0,
+    "directives_dispatched": 2799974,
+    "directive_exceptions": 0,
+    "local_agents": 1,
+    "registered_agents": 1,
+    "io_tasks": 0,
+    "beam_processes": 684,
+    "beam_memory_mib": 689.7,
+    "run_queue": 0,
+    "shards": [
+      {
+        "shard": "shard_0.db",
+        "live_agent_snapshots": 0,
+        "live_runtime_records": 0,
+        "wal_bytes": 67108864
+      },
+      {
+        "shard": "shard_1.db",
+        "live_agent_snapshots": 1,
+        "live_runtime_records": 0,
+        "wal_bytes": 67108864
+      },
+      {
+        "shard": "shard_2.db",
+        "live_agent_snapshots": 0,
+        "live_runtime_records": 0,
+        "wal_bytes": 67108864
+      },
+      {
+        "shard": "shard_3.db",
+        "live_agent_snapshots": 0,
+        "live_runtime_records": 1,
+        "wal_bytes": 67108864
+      },
+      {
+        "shard": "shard_4.db",
+        "live_agent_snapshots": 0,
+        "live_runtime_records": 0,
+        "wal_bytes": 67108864
+      },
+      {
+        "shard": "shard_5.db",
+        "live_agent_snapshots": 0,
+        "live_runtime_records": 0,
+        "wal_bytes": 67108864
+      },
+      {
+        "shard": "shard_6.db",
+        "live_agent_snapshots": 0,
+        "live_runtime_records": 0,
+        "wal_bytes": 67108864
+      },
+      {
+        "shard": "shard_7.db",
+        "live_agent_snapshots": 0,
+        "live_runtime_records": 0,
+        "wal_bytes": 67108864
+      }
+    ]
+  },
+  "notes": [
+    "UI elapsed measurements include browser progress delivery, not just the root selector.",
+    "Restart latency is an observation upper bound, not an exact server duration.",
+    "Counts are observations from the isolated preview; the research run on 4042 was preserved."
+  ],
+  "after_stop": {
+    "local_agents": 0,
+    "registered_agents": 0,
+    "io_tasks": 0,
+    "beam_processes": 681,
+    "beam_memory_mib": 653.6,
+    "shards": [
+      {
+        "shard": "shard_0.db",
+        "agent_snapshots": 0,
+        "integrity": [
+          [
+            "ok"
+          ]
+        ]
+      },
+      {
+        "shard": "shard_1.db",
+        "agent_snapshots": 0,
+        "integrity": [
+          [
+            "ok"
+          ]
+        ]
+      },
+      {
+        "shard": "shard_2.db",
+        "agent_snapshots": 0,
+        "integrity": [
+          [
+            "ok"
+          ]
+        ]
+      },
+      {
+        "shard": "shard_3.db",
+        "agent_snapshots": 0,
+        "integrity": [
+          [
+            "ok"
+          ]
+        ]
+      },
+      {
+        "shard": "shard_4.db",
+        "agent_snapshots": 0,
+        "integrity": [
+          [
+            "ok"
+          ]
+        ]
+      },
+      {
+        "shard": "shard_5.db",
+        "agent_snapshots": 0,
+        "integrity": [
+          [
+            "ok"
+          ]
+        ]
+      },
+      {
+        "shard": "shard_6.db",
+        "agent_snapshots": 0,
+        "integrity": [
+          [
+            "ok"
+          ]
+        ]
+      },
+      {
+        "shard": "shard_7.db",
+        "agent_snapshots": 0,
+        "integrity": [
+          [
+            "ok"
+          ]
+        ]
+      }
+    ]
+  }
+}

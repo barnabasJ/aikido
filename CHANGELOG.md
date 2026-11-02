@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+- Encode and decode the snapshot resource identifier through native Ash atom
+  types, retaining rejection of unknown resource atoms.
+
+- Make EKV optional for library consumers. The example app directly selects the
+  reviewable EKV cleanup fork while its periodic maintenance optimization is
+  evaluated. Other applications can select released EKV or another backend.
+
+- Register the background-evidence team and worker in the example domain, making
+  their native lifecycle and signal actions available to the complete demo suite.
+
+- Isolate playground node heartbeats in a native EKV store so agent snapshot
+  traffic cannot queue ahead of liveness writes. Keep watchdog deadlines unchanged
+  and record heartbeat latency and age in the scale benchmark.
+
+- Skip native inspector action recording unless an attachment or subscription
+  requests it; display-only playground subscriptions opt out. Add bounded
+  signal-throughput and approximate median/p95 duration graphs to the dashboard.
+
+- Add playground inspector capture controls that detach expensive state/event
+  projection while keeping recorded history and normal example updates available.
+  Preserve the setting across example restarts and add spacing to empty history.
+
+- Coalesce queued playground tree and inspector refreshes so large runs do not
+  replay a stale display backlog. Retain completion timing independently of the
+  browser, and add a staged scale/storage benchmark verifying 50,000 agents.
+
+- Reduce inspector capture work for empty and untyped maps and measure JSON size
+  without flattening the encoded value. Keep native sensitive-field redaction and
+  exact known credential keys, replacing heuristic credential-name regex checks.
+
+
+- Bound AI attempt preflight registration and the following owner-state read by
+  one monotonic window, clamped to any absolute deadline. Report preflight budget
+  expiry as timeout. Preserve relative per-attempt retry/work windows, the public
+  subscription default and asynchronous unsubscribe behavior.
+
 - Deliver terminal task results without a top-level inherited deadline. Preserve
   the original deadline inside task correlation metadata while allowing an idle
   receiver to start under its own execution policy. Existing active runs retain
@@ -43,10 +79,17 @@
   original startup stack or authority data. Direct durable activation errors
   retain their existing transport shape.
 
-- Preserve optional nil callback fields across fresh bootstrap projection and
-  paired codecs. Before final native create, omit nil only for embedded Function
-  attributes whose declared default is nil and which allow nil. Retain native
-  required/default validation and reject raw stored callback strings as input.
+- Remove recursive bootstrap schema and callback traversal. Use flat native Ash
+  map projection and safe term transport before the claim, with native state
+  initialization afterward. Paired owner codecs may distinguish fresh input from
+  snapshots through `reinstate/2`. Hook state contains Lua scripts and serializable
+  settings only; application interactions use the scoped AshLua surface. Preserve credential-safe codec
+  failures without raw fallbacks and native omitted/nil behavior. Initialized
+  snapshots remain supported; unfinished envelopes with retired generic callback
+  bookkeeping reject explicitly with a saved-identity reset instruction.
+- Remove per-hook Elixir request callbacks and callback serialization. Expose the
+  request/response example's approval as a scoped native application action called
+  from Lua. Persist hook source and serializable settings through normal Ash types.
 
 - Add opt-in `todo_continuation: :nudge_once`: remind once about unchanged open
   blocking work, then report a typed `CompletedUnclosed` error on a consecutive
@@ -70,14 +113,10 @@
   as their identity changes. Validate saved identity against the actual claim;
   preserve custom native scope protocols and fresh Todo defaults without
   applying saved-run interruption. Reject unsafe checkpoint-only bootstrap input
-  instead of persisting a fallback. Project nested typed bootstrap fields
-  without creating embedded resources before the claim; retain opaque map and
-  term data. Restore saved identities in anonymous pools without requiring a
-  fresh agent module or fresh attributes. Encode declared portable callbacks
-  with native Ash function codecs during fresh bootstrap, recording only actual
-  conversions and reversing them before the owning path codec. Preserve
-  codec-owned representations and reject stored capture strings supplied as
-  fresh function input.
+  instead of persisting a fallback. Restore saved identities in anonymous pools
+  without requiring a fresh agent module or fresh attributes. Owning codecs use
+  native Ash types for serialization; state validation stays in native
+  initialization after the claim.
 
 - Preserve topology startup and cleanup failures in a native typed error with
   the stable agent ID, instead of a generic unknown error. Forward the current

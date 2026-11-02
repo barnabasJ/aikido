@@ -34,8 +34,6 @@ Sole exception: middleware may stage `ctx.agent` for I/O purposes. The state/eff
 - Use slice/agent `externalize/1` and `reinstate/1`, or agent-wide `checkpoint/2` and `restore/2`, to control snapshot content. Keep credentials and runtime-only functions out of persistent configuration. A different Ash data layer does not persist the live process state.
 - Pass native Ash actor, tenant, context and tracer options at command boundaries. Authorization of a public command does not replace authorization of its reducer or tools. Use Ash tracing APIs to transfer context into custom asynchronous work.
 - Supply AI tools as Ash AI tool names plus native `tool_options`. Setup builds the tool descriptions and registry once per run; callers do not wrap executable callbacks.
-- Tool-loop warnings and optional cycle limits compare successful batches by sorted `{name, arguments, content}` entries. Join content to calls by call ID, but exclude IDs from the fingerprint. Keep duplicate entries. A failed or mixed batch affects only the consecutive-error streak and leaves successful-cycle history and its prior signature unchanged. Store only bounded SHA-256 fingerprints in that history.
-- Tool execution timeouts return an `ai.react.tool.completed` envelope with the current request and call IDs. A reducer accepts it only while that call ID is pending and has not already supplied a result. A later timeout for a completed call leaves a distinct pending call in the same request unchanged; reused provider call IDs across turns are outside this guarantee.
 
 ## Library Author Patterns
 - Give every `field` and `attribute` a purpose-specific `description` inside its `do … end` block, including in examples and fixtures.

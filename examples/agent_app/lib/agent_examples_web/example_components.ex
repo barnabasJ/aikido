@@ -5,26 +5,27 @@ defmodule AgentExamplesWeb.ExampleComponents do
   import AgentExamplesWeb.Components
   import AgentExamplesWeb.Markdown
 
-  attr :example, :map, required: true
-  attr :definitions, :list, required: true
-  attr :run, :any, required: true
-  attr :starting, :boolean, required: true
-  attr :error, :any, required: true
-  attr :mode, :string, required: true
-  attr :provider, :string, required: true
-  attr :key_configured, :boolean, required: true
-  attr :provider_saved, :boolean, required: true
-  attr :model, :string, required: true
-  attr :lua, :boolean, required: true
-  attr :system_prompt, :string, required: true
-  attr :max_iterations, :any, required: true
-  attr :inspection_selected, :any, default: nil
-  attr :inspection_view, :string, default: "diff"
-  attr :inspection_format, :string, default: "tree"
-  attr :inspection_filter, :string, default: ""
-  attr :show_signal_activity, :boolean, default: true
-  slot :inner_block, required: true
-  slot :inspector
+  attr(:example, :map, required: true)
+  attr(:definitions, :list, required: true)
+  attr(:run, :any, required: true)
+  attr(:starting, :boolean, required: true)
+  attr(:error, :any, required: true)
+  attr(:mode, :string, required: true)
+  attr(:provider, :string, required: true)
+  attr(:key_configured, :boolean, required: true)
+  attr(:provider_saved, :boolean, required: true)
+  attr(:model, :string, required: true)
+  attr(:lua, :boolean, required: true)
+  attr(:system_prompt, :string, required: true)
+  attr(:max_iterations, :any, required: true)
+  attr(:capture_pending, :boolean, default: false)
+  attr(:inspection_selected, :any, default: nil)
+  attr(:inspection_view, :string, default: "diff")
+  attr(:inspection_format, :string, default: "tree")
+  attr(:inspection_filter, :string, default: "")
+  attr(:show_signal_activity, :boolean, default: true)
+  slot(:inner_block, required: true)
+  slot(:inspector)
 
   def page(assigns) do
     ~H"""
@@ -55,7 +56,24 @@ defmodule AgentExamplesWeb.ExampleComponents do
         view={@inspection_view}
         format={@inspection_format}
         filter={@inspection_filter}
-      />
+      >
+        <:controls>
+          <button
+            type="button"
+            class="inspector-live inspector-capture"
+            style="margin-left:0"
+            phx-click="toggle_inspection_capture"
+            aria-pressed={to_string(@run && @run.capture_enabled)}
+            disabled={@capture_pending}
+            title="Detach inspector capture to skip state/event projection. Recorded history remains available."
+          >{cond do
+            @capture_pending -> "Changing capture…"
+            @run && @run.capture_enabled -> "Disable capture"
+            true -> "Enable capture"
+          end}</button>
+          <span :if={@run && !@run.capture_enabled}>Capture off</span>
+        </:controls>
+      </Aikido.Inspector.Components.inspector>
       <AgentExamplesWeb.Components.SourceDefinitions.source_definitions {assigns} />
       <footer class="page-footer">
         Instances stay available while the server runs. Stop an example to release its processes.
@@ -64,7 +82,7 @@ defmodule AgentExamplesWeb.ExampleComponents do
     """
   end
 
-  attr :run, :any, required: true
+  attr(:run, :any, required: true)
 
   def delegated_work(assigns) do
     tasks = if assigns.run, do: collect_delegated_tasks(assigns.run.snapshot, []), else: []
@@ -101,7 +119,7 @@ defmodule AgentExamplesWeb.ExampleComponents do
     own_tasks ++ child_tasks
   end
 
-  attr :run, :any, required: true
+  attr(:run, :any, required: true)
 
   def signal_activity(assigns) do
     ~H"""
@@ -120,11 +138,11 @@ defmodule AgentExamplesWeb.ExampleComponents do
     """
   end
 
-  attr :run, :any, required: true
-  attr :orchestrator, :boolean, default: false
-  attr :compact, :boolean, default: false
-  attr :tree_states, :map, default: %{}
-  slot :inner_block
+  attr(:run, :any, required: true)
+  attr(:orchestrator, :boolean, default: false)
+  attr(:compact, :boolean, default: false)
+  attr(:tree_states, :map, default: %{})
+  slot(:inner_block)
 
   def team_topology(assigns) do
     ~H"""
@@ -161,7 +179,7 @@ defmodule AgentExamplesWeb.ExampleComponents do
   defp result_text(nil), do: ""
   defp result_text(value), do: inspect(value)
 
-  attr :task, :map, required: true
+  attr(:task, :map, required: true)
 
   def delegated_task(assigns) do
     ~H"""

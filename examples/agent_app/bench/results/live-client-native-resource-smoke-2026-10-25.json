@@ -1,0 +1,10 @@
+{
+  "status": "completed",
+  "date": "2026-10-25T17:48:52.259430Z",
+  "provider": "zai_coder",
+  "model": "glm-5.3-flash",
+  "elapsed_ms": 16658,
+  "answer": "The text 'native resource snapshot' contains 3 words (24 characters), and the result has been stamped with the \"runtime\" label.",
+  "model_turns": 3,
+  "snapshot_format": "ash-embedded-v2"
+}

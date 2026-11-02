@@ -53,6 +53,14 @@ defmodule Aikido.Inspector do
   def detach(ref), do: GenServer.call(__MODULE__, {:detach, ref})
 
   @doc false
+  def capturing?(runtime) do
+    :ets.whereis(@registry) != :undefined &&
+      Enum.any?(attachments(), fn {ref, attachment} -> member?(ref, attachment, runtime) end)
+  rescue
+    ArgumentError -> false
+  end
+
+  @doc false
   def observe(runtime, event) do
     if :ets.whereis(@registry) != :undefined do
       for {ref, attachment} <- attachments(), member?(ref, attachment, runtime) do

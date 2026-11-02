@@ -42,7 +42,16 @@ config :agent_examples, :store,
 
 config :aikido, :durable,
   scope_adapter: AgentExamples.DurableScope,
-  backend: {DurableServer.Backends.EKVStore, name: AgentExamples.Store, timeout: 60_000}
+  backend: {DurableServer.Backends.EKVStore, name: AgentExamples.Store, timeout: 60_000},
+  durable_options: [
+    heartbeat_backend:
+      {DurableServer.Backends.EKVStore,
+       name: AgentExamples.HeartbeatStore,
+       data_dir: Path.join(store_directory, "heartbeats"),
+       cluster_size: 1,
+       node_id: "local",
+       shards: 1}
+  ]
 
 config :ash, default_string_length_count: :codepoints
 config :phoenix, :filter_parameters, ["api_key"]

@@ -1,0 +1,31 @@
+{
+  "status": "Failed large-run attempt; no completed-run record was produced",
+  "size": 100000,
+  "requested_runs": 2,
+  "completed_run_records": 0,
+  "ekv_shards": 1,
+  "recursive_inspection": true,
+  "full_state_projection": true,
+  "failure": "Playground.stop call exceeded 15000 ms during cleanup. The original failure was masked by this after-block exception.",
+  "limits": "This does not establish whether sorting, retirement or restart first exceeded its deadline. The harness now logs these phases separately and preserves primary failures.",
+  "log": "quicksort-ownership-100k-2026-10-25.log",
+  "baseline": "quicksort-ownership-100k-2026-10-25.jsonl",
+  "store_preserved": "examples/agent_app/_build/quicksort-ownership-100k-20261025",
+  "post_exit_files": [
+    {
+      "name": "shard_0.db",
+      "logical_bytes": 248164352,
+      "allocated_bytes": 248168448
+    },
+    {
+      "name": "shard_0.db-shm",
+      "logical_bytes": 18382848,
+      "allocated_bytes": 18382848
+    },
+    {
+      "name": "shard_0.db-wal",
+      "logical_bytes": 9458889672,
+      "allocated_bytes": 9458896896
+    }
+  ]
+}

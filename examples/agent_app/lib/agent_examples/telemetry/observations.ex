@@ -7,7 +7,7 @@ defmodule AgentExamples.Telemetry.Observations do
   explicit metadata allowlist: no prompts, responses, credentials or error bodies.
   """
   use GenServer
-  alias AgentExamples.Telemetry.Usage
+  alias AgentExamples.Telemetry.{Usage, SignalSeries}
   @table __MODULE__
   @keys [
     :signals_sent,
@@ -54,7 +54,18 @@ defmodule AgentExamples.Telemetry.Observations do
       ] ++ for phase <- [:start, :stop, :exception, :retry], do: [:req_llm, :request, phase]
 
     :ok = :telemetry.attach_many(@table, events, &__MODULE__.handle_event/4, nil)
-    {:ok, %{started_at: DateTime.utc_now(), active: %{}, recent: [], usage: %{}, missing_cost: 0}}
+    series = SignalSeries.new()
+    Process.send_after(self(), :sample_signals, 1000)
+
+    {:ok,
+     %{
+       signals: series,
+       started_at: DateTime.utc_now(),
+       active: %{},
+       recent: [],
+       usage: %{},
+       missing_cost: 0
+     }}
   end
 
   @impl true
@@ -63,7 +74,8 @@ defmodule AgentExamples.Telemetry.Observations do
   def handle_event([:aikido, :agent_server, :signal, :sent], _, _, _),
     do: increment(:signals_sent)
 
-  def handle_event([:aikido, :agent_server, :signal, :stop], _, metadata, _) do
+  def handle_event([:aikido, :agent_server, :signal, :stop], measurements, metadata, _) do
+    SignalSeries.record(measurements[:duration])
     increment(:signals_processed)
     if Map.has_key?(metadata, :error), do: increment(:signal_errors)
   end
@@ -121,6 +133,7 @@ defmodule AgentExamples.Telemetry.Observations do
 
     snapshot =
       %{state | active: active}
+      |> Map.put(:signal_series, state.signals.points)
       |> Map.put(:active_count, map_size(state.active))
       |> Map.put(:totals, Map.new(:ets.tab2list(@table)))
 
@@ -188,6 +201,13 @@ defmodule AgentExamples.Telemetry.Observations do
   end
 
   @impl true
+  def handle_info(:sample_signals, state) do
+    [{:signals_processed, total}] = :ets.lookup(@table, :signals_processed)
+    series = SignalSeries.sample(state.signals, total)
+    Process.send_after(self(), :sample_signals, 1000)
+    {:noreply, %{state | signals: series}}
+  end
+
   def handle_info({:DOWN, monitor, :process, _, _}, state) do
     case Enum.find(state.active, fn {_, request} -> request.monitor == monitor end) do
       nil ->

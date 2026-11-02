@@ -282,12 +282,12 @@ defmodule AgentExamples.Catalog do
       tools: [:text_stats, :stamp],
       kind: :ai,
       description:
-        "Let a Lua hook call an application callback, wait for your answer, and continue the same script.",
+        "Let a Lua hook call a scoped application action, wait for your answer, and continue the same script.",
       detail:
         "Every new task asks for approval before its first model request or tool call. Approval applies only to that task and is never reused from conversation history. The Lua script interprets your response and decides whether to continue or stop. The agent stays responsive while the hook task waits. Requests expire after two minutes; stopping the example closes the wait. This experiment does not resume Lua tasks after a process restart.",
       flow: [
         "Lua request",
-        "Application callback → LiveView",
+        "Application action → LiveView",
         "Callback returns your answer",
         "Same Lua script continues"
       ]

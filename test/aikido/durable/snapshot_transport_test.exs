@@ -21,6 +21,17 @@ defmodule Aikido.Durable.SnapshotTransportTest do
     end
   end
 
+  test "unknown resource names are rejected without interning atoms" do
+    name = "Elixir.UnknownSnapshotResource." <> Ash.UUIDv7.generate()
+    assert {:error, _} = Ash.Type.cast_input(:atom, name)
+
+    assert_raise ArgumentError, ~r/snapshot path :resource/, fn ->
+      Snapshot.load(%{"format" => "ash-embedded-v2", "resource" => name, "payload" => ""})
+    end
+
+    assert {:error, _} = Ash.Type.cast_input(:atom, name)
+  end
+
   test "legacy transport retains inert terms, binary type representations and monitor identities" do
     value = %{
       binary: <<0, 255, 131>>,

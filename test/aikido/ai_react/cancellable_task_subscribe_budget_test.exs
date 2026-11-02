@@ -52,8 +52,8 @@ end
 defmodule Aikido.AiReact.CancellableTaskSubscribeBudgetTest do
   @moduledoc """
   Uses an actual suspended owner and observed queued registration to exercise
-  subscription budgets independently of host throughput. This covers registration;
-  the subsequent owner-state read keeps its existing default timeout.
+  subscription budgets independently of host throughput. This file covers registration.
+  Shared state-read budgets are covered in `cancellable_task_preflight_contract_test.exs`.
   """
   use AikidoTest.Case, async: true
 
@@ -142,7 +142,8 @@ defmodule Aikido.AiReact.CancellableTaskSubscribeBudgetTest do
       send(caller.pid, {:start_subscribe_budget_call, token})
       assert_queued_registration(owner, caller.pid)
 
-      assert {:exit, {:timeout, {GenServer, :call, [^owner, {:subscribe, _, _, _, _, _}, 5_000]}}} =
+      assert {:exit,
+              {:timeout, {GenServer, :call, [^owner, {:subscribe, _, _, _, _, _, _}, 5_000]}}} =
                Task.await(caller, 8_000)
     end)
   end
@@ -167,7 +168,8 @@ defmodule Aikido.AiReact.CancellableTaskSubscribeBudgetTest do
       send(caller.pid, {:start_subscribe_budget_call, token})
       assert_queued_registration(owner, caller.pid)
 
-      assert {:exit, {:timeout, {GenServer, :call, [^owner, {:subscribe, _, _, _, _, _}, 200]}}} =
+      assert {:exit,
+              {:timeout, {GenServer, :call, [^owner, {:subscribe, _, _, _, _, _, _}, 200]}}} =
                Task.await(caller, 5_000)
     end)
   end
@@ -202,8 +204,8 @@ defmodule Aikido.AiReact.CancellableTaskSubscribeBudgetTest do
       delivered = :erlang.trace_delivered(caller_pid)
       assert_receive {:trace_delivered, ^caller_pid, ^delivered}, 5_000
 
-      refute_received {:trace, ^caller_pid, :send, {:"$gen_call", _, {:subscribe, _, _, _, _, _}},
-                       ^owner}
+      refute_received {:trace, ^caller_pid, :send,
+                       {:"$gen_call", _, {:subscribe, _, _, _, _, _, _}}, ^owner}
 
       refute_received {:subscribe_budget_work_started, ^token, _}
       assert result == {:error, :timeout}
@@ -273,7 +275,8 @@ defmodule Aikido.AiReact.CancellableTaskSubscribeBudgetTest do
 
   defp assert_queued_registration(owner, caller) do
     assert_receive {:trace, ^owner, :receive,
-                    {:"$gen_call", _, {:subscribe, "ai.react.**", _, ^caller, ^caller, true}}},
+                    {:"$gen_call", _,
+                     {:subscribe, "ai.react.**", _, ^caller, ^caller, true, true}}},
                    5_000
   end
 

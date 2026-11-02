@@ -46,21 +46,6 @@ defmodule Aikido.TodoContinuationTest.Client do
   end
 end
 
-defmodule Aikido.TodoContinuationTest.DeliveryGate do
-  @moduledoc false
-
-  @spec wait(request :: map(), context :: map()) :: {:ok, map()} | {:error, :fixture_timeout}
-  def wait(_request, %{event: %{metadata: %{observer: observer}}} = context) do
-    send(observer, {:delivery_gate, self(), context})
-
-    receive do
-      {:release, decision} -> {:ok, decision}
-    after
-      10_000 -> {:error, :fixture_timeout}
-    end
-  end
-end
-
 defmodule Aikido.TodoContinuationTest.DeliveryClient do
   @moduledoc false
   @behaviour Aikido.AiReact.Client
@@ -279,7 +264,11 @@ defmodule Aikido.TodoContinuationTest do
         request_id: "task-result/work",
         metadata: %{}
       })
-      |> Aikido.Signal.put_ctx(%{actor: %{id: "worker"}, tenant: "org"})
+      |> Aikido.Signal.put_ctx(%{
+        actor: %{id: "worker"},
+        tenant: "org",
+        context: %{observer: self()}
+      })
 
     assert {:ok, [%{id: "work", status: :pending}]} =
              Aikido.AgentServer.call(pid, delivery, &{:ok, &1.agent.state.todos.items})
@@ -311,7 +300,11 @@ defmodule Aikido.TodoContinuationTest do
         request_id: "delivery",
         todo: %{id: "deadline", text: "expiring", timeout_ms: 10}
       })
-      |> Aikido.Signal.put_ctx(%{actor: %{id: "worker"}, tenant: "org"})
+      |> Aikido.Signal.put_ctx(%{
+        actor: %{id: "worker"},
+        tenant: "org",
+        context: %{observer: self()}
+      })
 
     assert {:ok, :blocked} =
              Aikido.AgentServer.call_until(pid, signal, "aikido.todo.**", fn runtime ->
@@ -337,7 +330,11 @@ defmodule Aikido.TodoContinuationTest do
         request_id: "delivery",
         todo: %{id: "work", text: "new work"}
       })
-      |> Aikido.Signal.put_ctx(%{actor: %{id: "worker"}, tenant: "org"})
+      |> Aikido.Signal.put_ctx(%{
+        actor: %{id: "worker"},
+        tenant: "org",
+        context: %{observer: self()}
+      })
 
     assert {:ok, {["new work"], ["work"]}} =
              Aikido.AgentServer.call(pid, signal, fn runtime ->
@@ -367,10 +364,10 @@ defmodule Aikido.TodoContinuationTest do
       hook_text = unquote(hook_text)
       assert {:ok, :accepted} = deliver_waiting(pid, delivered)
       assert_receive {:delivery_gate, gate, context}, 5_000
-      assert context.request_id == before.ai.request_id
+      assert context["request_id"] == before.ai.request_id
 
-      assert context.event.metadata.deliveries == [
-               %{request_id: "worker-delivery", metadata: %{source: "worker"}}
+      assert context["metadata"]["deliveries"] == [
+               %{"request_id" => "worker-delivery", "metadata" => %{"source" => "worker"}}
              ]
 
       assert {:ok, held} = delivery_state(pid)
@@ -440,7 +437,7 @@ defmodule Aikido.TodoContinuationTest do
           assert failed.ai.hooks_pending == %{}
           refute_received {:delivery_model, _, _, _}
 
-          # The application owns its callback wait. Complete that real callback
+          # The application owns its action wait. Complete that real action
           # after cancellation and observe its actual late result at the server.
           assert {:ok, subscription} =
                    Aikido.AgentServer.subscribe(
@@ -453,7 +450,7 @@ defmodule Aikido.TodoContinuationTest do
                    )
 
           monitor = Process.monitor(gate)
-          send(gate, {:release, %{decision: "continue", context: "late callback approval"}})
+          send(gate, {:release, %{decision: "continue", context: "late action approval"}})
           assert_receive {:DOWN, ^monitor, :process, ^gate, _}, 5_000
           assert_receive {:aikido_subscription, ^subscription, %{result: {:ok, unchanged}}}, 5_000
           assert unchanged == failed
@@ -493,7 +490,11 @@ defmodule Aikido.TodoContinuationTest do
 
         :message ->
           assert {:ok, :queued} =
-                   Aikido.AI.queue_message(pid, feedback, actor: %{id: "worker"}, tenant: "org")
+                   Aikido.AI.queue_message(pid, feedback,
+                     actor: %{id: "worker"},
+                     tenant: "org",
+                     context: %{observer: self()}
+                   )
       end
 
       assert_receive {:delivery_gate, first_gate, _}, 5_000
@@ -530,12 +531,13 @@ defmodule Aikido.TodoContinuationTest do
 
     assert {:ok, :queued} =
              Aikido.AI.queue_message(pid, "Queued feedback",
+               context: %{observer: self()},
                actor: %{id: "worker"},
                tenant: "org"
              )
 
     assert_receive {:delivery_gate, gate, context}, 5_000
-    assert context.request_id == before.ai.request_id
+    assert context["request_id"] == before.ai.request_id
     assert {:ok, held} = delivery_state(pid)
     assert_same_waiting_run(before, held)
     assert held.ai.hook_sequence == before.ai.hook_sequence + 1
@@ -581,9 +583,9 @@ defmodule Aikido.TodoContinuationTest do
     hook = %{
       name: "delivery gate",
       event: :before_model,
-      request: &Aikido.TodoContinuationTest.DeliveryGate.wait/2,
+      lua_options: [otp_app: :aikido, labels: [:hook_interactions]],
       script: """
-      local answer = aikido.request("approve.delivery", {})
+      local answer = assert(interactions.delivery_gate({input = {event = event}}))
       return answer
       """
     }
@@ -597,6 +599,7 @@ defmodule Aikido.TodoContinuationTest do
       |> Keyword.put(:client, Aikido.TodoContinuationTest.DeliveryClient)
       |> Keyword.put(:tools, [:test_add])
       |> Keyword.put(:hooks, [hook])
+      |> Keyword.update(:context, %{observer: observer}, &Map.put(&1, :observer, observer))
       |> Keyword.put(:metadata, %{
         observer: observer,
         aikido_deadline_at: System.system_time(:millisecond) + 300_000
@@ -627,7 +630,11 @@ defmodule Aikido.TodoContinuationTest do
         request_id: "worker-delivery",
         metadata: %{source: "worker"}
       })
-      |> Aikido.Signal.put_ctx(%{actor: %{id: "worker"}, tenant: "org"})
+      |> Aikido.Signal.put_ctx(%{
+        actor: %{id: "worker"},
+        tenant: "org",
+        context: %{observer: self()}
+      })
 
     Aikido.AgentServer.call(pid, signal, fn _ -> {:ok, :accepted} end)
   end

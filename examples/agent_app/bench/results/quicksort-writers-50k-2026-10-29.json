@@ -1,0 +1,105 @@
+{
+  "date": "2026-10-29",
+  "method": "Two serial fresh native EKV stores, one50k fixedseed sort each,8normal schedulers, captureoff, separate heartbeatstore. Eightlow-rate canarywriters for8shards and16for16shards. Native original benchmark GC default300000ms; this does not reproduce playground30000ms cleanup. Subsequent diagnostics correct this mismatch.",
+  "runs": [
+    {
+      "io": {
+        "cancelled_write_bytes": 0,
+        "rchar": 4555218267,
+        "read_bytes": 2082884,
+        "syscr": 1362529,
+        "syscw": 6494298,
+        "wchar": 13738712940,
+        "write_bytes": 13411598804
+      },
+      "size": 50000,
+      "sync": {
+        "mode": "periodic",
+        "interval_ms": 30000
+      },
+      "schedulers": 8,
+      "seed": [
+        42,
+        43,
+        44
+      ],
+      "errors": [],
+      "inspector": false,
+      "ekv_shards": 8,
+      "root_id": "01a1866b-7add-7e53-9b92-38b6939c821b",
+      "sorted_correctly": true,
+      "sort_ms": 46292.762,
+      "child_retirement_ms": 0.001,
+      "root_stop_ms": 135.944,
+      "children_at_result": 0,
+      "agents_started": 50000,
+      "display_nodes": 50000,
+      "display_completed": 50000,
+      "display_failed": 0,
+      "remaining_agents": 0,
+      "saved_agent_snapshots": 0,
+      "local_agents": 0,
+      "peak_memory_bytes": 2670283336,
+      "peak_writer_queue": 856,
+      "heartbeat_isolated": true,
+      "heartbeat_store": "AgentExamples.Quicksort.Bench.Scale.HeartbeatStore",
+      "heartbeat_max_age_ms": 9537,
+      "heartbeat_max_put_ms": 121,
+      "heartbeat_unavailable_samples": 0,
+      "canary_writes": 315,
+      "canary_max_ms": 1376.086,
+      "canary_errors": [],
+      "ekv_gc_interval_ms": 300000
+    },
+    {
+      "io": {
+        "cancelled_write_bytes": 0,
+        "rchar": 3215286613,
+        "read_bytes": 1447264,
+        "syscr": 1085999,
+        "syscw": 6394851,
+        "wchar": 13406223627,
+        "write_bytes": 13179265088
+      },
+      "size": 50000,
+      "sync": {
+        "mode": "periodic",
+        "interval_ms": 30000
+      },
+      "schedulers": 8,
+      "seed": [
+        42,
+        43,
+        44
+      ],
+      "errors": [],
+      "inspector": false,
+      "ekv_shards": 16,
+      "root_id": "01a1866c-61ed-7728-923b-908c96a4f8ff",
+      "sorted_correctly": true,
+      "sort_ms": 47361.202,
+      "child_retirement_ms": 0.002,
+      "root_stop_ms": 124.413,
+      "children_at_result": 0,
+      "agents_started": 50000,
+      "display_nodes": 50000,
+      "display_completed": 50000,
+      "display_failed": 0,
+      "remaining_agents": 0,
+      "saved_agent_snapshots": 0,
+      "local_agents": 0,
+      "peak_memory_bytes": 1741782712,
+      "peak_writer_queue": 114,
+      "heartbeat_isolated": true,
+      "heartbeat_store": "AgentExamples.Quicksort.Bench.Scale.HeartbeatStore",
+      "heartbeat_max_age_ms": 9709,
+      "heartbeat_max_put_ms": 111,
+      "heartbeat_unavailable_samples": 0,
+      "canary_writes": 832,
+      "canary_max_ms": 488.787,
+      "canary_errors": [],
+      "ekv_gc_interval_ms": 300000
+    }
+  ],
+  "conclusion": "16shards lowered writer queues and maxprobe latency without improving sort elapsed. Single run perconfiguration, not a stable scaling result."
+}

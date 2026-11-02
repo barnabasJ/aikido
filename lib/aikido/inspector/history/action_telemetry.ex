@@ -70,6 +70,11 @@ defmodule Aikido.Inspector.History.ActionTelemetry do
   end
 
   @doc false
+  def handle_event([:aikido, :agent_server, :signal, :start], _, %{capture_actions?: false}, _) do
+    Process.delete(@key)
+    :ok
+  end
+
   def handle_event([:aikido, :agent_server, :signal, :start], _, metadata, _) do
     register_domain(Ash.EmbeddableType.ShadowDomain)
     register_domain(Ash.Resource.Info.domain(metadata.agent_module) || Aikido.RuntimeDomain)

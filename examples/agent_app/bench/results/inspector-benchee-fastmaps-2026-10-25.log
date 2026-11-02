@@ -1,0 +1,69 @@
+==> aikido
+Compiling 124 files (.ex)
+Generated aikido app
+==> agent_examples
+Compiling 55 files (.ex)
+Generated agent_examples app
+
+15:14:03.727 [notice]     :alarm_handler: {:set, {{:disk_almost_full, ~c"/media/joba/Data"}, []}}
+
+15:14:03.737 [notice]     :alarm_handler: {:set, {:system_memory_high_watermark, []}}
+
+15:14:04.902 [info] [EKV AgentExamples.Store] started (shards=1)
+
+15:14:04.932 [info] starting Aikido.Default.DurableAgents: %{name: Aikido.Default.DurableAgents, prefix: "aikido/Elixir.Aikido.Default.DurableAgents/", hibernate_after: nil, storage_backend: DurableServer.Backends.EKVStore, sticky_placement_history_limit: 5, heartbeat_staleness_threshold_ms: 30000, delete_tombstone_delete_request_margin_ms: 30000, ets_table: :"durable_supervisor_Elixir.Aikido.Default.DurableAgents", heartbeat_backend: DurableServer.Backends.EKVStore, supervisor_shutdown_timeout_ms: 60000, heartbeat_reconcile_interval_ms: 30000, heartbeat_tracking_mode: :subscribe, initial_discovery_delay_ms: {1000, 6000}, max_singleflight_waiters_per_key_module: 50000, placement_erpc_timeout_same_region_ms: 3000, placement_erpc_timeout_cross_region_ms: 8000, placement_region: nil, discovery_interval_ms: 3000, discovery_shuffle_batch_size: 20000, parallel_restart_batch_size: 50, restart_start_timeout_ms: 30000, restart_claim_preferred_fanout: 2, restart_claim_expanded_fanout: 4, restart_claim_gate_expand_after_ms: 30000, restart_claim_gate_disable_after_ms: 120000, heartbeat_interval_ms: 10000, heartbeat_future_skew_tolerance_ms: 5000, discovery_burst_count: 3, graceful_shutdown_timeout_ms: 30000, graceful_shutdown_total_timeout_ms: 55000, graceful_shutdown_concurrency: 50, dead_node_threshold_ms: 300000}
+
+15:14:04.972 [info] [Group Aikido.Default.DurableAgents] started (shards=8)
+
+15:14:04.975 [debug] Aikido.Default.DurableAgents: Node heartbeat written successfully in 2ms
+
+15:14:04.976 [debug] Aikido.Default.DurableAgents: Refreshed heartbeat cache with 1 nodes in 2ms
+Operating System: Linux
+CPU Information: AMD Ryzen 9 5950X 16-Core Processor
+Number of Available Cores: 8
+Available memory: 62.70 GB
+Elixir 1.19.5
+Erlang 28.5.0.4
+JIT enabled: true
+
+Benchmark suite executing with the following configuration:
+warmup: 0 ns
+time: 5 s
+memory time: 0 ns
+reduction time: 0 ns
+parallel: 1
+inputs: no inspector, root state only, tree full state, tree signal identities
+Estimated total run time: 20 s
+Excluding outliers: false
+
+Benchmarking sort with input no inspector ...
+Benchmarking sort with input root state only ...
+Benchmarking sort with input tree full state ...
+Benchmarking sort with input tree signal identities ...
+Calculating statistics...
+Formatting results...
+
+##### With input no inspector #####
+Name           ips        average  deviation         median         99th %
+sort          0.85         1.18 s     ±1.47%         1.17 s         1.20 s
+
+##### With input root state only #####
+Name           ips        average  deviation         median         99th %
+sort          0.85         1.17 s     ±1.40%         1.18 s         1.18 s
+
+##### With input tree full state #####
+Name           ips        average  deviation         median         99th %
+sort          0.65         1.54 s     ±0.63%         1.54 s         1.55 s
+
+##### With input tree signal identities #####
+Name           ips        average  deviation         median         99th %
+sort          0.82         1.21 s     ±3.96%         1.21 s         1.28 s
+    warning: :tprof.profile/2 is undefined (module :tprof is not available or is yet to be defined)
+    │
+ 66 │       :tprof.profile(fn -> sort(run) end, %{
+    │              ~
+    │
+    └─ bench/inspector_cost.exs:66:14: AgentExamples.Bench.InspectorCost.profile_capture/1
+
+[os_mon] memory supervisor port (memsup): Erlang has closed
+[os_mon] cpu supervisor port (cpu_sup): Erlang has closed

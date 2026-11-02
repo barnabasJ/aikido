@@ -1,0 +1,86 @@
+{
+  "status": "Two verified consecutive 100,000-agent runs through Playground and Restart with full recursive inspection",
+  "scope": "CLI benchmark with the actual playground collector; browser rendering at 100,000 agents remains to be verified",
+  "ekv_shards": 8,
+  "native_profile_enabled": true,
+  "fresh_root_per_run": true,
+  "run_reports": [
+    {
+      "root_id": "01a17364-bf10-70a2-b581-ef1d5a0ce818",
+      "sort_seconds": 119.327597,
+      "retirement_seconds": 0.294202,
+      "restart_seconds": 3.141158,
+      "spawned": 100000,
+      "completed": 100000,
+      "live_children": 0,
+      "longest_spawn_gap_ms": 180,
+      "beam_bytes_after_restart": 521023392,
+      "wal_logical_bytes_after_restart": 19550560248
+    },
+    {
+      "root_id": "01a17366-9e50-7fa8-bb9c-9ae8341fd2b1",
+      "sort_seconds": 128.362568,
+      "retirement_seconds": 0.268412,
+      "restart_seconds": 3.073822,
+      "spawned": 100000,
+      "completed": 100000,
+      "live_children": 0,
+      "longest_spawn_gap_ms": 362,
+      "beam_bytes_after_restart": 558913840,
+      "wal_logical_bytes_after_restart": 19937193408
+    }
+  ],
+  "final": {
+    "agents": 0,
+    "saved_agents": 0,
+    "io_tasks": 0,
+    "histories": 0,
+    "processes": 376
+  },
+  "all_restart_checkpoints_complete": true,
+  "post_exit_integrity_checks": {
+    "shard_0.db": [
+      [
+        "ok"
+      ]
+    ],
+    "shard_1.db": [
+      [
+        "ok"
+      ]
+    ],
+    "shard_2.db": [
+      [
+        "ok"
+      ]
+    ],
+    "shard_3.db": [
+      [
+        "ok"
+      ]
+    ],
+    "shard_4.db": [
+      [
+        "ok"
+      ]
+    ],
+    "shard_5.db": [
+      [
+        "ok"
+      ]
+    ],
+    "shard_6.db": [
+      [
+        "ok"
+      ]
+    ],
+    "shard_7.db": [
+      [
+        "ok"
+      ]
+    ]
+  },
+  "interpretation": "Single-shard runs reproduced heartbeat-watchdog eviction under storage pressure. Eight native EKV shards completed both measured runs without heartbeat eviction. WAL high-water files remain allocated while checkpointed space is reusable; logical file size is not a count of retained agent snapshots.",
+  "limitations": "Two runs are not a long-duration stress guarantee. Native consensus metadata for fresh identities is separate from deleted agent snapshots. Profiling and other local services can affect timing.",
+  "raw": "quicksort-eight-shards-100k-2026-10-25.jsonl"
+}

@@ -1,0 +1,133 @@
+{
+  "sdk_commit": "dd4d1aa3bb27a641523aa8415ac21cbc8540b019",
+  "failure_utc": "2026-10-28T20:04:05.699Z",
+  "evidence_log_sha256": "1055dd6336a7630b567983578478da3e0c7f384953240334fba91cf50d337729",
+  "observed": {
+    "last_slow_heartbeat_put_ms": 7742,
+    "last_slow_heartbeat_completed_utc": "2026-10-28T20:03:45.441Z",
+    "heartbeat_timestamp_precedes_put": true,
+    "watchdog_elapsed_ms": 28001,
+    "watchdog_deadline_ms": 28000,
+    "heartbeat_interval_ms": 10000,
+    "remaining_budget_after_previous_completion_and_interval_ms": 10258,
+    "subsequent_no_eligible_node_warnings": 10603,
+    "kernel_oom_kill_in_failure_window": false,
+    "preview_process_survived": true
+  },
+  "configuration": {
+    "snapshot_store": "AgentExamples.Store",
+    "snapshot_shards": 8,
+    "heartbeat_store": "AgentExamples.Store",
+    "heartbeat_isolation_auto_derived_for_managed_ekv_only": true,
+    "playground_ekv_is_externally_supervised": true,
+    "agent_sync": {
+      "mode": "periodic",
+      "interval_ms": 30000
+    }
+  },
+  "controlled_experiment": {
+    "schedulers": 4,
+    "results": [
+      {
+        "mode": "shared",
+        "success": true,
+        "elapsed_ms": 1001.371
+      },
+      {
+        "mode": "isolated",
+        "success": true,
+        "elapsed_ms": 0.285
+      }
+    ],
+    "blocked_shard": 6,
+    "writer_queue": 1,
+    "shared_backend": "HeartbeatContention.Data",
+    "isolated_backend": "HeartbeatContention.Control",
+    "method": "Private native EKV and DurableServer stores, four schedulers. Suspend one data writer, issue one heartbeat-backend put to the shared store and one to a separate heartbeat store, verify independent completion, resume writer, verify both writes succeed. No preview store modifications. This is a blocking-path experiment, not a replay of the actual failure."
+  },
+  "store_after_failure": {
+    "per_shard": [
+      {
+        "shard": "shard_0.db",
+        "kv": 60194,
+        "kv_keyrefs": 60194,
+        "kv_oplog": 1,
+        "kv_paxos": 60196,
+        "deleted": 60029,
+        "free_pages": 3580
+      },
+      {
+        "shard": "shard_1.db",
+        "kv": 60230,
+        "kv_keyrefs": 60230,
+        "kv_oplog": 1,
+        "kv_paxos": 60230,
+        "deleted": 60069,
+        "free_pages": 3326
+      },
+      {
+        "shard": "shard_2.db",
+        "kv": 60240,
+        "kv_keyrefs": 60240,
+        "kv_oplog": 1,
+        "kv_paxos": 60245,
+        "deleted": 60074,
+        "free_pages": 4989
+      },
+      {
+        "shard": "shard_3.db",
+        "kv": 59811,
+        "kv_keyrefs": 59811,
+        "kv_oplog": 4,
+        "kv_paxos": 59813,
+        "deleted": 59622,
+        "free_pages": 3745
+      },
+      {
+        "shard": "shard_4.db",
+        "kv": 60239,
+        "kv_keyrefs": 60239,
+        "kv_oplog": 1,
+        "kv_paxos": 60243,
+        "deleted": 60061,
+        "free_pages": 4013
+      },
+      {
+        "shard": "shard_5.db",
+        "kv": 60208,
+        "kv_keyrefs": 60208,
+        "kv_oplog": 1,
+        "kv_paxos": 60211,
+        "deleted": 60025,
+        "free_pages": 3735
+      },
+      {
+        "shard": "shard_6.db",
+        "kv": 59683,
+        "kv_keyrefs": 59683,
+        "kv_oplog": 1,
+        "kv_paxos": 59686,
+        "deleted": 59526,
+        "free_pages": 4024
+      },
+      {
+        "shard": "shard_7.db",
+        "kv": 59852,
+        "kv_keyrefs": 59852,
+        "kv_oplog": 1,
+        "kv_paxos": 59855,
+        "deleted": 59687,
+        "free_pages": 3204
+      }
+    ],
+    "total_rows": 480457,
+    "deletion_tombstones": 479093,
+    "paxos_rows": 480479,
+    "oplog_rows": 11,
+    "retention_ms": 604800000,
+    "note": "Deletion tombstones and CAS metadata are not running agents. Counts taken after recovery; they do not establish the writer operation in progress at failure."
+  },
+  "conclusion": "The node lost its liveness deadline while heartbeat writes shared the agent-data writer path. A slow successful write consumed part of the next heartbeat budget. The watchdog killed the lifecycle manager; the supervisor uses one_for_all, interrupting the agent tree and causing placement failures.",
+  "remaining_uncertainty": "No per-writer queue, current-operation, scheduler-latency or disk-latency samples were retained for the failed interval. The exact cause of the later stalled write (queueing, GC, disk or scheduling) cannot be established retrospectively.",
+  "recommended_change": "Use native DurableServer heartbeat_backend with a separately supervised/managed EKV store so agent snapshot/cleanup queues cannot block node heartbeats. Keep the safety watchdog. Measure native heartbeat age and put duration alongside writer queue and scheduler latency in the next scale replay."
+}

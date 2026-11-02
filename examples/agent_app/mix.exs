@@ -9,6 +9,10 @@ defmodule AgentExamples.MixProject do
       consolidate_protocols: Mix.env() != :test,
       deps: [
         {:aikido, path: "../.."},
+        {:ekv,
+         git: "https://github.com/barnabasJ/ekv.git",
+         ref: "648a3db4e1f788acde88a75a3f59c4f55213e58c",
+         override: true},
         {:benchee, "~> 1.5", only: :dev, runtime: false},
         {:ash, "~> 3.37 and >= 3.37.2"},
         {:ash_sqlite, "~> 0.2.19"},

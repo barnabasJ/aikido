@@ -1,0 +1,156 @@
+{
+  "date": "2026-10-22",
+  "environment": {
+    "elixir": "1.19.5",
+    "otp": "28.5.0.4",
+    "schedulers": 32,
+    "host_ram_gib": 62
+  },
+  "configuration": {
+    "ekv_shards": 8,
+    "activation_timeout_ms": 30000,
+    "max_io_tasks": 20000,
+    "persistence": "temporary, checkpointed while running",
+    "ui_batch_ms": 100
+  },
+  "sample_interval_ms": 5000,
+  "runs": [
+    {
+      "run": 1,
+      "browser_sort_ms": 64899,
+      "depth": 39,
+      "browser_result": {
+        "count": 100000,
+        "first": 1,
+        "last": 100000,
+        "equals_range": true
+      },
+      "registered_agents": 100000,
+      "reconnect_count": 100000,
+      "failures": 0,
+      "retries": 0,
+      "exceptions": 0,
+      "monitored_deletions": 100000,
+      "exit_reasons": {
+        "{:shutdown, :delete}": 100000
+      },
+      "cleanup_monitor_window_ms": 46716,
+      "sampled_peaks": {
+        "processes": 100753,
+        "memory_mb": 11486,
+        "io_tasks": 6447,
+        "mailbox_total": 20469,
+        "run_queue": 4
+      },
+      "largest_sampled_mailbox": 2404,
+      "operations": {
+        "{:directive, :stop, \"SpawnAgent\", :ok}": {
+          "count": 99999,
+          "total_us": 6780861,
+          "mean_us": 67.81
+        },
+        "{:directive, :stop, \"Notify\", :ok}": {
+          "count": 299998,
+          "total_us": 20432423,
+          "mean_us": 68.11
+        },
+        "{:signal, :stop, \"aikido.agent.child.started\", nil}": {
+          "count": 99999,
+          "total_us": 20344552,
+          "mean_us": 203.45
+        },
+        "{:directive, :stop, \"Emit\", :ok}": {
+          "count": 199998,
+          "total_us": 7061768,
+          "mean_us": 35.31
+        },
+        "{:signal, :stop, \"quicksort.sort\", nil}": {
+          "count": 100000,
+          "total_us": 15619125,
+          "mean_us": 156.19
+        },
+        "{:signal, :stop, \"quicksort.sorted\", nil}": {
+          "count": 99999,
+          "total_us": 17473002,
+          "mean_us": 174.73
+        }
+      }
+    },
+    {
+      "run": 2,
+      "browser_sort_ms": 69473,
+      "depth": 40,
+      "browser_result": {
+        "count": 100000,
+        "first": 1,
+        "last": 100000,
+        "equals_range": true
+      },
+      "registered_agents": 100000,
+      "reconnect_count": 100000,
+      "failures": 0,
+      "retries": 0,
+      "exceptions": 0,
+      "monitored_deletions": 100000,
+      "exit_reasons": {
+        "{:shutdown, :delete}": 100000
+      },
+      "cleanup_monitor_window_ms": 56802,
+      "sampled_peaks": {
+        "processes": 100755,
+        "memory_mb": 11560,
+        "io_tasks": 6479,
+        "mailbox_total": 21541,
+        "run_queue": 13
+      },
+      "largest_sampled_mailbox": 2169,
+      "operations": {
+        "{:directive, :stop, \"SpawnAgent\", :ok}": {
+          "count": 99999,
+          "total_us": 7020866,
+          "mean_us": 70.21
+        },
+        "{:directive, :stop, \"Notify\", :ok}": {
+          "count": 299998,
+          "total_us": 23582119,
+          "mean_us": 78.61
+        },
+        "{:signal, :stop, \"aikido.agent.child.started\", nil}": {
+          "count": 99999,
+          "total_us": 20597801,
+          "mean_us": 205.98
+        },
+        "{:directive, :stop, \"Emit\", :ok}": {
+          "count": 199998,
+          "total_us": 7189946,
+          "mean_us": 35.95
+        },
+        "{:signal, :stop, \"quicksort.sort\", nil}": {
+          "count": 100000,
+          "total_us": 15764297,
+          "mean_us": 157.64
+        },
+        "{:signal, :stop, \"quicksort.sorted\", nil}": {
+          "count": 99999,
+          "total_us": 17764822,
+          "mean_us": 177.65
+        }
+      }
+    }
+  ],
+  "post_cleanup": {
+    "live_agents": 0,
+    "saved_agent_records": 0,
+    "io_tasks": 0,
+    "all_eight_checkpoints_complete": true
+  },
+  "notes": [
+    "Browser form dispatched two independently shuffled 100000-value inputs.",
+    "Every output value was checked in the rendered DOM; real registrations and all process exits were independently checked.",
+    "Peak measurements cover each sorting/teardown observation window; samples can miss instantaneous peaks.",
+    "Operation timings are concurrent aggregate callback wall times, not CPU time or storage latency.",
+    "Cleanup monitor windows include the short interval between installing monitors and pressing Stop.",
+    "Native EKV reported transient WAL checkpoint lag while writing; all eight checkpoints caught up without busy frames.",
+    "This is local stress verification, not a cross-machine performance guarantee."
+  ]
+}

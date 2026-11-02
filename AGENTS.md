@@ -45,6 +45,8 @@ does not permit other runtime effects inside reducers.
 - `Aikido.Directive`: Spark/Ash typed-struct host and execution behaviour; concrete descriptors live under `Aikido.Directives` or their owning feature
 - `Aikido.Types.ActionResult`: typed reducer result containing sparse attribute changes and validated directives
 - `Aikido.Durable`: keyed activation and persistence through DurableServer; the default backend is local EKV
+- `Aikido.Cron`: recurring scheduling contracts and declaration compilation; `Cron.Slice` owns jobs and definitions through actions, directives and signals
+- `Aikido.Ownership.Slice`: parent and child bindings, monitor acknowledgements, attachment and orphan transitions; Team owns desired topology and task coordination
 
 ## Native Ash and Spark Contracts
 - Give each distinct action its own implementation module under its owner and bind it directly from the route or action declaration. Name the module for what the action does; avoid generic `Implementation` names. Do not redispatch business actions by `input.action.name`, signal type or selector options inside a shared implementation. Share reusable pure mechanics through ordinary helper functions. A single union action or wildcard observer remains one action.
@@ -53,7 +55,7 @@ does not permit other runtime effects inside reducers.
 - Let native Ash changesets and action inputs apply types, constraints and defaults. Use Spark Info modules for DSL metadata, transformers for expansion and verifiers for validation. Avoid generated companion resources, custom validation bridges and redundant accessor functions.
 - Forward native Ash/Spark options in convenience hosts. Use an application domain when supplied; `Aikido.RuntimeDomain` is the agent convenience macro's default. Keep normal domain-inclusion validation.
 - Pass actor, tenant, application context and tracers through native Ash scope and tracing APIs. The external command and internal reducer are separate Ash authorization boundaries; downstream tools retain their own authorization.
-- Supply AI tools as Ash AI tool names plus native `tool_options`. Tool setup builds descriptions and registry once per run. Prepared callbacks are transient and are rebuilt for a new run.
+- Supply AI tools as Ash AI tool names plus native `tool_options`. Tool setup builds descriptions and registry once per run. Prepared callbacks are transient and are rebuilt for a new run. Start returns tool preparation; readiness constructs the first model request. Later actions construct complete model/tool descriptors directly; do not add a catch-all result rewrite pass.
 - Internal messages use `Aikido.Signal`; define typed payloads with its Spark `signal`/`schema` DSL. Scope and native tracer context travel directly on the envelope. Pure reducers return literals; constructors that generate IDs or timestamps belong at I/O boundaries. Deliver to agents directly; publish native Ash notifications through directives after state adoption.
 - The purity rules apply to agent/slice state reducers. Public lifecycle/signal adapters and tool implementations are I/O boundaries, not reducers; invoke tools through directives or supervised work rather than from a reducer.
 - Put external domain command implementations in `Aikido.Agent.Commands` and `agent/commands/`. Their runtime I/O stays outside the reducer pipeline; agent/slice `Actions` and `actions/` contain reducers. Tool implementations remain separate I/O boundaries.
@@ -62,16 +64,22 @@ does not permit other runtime effects inside reducers.
 - DurableServer is the sole persistence/activation path. Do not introduce parallel storage adapters or an instance manager.
 - Start application agents through domain actions. Lifecycle action implementations and spawning directives call `Aikido.Durable` directly; do not add a parallel lifecycle facade. Add the Aikido runtime to the application supervision tree once; agents share its DurableServer supervisor and are not linked to command callers.
 - `persistence :permanent` retains snapshots on stop; `:temporary` deletes them on stop. Both checkpoint while running. The separate `delete` action removes the saved identity regardless of retention. `restart?` controls automatic crash recovery independently of retention.
+- Synchronization defaults to native periodic saves (30 seconds). Start with `sync: %{mode: :periodic | :automatic | :explicit, interval_ms: ...}` to configure it; spawned children inherit unless overridden. Periodic processing receipts do not acknowledge a storage commit. Parent-binding lifecycle changes and graceful stops still synchronize.
 - Use paired `externalize/1` and `reinstate/1` callbacks for path state, or paired agent-wide `checkpoint/2` and `restore/2`, to control snapshot content. Keep credentials and runtime-only closures out of persisted configuration. A separate Ash data layer does not persist the live agent automatically.
 - Local EKV requires its disk to survive; it does not by itself provide machine-loss protection. Recovery does not replay external effects or resume in-flight Lua VMs.
 - Subscribe before triggering asynchronous work. Use one-shot subscriptions or `Aikido.AgentServer.call_until/5` from external callers. Never poll for completion, and never wait for completion inside directive execution.
 
 ## Source organization
+- Use feature-first namespaces and paths: `Aikido.FSM.Slice` in `fsm/slice.ex`, with sibling `Actions`, `Signals`, `Directives`, `Changes` and `Types`. Put Spark extensions at `<Feature>.Extension` with their transformers and verifiers beneath them.
 - Keep feature-specific contracts and implementation beneath their owning resource or feature. Put native implementations in `Actions` and `actions/`, concrete signal definitions in `Signals` and `signals/`, and effects in `Directives` and `directives/`. Keep shared helpers beside these folders and reusable signal infrastructure under `Aikido.Signal`.
 - Keep each Ash extension's metadata, transformers and verifiers beneath that extension. Retain genuinely reusable actions, directives and runtime contracts in their shared subsystems.
 - Place example resources beside their own implementation and signal files. Keep source-viewer paths and categories aligned with the declared native contracts when files move.
 
 ## Standards
+- Write the project name as **Aikido** in UI copy and prose. Keep native code identifiers, package names, paths and URLs in their canonical form.
+- Break multi-step logic into helpers named for the operations they perform. Pipe state through pure transformation steps and use `with` for steps that can fail. Apply this to helpers, runtime code, DSL expansion and examples as well as reducers. Expose smaller documented operations when an umbrella helper mixes concerns, rather than inventing another vague wrapper. Keep cohesive declarations and required behaviour callback names.
+- Name helper modules for the data or lifecycle they own, and keep only operations with that shared responsibility together. Separate policy checks from unrelated cleanup or runtime effects; avoid generic names such as `Completion`, `Context` or `Execution` when a concrete subject can be named.
+- Give each operation one canonical name. Call shared operations directly instead of adding differently named forwarding helpers; keep adapters only when they perform a distinct conversion or policy step.
 - Keep Ash reducer actions pure: the same input returns the same attribute changes and directives
 - Directives mutate **no** state — neither `agent.state` (domain) nor `%AgentServer.State{}` (runtime). State changes flow through the action's return value; runtime bookkeeping flows through GenServer callbacks and `process_signal/2` cascade callbacks
 - Use **Ash types** for data contracts and **Spark.Options** for DSL/configuration validation

@@ -7,7 +7,17 @@ teams. Add `Aikido.AI.Extension` for model turns and dynamically supplied tools.
 The default `Aikido` supervision tree uses DurableServer for activation, snapshots,
 and recovery. Configure its backend with `durable: [...]`. Use `Aikido.Durable`
 for a separately configured DurableServer namespace; it delegates process ownership
-and storage to DurableServer.
+and storage to DurableServer. Local EKV options can be supplied directly, for example
+`durable: [data_dir: "path/to/fresh-store", ekv_options: [shards: 8]]`.
+The existing one-shard default is retained for compatibility. The example app can select
+eight shards with `AIKIDO_EXAMPLES_EKV_SHARDS=8`. EKV records the shard count on disk;
+changing it requires a fresh store or a separate migration, not reopening existing
+files with a different count. Explicit `backend` configurations own their own options.
+`SpawnAgent.start_options` forwards native DurableServer activation options,
+including `timeout`. This bounds the supervised activation task's wait rather than
+blocking the parent. The large quicksort example uses a 30-second activation budget;
+storage operations keep their own deadlines, and rejected starts still return
+failure signals.
 
 Activate agents through their generated domain `start` action. Adding `Aikido`
 to the application supervision tree starts one shared runtime. Its DurableServer
@@ -49,6 +59,73 @@ is the runtime callback implementation hosted by DurableServer. Configure
 return state transitions and directives without performing side effects. All
 side effects belong in directives; results return through signals.
 
+
+Initialization runs the resource's native initialize action. DurableServer restores
+saved state through the configured snapshot codecs, then startup lifecycle signals
+run through the existing middleware and action pipeline. Persistence remains
+DurableServer's responsibility; middleware does not write a second checkpoint.
+
+Explicit domain stops and stop directives process `aikido.agent.lifecycle.stopping`
+before returning the final state to DurableServer. Cleanup actions therefore
+contribute their state changes to the final permanent snapshot, and cleanup is
+not repeated in `terminate/2`. External supervisor shutdowns use a best-effort
+`terminate/2` fallback: that callback cannot return changed state for persistence.
+Record business completion through a normal action before stopping the process.
+
+Subscriptions remain in AgentServer. They observe adopted state after directive
+execution for the current signal; they do not wait for asynchronous work launched
+by those directives. Results of that work arrive as later signals and trigger
+later observations. No additional middleware hook is needed for subscriptions.
+
+Choose a root `id` explicitly when an application must recover the same logical
+execution, for example `"workflow/#{workflow_id}/review"`. Starting a stopped
+permanent agent with that same ID restores its snapshot; a new workflow execution
+should receive a different root ID. Root IDs share a namespace within their
+Aikido instance and partition, so the application must choose distinct roots.
+
+`Aikido.Agent.child_id(parent_id, child_name)` derives deterministic child IDs.
+For example, a reviewer beneath `workflow/42` is `workflow/42/reviewer`, and its
+helper is `workflow/42/reviewer/helper`. Names are escaped as individual path
+components: the name `"reviewer/helper"` becomes `reviewer%2Fhelper`, distinct from
+that nested hierarchy. SpawnAgent uses this derivation unless an ID is supplied
+explicitly. Team members follow their declared ownership ancestry. A child's
+stable ID is independent of its PID and of activation attempts.
+
+Recovery resolves saved parents within the same DurableServer pool and partition.
+If a saved parent is unavailable and `on_parent_death: :stop` applies, the child
+stops instead of continuing as an unowned agent. Permanent snapshots retain the
+logical parent binding so a later explicit activation can reconnect it; temporary
+snapshots are deleted on that stop.
+
+Keep completion requirements and hook planning visible as separate steps in a
+reducer rather than calling a helper that combines both:
+
+```elixir
+result
+|> Aikido.AiReact.RunState.resolve_run_outcome(input)
+|> Aikido.AiReact.HookQueue.queue_event_hooks_if_changed(input, :after_tool, payload)
+```
+
+The ReAct helpers have distinct owners:
+
+- `RunState` initializes a run, resolves its proposed outcome and clears finished-run data.
+- `TodoRequirements` evaluates blocking todos; it does not execute or complete them.
+- `Conversation` owns message history and its cached token counts.
+- `ConversationHandoff` plans a model-written replacement conversation.
+- `HookQueue` orders hook events and releases their pending effects.
+- `RunCaller` binds a run to its actor and tenant.
+- `CancellableTask` owns supervised I/O attempts, deadlines, retries and cleanup.
+- `ModelStream` batches deltas from a ReqLLM response stream.
+
+Helpers follow the same style: pure transformations compose through pipelines,
+and fallible operations compose through `with`. For example,
+`Aikido.Slice.Config.cast_config/2` casts supplied configuration without reading
+application configuration; `resolve_config/2` adds application config lookup.
+Handoff eligibility (`ConversationHandoff.required?/2`) is separate from constructing the
+request (`ConversationHandoff.prepare_request/2`). These operations describe state and effects;
+only the action return value adopts state and only directives execute effects.
+
+
 If a directive raises, the runtime stops that effect batch and retains the
 already adopted state. Subscribers observe that state, synchronous callers
 receive the error, and DurableServer checkpoints the state as usual. Effects
@@ -57,15 +134,20 @@ already delivered are not rolled back; later directives in the batch do not run.
 Signal emission descriptors may use
 `%Aikido.Signal{id: nil, type: "work.ready", data: %{}, source: "/worker"}`.
 Emit, Schedule and Cron complete missing envelope IDs and timestamps during
-execution. Constructing the directive performs no I/O. Identity, memory and
+execution. Constructing the directive performs no I/O. Memory and
 thread actions use the input signal's timestamp and deterministic state/entry
 IDs rather than reading the clock or generating random IDs. Direct calls without
 an input signal use timestamp zero. Mounted slice resources apply their native
 attribute defaults during initialization.
 
-`CronCancel` queues an ordered runtime request, so it also cancels a registration
-returned earlier in the same directive batch. The runtime retires that job's
-ownership and saved definition before supervised shutdown. Cancellation completes
+Every agent mounts `Aikido.Cron.Slice` at `:cron`. Its native actions own job
+registrations and recovery; the runtime only translates scheduler monitor
+messages into signals. Dynamic definitions are persisted through the slice codec,
+while PIDs, monitors, implicit scope and retry state are transient.
+
+`Aikido.Cron.Directives.Cancel` queues an ordered signal, so it also cancels a
+registration returned earlier in the same directive batch. The slice action retires
+that job's ownership and saved definition before supervised shutdown. Cancellation completes
 with `aikido.agent.cron.cancelled`; subscribe before triggering it when completion
 matters. A subsequent replacement keeps its own process and definition even if
 shutdown of the previous process finishes later.
@@ -78,9 +160,20 @@ from durable storage rebuilds the job without that implicit caller context, as d
 static DSL schedules. Explicit scope supplied in a configured message remains
 application-owned configuration and must be safe to persist.
 
-`SpawnAgent` starts durable child agents and snapshots their current logical parent. Teams add desired topology,
-dependencies, ownership, lazy activation, dynamic worker templates, and task
-receipts. A team resource can itself be a member or a worker template.
+`SpawnAgent` starts durable child agents and snapshots their current logical parent.
+`Aikido.Ownership.Slice` records parent and child bindings through attachment,
+startup, monitor and exit signals. Read these with
+`Aikido.Ownership.parent(runtime)`, `orphaned_from(runtime)` and `children(runtime)`.
+Its actions apply parent-death policies and reject stale monitor acknowledgements.
+AgentServer translates process messages into signals rather than maintaining a
+second ownership record. Live bindings and monitor references are transient;
+DurableServer saves the logical parent identity separately and resolves its
+current process before activation.
+
+Teams add desired topology, dependencies, lazy activation, dynamic worker
+templates and task receipts. A team resource can itself be a member or a worker
+template. Team's own slice codec clears live member bindings and lifecycle
+operations before persistence, regardless of its mount path.
 
 A `partition` scopes logical identities inside a runtime instance; it does not
 provide Ash authorization or security isolation. Use Ash actors, tenants, and
@@ -105,6 +198,17 @@ Native Ash action spans connect to custom signal, directive and asynchronous
 work spans. AsyncTask results, AI setup/model/tool results, emitted signals and
 delayed signals preserve that ancestry. Retries create individual attempt spans.
 Signal IDs and types remain metadata on spans and telemetry events.
+
+Model I/O executes inside `aikido_model_call` and individual `aikido_attempt`
+spans. The native ReqLLM/Req request inherits that context; ReqLLM request
+telemetry separately reports HTTP status, duration, retries and provider usage.
+This does not add a separate Ash span for each internal Req step.
+
+Native tool action spans also retain the caller tracer. For Ash AI callbacks,
+Aikido carries it in Ash's native private action context, which continues through
+AshLua's eval action to the Ash actions called by the script. Lua instructions
+themselves do not produce individual spans. Applications can use the action and
+tool/attempt spans to distinguish VM/tool work from provider requests.
 
 The connection lasts across process boundaries even after the initiating call
 has returned. Snapshot recovery starts new work; it does not resume an active
@@ -207,65 +311,39 @@ run state does not itself resume an interrupted VM or replay an external effect.
 Run the example app and open `/examples/hooks` for an offline demonstration,
 including the hook context panel, signal timeline, and expandable source code.
 
-### Experimental request / response from Lua
+### Application interactions from Lua
 
-Both sync and async hooks can call `aikido.request(type, payload)`. The Lua task
-invokes the hook's application-supplied `request` callback and returns its answer
-to the same script. Aikido supplies no request registry or UI transport. Only Lua
-decides what the response means:
+Hooks contain Lua source and serializable settings, never Elixir callbacks.
+Application developers expose approved operations through the existing AshLua
+application surface; users write Lua that calls those operations. Hook
+`lua_options` selects the application's OTP app, labels or action entrypoints.
+Native actor, tenant and context reach the action, and its policies apply normally.
+Hook executions create their own VM and capability manifest. The agent Lua tool
+uses a separate VM and its own selected surface; neither inherits the other's
+actions, tools or Lua globals.
+
+For example, the playground exposes an application-owned `approvals.review`
+action. Its implementation waits for the current actor's browser response in the
+hook task; the agent mailbox remains responsive. Lua interprets the returned
+choice and returns its gate decision:
 
 ```lua
-local answer, err = aikido.request("tool.review", {
-  title = "Run this tool?",
-  details = event.tool_call,
+local answer, err = approvals.review({input = {
+  title = "Allow this task?",
+  details = event,
   choices = {"approve", "deny"}
-})
+}})
 if err then return {decision = "deny", message = err.message} end
 if answer.choice == "approve" then return {decision = "continue"} end
 return {decision = "deny", message = "Declined"}
 ```
 
-Configure the callback at startup or on a per-run hook:
-
-```elixir
-%{
-  name: "review_tool",
-  event: :before_tool,
-  script: script,
-  request: &MyApp.Interactions.request/2
-}
-```
-
-The callback receives `%{type: type, payload: payload}` and a context map with
-`hook`, `request_id` (the AI run ID), and `event` (the hook's event snapshot).
-It returns `{:ok, response}` or `{:error, reason}`. Ash's function type validates
-that it is an external capture (`&Module.function/2`) accepting two arguments.
-Anonymous closures are rejected so checkpoints cannot retain captured runtime values.
-Pass serializable per-run configuration in the ask action's `metadata`; the callback
-reads it from `context.event.metadata`. Without a callback, Lua receives
-`nil, {message = ":request_callback_not_configured"}`. Errors become the second
-Lua return value; callback exceptions fail the hook normally.
-
-The callback runs in the hook task and may wait without blocking the agent
-mailbox. The application owns authorization, UI communication, deadlines and
-cancellation. Aikido does not wait for a special approval signal, inspect the
-agent for pending interactions, or add a response action. External captures are
-portable callback references; they do not capture a user or browser session.
-Saving a callback reference does not restore a waiting Lua continuation.
-
-The example app supplies a callback when starting `InteractiveAssistant`. Its
-existing `Playground` process holds the pending UI card and the callback caller,
-then publishes its normal PubSub update. LiveView replies through Playground,
-which returns `{:ok, response}` to the callback. That return resumes Lua. The
-application removes cards on reply, timeout, caller exit, cancellation or stop;
-LiveView reconnection can redisplay cards while Playground and the waiting task
-survive. There is no additional Aikido service in the supervision tree.
-
-Open `/examples/hook-requests` to try the complete flow offline. The Lua script
-asks only about the `stamp` tool; other tools may run before that gate. The
-example callback's deadline is two minutes, and the card also offers cancellation.
-Set external caller timeouts long enough for the interaction. Pending requests
-and Lua continuations are ephemeral and do not survive process restarts.
+The hook selects `lua_options: [otp_app: :agent_examples, labels: [:approvals]]`.
+The application action derives the owner from the native actor rather than a
+user-supplied owner ID. The application owns UI transport, timeout and cleanup.
+Only Lua source and the serializable surface selection are persisted. A restart
+does not resume an interrupted VM or replay a pending approval. Every new task
+requests fresh approval. Open `/examples/hook-requests` to try it offline.
 
 ### Snapshot and command scope boundaries
 
@@ -278,10 +356,13 @@ the value.
 
 The current snapshot envelope contains the serialized agent, logical parent
 binding, cron definitions, restart configuration and selected runtime boot
-options. It encodes compressed Erlang terms as a Base64 payload inside a map;
-it does not automatically dump all attributes to JSON through Ash types.
-Ash types validate action and state contracts; application codecs decide the
-persistent representation. Prepared AI tool callbacks and live run scope are
+options. Slices are typed attributes on the agent resource. Native Ash
+struct dumping traverses that resource and its nested slices, using the same
+compiled attribute contract as native inspection.
+Ash's `:term` and `:binary` types encode and decode the outer transport payload;
+their native casts also restore older compressed snapshots. Application codecs
+can change a path's persistent representation, stored through Ash's term type.
+Prepared AI tool callbacks and live run scope are
 excluded by the ReAct slice codec and tools are rebuilt for each new run.
 
 Both first activation and later durable snapshots apply slice `externalize/1`
@@ -331,15 +412,21 @@ options %{
 
 Options use the `Aikido.AiReact.Options` typed struct. Hook decisions likewise use
 `Aikido.AiReact.Hooks.Decision`; neither requires a resource or create action. Hook
-configuration retains its embedded resource so native casting handles an
-omitted or nil `:function` request callback correctly.
+configuration uses its embedded resource for native casting of Lua source and
+serializable settings.
 A per-request options value
 replaces the configured options. Retry defaults are zero. Tool retries must be
 explicitly enabled and are appropriate only when repeating the tool is safe.
-All attempts and backoff share one overall deadline. Cancellation and owner
-termination stop active model/tool attempts; streaming cancellation also closes
+When a directive carries an absolute deadline, preflight, attempts and backoff
+remain clamped to it. Subscription registration and the initial owner-state read
+share one monotonic preflight window based on the attempt timeout. Without an
+absolute deadline, each work attempt retains its configured relative timeout;
+completing preflight does not create an overall retry deadline. Public subscriptions
+without an explicit timeout still use five seconds, and unsubscribe remains
+asynchronous. Cancellation and owner termination stop active model/tool attempts;
+streaming cancellation also closes
 the ReqLLM stream. A custom client can wrap provider-specific concurrency limits.
-Applications still own cancellation and deadlines inside their Lua request callback.
+Applications still own cancellation and deadlines inside actions exposed to Lua.
 
 Streaming clients implement `stream_text/3` and return `ReqLLM.StreamResponse`.
 The native response builder assembles tool calls, reasoning and usage. Aikido
@@ -472,13 +559,22 @@ registry directly. There is no per-tool Aikido tuple or callback wrapper.
 Native tool action errors reach the model unchanged as Ash AI's formatted content;
 execution deadlines and crashes are handled by the bounded I/O task.
 
-A run starts in `:setup`. Startup hooks and tool preparation must finish before
-it enters `:running` and sends its first model request. Another start or
-`replace_context` is rejected during setup. Messages and deliveries from the same actor/tenant
-are queued and included in that first request. Cancellation stops an active
-preparation task; failures settle the run without calling the model. Late results
-cannot revive a cancelled or replaced run. Tool preparation uses the configured
-`model_timeout_ms` budget.
+A run starts in `:setup`. The opening action returns a `PrepareTools` directive,
+withheld until `run_started` hooks allow it. Its result signal routes to
+`ToolsReady`, which installs the descriptions/registry, enters `:running` and
+constructs the first model request. Before-model hooks then gate that request.
+Another start or `replace_context` is rejected during setup. Messages and
+deliveries from the same actor/tenant queue until the next model request is
+released, including messages arriving while a before-model hook waits.
+Cancellation stops active startup work; failures settle the run without calling
+the model. Late results cannot revive a cancelled or replaced run. Tool
+preparation uses the configured `model_timeout_ms` budget.
+
+Subsequent model/tool actions construct descriptors with the prepared descriptions
+or registry already attached. Hooks release each model request after adding hook
+context and queued messages; only that boundary checks whether a handoff is
+needed. Terminal transitions clear tool callbacks and pending handoffs. Streaming
+and context-only actions do not perform setup or rewrite returned directives.
 
 Aikido builds descriptions and the callback registry once per ReAct run, before
 its first model or tool effect. Later turns and parallel tool calls reuse them;
@@ -556,30 +652,39 @@ resource's pure checkpoint or path codec. The envelope retains the opaque
 credential separately. A sensitive flag alone is not an inspection access policy.
 
 Fresh supplied paths use their existing `externalize/1` and `reinstate/1` callbacks
-without creating records before the claim. Owners with crash-recovery settlement
-can also implement `reinstate/2`, receiving `%{fresh?: true}` for fresh input and
-`%{fresh?: false}` for saved state. Fresh decoding must not mark never-started work
-as interrupted. The one-argument callback remains required and compatible. Callbacks should accept partial input
-maps as well as their initialized values. If an explicit path cannot be safely
-encoded, activation returns `{:error, {:bootstrap_codec_failed, owner, path}}`;
-it does not persist an unencoded fallback. Unknown inputs are discarded with
-native constrained Ash maps derived recursively from resource, typed struct,
-array and constrained map metadata. Undeclared nested fields are omitted while
-unconstrained maps and terms retain their data. Native resource creation, defaults
-and semantic validation remain after the claim.
-A checkpoint-only serializer cannot sanitize partial input without initializing
-it first. Supplied paths without a paired codec therefore return
-`{:error, {:bootstrap_preparation_required, owner, path}}` unless the configured
-adapter has explicitly prepared safe attributes. This is an explicit restriction
-on checkpoint-only startup input, not permission to store raw secrets. Defaults
-are still applied by native initialization after the claim. Declared portable
-function inputs are validated through their native Ash function type before
-encoding. Native function codecs make those captures portable in the bootstrap
-transport; internal codec bookkeeping records only conversions actually made.
-Restoration reverses those conversions before the owning path's `reinstate`
-callback, leaving a custom codec's own encoded strings untouched. The explicit initial snapshot helper retains its
-existing codec contract, and normal resource checkpoint/restore callbacks still
-return two-element tuples.
+without creating records before the claim. Owners can implement `reinstate/2`
+to receive `%{fresh?: true}` for sparse startup input and
+`%{fresh?: false}` for initialized snapshots. The one-argument callbacks remain
+required. Fresh decoding must not apply crash-recovery settlement to never-started
+work.
+
+The SDK uses native constrained Ash maps to retain and normalize declared mount
+paths and their immediate attributes, including string keys. Whole-agent
+checkpoint preparation requirements are checked before encoding any supplied path. It does not recursively reinterpret embedded resources,
+NewTypes, maps or callback fields. Nested inputs receive their normal native
+casting, defaults and validation during initialization after the durable claim.
+Opaque metadata and codec-owned data retain their authored representation.
+
+A path codec or the scope adapter's preparation callback owns safe pre-storage
+content, including removal of credentials. A checkpoint-only serializer cannot
+sanitize partial startup input without initialization; nonempty supplied paths
+for such owners return `{:error, {:bootstrap_preparation_required, owner, path}}` unless
+a paired codec or an explicitly prepared adapter input is available. If a codec
+fails, or its output cannot round-trip through Ash's safe term type, startup
+returns `{:error, {:bootstrap_codec_failed, owner, path}}` without storing a raw
+fallback. Declaring an attribute sensitive does not remove it from persistence.
+
+Persisted hook configuration contains only Lua source and serializable settings.
+No Elixir function field, function reconstruction or generic callback walker is
+part of the hook contract. Application operations are registered in the Lua VM
+through the normal AshLua surface, rather than stored as callbacks in state.
+
+Initialized snapshots from the preceding published implementation continue to
+restore through native embedded types. An old **uninitialized** envelope containing
+retired generic callback-location bookkeeping is rejected explicitly instead of
+passing encoded strings to an unrelated owner's codec. Delete that saved identity
+and start it again with its owning codec. This reset policy applies to that
+unfinished bootstrap format; initialized data still passes through the current native resource schema.
 
 Without an adapter, anonymous scope-free agents retain normal activation. A
 scoped durable activation requires an adapter rather than persisting its raw

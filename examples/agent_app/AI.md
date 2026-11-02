@@ -6,6 +6,15 @@ page. Start an offline or live instance, send a prompt, and inspect its topology
 model turns, results, and signal activity. Runs remain available on navigation
 and reload; Stop releases the processes.
 
+The **AI provider** form on every AI page configures the provider, model and
+key once for the browser session. Choose the z.ai standard or coding-plan
+endpoint matching your key, save, and start any AI example. Fixed workers,
+dynamically spawned workers and nested AI teams inherit the same model/client
+configuration. Live requests resolve the key from server memory at the I/O
+boundary; snapshots and public run data contain no API key. Saved settings apply
+when starting examples; restart an active example to change its configuration.
+After a server restart, save the key again before using a restored conversation.
+
 The command-line demo remains available from `examples/agent_app`:
 
 ```sh

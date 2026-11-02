@@ -5,6 +5,8 @@ defmodule AgentExamples.QuicksortTest do
   test "sorted partitions retire while their root and recorded graph remain available" do
     topic = "sort-test:" <> Ash.UUIDv7.generate()
     Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
+    :ok = AgentExamples.Quicksort.RunHistory.open(topic)
+    on_exit(fn -> AgentExamples.Quicksort.RunHistory.close(topic) end)
     root = Agents.quicksort_start!(%{})
     on_exit(fn -> Agents.quicksort_stop(root) end)
     handler = {__MODULE__, make_ref()}
@@ -59,8 +61,9 @@ defmodule AgentExamples.QuicksortTest do
              id == root.id || String.starts_with?(id, root.id <> "/")
            end) == [{root.id, root.pid}]
 
-    assert_receive {:quicksort_progress, ^topic, %{status: :idle, branch: "rootL"}}, 5000
-    assert_receive {:quicksort_progress, ^topic, %{status: :completed, branch: "root"}}, 5000
+    progress = await_progress(topic, %{})
+    assert progress["root"].status == :completed
+    assert Map.has_key?(progress, "rootL")
   end
 
   test "stopping a complete tree removes every descendant while preserving another owned root" do
@@ -144,8 +147,30 @@ defmodule AgentExamples.QuicksortTest do
     {:ok, run} = AgentExamples.Playground.start(owner, "quicksort", %{})
     pool = Aikido.durable_supervisor_name(Aikido.Default)
     id = Aikido.Agent.child_id(run.record.id, "L")
-    topic = run.snapshot.own.topic
-    AgentExamples.Quicksort.RunHistory.open(topic)
+    topic = AgentExamples.Quicksort.RunHistory.topic(Ash.UUIDv7.generate())
+    :ok = AgentExamples.Quicksort.RunHistory.open(topic)
+    signal = AgentExamples.Quicksort.Signals.Sort.new!(%{numbers: [3, 1, 2], topic: topic})
+
+    assert {:ok, [1, 2, 3]} =
+             Aikido.AgentServer.call_until(
+               run.record.pid,
+               signal,
+               "quicksort.**",
+               fn runtime ->
+                 if runtime.agent.state.state.status == :completed,
+                   do: {:ok, runtime.agent.state.state.result},
+                   else: :skip
+               end
+             )
+
+    case Aikido.Durable.lookup(pool, id) do
+      {:ok, pid} ->
+        monitor = Process.monitor(pid)
+        assert_receive {:DOWN, ^monitor, :process, ^pid, _}, 5_000
+
+      :error ->
+        :ok
+    end
 
     AgentExamples.Quicksort.RunHistory.record(topic, %{
       id: id,
@@ -383,6 +408,16 @@ defmodule AgentExamples.QuicksortTest do
   def capture_partition(_event, _measurements, metadata, {owner, root_id}) do
     if String.starts_with?(metadata.agent_id, root_id <> "/") do
       send(owner, {:partition_ready, metadata.agent_id, self()})
+    end
+  end
+
+  defp await_progress(topic, nodes) do
+    if match?(%{status: :completed}, nodes["root"]) && Map.has_key?(nodes, "rootL") do
+      nodes
+    else
+      assert_receive {:quicksort_progress_batch, ^topic, batch}, 5_000
+      nodes = Enum.reduce(batch, nodes, &Map.put(&2, &1.branch, &1))
+      await_progress(topic, nodes)
     end
   end
 end

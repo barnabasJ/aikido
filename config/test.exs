@@ -29,5 +29,7 @@ config :aikido,
     AikidoTest.StopScope.Domain,
     AikidoTest.TeamStopScope.Domain,
     AikidoTest.Atl47Native.Domain,
+    AikidoTest.GeneratedAIBootstrap.Domain,
+    AikidoTest.HookActions.Domain,
     Aikido.CommandRuntimeErrorTest.Domain
   ]

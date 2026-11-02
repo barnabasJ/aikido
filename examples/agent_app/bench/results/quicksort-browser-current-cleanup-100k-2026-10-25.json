@@ -1,0 +1,246 @@
+{
+  "runs": [
+    {
+      "root_id": "01a173ea-2037-7379-a33d-c07fd30219b3",
+      "spawned": 100000,
+      "completed": 100000,
+      "sorting": 0,
+      "depth": 39,
+      "completion_observed_within_ms": 211269,
+      "seconds_to_result": 121.301
+    },
+    {
+      "root_id": "01a173ee-8279-7fd2-8446-155e76e78154",
+      "spawned": 100000,
+      "completed": 100000,
+      "sorting": 0,
+      "depth": 39,
+      "completion_observed_within_ms": 163516,
+      "seconds_to_result": 125.082,
+      "result": {
+        "correct": true,
+        "length": 100000
+      }
+    }
+  ],
+  "restart_ready_observed_within_ms": 15611,
+  "descendant_inspector_ids": [
+    "01a173ee-8279-7fd2-8446-155e76e78154/L",
+    "01a173ee-8279-7fd2-8446-155e76e78154/L/R",
+    "01a173ee-8279-7fd2-8446-155e76e78154/L/R/L/R",
+    "01a173ee-8279-7fd2-8446-155e76e78154/L/R",
+    "01a173ee-8279-7fd2-8446-155e76e78154/L/R",
+    "01a173ee-8279-7fd2-8446-155e76e78154/L/R/L",
+    "01a173ee-8279-7fd2-8446-155e76e78154/L/R/L",
+    "01a173ee-8279-7fd2-8446-155e76e78154/L/R/L",
+    "01a173ee-8279-7fd2-8446-155e76e78154/L/R/L/R",
+    "01a173ee-8279-7fd2-8446-155e76e78154/L/R/L/R"
+  ],
+  "after_stop": {
+    "local_agents": 0,
+    "registered_agents": 0,
+    "io_tasks": 0
+  },
+  "date": "2026-10-25",
+  "url": "http://localhost:4043/examples/quicksort",
+  "store": "examples/agent_app/_build/final-code-browser-100k-20261025",
+  "shards": 8,
+  "recursive_inspector": true,
+  "after_restart_store": [
+    {
+      "shard": "shard_0.db",
+      "live_agent_snapshots": 0,
+      "live_runtime_records": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_1.db",
+      "live_agent_snapshots": 0,
+      "live_runtime_records": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_2.db",
+      "live_agent_snapshots": 0,
+      "live_runtime_records": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_3.db",
+      "live_agent_snapshots": 0,
+      "live_runtime_records": 1,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_4.db",
+      "live_agent_snapshots": 0,
+      "live_runtime_records": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_5.db",
+      "live_agent_snapshots": 0,
+      "live_runtime_records": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_6.db",
+      "live_agent_snapshots": 0,
+      "live_runtime_records": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_7.db",
+      "live_agent_snapshots": 1,
+      "live_runtime_records": 0,
+      "wal_bytes": 67108864
+    }
+  ],
+  "after_second_store": [
+    {
+      "shard": "shard_0.db",
+      "agent_snapshots": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_1.db",
+      "agent_snapshots": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_2.db",
+      "agent_snapshots": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_3.db",
+      "agent_snapshots": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_4.db",
+      "agent_snapshots": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_5.db",
+      "agent_snapshots": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_6.db",
+      "agent_snapshots": 0,
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_7.db",
+      "agent_snapshots": 1,
+      "wal_bytes": 67108864
+    }
+  ],
+  "after_stop_store": [
+    {
+      "shard": "shard_0.db",
+      "agent_snapshots": 0,
+      "integrity": [
+        [
+          "ok"
+        ]
+      ],
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_1.db",
+      "agent_snapshots": 0,
+      "integrity": [
+        [
+          "ok"
+        ]
+      ],
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_2.db",
+      "agent_snapshots": 0,
+      "integrity": [
+        [
+          "ok"
+        ]
+      ],
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_3.db",
+      "agent_snapshots": 0,
+      "integrity": [
+        [
+          "ok"
+        ]
+      ],
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_4.db",
+      "agent_snapshots": 0,
+      "integrity": [
+        [
+          "ok"
+        ]
+      ],
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_5.db",
+      "agent_snapshots": 0,
+      "integrity": [
+        [
+          "ok"
+        ]
+      ],
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_6.db",
+      "agent_snapshots": 0,
+      "integrity": [
+        [
+          "ok"
+        ]
+      ],
+      "wal_bytes": 67108864
+    },
+    {
+      "shard": "shard_7.db",
+      "agent_snapshots": 0,
+      "integrity": [
+        [
+          "ok"
+        ]
+      ],
+      "wal_bytes": 67108864
+    }
+  ],
+  "totals": {
+    "call_cast_dispatches": 599996,
+    "signals_processed": 1665703,
+    "signal_errors": 0,
+    "directives_dispatched": 2799974,
+    "directive_exceptions": 0
+  },
+  "notes": [
+    "seconds_to_result is the actual Playground elapsed metric; the first value was read from the saved completion screenshot.",
+    "completion_observed_within_ms and restart_ready_observed_within_ms include gaps between observations and are upper bounds, not exact server durations.",
+    "The final result was checked in the browser: all 100000 values equal 1 through 100000 in order.",
+    "Before final stop, only the root process and its one agent snapshot remained. After stop, native process and membership counts and agent snapshots were all zero.",
+    "Native WAL maintenance reached 64 MiB per shard without manual checkpoint or truncation. Consensus metadata is separate from saved agent snapshots.",
+    "The current demo on 4042 was not stopped or reset.",
+    "The native store emitted 11 transient WAL-checkpoint starvation warnings during writes; all shards caught up and returned to 64 MiB at quiescence."
+  ],
+  "isolated_preview_exit_code": 0,
+  "isolated_store_removed_after_verification": true,
+  "isolated_store_logical_bytes_released": 1041457152,
+  "native_log_observations": {
+    "transient_wal_checkpoint_starvation_warnings": 11,
+    "heartbeat_or_eviction_errors": 0
+  }
+}

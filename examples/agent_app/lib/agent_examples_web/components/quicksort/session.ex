@@ -46,7 +46,7 @@ defmodule AgentExamplesWeb.Components.Quicksort.Session do
         end
 
       case AgentExamples.Quicksort.RunHistory.fetch(topic) do
-        {:ok, tree} -> assign(socket, tree: tree)
+        {:ok, tree} -> assign(socket, tree: tree, elapsed: recorded_elapsed(topic))
         :error -> assign(socket, history_available: own(socket.assigns.run)[:status] == :idle)
       end
     else
@@ -60,7 +60,7 @@ defmodule AgentExamplesWeb.Components.Quicksort.Session do
   defp handle_event("restart_sort", _, socket) do
     owner = socket.assigns.owner
 
-    socket = socket |> release_root_monitor() |> put_private(:quicksort_pending, %{})
+    socket = release_root_monitor(socket)
 
     if socket.assigns.sort_topic do
       Phoenix.PubSub.unsubscribe(AgentExamples.PubSub, socket.assigns.sort_topic)
@@ -89,7 +89,7 @@ defmodule AgentExamplesWeb.Components.Quicksort.Session do
       :ok = Phoenix.PubSub.subscribe(AgentExamples.PubSub, topic)
 
       socket =
-        assign(socket |> release_root_monitor() |> put_private(:quicksort_pending, %{}),
+        assign(release_root_monitor(socket),
           history_available: true,
           root_unavailable: nil,
           root_monitor: Process.monitor(socket.assigns.run.record.pid),
@@ -148,52 +148,45 @@ defmodule AgentExamplesWeb.Components.Quicksort.Session do
 
   defp handle_async(_, _, socket), do: {:cont, socket}
 
-  defp handle_info({:quicksort_progress, topic, node}, %{assigns: %{sort_topic: topic}} = socket) do
-    pending = Map.get(socket.private, :quicksort_pending, %{})
-
-    if map_size(pending) == 0 do
-      Process.send_after(self(), :flush_quicksort_progress, 100)
-    end
-
-    prior = Map.get(pending, node.branch)
-
-    node =
-      if prior &&
-           (prior.status in [:completed, :failed] ||
-              (prior.status == :sorting && node.status == :idle)), do: prior, else: node
-
-    if node.branch == "root" && node.status in [:completed, :failed],
-      do: send(self(), :flush_quicksort_progress)
-
-    {:halt, put_private(socket, :quicksort_pending, Map.put(pending, node.branch, node))}
-  end
-
-  defp handle_info(:flush_quicksort_progress, socket) do
-    pending = Map.get(socket.private, :quicksort_pending, %{})
-
+  defp handle_info(
+         {:quicksort_progress_batch, topic, nodes},
+         %{assigns: %{sort_topic: topic}} = socket
+       ) do
     tree =
-      Enum.reduce(pending, socket.assigns.tree, fn {_, node}, tree ->
-        AgentExamples.Quicksort.TreeView.put_node(tree, node)
-      end)
+      adopt_pending_progress(socket.assigns.tree, topic, nodes)
 
     elapsed =
-      if socket.assigns.started_at && tree.nodes["root"] &&
+      if tree.nodes["root"] &&
            tree.nodes["root"].status == :completed,
-         do:
-           socket.assigns.elapsed ||
-             System.monotonic_time(:millisecond) - socket.assigns.started_at,
+         do: socket.assigns.elapsed || recorded_elapsed(topic),
          else: nil
 
-    {:halt,
-     socket |> put_private(:quicksort_pending, %{}) |> assign(tree: tree, elapsed: elapsed)}
+    {:halt, assign(socket, tree: tree, elapsed: elapsed)}
   end
 
-  defp handle_info({:quicksort_progress, _, _}, socket), do: {:halt, socket}
+  defp handle_info({:quicksort_progress_batch, _, _}, socket), do: {:halt, socket}
 
   defp handle_info({:DOWN, ref, :process, _, reason}, %{assigns: %{root_monitor: ref}} = socket),
     do: {:halt, assign(socket, root_unavailable: inspect(reason), root_monitor: nil)}
 
   defp handle_info(_, socket), do: {:cont, socket}
+
+  defp adopt_pending_progress(tree, topic, nodes) do
+    tree = Enum.reduce(nodes, tree, &AgentExamples.Quicksort.TreeView.put_node(&2, &1))
+
+    receive do
+      {:quicksort_progress_batch, ^topic, pending} -> adopt_pending_progress(tree, topic, pending)
+    after
+      0 -> tree
+    end
+  end
+
+  defp recorded_elapsed(topic) do
+    case AgentExamples.Quicksort.RunHistory.elapsed(topic) do
+      {:ok, elapsed} -> elapsed
+      _ -> nil
+    end
+  end
 
   defp release_root_monitor(socket) do
     if socket.assigns.root_monitor, do: Process.demonitor(socket.assigns.root_monitor, [:flush])

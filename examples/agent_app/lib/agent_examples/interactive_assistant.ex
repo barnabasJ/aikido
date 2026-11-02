@@ -1,8 +1,8 @@
 defmodule AgentExamples.InteractiveAssistant do
   @moduledoc """
   Experimental request/response inside Lua. Only Lua interprets the response
-  as permission to run a tool. The application supplies the request callback
-  at startup; Aikido does not manage UI communication.
+  as permission to run a tool. Application actions exposed through AshLua own
+  UI communication; no callback is stored on the hook.
 
   Every new task asks for fresh approval before its first model request. Approval
   applies only to that task; conversation history never grants later permission.
@@ -24,12 +24,13 @@ defmodule AgentExamples.InteractiveAssistant do
         name: "review_task",
         event: :run_started,
         mode: :sync,
+        lua_options: [otp_app: :agent_examples, labels: [:approvals]],
         script: """
-        local answer, err = aikido.request("task.review", {
+        local answer, err = approvals.review({input = {
           title = "Allow this task to run?",
           details = event,
           choices = {"approve", "deny"}
-        })
+        }})
 
         if err then
           return {decision = "deny", message = "Request ended: " .. err.message}

@@ -17,6 +17,7 @@ defmodule AgentExamplesWeb.ExamplePage do
         owner: owner,
         run: Playground.get(owner, slug),
         starting: false,
+        capture_pending: false,
         error: nil,
         mode: provider.mode,
         provider: provider.provider,
@@ -68,6 +69,24 @@ defmodule AgentExamplesWeb.ExamplePage do
      |> start_async(:start_example, fn -> start_example(owner, slug, params) end)}
   end
 
+  defp handle_event(
+         "toggle_inspection_capture",
+         _,
+         %{assigns: %{capture_pending: true}} = socket
+       ),
+       do: {:halt, socket}
+
+  defp handle_event("toggle_inspection_capture", _, socket) do
+    owner = socket.assigns.owner
+    slug = socket.assigns.example.slug
+    enabled = !socket.assigns.run.capture_enabled
+
+    {:halt,
+     socket
+     |> assign(capture_pending: true)
+     |> start_async(:inspection_capture, fn -> Playground.set_capture(owner, slug, enabled) end)}
+  end
+
   defp handle_event("stop", _, socket) do
     result = Playground.stop(socket.assigns.owner, socket.assigns.example.slug)
     {:halt, socket |> assign(error: command_error(result)) |> reload_run()}
@@ -88,6 +107,19 @@ defmodule AgentExamplesWeb.ExamplePage do
 
   defp start_example(owner, slug, params), do: Playground.start(owner, slug, params)
 
+  defp handle_async(:inspection_capture, {:ok, result}, socket),
+    do:
+      {:halt,
+       socket |> assign(capture_pending: false, error: command_error(result)) |> reload_run()}
+
+  defp handle_async(:inspection_capture, {:exit, reason}, socket),
+    do:
+      {:halt,
+       assign(socket,
+         capture_pending: false,
+         error: "Could not change capture: #{inspect(reason)}"
+       )}
+
   defp handle_async(:start_example, {:ok, {:ok, run}}, socket),
     do: {:halt, assign(socket, run: run, starting: false, error: nil)}
 
@@ -100,6 +132,8 @@ defmodule AgentExamplesWeb.ExamplePage do
   defp handle_async(_, _, socket), do: {:cont, socket}
 
   defp handle_info({:run_updated, owner, slug}, socket) do
+    drain_run_updates(owner, slug)
+
     socket =
       if owner == socket.assigns.owner && slug == socket.assigns.example.slug,
         do: reload_run(socket),
@@ -109,6 +143,14 @@ defmodule AgentExamplesWeb.ExamplePage do
   end
 
   defp handle_info(_, socket), do: {:cont, socket}
+
+  defp drain_run_updates(owner, slug) do
+    receive do
+      {:run_updated, ^owner, ^slug} -> drain_run_updates(owner, slug)
+    after
+      0 -> :ok
+    end
+  end
 
   def command(socket, action, input) do
     result = Playground.command(socket.assigns.owner, socket.assigns.example.slug, action, input)

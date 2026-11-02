@@ -1,0 +1,85 @@
+{
+  "scope": "Existing port-4042 preview and its original EKV store; no store reset or filesystem cleanup",
+  "regression": "Sort stopped at 5691/10000 after colliding with an older parentless worker",
+  "fixes": [
+    "Honor on_parent_death :stop for unresolved saved parents",
+    "Resolve saved parents in the actual DurableServer pool",
+    "Delete inactive crash snapshots as well as live descendants at Quicksort restart",
+    "Use a fresh root ID per new sorting execution and parent/name child IDs",
+    "Report stable IDs in duplicate activation errors"
+  ],
+  "runs": [
+    {
+      "mode": "existing failed store after crash-checkpoint cleanup",
+      "values": 10000,
+      "every_value_verified": true,
+      "seconds": 9.505905
+    },
+    {
+      "mode": "fresh root execution 1",
+      "root_id": "01a16573-ceaa-74e3-b3e6-c2ae0d23726c",
+      "previous_root_id": "01a16537-2f2b-744e-9efc-4fdf854b790d",
+      "values": 10000,
+      "every_value_verified": true,
+      "seconds": 13.120374
+    },
+    {
+      "mode": "fresh root execution 2",
+      "root_id": "01a16574-0dfc-7ec3-bc87-b6f0f96c9242",
+      "previous_root_id": "01a16573-ceaa-74e3-b3e6-c2ae0d23726c",
+      "values": 10000,
+      "every_value_verified": true,
+      "seconds": 9.862628
+    },
+    {
+      "mode": "browser controls with fresh root and hierarchical IDs",
+      "values": 10000,
+      "every_value_verified": true,
+      "spawned": 10000,
+      "completed": 10000,
+      "sorting": 0,
+      "failure_banner": false,
+      "seconds": 9.417
+    }
+  ],
+  "retired_roots": [
+    {
+      "id": "01a16537-2f2b-744e-9efc-4fdf854b790d",
+      "live_processes": 0,
+      "saved_snapshots": 0
+    },
+    {
+      "id": "01a16573-ceaa-74e3-b3e6-c2ae0d23726c",
+      "live_processes": 0,
+      "saved_snapshots": 0
+    },
+    {
+      "id": "01a164a0-9558-72ce-844e-bd8a9f227894",
+      "live_processes": 0,
+      "saved_snapshots": 0
+    }
+  ],
+  "conflicting_process_alive": false,
+  "remaining_saved_sorting_roots": 2,
+  "io_tasks": 0,
+  "tests": {
+    "library_full_suite": {
+      "tests": 1010,
+      "failures": 0
+    },
+    "examples_full_suite": {
+      "tests": 82,
+      "failures": 0
+    },
+    "public_error_regression_file": {
+      "tests": 24,
+      "failures": 0
+    },
+    "quality": "mix q passed"
+  },
+  "limits": [
+    "Fresh execution namespaces allocate new native EKV consensus keys; this report does not claim bounded metadata with fresh root IDs.",
+    "The two completed roots and their UI histories remain available for user inspection.",
+    "This verifies recovery of the failed preview and subsequent 10000-value runs; the older 10x100000 report describes the earlier reused-root configuration."
+  ]
+}

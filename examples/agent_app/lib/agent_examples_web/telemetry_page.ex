@@ -1,22 +1,36 @@
 defmodule AgentExamplesWeb.TelemetryPage do
   @moduledoc "System-wide agent and provider diagnostics retained from application startup."
-  use Phoenix.LiveDashboard.PageBuilder, refresher?: true
+  use Phoenix.LiveDashboard.PageBuilder, refresher?: false
   alias AgentExamples.Telemetry.SystemSnapshot
+  import AgentExamplesWeb.Components.TelemetryChart, only: [chart: 1]
 
   @impl true
   def menu_link(_, _), do: {:ok, "Aikido"}
 
   @impl true
-  def mount(_, _, socket), do: {:ok, assign(socket, :overview, SystemSnapshot.read())}
+  def mount(_, _, socket) do
+    socket = assign(socket, :overview, SystemSnapshot.read())
+    if Phoenix.LiveView.connected?(socket), do: schedule_refresh()
+    {:ok, socket}
+  end
 
   @impl true
-  def handle_refresh(socket), do: {:noreply, assign(socket, :overview, SystemSnapshot.read())}
+  def handle_info(:refresh_aikido, socket) do
+    socket = assign(socket, :overview, SystemSnapshot.read())
+    schedule_refresh()
+    {:noreply, socket}
+  end
+
+  def handle_info(_, socket), do: {:noreply, socket}
+
+  defp schedule_refresh, do: Process.send_after(self(), :refresh_aikido, 1_000)
 
   @impl true
   def render(assigns) do
     ~H"""
     <section id="aikido-system-overview">
       <h2>Aikido system overview</h2>
+      <p id="aikido-refresh-status">Updates every second while this page is connected.</p>
       <p>
         Totals since {Calendar.strftime(@overview.started_at, "%Y-%m-%d %H:%M:%S UTC")}. Retained while this application is running, including before you open the dashboard.
       </p>
@@ -83,6 +97,27 @@ defmodule AgentExamplesWeb.TelemetryPage do
           title="Reported cost (USD)"
           value={cost(@overview.usage[:total_cost])}
           note={"#{@overview.missing_cost} finished requests without pricing; unavailable is not zero"}
+        />
+      </div>
+      <div class="row" id="aikido-signal-charts">
+        <.chart
+          id="signal-throughput-chart"
+          title="Signal processing throughput"
+          unit="signals / second"
+          points={@overview.signal_series}
+          series={[{:throughput, "Processed", "#2563eb"}]}
+          note="Completed signals per elapsed second. Last 120 samples; collected even while the dashboard is closed."
+        />
+        <.chart
+          id="signal-duration-chart"
+          title="Signal processing duration"
+          unit="milliseconds"
+          points={@overview.signal_series}
+          series={[
+            {:median_ms, "Median (upper bound)", "#0f766e"},
+            {:p95_ms, "p95 (upper bound)", "#c2410c"}
+          ]}
+          note="Approximate per-interval quantiles from fixed duration buckets, up to 60 seconds. Gaps mean no durations or values above that bound. Measures reducer/middleware time before directive execution, not task completion or mailbox wait."
         />
       </div>
       <h3>What agents are doing</h3>
@@ -170,9 +205,9 @@ defmodule AgentExamplesWeb.TelemetryPage do
     """
   end
 
-  attr :title, :string, required: true
-  attr :value, :any, required: true
-  attr :note, :string, required: true
+  attr(:title, :string, required: true)
+  attr(:value, :any, required: true)
+  attr(:note, :string, required: true)
 
   defp metric(assigns) do
     ~H"""

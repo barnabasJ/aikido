@@ -27,35 +27,59 @@ defmodule Aikido.AiReact.CancellableTask do
       if run_active?, do: :skip, else: {:error, :cancelled}
     end
 
-    case remaining_timeout(opts) do
+    preflight_deadline = now() + remaining_timeout(opts)
+
+    with {:ok, subscription} <-
+           subscribe_for_cancellation(owner, selector, opts, preflight_deadline) do
+      monitor = Process.monitor(owner)
+
+      try do
+        case read_run_after_subscription(owner, selector, opts, preflight_deadline) do
+          {:ok, :skip} ->
+            execute_attempt(owner, supervisor, work, opts, subscription, monitor, 0)
+
+          {:error, :timeout} = expired ->
+            expired
+
+          _ ->
+            {:error, :cancelled}
+        end
+      after
+        Process.demonitor(monitor, [:flush])
+
+        if Process.alive?(owner), do: Aikido.AgentServer.unsubscribe(owner, subscription)
+      end
+    end
+  catch
+    :exit, reason -> {:error, {:owner_unavailable, reason}}
+  end
+
+  defp subscribe_for_cancellation(owner, selector, opts, preflight_deadline) do
+    case preflight_timeout(opts, preflight_deadline) do
       0 ->
         {:error, :timeout}
 
       budget ->
-        with {:ok, subscription} <-
-               Aikido.AgentServer.subscribe(owner, "ai.react.**", selector,
-                 once: true,
-                 timeout: budget
-               ) do
-          monitor = Process.monitor(owner)
-
-          try do
-            case Aikido.AgentServer.state(owner, &{:ok, selector.(&1)}) do
-              {:ok, :skip} ->
-                execute_attempt(owner, supervisor, work, opts, subscription, monitor, 0)
-
-              _ ->
-                {:error, :cancelled}
-            end
-          after
-            Process.demonitor(monitor, [:flush])
-
-            if Process.alive?(owner), do: Aikido.AgentServer.unsubscribe(owner, subscription)
-          end
-        end
+        Aikido.AgentServer.subscribe(owner, "ai.react.**", selector, once: true, timeout: budget)
     end
   catch
-    :exit, reason -> {:error, {:owner_unavailable, reason}}
+    :exit, {:timeout, {GenServer, :call, _request}} -> {:error, :timeout}
+  end
+
+  defp read_run_after_subscription(owner, selector, opts, preflight_deadline) do
+    case preflight_timeout(opts, preflight_deadline) do
+      0 ->
+        {:error, :timeout}
+
+      budget ->
+        Aikido.AgentServer.state(owner, &{:ok, selector.(&1)}, timeout: budget)
+    end
+  catch
+    :exit, {:timeout, {GenServer, :call, _request}} -> {:error, :timeout}
+  end
+
+  defp preflight_timeout(opts, preflight_deadline) do
+    max(0, min(preflight_deadline - now(), remaining_timeout(opts)))
   end
 
   defp execute_attempt(owner, supervisor, work, opts, sub, monitor, number) do

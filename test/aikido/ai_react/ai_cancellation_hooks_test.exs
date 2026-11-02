@@ -35,14 +35,6 @@ defmodule Aikido.AICancellationHooksTest.Client do
        context: ReqLLM.Context.new(messages)
      }}
   end
-
-  def request(_, %{event: %{type: event, metadata: %{observer: observer}}}) do
-    send(observer, {:hook_waiting, event, self()})
-
-    receive do
-      :release -> {:ok, %{}}
-    end
-  end
 end
 
 defmodule Aikido.AICancellationHooksTest do
@@ -56,7 +48,7 @@ defmodule Aikido.AICancellationHooksTest do
              Aikido.AI.ask(pid, "run",
                model: "offline",
                client: Client,
-               metadata: %{observer: self()},
+               context: %{observer: self()},
                llm_opts: [observer: self()],
                options: %{streaming: true},
                hooks:
@@ -64,8 +56,9 @@ defmodule Aikido.AICancellationHooksTest do
                    %{
                      name: to_string(event),
                      event: event,
-                     script: ~s|aikido.request("wait", {})|,
-                     request: &Client.request/2
+                     script:
+                       ~s|assert(interactions.terminal_gate({input = {event = event.type}})); return nil|,
+                     lua_options: [otp_app: :aikido, labels: [:hook_interactions]]
                    }
                  end
              )
@@ -87,7 +80,7 @@ defmodule Aikido.AICancellationHooksTest do
         once: true
       )
 
-    assert :ok = Aikido.AI.cancel(pid, request_id)
+    assert :ok = Aikido.AI.cancel(pid, request_id, context: %{observer: self()})
     assert_receive {:hook_waiting, :run_cancelled, cancelled_hook}, 5_000
     assert_receive {:DOWN, ^monitor, :process, ^model, _}, 5_000
     assert_receive :stream_closed, 5_000

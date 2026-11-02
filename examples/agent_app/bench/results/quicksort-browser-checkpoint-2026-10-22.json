@@ -1,0 +1,31 @@
+{
+  "url": "http://localhost:4042/examples/quicksort",
+  "runs": [
+    {
+      "values": 10000,
+      "every_sorted_value_verified": true,
+      "elapsed_seconds": 15.73
+    },
+    {
+      "values": 10000,
+      "every_sorted_value_verified": true,
+      "elapsed_seconds": 12.191
+    }
+  ],
+  "restart_between_runs": "actual Quicksort.Restart path with native EKV passive checkpoints",
+  "final_browser_state": "restarted to clear history, then stopped idle root",
+  "final_preview_resources": {
+    "live_agents": 0,
+    "io_tasks": 0,
+    "histories": 0,
+    "beam_bytes": 205429432,
+    "saved_agent_records": 11728
+  },
+  "remaining_saved_records": {
+    "root_id": "01a16407-8d30-7991-8d67-4d8549307509",
+    "permanent": false,
+    "running": 10747,
+    "stopped_graceful": 981,
+    "notes": "Older failed tree; not removed. No saved records from the two new browser runs remained."
+  }
+}

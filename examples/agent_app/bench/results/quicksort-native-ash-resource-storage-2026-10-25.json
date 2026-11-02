@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-25",
+  "store": "/home/joba/sandbox/jido/examples/agent_app/_build/native-ash-resource-100k-20261025",
+  "native_ash_resource_snapshot": true,
+  "all_processes_and_agent_snapshots_released": true,
+  "all_wal_frames_checkpointed": true,
+  "allocated_wal_files_can_remain_large_until_reused": true,
+  "shards": [
+    {
+      "name": "shard_0.db",
+      "integrity": "ok",
+      "bytes": 248295424,
+      "wal_bytes": 3229367272
+    },
+    {
+      "name": "shard_1.db",
+      "integrity": "ok",
+      "bytes": 248786944,
+      "wal_bytes": 3214502312
+    },
+    {
+      "name": "shard_2.db",
+      "integrity": "ok",
+      "bytes": 248487936,
+      "wal_bytes": 3233334832
+    },
+    {
+      "name": "shard_3.db",
+      "integrity": "ok",
+      "bytes": 247726080,
+      "wal_bytes": 3168057552
+    },
+    {
+      "name": "shard_4.db",
+      "integrity": "ok",
+      "bytes": 249802752,
+      "wal_bytes": 3218169112
+    },
+    {
+      "name": "shard_5.db",
+      "integrity": "ok",
+      "bytes": 244285440,
+      "wal_bytes": 3200671472
+    },
+    {
+      "name": "shard_6.db",
+      "integrity": "ok",
+      "bytes": 244817920,
+      "wal_bytes": 67108864
+    },
+    {
+      "name": "shard_7.db",
+      "integrity": "ok",
+      "bytes": 242130944,
+      "wal_bytes": 3148009632
+    }
+  ],
+  "isolated_store_removed": true
+}
