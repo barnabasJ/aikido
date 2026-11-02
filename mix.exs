@@ -173,7 +173,7 @@ defmodule Aikido.MixProject do
       {:expublish, "~> 2.7", only: [:dev], runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:mimic, "~> 2.0", only: :test},
-      {:mix_test_interactive, "~> 5.1", only: :dev, runtime: false}
+      {:mix_test_interactive, "~> 6.0", only: :dev, runtime: false}
     ]
   end
 
