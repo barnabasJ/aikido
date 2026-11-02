@@ -265,13 +265,19 @@ defmodule AgentExamples.AITest do
     current = Agents.research_team_inspect!(team.id)
 
     assert Enum.sort(Map.keys(current.team.members)) == [
-             "analyst",
-             "analyst-helper",
-             "reviewer",
-             "specialist"
+             "investigation",
+             "verification"
            ]
 
-    assert current.team.topology.nodes["analyst-helper"].owner == "analyst"
+    investigation = member(current, "investigation")
+    verification = member(current, "verification")
+    assert investigation.__struct__ == AgentExamples.ResearchSquad
+    assert verification.__struct__ == AgentExamples.ResearchSquad
+    focused = member(investigation, "focused-research")
+    assert focused.__struct__ == AgentExamples.ResearchSquad
+    assert focused.team.topology.nodes["analyst-helper"].owner == "researcher"
+    assert verification.team.topology.nodes["analyst-helper"].owner == "researcher"
+    assert Enum.all?(current.team.tasks, fn {_, task} -> task.status == :completed end)
   end
 
   test "model and tools are sufficient for real agents and teams" do

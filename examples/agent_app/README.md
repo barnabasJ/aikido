@@ -325,7 +325,9 @@ This preserves structured VM/action details and recovery guidance, and lets the
 agent's configured consecutive-error safeguard count failed scripts. Native
 `eval` retains its `{result, error}` contract; an ordinary returned value that
 contains an `error` key is still successful data.
-The offline script reads the roster before spawning and reuses workers on later prompts.
+The offline script starts with an empty roster, creates investigation and verification
+squads plus a nested research squad and worker-owned helpers, then reuses them on
+later prompts. The command-line `mix ai.demo` follows the same native hierarchy.
 
 The **Recursive quicksort** page (`/examples/quicksort`) demonstrates BEAM process
 fan-out without an AI provider. Start the example and sort 4,096 shuffled integers:

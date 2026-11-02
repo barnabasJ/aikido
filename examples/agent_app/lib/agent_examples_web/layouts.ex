@@ -17,6 +17,7 @@ defmodule AgentExamplesWeb.Layouts do
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="csrf-token" content={Plug.CSRFProtection.get_csrf_token()} />
         <title>Aikido · Agent playground</title>
+        <link rel="icon" href="data:," />
         <link rel="stylesheet" href={stylesheet_url()} />
         <link rel="stylesheet" href="/aikido/inspector/inspector.css" />
         <script type="module" src="/assets/app.js">

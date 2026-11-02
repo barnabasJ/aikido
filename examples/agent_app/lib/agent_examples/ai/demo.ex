@@ -19,7 +19,6 @@ defmodule AgentExamples.AI.Demo do
     with_resource(
       Agents.research_team_start!(
         AI.offline(%{
-          tool_context: %{context: %{stamp_label: "research"}},
           tools: AI.Tools.for_assistant() ++ AI.Tools.for_lua()
         })
       ),
@@ -31,9 +30,12 @@ defmodule AgentExamples.AI.Demo do
         #{answer}
         """)
 
-        team = AgentExamples.Agents.research_team_inspect!(team.id)
-        IO.inspect(Map.keys(team.team.members), label: "Dynamically created workers")
-        IO.inspect(team.team.topology.nodes["analyst-helper"].owner, label: "Helper's owner")
+        team = Agents.research_team_inspect!(team.id)
+        investigation = Agents.research_squad_inspect!(team.team.members["investigation"])
+        focused = Agents.research_squad_inspect!(investigation.team.members["focused-research"])
+        IO.inspect(Map.keys(team.team.members), label: "Dynamically created squads")
+        IO.inspect(Map.keys(investigation.team.members), label: "Nested squads")
+        IO.inspect(focused.team.topology.nodes["analyst-helper"].owner, label: "Helper's owner")
       end
     )
 
@@ -57,7 +59,6 @@ defmodule AgentExamples.AI.Demo do
     # Inline specs support model IDs newer than the installed model catalog.
     configuration = %{
       model: %{provider: provider, id: id},
-      tool_context: %{context: %{stamp_label: "live"}},
       tools: AI.Tools.for_assistant() ++ AI.Tools.for_lua()
     }
 
@@ -65,8 +66,8 @@ defmodule AgentExamples.AI.Demo do
       {:ok, answer} =
         AI.ask(
           team,
-          "Analyze 'Signals carry results'. Create an analyst and ask it to create a helper and delegate counting to it. Create an independent specialist yourself. Create a reviewer to check the results, and report the evidence.",
-          timeout: 180_000
+          "Independently count the words in 'Signals carry results' using investigation and verification squads, including a focused nested squad. Keep assignments small and report the checked count and team structure.",
+          timeout: 3_600_000
         )
 
       IO.puts(answer)

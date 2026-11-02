@@ -2,8 +2,10 @@ defmodule AgentExamples.AI.ScriptedClient do
   @moduledoc """
   A deterministic model substitute that exercises real tools and signal flows.
 
-  An `orchestrate:` request creates an analyst, reviewer and specialist, delegates
-  to the analyst (which creates its own helper), then asks the reviewer and specialist. Ordinary requests use text_stats and team_roster.
+  An `orchestrate:` request builds investigation and verification squads, including
+  a nested research squad and researcher-owned helpers. A team with existing analysts
+  exercises worker-owned delegation instead. Ordinary requests use text_stats
+  and team_roster.
   """
   @behaviour Aikido.AiReact.Client
 
@@ -24,6 +26,12 @@ defmodule AgentExamples.AI.ScriptedClient do
 
       String.starts_with?(query, "expand:") && ("spawn_worker" in tools || "run_lua" in tools) ->
         plan_worker_delegation(results, query, "run_lua" in tools)
+
+      String.starts_with?(query, "squad:") && ("spawn_worker" in tools || "run_lua" in tools) ->
+        plan_nested_squad(results, query, "run_lua" in tools)
+
+      String.starts_with?(query, "research:") && ("spawn_worker" in tools || "run_lua" in tools) ->
+        plan_squad_research(results, query, "run_lua" in tools)
 
       results == [] ->
         initial_tool_response(tools, query)
@@ -89,13 +97,49 @@ defmodule AgentExamples.AI.ScriptedClient do
   defp plan_team_delegation(results, query, lua?) do
     task = String.trim_leading(query, "orchestrate:") |> String.trim()
 
-    operations = [
+    operations =
+      if Enum.any?(team_members(results), &(&1 in ["analyst", "reviewer"])) do
+        existing_worker_operations(task)
+      else
+        [
+          {"spawn_worker", %{name: "investigation", template: "squad"}},
+          {"spawn_worker", %{name: "verification", template: "squad"}},
+          {"delegate", %{member: "investigation", text: "squad: #{task}"}},
+          {"delegate", %{member: "verification", text: "research: #{task}"}}
+        ]
+      end
+
+    request_next_team_operation(results, operations, lua?)
+  end
+
+  defp existing_worker_operations(task) do
+    [
       {"spawn_worker", %{name: "analyst", specialty: "analysis"}},
       {"spawn_worker", %{name: "reviewer", specialty: "review"}},
       {"spawn_worker", %{name: "specialist", specialty: "independent verification"}},
       {"delegate", %{member: "analyst", text: "expand: #{task}"}},
       {"delegate", %{member: "reviewer", text: task}},
       {"delegate", %{member: "specialist", text: task}}
+    ]
+  end
+
+  defp plan_nested_squad(results, query, lua?) do
+    task = String.trim_leading(query, "squad:") |> String.trim()
+
+    operations = [
+      {"spawn_worker", %{name: "focused-research", template: "squad"}},
+      {"delegate", %{member: "focused-research", text: "research: #{task}"}}
+    ]
+
+    request_next_team_operation(results, operations, lua?)
+  end
+
+  defp plan_squad_research(results, query, lua?) do
+    task = String.trim_leading(query, "research:") |> String.trim()
+
+    operations = [
+      {"spawn_worker", %{name: "researcher", template: "researcher"}},
+      {"delegate", %{member: "researcher", text: "expand: #{task}"}}
     ]
 
     request_next_team_operation(results, operations, lua?)
@@ -115,9 +159,8 @@ defmodule AgentExamples.AI.ScriptedClient do
   defp request_next_team_operation([], _operations, lua?),
     do: respond_with_team_tool("team_roster", %{}, lua?)
 
-  defp request_next_team_operation([roster | _] = results, operations, lua?) do
-    roster = roster |> message_text() |> Jason.decode!()
-    members = Map.get(roster["result"] || roster, "members", [])
+  defp request_next_team_operation(results, operations, lua?) do
+    members = team_members(results)
 
     operations =
       Enum.reject(operations, fn
@@ -129,6 +172,13 @@ defmodule AgentExamples.AI.ScriptedClient do
       {name, arguments} -> respond_with_team_tool(name, arguments, lua?)
       nil -> respond_with_tool_results(results)
     end
+  end
+
+  defp team_members([]), do: []
+
+  defp team_members([roster | _]) do
+    roster = roster |> message_text() |> Jason.decode!()
+    Map.get(roster["result"] || roster, "members", [])
   end
 
   defp respond_with_team_tool(name, arguments, false), do: respond_with_tool_call(name, arguments)

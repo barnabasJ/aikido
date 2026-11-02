@@ -39,6 +39,65 @@ defmodule Aikido.CommandRuntimeErrorTest do
     assert [%RuntimeUnavailable{reason: :not_running}] = errors
   end
 
+  test "generated list omits a retiring entry and preserves a healthy agent" do
+    retiring = Domain.counter_start!(%{id: unique_id("stopped-list")})
+    healthy = Domain.counter_start!(%{id: unique_id("healthy-list")})
+    nonce = AikidoTest.AgentCommandGate.install(retiring.pid, :shutdown)
+    stopping = Task.async(fn -> Domain.counter_stop(retiring.id) end)
+
+    try do
+      assert_receive {^nonce, :held, pid} when pid == retiring.pid, 5_000
+
+      listing =
+        Task.async(fn ->
+          receive do
+            :list -> Domain.counter_list()
+          end
+        end)
+
+      :erlang.trace(listing.pid, true, [:send])
+      send(listing.pid, :list)
+      reader = listing.pid
+      owner = retiring.pid
+
+      assert_receive {:trace, ^reader, :send, {:"$gen_call", _, {:read_state_with_selector, _}},
+                      ^owner},
+                     5_000
+
+      AikidoTest.AgentCommandGate.release(retiring.pid, nonce)
+      assert {:ok, _} = Task.await(stopping, 5_000)
+      assert {:ok, records} = Task.await(listing, 5_000)
+      assert Enum.map(records, & &1.id) == [healthy.id]
+    after
+      AikidoTest.AgentCommandGate.release(retiring.pid, nonce)
+    end
+  end
+
+  test "a timeout during generated list remains a typed runtime error" do
+    reference = Domain.counter_start!(%{id: unique_id("list-timeout")})
+    nonce = AikidoTest.AgentCommandGate.install(reference.pid, :read)
+    listing = Task.async(fn -> Domain.counter_list() end)
+
+    try do
+      assert_receive {^nonce, :held, pid} when pid == reference.pid, 5_000
+      assert {:error, %Ash.Error.Invalid{errors: errors}} = Task.await(listing, 7_000)
+      assert [%RuntimeUnavailable{reason: {:timeout, {GenServer, :call, _}}}] = errors
+      assert Process.alive?(reference.pid)
+    after
+      AikidoTest.AgentCommandGate.release(reference.pid, nonce)
+    end
+  end
+
+  test "an unexpected crash during generated list remains a typed runtime error" do
+    reference = Domain.counter_start!(%{id: unique_id("list-crash")})
+    nonce = AikidoTest.AgentCommandGate.install(reference.pid, :read)
+    listing = Task.async(fn -> Domain.counter_list() end)
+    assert_receive {^nonce, :held, pid} when pid == reference.pid, 5_000
+    Process.exit(reference.pid, :kill)
+    assert {:error, %Ash.Error.Invalid{errors: errors}} = Task.await(listing, 5_000)
+    assert [%RuntimeUnavailable{reason: {:killed, {GenServer, :call, _}}}] = errors
+  end
+
   test "runtime timeouts retain their exact cause without implying process death" do
     reason = {:timeout, {GenServer, :call, [self(), :request, 10]}}
 

@@ -64,5 +64,9 @@ defmodule Aikido.Agent.Commands.List do
   catch
     :exit, {reason, {GenServer, :call, _}} when reason in [:noproc, :normal, :shutdown] ->
       {:error, :not_running}
+
+    :exit, {{:shutdown, reason}, {GenServer, :call, _}}
+    when reason in [:normal, :permanent, :delete] ->
+      {:error, :not_running}
   end
 end

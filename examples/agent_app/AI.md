@@ -7,13 +7,13 @@ model turns, results, and signal activity. Runs remain available on navigation
 and reload; Stop releases the processes.
 
 The **AI provider** form on every AI page configures the provider, model and
-key once for the browser session. Choose the z.ai standard or coding-plan
+key once for the browser. Choose the z.ai standard or coding-plan
 endpoint matching your key, save, and start any AI example. Fixed workers,
 dynamically spawned workers and nested AI teams inherit the same model/client
-configuration. Live requests resolve the key from server memory at the I/O
+configuration. Live requests resolve the encrypted SQLite settings at the I/O
 boundary; snapshots and public run data contain no API key. Saved settings apply
 when starting examples; restart an active example to change its configuration.
-After a server restart, save the key again before using a restored conversation.
+The settings and encrypted key survive server restarts for the same browser.
 
 The command-line demo remains available from `examples/agent_app`:
 
@@ -27,21 +27,22 @@ mix test
 the runtime executes callbacks, delivers signals, applies actions, and calls
 the model again with the results. No provider key or database is needed.
 
-The team resource itself is the top-level AI orchestrator. It starts two fixed
-workers, `:analyst` and `:reviewer`. During the demo the orchestrator creates a
-`"specialist"`, and the analyst creates its own `"analyst-helper"`. Both levels
-use `run_lua` to call the same `agents.spawn` and `agents.delegate` Ash actions.
-The analyst owns its helper;
-removing the analyst removes that subtree. Team and template limits bound the
-number of workers.
+The team resource is the top-level AI orchestrator and starts with an empty roster.
+The offline demonstration creates investigation and verification squads, a focused
+nested research squad, and researchers with their own helpers. All creation and
+delegation use the real `agents.spawn` and `agents.delegate` AshLua actions.
+Later tasks reuse these squads. Live mode lets the model choose concrete roles
+under the same template, ownership and member-limit contracts.
 
 ```mermaid
 flowchart TD
   Caller --> Team[ResearchTeam: AI orchestrator]
-  Team --> Analyst[Fixed analyst]
-  Team --> Reviewer[Fixed reviewer]
-  Team --> Specialist[Dynamic specialist]
-  Analyst --> Helper[Dynamic analyst-helper]
+  Team --> Investigation[Investigation squad]
+  Team --> Verification[Verification squad]
+  Investigation --> Focused[Focused research squad]
+  Focused --> Researcher[Researcher]
+  Researcher --> Helper[Owned helper]
+  Verification --> Verifier[Researcher and owned helper]
 ```
 
 ## One outside interface
@@ -111,9 +112,7 @@ team = Agents.research_team_start!(%{
   tool_context: %{context: %{stamp_label: "workspace"}}
 })
 
-{:ok, answer} = AI.ask(team, "orchestrate: Signals carry results",
-  ash: [actor: current_user, tenant: workspace_id]
-)
+{:ok, answer} = AI.ask(team, "Signals carry results")
 ```
 
 Aikido infers the source OTP app from the agent/domain, or accepts native
@@ -124,6 +123,13 @@ the descriptions across model turns, and invokes the returned registry directly
 for tool calls. Ash AI owns schemas, argument casting, authorization
 filtering, action execution and result serialization. Callers do not build,
 repackage or wrap callback functions.
+
+The playground's example scope adapter intentionally admits only anonymous scope
+or its signed browser actor and tenant, with no extra application context on
+activation. The CLI hierarchy therefore uses its ordinary anonymous scope. If an
+application needs additional context restored during child activation, its own
+scope adapter must explicitly support that contract; the example does not weaken
+its browser admission checks to accept arbitrary context.
 
 Snapshots retain tool names and configuration. Generated descriptions and
 execution functions are excluded from snapshots and rebuilt for new runs. Runtime-only functions supplied via

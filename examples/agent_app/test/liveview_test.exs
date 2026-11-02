@@ -575,7 +575,9 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert has_element?(view, "#tasks", "worker finished")
   end
 
-  test "the AI team page runs orchestration, Lua, and dynamic helpers", %{conn: conn} do
+  test "the AI team page dynamically creates squads, nested teams and worker-owned helpers", %{
+    conn: conn
+  } do
     {:ok, view, _} = live(conn, "/examples/research-team")
     owner = start(view, "research-team", %{mode: "offline", lua: "true"})
     refute has_element?(view, "#team-tree [data-node=analyst]")
@@ -588,12 +590,14 @@ defmodule AgentExamplesWeb.LiveViewTest do
     await(owner, "research-team", &(&1.status == :completed), 30_000)
     assert has_element?(view, "#messages", "Words: 3")
     assert has_element?(view, "#messages", "Lua:")
-    assert has_element?(view, "#team-tree [data-node=analyst-helper]")
-    assert has_element?(view, "#member-count", "4 members")
+    assert has_element?(view, "#team-tree [data-node=investigation]")
+    assert has_element?(view, "#team-tree [data-node=verification]")
+    assert has_element?(view, "#team-tree [data-node=focused-research]")
+    assert has_element?(view, "#member-count", "2 members")
     assert has_element?(view, ".inspector #tasks", "completed")
     assert has_element?(view, ".inspector #tasks + #signal-activity")
     assert has_element?(view, "#team-tree [data-agent=Orchestrator]", "Completed")
-    view |> element("#team-tree [data-agent='Orchestrator / analyst']") |> render_click()
+    view |> element("#team-tree [data-agent='Orchestrator / investigation']") |> render_click()
     assert has_element?(view, "#agent-details", "Model turns:")
     assert has_element?(view, "#agent-details", "Succeeded")
     view |> element("#agent-details button", "Focus on this branch") |> render_click()
@@ -601,7 +605,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
     view |> element("#team-tree button", "Up one parent") |> render_click()
 
     {:ok, reloaded, _} = live(conn, "/examples/research-team")
-    assert has_element?(reloaded, "#member-count", "4 members")
+    assert has_element?(reloaded, "#member-count", "2 members")
     assert has_element?(reloaded, "#messages", "Lua:")
     refute Playground.get("another-browser", "research-team")
 
@@ -616,7 +620,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
       30_000
     )
 
-    assert has_element?(view, "#member-count", "4 members")
+    assert has_element?(view, "#member-count", "2 members")
     refute has_element?(view, "#agent-details [data-tool-status=failed]")
     refute has_element?(view, "#messages", "Tool error:")
   end

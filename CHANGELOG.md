@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Omit normally retiring agents from native list results when their final exit
+  uses DurableServer's shutdown tuple. Keep timeouts and unexpected crashes as
+  typed runtime errors.
+
+- Align the offline research-team and command-line demonstrations with dynamic
+  squads, nested teams and worker-owned helpers. Reuse existing squads on later
+  tasks, match the live CLI deadline to the playground, and document persistent
+  browser credentials. Verify example flows through real browser interactions.
+
 - Encode and decode the snapshot resource identifier through native Ash atom
   types, retaining rejection of unknown resource atoms.
 
