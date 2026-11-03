@@ -9,7 +9,8 @@ defmodule Aikido.Team.Actions.Reconcile do
 
     ActionAdapter.to_action_result(
       reconcile_member_activation(signal, state, context, config),
-      state
+      state,
+      context
     )
   end
 

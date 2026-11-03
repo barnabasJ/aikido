@@ -32,6 +32,57 @@ defmodule Aikido.Thread.Slice do
     description "Append-only conversation history thread for the agent."
 
     schema do
+      attribute :replay?, :boolean do
+        description "Opt into immutable replay receipts and cursor-based Follow/Prune; ordinary threads avoid receipt hashing and retention."
+        default false
+        allow_nil? false
+      end
+
+      attribute :generation, :string do
+        description "Durable generation identity allocated by native initialization and changed by Clear."
+        default &Ash.UUIDv7.generate/0
+        allow_nil? false
+        public? true
+      end
+
+      attribute :last_clear_id, :string do
+        description "Most recently accepted Clear signal ID, retained across intervening appends to ignore its retry."
+      end
+
+      attribute :next_sequence, :integer do
+        description "Next sequence, preserved when older entries are pruned."
+        default 0
+        allow_nil? false
+        constraints min: 0
+      end
+
+      attribute :first_sequence, :integer do
+        description "Retention floor; cursors below this floor receive an explicit gap."
+        default 0
+        allow_nil? false
+        constraints min: 0
+      end
+
+      attribute :followers, {:array, Aikido.Thread.Types.Follower} do
+        description "Authorized durable consumer cursors with one bounded outstanding range each."
+        default []
+        allow_nil? false
+        constraints max_length: 128
+      end
+
+      attribute :entry_receipts, {:array, Aikido.Thread.Types.EntryReceipt} do
+        description "Immutable entry identity receipts retained through pruning; grows until Clear or identity deletion."
+        default []
+        allow_nil? false
+      end
+
+      attribute :retry_ms, :integer do
+        description "Native scheduled redelivery interval while a batch remains unacknowledged."
+        default 5_000
+        allow_nil? false
+        constraints min: 1
+      end
+
       attribute :id, :string do
         description "Thread identifier within the owning agent"
         default "thread"
@@ -85,5 +136,13 @@ defmodule Aikido.Thread.Slice do
 
     route Aikido.Thread.Signals.Append, Aikido.Thread.Actions.Append
     route Aikido.Thread.Signals.Clear, Aikido.Thread.Actions.Clear
+    route Aikido.Thread.Signals.Follow, Aikido.Thread.Actions.Follow
+    route Aikido.Thread.Signals.Ack, Aikido.Thread.Actions.Ack
+    route Aikido.Thread.Signals.Unfollow, Aikido.Thread.Actions.Unfollow
+    route Aikido.Thread.Signals.Prune, Aikido.Thread.Actions.Prune
+    route Aikido.Thread.Signals.Retry, Aikido.Thread.Actions.Retry, public?: false
+
+    route Aikido.AgentServer.Signals.LifecycleReady, Aikido.Thread.Actions.ResumeFollowers,
+      public?: false
   end
 end

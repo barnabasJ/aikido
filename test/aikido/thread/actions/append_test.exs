@@ -9,6 +9,8 @@ defmodule AikidoTest.Thread.Actions.AppendTest do
     assert state.entries == []
     assert state.rev == 0
     assert state.stats == %{entry_count: 0}
+    refute state.replay?
+    assert state.entry_receipts == []
   end
 
   test "append creates typed entries with deterministic IDs and input timestamps" do
@@ -61,6 +63,15 @@ defmodule AikidoTest.Thread.Actions.AppendTest do
     assert entry.at == 123
     assert entry.kind == :message
     assert entry.refs == %{"source" => "caller"}
+  end
+
+  test "ordinary threads append without retaining immutable replay receipts" do
+    state = Ash.create!(Aikido.Thread.Slice, %{})
+    assert {:ok, result} = append(state, %{id: "ordinary", payload: %{text: "hello"}})
+    refute Map.has_key?(result.changes, :entry_receipts)
+    adopted = Ash.update!(state, result.changes, action: :update)
+    assert adopted.entry_receipts == []
+    assert {:error, _} = Aikido.Thread.Journal.require_replay(adopted)
   end
 
   test "invalid entries reject the complete batch without changing the original state" do

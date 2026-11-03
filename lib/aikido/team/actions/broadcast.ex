@@ -10,7 +10,8 @@ defmodule Aikido.Team.Actions.Broadcast do
 
     ActionAdapter.to_action_result(
       build_member_deliveries(signal.data, state, context, config),
-      state
+      state,
+      context
     )
   end
 

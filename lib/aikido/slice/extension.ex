@@ -54,6 +54,11 @@ defmodule Aikido.Slice.Extension do
     schema: [
       name: [type: :string, required: true],
       description: [type: :string],
+      singleton?: [
+        type: :boolean,
+        default: false,
+        doc: "Whether an agent may mount at most one instance of this slice module."
+      ],
       otp_app: [type: :atom],
       initialize: [
         type: {:spark_behaviour, Ash.Resource.Change},

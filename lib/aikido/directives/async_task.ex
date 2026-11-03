@@ -36,6 +36,12 @@ defmodule Aikido.Directives.AsyncTask do
       description "MFA or function to execute in a supervised task"
     end
 
+    field :cancel_on_owner_exit?, :boolean do
+      description "Retire this task's work process when the originating agent exits; external services may already have accepted its I/O."
+      default false
+      allow_nil? false
+    end
+
     field :success_type, :string do
       allow_nil? false
       default @default_success_type
@@ -103,9 +109,42 @@ defmodule Aikido.Directives.AsyncTask do
       Ash.ProcessHelpers.transfer_context(transfer)
 
       Ash.Tracer.span {:custom, :aikido_async_task}, "aikido.async_task", tracers do
-        run_work_and_send_result_signals(directive, input_signal, state, agent_pid)
+        if directive.cancel_on_owner_exit?,
+          do: run_owned_work(directive, input_signal, state, agent_pid),
+          else: run_work_and_send_result_signals(directive, input_signal, state, agent_pid)
       end
     end)
+  end
+
+  defp run_owned_work(directive, input_signal, state, agent_pid) do
+    owner_ref = Process.monitor(agent_pid)
+
+    if Process.alive?(agent_pid) do
+      transfer =
+        Ash.ProcessHelpers.get_context_for_transfer(
+          tracer: Signal.tracers(input_signal, state.aikido)
+        )
+
+      task =
+        Task.async(fn ->
+          Ash.ProcessHelpers.transfer_context(transfer)
+          run_work_and_send_result_signals(directive, input_signal, state, agent_pid)
+        end)
+
+      receive do
+        {ref, :ok} when ref == task.ref ->
+          Process.demonitor(task.ref, [:flush])
+          Process.demonitor(owner_ref, [:flush])
+          :ok
+
+        {:DOWN, ^owner_ref, :process, ^agent_pid, _reason} ->
+          Task.shutdown(task, :brutal_kill)
+          :ok
+      end
+    else
+      Process.demonitor(owner_ref, [:flush])
+      :ok
+    end
   end
 
   @spec run_work_and_send_result_signals(

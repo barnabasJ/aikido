@@ -62,6 +62,12 @@ defmodule Aikido.Team.Extension do
           "Own-state attributes copied to members at creation; explicit member initial values take precedence."
       ],
       max_members: [type: :pos_integer, default: 128],
+      roster_history?: [
+        type: :boolean,
+        default: false,
+        doc:
+          "Retain membership facts for optional replay consumers; disabled for ordinary notification-only teams."
+      ],
       operation_timeout: [type: :pos_integer, default: 5_000]
     ]
   }

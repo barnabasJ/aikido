@@ -102,8 +102,22 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
       Enum.filter(entities, &(match?(%Aikido.Agent.Route{}, &1) && &1.public?))
 
     {dsl, declared_signals, aliases} = resolve_local_actions(dsl, declared_signals, resource)
-    inherited = inherited_signals(mounts, declared_signals)
+    inherited_routes = inherited_signals(mounts, declared_signals)
+
+    inherited =
+      inherited_routes
+      |> Enum.reject(fn route -> Enum.any?(declared_signals, &(&1.name == route.name)) end)
+      |> Enum.uniq_by(&{&1.name, &1.action})
+
     signals = declared_signals ++ inherited
+
+    dsl =
+      Transformer.persist(
+        dsl,
+        :aikido_public_admission_routes,
+        declared_signals ++ inherited_routes
+      )
+
     dsl = Enum.reduce(inherited, dsl, &Transformer.add_entity(&2, [:agent], &1))
 
     dsl = add_state_attributes(dsl)
@@ -269,18 +283,25 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
         {resource, name} = Aikido.Slice.Info.action_reference(mount.module, route.action),
         action = Ash.Resource.Info.action(resource, name),
         match?(%{public?: true}, action),
-        command_name = route.name || inherited_name(route, resource, action.name),
-        !Enum.any?(declared, &(&1.name == command_name)) do
+        command_name = admission_name(route, resource, action.name, declared) do
       %Aikido.Agent.Route{
         name: command_name,
         type: route.type,
         action: {resource, action.name},
         signal_module: route.signal_module,
         implementation: route.implementation,
+        match: route.match,
+        priority: route.priority,
         public?: true
       }
     end
-    |> Enum.uniq_by(&{&1.name, &1.action})
+  end
+
+  defp admission_name(route, resource, action, declared) do
+    case Enum.find(declared, &(&1.type == route.type && &1.action == {resource, action})) do
+      nil -> route.name || inherited_name(route, resource, action)
+      explicit -> explicit.name
+    end
   end
 
   defp inherited_name(%{signal_module: module}, resource, action) when not is_nil(module) do

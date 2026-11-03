@@ -17,11 +17,32 @@ defmodule Aikido.Agent.Extension.Verifiers.Validate do
   @impl true
   def verify(dsl) do
     with :ok <- validate_public_names(dsl),
+         :ok <- validate_admission_targets(dsl),
          :ok <- validate_signal_definitions(dsl),
          :ok <- validate_schedule_ids(dsl),
          :ok <- validate_codec_pairs(dsl),
          :ok <- validate_route_actions(dsl) do
       validate_state_paths(dsl)
+    end
+  end
+
+  defp validate_admission_targets(dsl) do
+    conflict =
+      dsl
+      |> Verifier.get_persisted(:aikido_public_admission_routes, [])
+      |> Enum.group_by(& &1.name)
+      |> Enum.find(fn {_name, routes} ->
+        routes |> Enum.map(& &1.action) |> Enum.uniq() |> length() > 1
+      end)
+
+    case conflict do
+      nil ->
+        :ok
+
+      {name, _routes} ->
+        error(
+          "Public route #{inspect(name)} refers to unrelated targets. Give each target an explicit distinct route name so its native command owns its input contract and policy."
+        )
     end
   end
 

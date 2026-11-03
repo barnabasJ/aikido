@@ -6,7 +6,12 @@ defmodule Aikido.Team.Actions.TaskFailed do
   @impl true
   def run(input, _opts, _context) do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
-    ActionAdapter.to_action_result(record_task_failure(signal, state, context, config), state)
+
+    ActionAdapter.to_action_result(
+      record_task_failure(signal, state, context, config),
+      state,
+      context
+    )
   end
 
   defp record_task_failure(signal, state, context, _config) do

@@ -9,7 +9,8 @@ defmodule Aikido.Team.Actions.StopMember do
 
     ActionAdapter.to_action_result(
       pause_member_and_descendants(signal, state, context, config),
-      state
+      state,
+      context
     )
   end
 

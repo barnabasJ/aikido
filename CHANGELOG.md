@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Add optional Thread replay with explicit source opt-in, immutable entry
+  receipts, bounded consumer demand and a native save boundary before Batch
+  publication. Correlated replies retain consumer authority and reject forged
+  private typed ingress. Ordinary Thread appends avoid replay receipt work.
+
+- Allow AsyncTask work processes to retire with their originating agent using
+  `cancel_on_owner_exit?: true`; external services retain their own transaction
+  and cancellation semantics.
+
+- Require distinct explicit public command names for unrelated mounted route
+  targets. Retain alternate spellings and predicates during owner admission so
+  no-op reducers still check the correct public policy. See `guides/thread-replay.md`.
+
 - Bind authenticated durable activations to their execution scope. Correlated
   team and ownership messages preserve the recipient's authority, while public
   commands keep caller authorization. Changing AI execution identity requires

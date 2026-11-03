@@ -186,14 +186,7 @@ defmodule Aikido.Directives do
   """
   @spec async_task(work :: AsyncTask.work(), opts :: keyword()) :: AsyncTask.t()
   def async_task(work, opts \\ []) do
-    %AsyncTask{
-      work: work,
-      success_type: Keyword.get(opts, :success_type, "aikido.async_task.completed"),
-      error_type: Keyword.get(opts, :error_type, "aikido.async_task.failed"),
-      payload: Keyword.get(opts, :payload, %{}),
-      source: Keyword.get(opts, :source),
-      target: Keyword.get(opts, :target)
-    }
+    AsyncTask.new!(Keyword.put(opts, :work, work))
   end
 
   @doc """

@@ -17,6 +17,12 @@ defmodule Aikido.Team.ActionAdapter do
   end
 
   @doc "Compare a team transition with its input and return changed attributes, preserving errors."
+  def to_action_result(result, previous, context) do
+    result
+    |> Aikido.Team.Roster.record(previous, context)
+    |> to_action_result(previous)
+  end
+
   def to_action_result({:ok, state, directives}, previous) do
     attributes = Enum.map(Ash.Resource.Info.attributes(Aikido.Team.Slice), & &1.name)
 

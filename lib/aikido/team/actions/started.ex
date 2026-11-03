@@ -10,7 +10,8 @@ defmodule Aikido.Team.Actions.Started do
 
     ActionAdapter.to_action_result(
       adopt_started_member(signal.data, state, context, config),
-      state
+      state,
+      context
     )
   end
 

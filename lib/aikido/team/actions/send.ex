@@ -10,7 +10,8 @@ defmodule Aikido.Team.Actions.Send do
 
     ActionAdapter.to_action_result(
       build_member_delivery(signal.data, state, context, config),
-      state
+      state,
+      context
     )
   end
 

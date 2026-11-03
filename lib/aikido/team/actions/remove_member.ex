@@ -9,7 +9,8 @@ defmodule Aikido.Team.Actions.RemoveMember do
 
     ActionAdapter.to_action_result(
       remove_member_and_dependents(signal, state, context, config),
-      state
+      state,
+      context
     )
   end
 

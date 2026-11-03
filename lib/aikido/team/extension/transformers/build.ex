@@ -28,6 +28,7 @@ defmodule Aikido.Team.Extension.Transformers.Build do
       state_path: Transformer.get_option(dsl, [:agent], :path, :state),
       topology: %Aikido.Team.Topology{nodes: Map.merge(raw, definitions)},
       max_members: limit,
+      roster_history?: Transformer.get_option(dsl, [:team], :roster_history?, false),
       timeout: Transformer.get_option(dsl, [:team], :operation_timeout, 5_000),
       workers: Map.new(workers, &{&1.name, Map.from_struct(&1)})
     }
@@ -39,18 +40,22 @@ defmodule Aikido.Team.Extension.Transformers.Build do
     Code.ensure_compiled!(Aikido.Team.Slice)
 
     dsl
-    |> mount_team_slice()
+    |> mount_team_slice(config)
     |> Transformer.persist(:aikido_team_config, config)
     |> then(&{:ok, &1})
   end
 
-  defp mount_team_slice(dsl) do
+  defp mount_team_slice(dsl, config) do
     dsl
     |> Transformer.persist(:aikido_team_slice, Aikido.Team.Slice)
     |> Transformer.add_entity([:agent], %Aikido.Agent.SliceMount{
       path: :team,
       module: Aikido.Team.Slice,
-      options: []
+      options:
+        if(config.roster_history?,
+          do: [membership_journal: %{id: "team-membership", replay?: true}],
+          else: []
+        )
     })
   end
 end

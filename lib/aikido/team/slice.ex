@@ -5,6 +5,10 @@ defmodule Aikido.Team.Slice do
     extensions: [Aikido.Slice.Extension]
 
   attributes do
+    attribute :membership_journal, Aikido.Thread.Slice do
+      description "Retained membership changes and acknowledged roster followers, without persisted PIDs."
+    end
+
     attribute :topology, Aikido.Team.Topology do
       description "Desired member resources, ownership and dependencies for this team."
       public? true
@@ -91,6 +95,14 @@ defmodule Aikido.Team.Slice do
     route Aikido.Team.Signals.StopMember, Aikido.Team.Actions.StopMember
     route Aikido.Team.Signals.Send, Aikido.Team.Actions.Send
     route Aikido.Team.Signals.Broadcast, Aikido.Team.Actions.Broadcast
+    route Aikido.Team.Signals.FollowRoster, Aikido.Team.Actions.FollowRoster
+    route Aikido.Team.Signals.AckRoster, Aikido.Team.Actions.AckRoster
+    route Aikido.Team.Signals.UnfollowRoster, Aikido.Team.Actions.UnfollowRoster
+    route Aikido.Team.Signals.RetryRoster, Aikido.Team.Actions.RetryRoster, public?: false
+
+    route Aikido.AgentServer.Signals.LifecycleReady, Aikido.Team.Actions.ResumeRoster,
+      public?: false
+
     route Aikido.Team.Signals.AssignTask, Aikido.Team.Actions.AssignTask
     route Aikido.Team.Signals.BackgroundTask, Aikido.Team.Actions.BackgroundTask
     route Aikido.Team.Signals.Cleanup, Aikido.Team.Actions.Cleanup, public?: false

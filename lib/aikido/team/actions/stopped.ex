@@ -9,7 +9,8 @@ defmodule Aikido.Team.Actions.Stopped do
 
     ActionAdapter.to_action_result(
       remove_stopped_member(signal.data, state, context, config),
-      state
+      state,
+      context
     )
   end
 

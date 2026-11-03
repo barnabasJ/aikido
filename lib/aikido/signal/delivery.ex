@@ -1,7 +1,7 @@
 defmodule Aikido.Signal.Delivery do
   @moduledoc "Internal correlated delivery that preserves recipient-owned execution authority."
 
-  @protocols [Aikido.Team.Delivery, Aikido.Ownership.Delivery]
+  @protocols [Aikido.Team.Delivery, Aikido.Ownership.Delivery, Aikido.Thread.Delivery]
 
   @doc "Send one internal signal with runtime-owned sender and parent provenance."
   def send(protocol, target, signal, runtime, correlation) when protocol in @protocols do
@@ -28,11 +28,17 @@ defmodule Aikido.Signal.Delivery do
       )
       when protocol in @protocols and is_map(correlation) do
     if protocol.permitted?(runtime, sender, signal, correlation),
-      do: {:ok, bind_scope(runtime, sender, signal)},
+      do: {:ok, delivery_scope(runtime, protocol, sender, signal, correlation)},
       else: :ignore
   end
 
   def receive_signal(_runtime, _protocol, _sender, _signal, _correlation), do: :ignore
+
+  defp delivery_scope(_runtime, Aikido.Thread.Delivery, _sender, signal, %{kind: :request}),
+    do: signal
+
+  defp delivery_scope(runtime, _protocol, sender, signal, _correlation),
+    do: bind_scope(runtime, sender, signal)
 
   defp bind_scope(%{bound_execution_scope: nil}, _sender, signal), do: signal
 

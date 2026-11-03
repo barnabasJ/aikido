@@ -30,7 +30,7 @@ defmodule AikidoTest.Thread.Actions.ClearTest do
 
     assert {:ok, again} = clear(updated, signal)
     assert again.changes.rev == 4
-    assert again.changes.entries == []
+    assert Map.get(again.changes, :entries, updated.entries) == []
   end
 
   defp clear(state, signal) do

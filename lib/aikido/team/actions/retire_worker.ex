@@ -19,6 +19,6 @@ defmodule Aikido.Team.Actions.RetireWorker do
         {:ok, state, []}
       end
 
-    Aikido.Team.ActionAdapter.to_action_result(result, state)
+    Aikido.Team.ActionAdapter.to_action_result(result, state, context)
   end
 end

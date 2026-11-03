@@ -6,37 +6,15 @@ defmodule Aikido.Thread.Actions.Append do
   def run(input, _opts, _context) do
     %Ash.Union{value: entry} = input.arguments.entry
     thread = input.arguments.state
-    now = Aikido.Signal.timestamp(get_in(input.context, [:aikido, :signal]))
+    context = input.context[:aikido] || %{signal: %Aikido.Signal{type: "aikido.thread.append"}}
 
-    with {:ok, entries} <- stamp_and_cast_entries(List.wrap(entry), thread, now) do
-      append_entries(thread, entries, now)
+    with {:ok, updated} <- Aikido.Thread.Journal.append(thread, entry, context.signal) do
+      {updated, directives} = Aikido.Thread.Followers.offer_all(updated, context, :thread)
+
+      Aikido.Types.ActionResult.new(
+        changes: Aikido.Thread.Journal.changes(thread, updated),
+        directives: directives
+      )
     end
-  end
-
-  defp append_entries(thread, entries, now) do
-    count = length(entries)
-
-    Aikido.Types.ActionResult.new(
-      changes: %{
-        entries: thread.entries ++ entries,
-        rev: thread.rev + count,
-        updated_at: now,
-        stats: %{thread.stats | entry_count: thread.stats.entry_count + count}
-      }
-    )
-  end
-
-  defp stamp_and_cast_entries(entries, thread, now) do
-    entries
-    |> Enum.with_index(length(thread.entries))
-    |> Enum.map(fn {attrs, sequence} -> stamp_entry(attrs, sequence, thread, now) end)
-    |> then(&Ash.Type.cast_input({:array, Aikido.Thread.Types.Entry}, &1))
-  end
-
-  defp stamp_entry(attrs, sequence, thread, now) do
-    attrs
-    |> Map.put(:seq, sequence)
-    |> Map.put_new(:id, Map.get(attrs, "id", "#{thread.id}:#{thread.rev}:#{sequence}"))
-    |> Map.put_new(:at, Map.get(attrs, "at", now))
   end
 end

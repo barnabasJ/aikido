@@ -10,7 +10,8 @@ defmodule Aikido.Team.Actions.TaskTimeout do
 
     ActionAdapter.to_action_result(
       expire_task_and_request_cancellation(signal.data, state, context, config),
-      state
+      state,
+      context
     )
   end
 

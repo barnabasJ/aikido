@@ -197,6 +197,15 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
     assert Aikido.Agent.Info.slice_paths_for_action(resource)[{Counter, :matched}] ==
              [:counter, :other]
 
+    command =
+      resource
+      |> Spark.Dsl.Extension.get_entities([:agent])
+      |> Enum.find(&(&1.name == :matched))
+
+    assert command.priority == -15
+    assert command.match.(Aikido.Signal.new!("mounted.matched", %{allowed: true}))
+    refute command.match.(Aikido.Signal.new!("mounted.matched", %{allowed: false}))
+
     assert Enum.any?(Aikido.Agent.Info.routes(resource), fn
              {"mounted.matched", predicate, {Counter, :matched}, -15} ->
                is_function(predicate, 1)
@@ -283,7 +292,7 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
   end
 
   test "unrelated public targets still conflict unless explicitly overridden" do
-    for override? <- [false, true] do
+    for override <- [:none, :ambiguous, :renamed] do
       resource = Module.concat(__MODULE__, "Conflict#{System.unique_integer([:positive])}")
 
       output =
@@ -309,13 +318,14 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
               name "conflicting_routes"
               slice :counter, #{inspect(Counter)}
               slice :other, #{inspect(resource)}.Slice
-              #{if override?, do: "route \"mounted.local\", {#{inspect(Counter)}, :local}", else: ""}
+              #{if override != :none, do: "route \"mounted.local\", {#{inspect(Counter)}, :local}", else: ""}
+              #{if override == :renamed, do: "route \"other.local\", {#{inspect(resource)}.Slice, :local}, name: :other_local", else: ""}
             end
           end
           """)
         end)
 
-      if override? do
+      if override == :renamed do
         assert output == ""
 
         assert [%{action: {Counter, :local}}] =
@@ -323,7 +333,9 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
                  |> Spark.Dsl.Extension.get_entities([:agent])
                  |> Enum.filter(&match?(%Aikido.Agent.Route{name: :local}, &1))
       else
-        assert output =~ "Public route names must be unique: :local"
+        if override == :ambiguous,
+          do: assert(output =~ "refers to unrelated targets"),
+          else: assert(output =~ "Public route names must be unique: :local")
       end
     end
   end

@@ -97,6 +97,7 @@ defmodule Aikido.Agent.Extension do
     verifiers: [
       Aikido.Agent.Extension.Verifiers.Validate,
       Aikido.Agent.Extension.Verifiers.UniquePaths,
+      Aikido.Agent.Extension.Verifiers.SingletonSlices,
       Aikido.Agent.Extension.Verifiers.Composition
     ]
 end

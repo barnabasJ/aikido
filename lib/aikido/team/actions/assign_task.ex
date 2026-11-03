@@ -14,7 +14,8 @@ defmodule Aikido.Team.Actions.AssignTask do
     with :ok <- Aikido.Team.TaskDependencies.validate_assignment(state, signal.data) do
       ActionAdapter.to_action_result(
         assign_or_activate_member(signal, state, context, config),
-        state
+        state,
+        context
       )
     end
   end

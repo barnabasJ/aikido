@@ -9,6 +9,6 @@ defmodule Aikido.Team.Actions.Failed do
 
     signal.data
     |> TopologyOperation.fail_operation_and_pending_tasks(state, context)
-    |> ActionAdapter.to_action_result(state)
+    |> ActionAdapter.to_action_result(state, context)
   end
 end

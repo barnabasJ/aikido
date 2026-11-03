@@ -1154,25 +1154,56 @@ defmodule Aikido.AgentServer do
     end
   end
 
+  def handle_info(
+        {Aikido.Signal.Delivery, Aikido.Thread.Delivery, sender, signal,
+         %{kind: :request} = delivery},
+        state
+      ) do
+    case Aikido.Signal.Delivery.receive_signal(
+           state,
+           Aikido.Thread.Delivery,
+           sender,
+           signal,
+           delivery
+         ) do
+      {:ok, signal} ->
+        case process_signal(state, signal, %{
+               protocol: Aikido.Thread.Delivery,
+               sender: sender,
+               kind: :request
+             }) do
+          {:ok, next, _directives} ->
+            {:noreply, next}
+
+          {:error, next, error} ->
+            :ok = Aikido.Thread.Delivery.reject(next, sender, signal, error)
+            {:noreply, next}
+
+          {:stop, reason, next} ->
+            {:stop, reason, finish_signal_stop(next, reason, signal)}
+        end
+
+      :ignore ->
+        {:noreply, state}
+    end
+  end
+
   def handle_info({Aikido.Signal.Delivery, protocol, sender, signal, delivery}, state) do
     case Aikido.Signal.Delivery.receive_signal(state, protocol, sender, signal, delivery) do
-      {:ok, signal} -> handle_info({:signal, signal}, state)
-      :ignore -> {:noreply, state}
+      {:ok, signal} ->
+        handle_signal_info(state, signal, %{
+          protocol: protocol,
+          sender: sender,
+          kind: Map.get(delivery, :kind)
+        })
+
+      :ignore ->
+        {:noreply, state}
     end
   end
 
-  def handle_info({:signal, %Signal{} = signal}, state) do
-    case process_signal(state, signal) do
-      {:ok, new_state, _directives} ->
-        {:noreply, new_state}
-
-      {:error, committed_state, _reason} ->
-        {:noreply, committed_state}
-
-      {:stop, reason, new_state} ->
-        {:stop, reason, finish_signal_stop(new_state, reason, signal)}
-    end
-  end
+  def handle_info({:signal, %Signal{} = signal}, state),
+    do: handle_signal_info(state, signal, nil)
 
   def handle_info(message, state) do
     case Aikido.Notifications.Receiver.receive_message(message, state.agent) do
@@ -1185,6 +1216,19 @@ defmodule Aikido.AgentServer do
       {:error, reason} ->
         Logger.error("Agent #{state.id} rejected notification: #{inspect(reason)}")
         {:noreply, state}
+    end
+  end
+
+  defp handle_signal_info(state, signal, delivery) do
+    case process_signal(state, signal, delivery) do
+      {:ok, new_state, _directives} ->
+        {:noreply, new_state}
+
+      {:error, committed_state, _reason} ->
+        {:noreply, committed_state}
+
+      {:stop, reason, new_state} ->
+        {:stop, reason, finish_signal_stop(new_state, reason, signal)}
     end
   end
 
@@ -1265,8 +1309,10 @@ defmodule Aikido.AgentServer do
 
   @spec process_signal(State.t(), Signal.t()) ::
           {:ok, State.t(), [struct()]} | {:error, State.t(), term()} | {:stop, term(), State.t()}
-  defp process_signal(%State{} = state, %Signal{} = signal) do
-    with_signal_span(state, signal, &do_process_signal(state, &1))
+  defp process_signal(state, signal, delivery \\ nil)
+
+  defp process_signal(%State{} = state, %Signal{} = signal, delivery) do
+    with_signal_span(state, signal, &do_process_signal(state, &1, delivery))
   end
 
   defp with_signal_span(state, signal, fun) do
@@ -1291,7 +1337,7 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  defp do_process_signal(%State{} = state, %Signal{} = signal) do
+  defp do_process_signal(%State{} = state, %Signal{} = signal, delivery) do
     start_time = System.monotonic_time()
     metadata = build_signal_metadata(state, signal)
 
@@ -1306,7 +1352,7 @@ defmodule Aikido.AgentServer do
     )
 
     try do
-      result = run_middleware_and_adopt_agent(signal, state)
+      result = run_middleware_and_adopt_agent(signal, state, delivery: delivery)
 
       emit_telemetry(
         [:aikido, :agent_server, :signal, :stop],
@@ -1371,12 +1417,13 @@ defmodule Aikido.AgentServer do
   defp run_middleware_and_adopt_agent(
          %Signal{} = signal,
          %State{middleware_chain: chain} = state,
-         opts \\ []
+         opts
        )
        when is_function(chain, 2) do
     ctx =
       build_signal_ctx(signal, state)
       |> Map.put(:__allow_unhandled__, Keyword.get(opts, :allow_unhandled?, false))
+      |> Map.put(:__delivery__, Keyword.get(opts, :delivery))
 
     case chain.(signal, ctx) do
       {:ok, new_ctx, directives} ->
@@ -1666,21 +1713,26 @@ defmodule Aikido.AgentServer do
 
   @doc false
   def apply_actions(%Signal{} = signal, ctx, targets) do
-    case Ash.transact(ctx.agent_module, fn -> stage_actions!(signal, ctx, targets) end,
-           return_notifications?: true,
-           tenant: Map.get(ctx, :tenant)
-         ) do
-      {:ok, {proposed, notifications, directives}, nested_notifications} ->
-        notices =
-          Enum.flat_map(nested_notifications ++ notifications, fn
-            %Ash.Notifier.Notification{for: []} -> []
-            notification -> [%Aikido.Directives.Notify{notification: notification}]
-          end)
+    with :ok <- Aikido.Thread.Delivery.admit(signal, ctx),
+         :ok <- Aikido.Agent.SignalAdmission.authorize(signal, ctx, targets) do
+      case Ash.transact(ctx.agent_module, fn -> stage_actions!(signal, ctx, targets) end,
+             return_notifications?: true,
+             tenant: Map.get(ctx, :tenant)
+           ) do
+        {:ok, {proposed, notifications, directives}, nested_notifications} ->
+          notices =
+            Enum.flat_map(nested_notifications ++ notifications, fn
+              %Ash.Notifier.Notification{for: []} -> []
+              notification -> [%Aikido.Directives.Notify{notification: notification}]
+            end)
 
-        {:ok, proposed, notices ++ directives}
+          {:ok, proposed, notices ++ directives}
 
-      {:error, error} ->
-        {:error, ctx, error}
+        {:error, error} ->
+          {:error, ctx, error}
+      end
+    else
+      {:error, error} -> {:error, ctx, error}
     end
   rescue
     error -> {:error, ctx, Ash.Error.to_error_class(error)}

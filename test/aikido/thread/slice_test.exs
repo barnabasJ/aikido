@@ -30,7 +30,13 @@ defmodule AikidoTest.Thread.SliceTest do
                action_set,
                MapSet.new([
                  {Aikido.Thread.Slice, :append},
-                 {Aikido.Thread.Slice, :clear}
+                 {Aikido.Thread.Slice, :clear},
+                 {Aikido.Thread.Slice, :follow},
+                 {Aikido.Thread.Slice, :ack},
+                 {Aikido.Thread.Slice, :unfollow},
+                 {Aikido.Thread.Slice, :prune},
+                 {Aikido.Thread.Slice, :retry},
+                 {Aikido.Thread.Slice, :lifecycle_ready}
                ])
              )
     end

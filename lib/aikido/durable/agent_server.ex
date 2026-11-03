@@ -196,6 +196,10 @@ defmodule Aikido.Durable.AgentServer do
     wrap_runtime_reply(result, state)
   end
 
+  def handle_info({:aikido_journal_sync, directive, input}, state) do
+    {:noreply, state, {:continue, {:aikido_journal_synced, directive, input}}, sync: true}
+  end
+
   def handle_info(:aikido_missing_parent, %{unresolved_parent: parent} = state)
       when not is_nil(parent) do
     if is_nil(Aikido.Ownership.parent(state.runtime)) do
@@ -209,6 +213,11 @@ defmodule Aikido.Durable.AgentServer do
     do: wrap_runtime_reply(AgentServer.handle_info(message, state.runtime), state)
 
   @impl true
+  def handle_continue({:aikido_journal_synced, directive, input}, state) do
+    :ok = Aikido.Thread.Delivery.release(directive, input, state.runtime, state.runtime.agent)
+    {:noreply, state}
+  end
+
   def handle_continue(continue, state),
     do: wrap_runtime_reply(AgentServer.handle_continue(continue, state.runtime), state)
 

@@ -131,6 +131,30 @@ defmodule Aikido.Directives.AsyncTaskTest do
     :ok
   end
 
+  test "owned work is retired when its originating agent exits", %{agent: agent} do
+    observer = self()
+
+    directive =
+      Aikido.Directives.async_task(
+        fn ->
+          send(observer, {:owned_work_started, self()})
+
+          receive do
+            :finish -> {:ok, :finished}
+          end
+        end,
+        cancel_on_owner_exit?: true
+      )
+
+    assert :ok = run_directive(agent, directive)
+    assert_receive {:owned_work_started, worker}, 1_000
+    worker_ref = Process.monitor(worker)
+    owner_ref = Process.monitor(agent)
+    Process.exit(agent, :kill)
+    assert_receive {:DOWN, ^owner_ref, :process, ^agent, :killed}, 1_000
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, :killed}, 1_000
+  end
+
   test("wraps {:ok, result} in the configured success signal", %{agent: agent}) do
     test_pid = self()
 
