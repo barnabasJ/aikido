@@ -330,7 +330,9 @@ defmodule Aikido.Durable.AgentServer do
   defp restore_agent({:checkpoint, checkpoint}, agent_module, scope) do
     case agent_module.restore(checkpoint, %{scope: Map.new(scope)}) do
       {:ok, %Aikido.Agent{} = agent} ->
-        Aikido.Durable.Codec.transform_agent(agent, agent_module, :reinstate)
+        agent
+        |> Aikido.Durable.Codec.transform_agent(agent_module, :reinstate)
+        |> Aikido.Durable.MountedSchema.restore(agent_module, scope)
 
       other ->
         raise ArgumentError,

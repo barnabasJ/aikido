@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Restore physically older mounted records returned by opaque checkpoint
+  callbacks through native create actions after authentication. Preserve saved
+  field values and explicit nils while applying defaults to newly declared
+  fields; no claim is made about presence lost by an earlier typed decode.
+
 - Require runtime-correlated self delivery and an active writing credit before
   journal Work reaches an application action. Direct typed Work cannot start
   database work, including when it copies an existing batch range.

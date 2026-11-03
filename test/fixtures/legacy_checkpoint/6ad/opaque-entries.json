@@ -1,0 +1,1 @@
+[{"id":"opaque-first","at":123,"seq":0,"kind":"note","payload":{"text":"first original entry"}},{"id":"opaque-second","at":456,"seq":1,"kind":"note","payload":{"text":"second original entry"}}]

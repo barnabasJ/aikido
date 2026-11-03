@@ -207,13 +207,28 @@ defmodule Aikido.Durable.Snapshot do
   # example a stable cron job ID). Load the resource's compiled contracts before
   # safe decoding, just as its embedded types must be loaded before casting.
   defp load_declared_implementations(paths) do
+    Code.ensure_loaded!(Aikido.Agent)
     Code.ensure_loaded!(Aikido.Signal)
+
+    for {_path, {_kind, resource}} <- paths,
+        attribute <- Ash.Resource.Info.attributes(resource) do
+      load_declared_type(attribute.type, attribute.constraints)
+    end
 
     for {_path, {_kind, resource}} <- paths,
         action <- Ash.Resource.Info.actions(resource),
         {implementation, _options} <- List.wrap(Map.get(action, :run)) do
       Code.ensure_loaded!(implementation)
     end
+  end
+
+  defp load_declared_type({:array, type}, constraints),
+    do: load_declared_type(type, constraints[:items] || [])
+
+  defp load_declared_type(type, constraints) do
+    Code.ensure_loaded!(Ash.Type.get_type(type))
+
+    if instance = constraints[:instance_of], do: Code.ensure_loaded!(instance)
   end
 
   defp storage_type({:slice, resource} = owner, value) do
