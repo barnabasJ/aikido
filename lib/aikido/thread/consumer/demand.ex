@@ -174,7 +174,20 @@ defmodule Aikido.Thread.Consumer.Demand do
             data: Map.take(data, [:source, :path, :channel, :batch, :entries, :metadata])
           }
 
-          {%{state | credits: credits}, [Aikido.Directives.emit(work)]}
+          delivery =
+            Aikido.Thread.Directives.Deliver.new!(
+              target:
+                Aikido.Agent.Reference.new!(
+                  id: context.agent_id,
+                  resource: context.agent_module,
+                  aikido: context.aikido,
+                  partition: context.partition
+                ),
+              signal: work,
+              kind: :work
+            )
+
+          {%{state | credits: credits}, [delivery]}
         else
           {:error, _reason} ->
             fail_request(

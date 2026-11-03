@@ -75,10 +75,21 @@ that provenance. Arbitrary code running inside the BEAM is trusted runtime code.
 ## Consumer and SQL boundary
 
 Mount `Aikido.Thread.Consumer.Slice` once on an ordinary storage agent and route
-`Aikido.Thread.Consumer.Signals.Work` to an application action. That action returns
+`Aikido.Thread.Consumer.Signals.Work` to an application action. Work is admitted
+only through the consumer runtime’s internal self delivery and while its exact
+source and batch have a writing credit. A directly cast Work signal is rejected
+before the application action runs. That action returns
 an AsyncTask directive for the application's scoped database transaction. Emit
 `Committed` only after that transaction commits, or `Failed` on failure. The slice
-does not write SQL or infer database success.
+does not write SQL or infer database success. `Committed` is an application
+assertion, whether sent manually or returned by AsyncTask. Committed and Failed
+are public native commands so owner authorization runs even for unmatched,
+no-op settlements. Private source replies remain internal. It must match an
+active writing credit and its exact batch range. The application's native Ash
+policies must restrict this assertion to the actual writer identity; knowing a
+source address or batch range does not grant permission. Emit it only after the
+sink transaction has committed. Aikido does not independently verify an external
+database transaction.
 
 A credit covers one source request or a batch awaiting application commit. The
 configured window covers all sources in the current consumer incarnation. Credits

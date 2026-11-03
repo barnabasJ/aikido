@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Require runtime-correlated self delivery and an active writing credit before
+  journal Work reaches an application action. Direct typed Work cannot start
+  database work, including when it copies an existing batch range.
+
 - Add native retained-thread replay configuration preserving existing entry
   identity and sequence. Confirm source metadata with replay batches for
   application routing as data, preserving application authorization boundaries.

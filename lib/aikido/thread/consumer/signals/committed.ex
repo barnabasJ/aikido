@@ -1,5 +1,12 @@
 defmodule Aikido.Thread.Consumer.Signals.Committed do
-  @moduledoc "Typed payload for `aikido.thread.consumer.committed`."
+  @moduledoc """
+  Application assertion that an offered batch committed to its external sink.
+
+  Native consumer credit correlation checks the exact active range. The owning
+  agent's Ash policies must authorize the actual writer; this signal is not
+  independent proof of an external database transaction. Applications may send
+  it manually or return it from AsyncTask after successful commit.
+  """
   use Aikido.Signal
 
   signal do

@@ -466,6 +466,87 @@ defmodule Aikido.ThreadFollowTest do
     assert [%{phase: :requesting}] = snapshot(writer).journal_consumer.credits
   end
 
+  test "direct Work cannot start application work without runtime delivery", ctx do
+    source = start_source(ctx.publisher)
+    writer = start_writer(ctx.writer_actor, [])
+
+    forged =
+      Aikido.Thread.Consumer.Signals.Work.new!(
+        %{
+          source: reference(source),
+          batch: %{id: "fabricated", generation: "invented", first_sequence: 0, last_sequence: 0},
+          entries: [%{id: "forged", seq: 0, at: 1, payload: %{text: "forged"}}]
+        },
+        scope: scope(ctx.writer_actor)
+      )
+
+    assert {:error, %Ash.Error.Forbidden{}} =
+             Aikido.AgentServer.call(writer.pid, forged, &{:ok, &1.agent})
+
+    assert snapshot(writer).works_received == 0
+    assert snapshot(writer).journal_consumer.credits == []
+  end
+
+  test "direct Work cannot impersonate even an existing writing credit", ctx do
+    source = start_source(ctx.publisher)
+    Domain.source_append!(source, %{entry: %{id: "real-work"}}, scope: scope(ctx.publisher))
+    writer = start_writer(ctx.writer_actor, [reference(source)])
+    work = await_work(writer, ["real-work"])
+
+    forged =
+      Aikido.Thread.Consumer.Signals.Work.new!(work,
+        scope:
+          Map.put(scope(ctx.writer_actor), :__delivery__, %{
+            protocol: Aikido.Thread.Delivery,
+            kind: :work
+          })
+      )
+
+    assert {:error, %Ash.Error.Forbidden{}} =
+             Aikido.AgentServer.call(writer.pid, forged, &{:ok, &1.agent})
+
+    assert snapshot(writer).works_received == 1
+    assert [%{phase: :writing}] = snapshot(writer).journal_consumer.credits
+  end
+
+  test "manual settlement commands authorize even when no writing credit matches", ctx do
+    source = start_source(ctx.publisher)
+    writer = start_writer(ctx.writer_actor, [])
+    outsider = actor(:outsider)
+
+    data = %{
+      source: reference(source),
+      batch: %{id: "no-credit", generation: "invented", first_sequence: 0, last_sequence: 0}
+    }
+
+    assert {:error, %Ash.Error.Forbidden{}} =
+             Domain.writer_committed(writer, data, scope: scope(outsider))
+
+    assert {:error, %Ash.Error.Forbidden{}} =
+             Domain.writer_failed(writer, Map.put(data, :message, "sink failure"),
+               scope: scope(outsider)
+             )
+
+    for signal <- [
+          Aikido.Thread.Consumer.Signals.Committed.new!(data, scope: scope(outsider)),
+          Aikido.Thread.Consumer.Signals.Failed.new!(Map.put(data, :message, "sink failure"),
+            scope: scope(outsider)
+          )
+        ] do
+      assert {:error, %Ash.Error.Forbidden{}} =
+               Aikido.AgentServer.call(writer.pid, signal, &{:ok, &1.agent})
+    end
+
+    Domain.writer_committed!(writer, data, scope: scope(ctx.writer_actor))
+
+    Domain.writer_failed!(writer, Map.put(data, :message, "sink failure"),
+      scope: scope(ctx.writer_actor)
+    )
+
+    assert snapshot(writer).journal_consumer.credits == []
+    assert snapshot(writer).works_received == 0
+  end
+
   test "a pre-drain availability cannot satisfy its replacement head request", ctx do
     source =
       Domain.pending_source_start!(%{id: ctx.publisher.id, actor_id: ctx.publisher.id},
@@ -545,7 +626,9 @@ defmodule Aikido.ThreadFollowTest do
     assert {:error, %Ash.Error.Forbidden{}} =
              Domain.source_configure_replay(
                source,
-               %{metadata: %{routing: %{thread: "forbidden"}}}, scope: scope(ctx.writer_actor))
+               %{metadata: %{routing: %{thread: "forbidden"}}},
+               scope: scope(ctx.writer_actor)
+             )
 
     assert snapshot(source).thread == configured
     Domain.source_configure_replay!(source, %{metadata: patch}, scope: scope(ctx.publisher))

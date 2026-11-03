@@ -3,6 +3,6 @@ defmodule Aikido.Thread.Errors.UntrustedDelivery do
   use Splode.Error, class: :forbidden, fields: []
 
   def message(_error) do
-    "Journal replies require runtime-correlated source delivery. Use the public Follow or Watch command; a source address and request ID do not authenticate a private reply."
+    "Journal replies require runtime-correlated source delivery. Work additionally requires an active writing credit. Use the public Follow or Watch command; a source address and request ID do not authenticate a private reply or SQL work request."
   end
 end

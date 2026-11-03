@@ -1,4 +1,4 @@
 defmodule Aikido.Thread.Types.DeliveryKind do
-  @moduledoc "Whether journal delivery retains consumer request authority or binds the batch recipient."
-  use Ash.Type.Enum, values: [:request, :batch]
+  @moduledoc "Journal request, source reply or consumer-owned SQL-work delivery."
+  use Ash.Type.Enum, values: [:request, :batch, :work]
 end

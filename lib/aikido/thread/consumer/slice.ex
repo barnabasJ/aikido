@@ -115,11 +115,9 @@ defmodule Aikido.Thread.Consumer.Slice do
       name: :journal_unavailable,
       public?: false
 
-    route Aikido.Thread.Consumer.Signals.Committed, Aikido.Thread.Consumer.Actions.Committed,
-      public?: false
+    route Aikido.Thread.Consumer.Signals.Committed, Aikido.Thread.Consumer.Actions.Committed
 
-    route Aikido.Thread.Consumer.Signals.Failed, Aikido.Thread.Consumer.Actions.Failed,
-      public?: false
+    route Aikido.Thread.Consumer.Signals.Failed, Aikido.Thread.Consumer.Actions.Failed
 
     route Aikido.Thread.Consumer.Signals.RequestTimeout,
           Aikido.Thread.Consumer.Actions.RequestTimeout, public?: false

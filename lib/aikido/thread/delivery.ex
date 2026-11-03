@@ -18,7 +18,7 @@ defmodule Aikido.Thread.Delivery do
     "aikido.thread.rejected"
   ]
 
-  @doc "Admit private replies only when the receiving runtime verified their transport."
+  @doc "Admit private replies and reserved SQL work only after runtime transport verification."
   def admit(%{type: type}, context) when type in @replies do
     case context[:__delivery__] do
       %{protocol: __MODULE__, kind: :batch} ->
@@ -29,7 +29,31 @@ defmodule Aikido.Thread.Delivery do
     end
   end
 
+  def admit(%{type: "aikido.thread.consumer.work", data: data}, context) do
+    with %{protocol: __MODULE__, kind: :work} <- context[:__delivery__],
+         true <- reserved_work?(context.agent.state, data) do
+      :ok
+    else
+      _ ->
+        {:error, Ash.Error.to_error_class(Aikido.Thread.Errors.UntrustedDelivery.exception([]))}
+    end
+  end
+
   def admit(_signal, _context), do: :ok
+
+  defp reserved_work?(state, data) do
+    Enum.any?(Map.values(state), fn
+      %Aikido.Thread.Consumer.Slice{credits: credits} ->
+        Enum.any?(credits, fn credit ->
+          credit.phase == :writing && credit.source == data.source &&
+            credit.path == data.path && credit.channel == data.channel &&
+            credit.batch == data.batch
+        end)
+
+      _ ->
+        false
+    end)
+  end
 
   @doc "Release only a batch whose exact immutable range exists in the confirmed snapshot."
   def release(directive, input, runtime, confirmed_agent) do
@@ -103,6 +127,10 @@ defmodule Aikido.Thread.Delivery do
         aikido: runtime.aikido,
         partition: runtime.partition
       })
+  end
+
+  def permitted?(runtime, sender, %{type: "aikido.thread.consumer.work"}, %{kind: :work}) do
+    sender.pid == self() && Reference.matches?(Reference.from_runtime(runtime), sender)
   end
 
   def permitted?(_runtime, _sender, _signal, _correlation), do: false
