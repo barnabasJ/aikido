@@ -8,9 +8,12 @@ defmodule Aikido.AiReact.CancellableTask do
   """
   require Ash.Tracer
   require Logger
+  alias Aikido.AiReact.AttemptTiming
 
   @doc "Run bounded I/O attempts, retry eligible failures, and cancel when the owning run ends."
   def run_cancellable_attempts(owner, request_id, supervisor, work, opts) do
+    opts = Keyword.put(opts, :timing, AttemptTiming.resolve(opts[:timing]))
+
     selector = fn runtime ->
       run_active? =
         Enum.any?(runtime.agent.state, fn
@@ -27,7 +30,7 @@ defmodule Aikido.AiReact.CancellableTask do
       if run_active?, do: :skip, else: {:error, :cancelled}
     end
 
-    preflight_deadline = now() + remaining_timeout(opts)
+    preflight_deadline = now(opts) + remaining_timeout(opts)
 
     with {:ok, subscription} <-
            subscribe_for_cancellation(owner, selector, opts, preflight_deadline) do
@@ -36,7 +39,9 @@ defmodule Aikido.AiReact.CancellableTask do
       try do
         case read_run_after_subscription(owner, selector, opts, preflight_deadline) do
           {:ok, :skip} ->
-            execute_attempt(owner, supervisor, work, opts, subscription, monitor, 0)
+            if preflight_timeout(opts, preflight_deadline) == 0,
+              do: {:error, :timeout},
+              else: execute_attempt(owner, supervisor, work, opts, subscription, monitor, 0)
 
           {:error, :timeout} = expired ->
             expired
@@ -60,7 +65,10 @@ defmodule Aikido.AiReact.CancellableTask do
         {:error, :timeout}
 
       budget ->
-        Aikido.AgentServer.subscribe(owner, "ai.react.**", selector, once: true, timeout: budget)
+        Aikido.AgentServer.subscribe(owner, "ai.react.**", selector,
+          once: true,
+          timeout: AttemptTiming.control_timeout(opts[:timing], budget)
+        )
     end
   catch
     :exit, {:timeout, {GenServer, :call, _request}} -> {:error, :timeout}
@@ -72,14 +80,16 @@ defmodule Aikido.AiReact.CancellableTask do
         {:error, :timeout}
 
       budget ->
-        Aikido.AgentServer.state(owner, &{:ok, selector.(&1)}, timeout: budget)
+        Aikido.AgentServer.state(owner, &{:ok, selector.(&1)},
+          timeout: AttemptTiming.control_timeout(opts[:timing], budget)
+        )
     end
   catch
     :exit, {:timeout, {GenServer, :call, _request}} -> {:error, :timeout}
   end
 
   defp preflight_timeout(opts, preflight_deadline) do
-    max(0, min(preflight_deadline - now(), remaining_timeout(opts)))
+    max(0, min(preflight_deadline - now(opts), remaining_timeout(opts)))
   end
 
   defp execute_attempt(owner, supervisor, work, opts, sub, monitor, number) do
@@ -93,7 +103,7 @@ defmodule Aikido.AiReact.CancellableTask do
   end
 
   defp execute_live_attempt(owner, supervisor, work, opts, sub, monitor, number, timeout) do
-    deadline = now() + timeout
+    deadline = now(opts) + timeout
     parent = self()
     key = make_ref()
 
@@ -108,7 +118,7 @@ defmodule Aikido.AiReact.CancellableTask do
             sub,
             monitor,
             deadline,
-            now() + Keyword.get(opts, :progress_timeout, opts[:timeout]),
+            now(opts) + Keyword.get(opts, :progress_timeout, opts[:timeout]),
             opts,
             []
           )
@@ -120,12 +130,17 @@ defmodule Aikido.AiReact.CancellableTask do
     if retry_allowed?(result, number, opts) do
       delay = min(retry_delay(number, opts), remaining_timeout(opts))
 
-      receive do
-        {:aikido_subscription, ^sub, _} -> {:error, :cancelled}
-        {:DOWN, ^monitor, :process, _, _} -> {:error, :cancelled}
+      tag = {make_ref(), :aikido_attempt_backoff}
+      timer = AttemptTiming.schedule_at(opts[:timing], self(), tag, now(opts) + delay)
+
+      try do
+        receive do
+          {:aikido_subscription, ^sub, _} -> {:error, :cancelled}
+          {:DOWN, ^monitor, :process, _, _} -> {:error, :cancelled}
+          ^tag -> execute_attempt(owner, supervisor, work, opts, sub, monitor, number + 1)
+        end
       after
-        delay ->
-          execute_attempt(owner, supervisor, work, opts, sub, monitor, number + 1)
+        retire_timer(opts[:timing], timer, tag)
       end
     else
       result
@@ -137,7 +152,7 @@ defmodule Aikido.AiReact.CancellableTask do
 
     case opts[:deadline_at] do
       nil -> timeout
-      deadline -> max(0, min(timeout, deadline - System.system_time(:millisecond)))
+      deadline -> max(0, min(timeout, deadline - AttemptTiming.system_ms(opts[:timing])))
     end
   end
 
@@ -186,33 +201,51 @@ defmodule Aikido.AiReact.CancellableTask do
          opts,
          cleanups
        ) do
-    remaining = min(deadline, progress) - now()
-
     result =
-      if remaining <= 0 do
-        {:error, :timeout}
-      else
-        receive do
-          {^task_ref, value} ->
-            value
+      try do
+        remaining = min(deadline, progress) - now(opts)
 
-          {:DOWN, ^task_ref, :process, _, reason} ->
-            {:error, reason}
+        if remaining <= 0 do
+          {:error, :timeout}
+        else
+          tag = {key, make_ref(), :aikido_attempt_timeout}
+          timer = AttemptTiming.schedule_at(opts[:timing], self(), tag, min(deadline, progress))
 
-          {^key, :progress} ->
-            {:continue, now() + Keyword.get(opts, :progress_timeout, opts[:timeout]), cleanups}
+          try do
+            receive do
+              {^task_ref, value} ->
+                value
 
-          {^key, {:cleanup, cleanup}} ->
-            {:continue, progress, [cleanup | cleanups]}
+              {:DOWN, ^task_ref, :process, _, reason} ->
+                {:error, reason}
 
-          {:aikido_subscription, ^sub, _} ->
-            {:error, :cancelled}
+              {^key, :progress} ->
+                {:continue, now(opts) + Keyword.get(opts, :progress_timeout, opts[:timeout]),
+                 cleanups}
 
-          {:DOWN, ^monitor, :process, _, _} ->
-            {:error, :cancelled}
-        after
-          remaining -> {:error, :timeout}
+              {^key, {:cleanup, cleanup}} ->
+                {:continue, progress, [cleanup | cleanups]}
+
+              {:aikido_subscription, ^sub, _} ->
+                {:error, :cancelled}
+
+              {:DOWN, ^monitor, :process, _, _} ->
+                {:error, :cancelled}
+
+              ^tag ->
+                {:error, :timeout}
+
+              {^key, _retired_generation, :aikido_attempt_timeout} ->
+                {:continue, progress, cleanups}
+            end
+          after
+            retire_timer(opts[:timing], timer, tag)
+          end
         end
+      rescue
+        error -> {:error, error}
+      catch
+        kind, reason -> {:error, {kind, reason}}
       end
 
     case result do
@@ -253,5 +286,23 @@ defmodule Aikido.AiReact.CancellableTask do
     end
   end
 
-  defp now, do: System.monotonic_time(:millisecond)
+  defp retire_timer(timing, reference, tag) do
+    try do
+      AttemptTiming.cancel_timer(timing, reference)
+    rescue
+      _error ->
+        Logger.warning("Attempt timer cancellation failed; retired timer tags remain ignored.")
+    catch
+      _kind, _reason ->
+        Logger.warning("Attempt timer cancellation failed; retired timer tags remain ignored.")
+    after
+      receive do
+        ^tag -> :ok
+      after
+        0 -> :ok
+      end
+    end
+  end
+
+  defp now(opts), do: AttemptTiming.monotonic_ms(opts[:timing])
 end

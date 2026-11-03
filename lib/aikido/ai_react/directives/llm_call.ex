@@ -161,6 +161,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
   defp execution_options(d, scope) do
     [
       tracer: scope[:tracer],
+      timing: get_in(scope, [:context, :aikido_attempt_timing]),
       timeout: d.options.model_timeout_ms,
       deadline_at: d.deadline_at,
       progress_timeout:

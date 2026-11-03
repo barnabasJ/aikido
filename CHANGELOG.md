@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add transient per-call attempt timing for deterministic model I/O deadlines,
+  progress windows and retry backoff. Production keeps System/Process defaults;
+  clock capabilities never become persisted AI configuration.
+
 - Add optional Thread replay with explicit source opt-in, immutable entry
   receipts, bounded consumer demand and a native save boundary before Batch
   publication. Correlated replies retain consumer authority and reject forged

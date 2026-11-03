@@ -744,3 +744,38 @@ envelope with the same reference and opaque recovery guidance. The diagnostic
 does not change retries, timeout/cancellation outcomes, native tool errors or
 the original internal error term. A reference is not evidence that retrying a
 partly completed effect is safe.
+
+
+## Deterministic attempt timing
+
+Cancellable model I/O uses a per-call timing capability. Production defaults use
+System clocks and Process timers. A trusted application or test can supply its
+own implementation of `Aikido.AiReact.AttemptTiming` through native call scope:
+
+```elixir
+scope = %{
+  actor: actor,
+  tenant: tenant,
+  context: %{aikido_attempt_timing: {MyAttemptClock, private_clock_context}}
+}
+```
+
+LLMCall forwards that value only into transient CancellableTask execution options.
+It is not an AI slice option, provider option, actor replacement or checkpoint
+attribute. Do not store timer callbacks or clock processes in durable agent state.
+The backend provides monotonic and system milliseconds, schedules a private tag
+at an absolute monotonic deadline, cancels superseded timers, and bounds actual
+native subscription/state transport through `control_timeout/2`.
+
+A manual test clock must control timer delivery as well as time reads. Attempt,
+progress and retry backoff wait on unique private tags. Progress rearms the
+progress window without moving the total attempt deadline. Stale canceled tags
+cannot expire another wait. Cleanup registration moves neither deadline. The
+production control timeout remains the logical remaining budget; a test backend
+can use a bounded failure ceiling for actual GenServer control calls while the
+separate logical clock remains authoritative for business deadlines.
+
+Drive real provider work and wait for its rearmed timer before advancing virtual
+time. Assertion receive timeouts then serve only as failure ceilings. This lets
+a stream last longer than one progress window while proving every actual content
+gap stays inside that window, without sleeps or fabricated agent state.
