@@ -31,24 +31,61 @@ defmodule Aikido.Team.Roster do
        Ash.Error.Action.InvalidArgument.exception(
          field: :path,
          message:
-           "Roster history is disabled. Configure `roster_history? true` in the team's DSL before starting it to retain membership for replay."
+           "Roster history is disabled. Use the owning configure_roster_replay command to enable a retained team, or configure `roster_history? true` before initial startup."
        )}
     else
       if Journal.next_sequence(journal) == 0 do
-        members =
-          Enum.map(state.topology.nodes, fn {name, spec} -> member(name, spec, state, context) end)
-
-        entry = %{
-          id: "#{context.signal.id}/roster",
-          kind: :roster,
-          payload: %{event: :bootstrap, members: members}
-        }
+        entry = bootstrap_entry(state, context)
 
         Journal.append(journal, [entry], context.signal)
       else
         {:ok, journal}
       end
     end
+  end
+
+  @doc "Sparse native creation input that atomically records the current topology when enabling replay."
+  def initial_journal(state, metadata, context) do
+    now = Aikido.Signal.timestamp(context.signal)
+
+    entry =
+      bootstrap_entry(state, context)
+      |> Map.merge(%{
+        seq: 0,
+        at: now,
+        refs: %{
+          signal_id: context.signal.id,
+          signal_type: context.signal.type,
+          signal_time: now
+        }
+      })
+      |> Aikido.Thread.Types.Entry.new!()
+
+    with {:ok, receipt} <- Aikido.Thread.EntryReceipts.from_entry(entry) do
+      {:ok,
+       %{
+         id: "team-membership",
+         replay?: true,
+         metadata: metadata,
+         entries: [entry],
+         entry_receipts: [receipt],
+         rev: 1,
+         next_sequence: 1,
+         updated_at: now,
+         stats: %{entry_count: 1}
+       }}
+    end
+  end
+
+  defp bootstrap_entry(state, context) do
+    members =
+      Enum.map(state.topology.nodes, fn {name, spec} -> member(name, spec, state, context) end)
+
+    %{
+      id: "#{context.signal.id}/roster",
+      kind: :roster,
+      payload: %{event: :bootstrap, members: members}
+    }
   end
 
   defp member_entries(previous, current, context) do
@@ -94,11 +131,11 @@ defmodule Aikido.Team.Roster do
 
         payload =
           case {event, previous.members[name]} do
-            {:stopped, %{resource: resource}} ->
-              Map.put(payload, :reference, reference(name, resource, previous, context))
+            {:stopped, pid} when is_pid(pid) ->
+              Map.put(payload, :reference, reference(name, before.resource, previous, context))
 
-            {:removed, %{resource: resource}} ->
-              Map.put(payload, :reference, reference(name, resource, previous, context))
+            {:removed, pid} when is_pid(pid) ->
+              Map.put(payload, :reference, reference(name, before.resource, previous, context))
 
             {:replaced, _} ->
               old_resource =
@@ -126,7 +163,7 @@ defmodule Aikido.Team.Roster do
 
   defp member(name, spec, state, context) do
     reference = reference(name, spec.resource, state, context)
-    active? = match?(%{resource: resource} when resource == spec.resource, state.members[name])
+    active? = is_pid(state.members[name])
 
     %{
       name: name,

@@ -11,6 +11,10 @@
   restart and stale timer deliveries do not reset the budget. Success or an
   explicit manual retry resets the count. Default retry limit remains zero.
 
+- Add a public Team roster replay configuration command for retained identities
+  whose membership journal was disabled. Native adoption creates the embedded
+  journal; authorized Follow bootstraps current topology without fake history.
+
 - Add native retained-thread replay configuration preserving existing entry
   identity and sequence. Confirm source metadata with replay batches for
   application routing as data, preserving application authorization boundaries.

@@ -95,6 +95,7 @@ defmodule Aikido.Team.Slice do
     route Aikido.Team.Signals.StopMember, Aikido.Team.Actions.StopMember
     route Aikido.Team.Signals.Send, Aikido.Team.Actions.Send
     route Aikido.Team.Signals.Broadcast, Aikido.Team.Actions.Broadcast
+    route Aikido.Team.Signals.ConfigureRosterReplay, Aikido.Team.Actions.ConfigureRosterReplay
     route Aikido.Team.Signals.FollowRoster, Aikido.Team.Actions.FollowRoster
     route Aikido.Team.Signals.AckRoster, Aikido.Team.Actions.AckRoster
     route Aikido.Team.Signals.UnfollowRoster, Aikido.Team.Actions.UnfollowRoster

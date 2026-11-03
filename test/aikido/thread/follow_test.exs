@@ -225,6 +225,37 @@ defmodule Aikido.ThreadFollowTest.Team do
   end
 end
 
+defmodule Aikido.ThreadFollowTest.OptionalRosterTeam do
+  @moduledoc "An ordinary team initially configured without retained roster history."
+  use Ash.Resource,
+    domain: Aikido.ThreadFollowTest.Domain,
+    authorizers: [Ash.Policy.Authorizer],
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
+
+  agent do
+    name "optional_roster_team"
+    persistence :permanent
+
+    schema do
+      attribute :actor_id, :string do
+        description "Authenticated owner of the retained team."
+        allow_nil? false
+      end
+    end
+  end
+
+  team do
+    inherit [:actor_id]
+    worker :source, Aikido.ThreadFollowTest.Source
+  end
+
+  policies do
+    policy always() do
+      authorize_if Aikido.ThreadFollowTest.SourcePolicy
+    end
+  end
+end
+
 defmodule Aikido.ThreadFollowTest.HoldRequest do
   use Ash.Resource.Actions.Implementation
 
@@ -321,6 +352,7 @@ defmodule Aikido.ThreadFollowTest.Domain do
     agent :pending_source, Aikido.ThreadFollowTest.PendingSource
     agent :writer, Aikido.ThreadFollowTest.Writer
     agent :journal_team, Aikido.ThreadFollowTest.Team
+    agent :optional_roster_team, Aikido.ThreadFollowTest.OptionalRosterTeam
   end
 end
 
@@ -1220,6 +1252,110 @@ defmodule Aikido.ThreadFollowTest do
       end,
       timeout: 5_000
     )
+  end
+
+  test "a retained nil roster journal bootstraps its actual current live membership", ctx do
+    team =
+      Domain.optional_roster_team_start!(
+        %{
+          id: ctx.publisher.id,
+          actor_id: ctx.publisher.id
+        },
+        scope: scope(ctx.publisher)
+      )
+
+    Domain.optional_roster_team_add_member!(
+      team,
+      %{member: :existing, template: :source, initial_state: %{thread: %{replay?: true}}},
+      scope: scope(ctx.publisher)
+    )
+
+    assert snapshot(team).team.membership_journal == nil
+    Domain.optional_roster_team_stop!(team, scope: scope(ctx.publisher))
+
+    restored =
+      Domain.optional_roster_team_start!(%{id: ctx.publisher.id, actor_id: ctx.publisher.id},
+        scope: scope(ctx.publisher)
+      )
+
+    Domain.optional_roster_team_reconcile!(restored, %{}, scope: scope(ctx.publisher))
+
+    retained =
+      await_state_value(
+        restored.pid,
+        fn runtime ->
+          team = runtime.agent.state.team
+          if is_pid(team.members[:existing]), do: team
+        end,
+        timeout: 5_000
+      )
+
+    assert is_pid(retained.members.existing)
+    assert retained.membership_journal == nil
+
+    assert {:error, %Ash.Error.Forbidden{}} =
+             Domain.optional_roster_team_configure_roster_replay(
+               restored,
+               %{metadata: %{routing: %{storage: "writer"}}},
+               scope: scope(ctx.writer_actor)
+             )
+
+    assert snapshot(restored).team.membership_journal == nil
+
+    Domain.optional_roster_team_configure_roster_replay!(restored, %{metadata: %{user: "keep"}},
+      scope: scope(ctx.publisher)
+    )
+
+    initialized = snapshot(restored).team.membership_journal
+    assert initialized.replay?
+    assert is_binary(initialized.generation)
+    assert [%{kind: :roster}] = initialized.entries
+
+    Domain.optional_roster_team_configure_roster_replay!(
+      restored,
+      %{metadata: %{routing: %{storage: "writer"}}},
+      scope: scope(ctx.publisher)
+    )
+
+    configured = snapshot(restored).team.membership_journal
+    assert configured.generation == initialized.generation
+    assert configured.metadata == %{user: "keep", routing: %{storage: "writer"}}
+
+    Domain.optional_roster_team_add_member!(
+      restored,
+      %{member: :later, template: :source, initial_state: %{thread: %{replay?: true}}},
+      scope: scope(ctx.publisher)
+    )
+
+    writer = start_writer(ctx.writer_actor, [])
+
+    Domain.writer_watch_journal!(
+      writer,
+      %{source: reference(restored), path: :team, channel: :roster},
+      scope: scope(ctx.writer_actor)
+    )
+
+    work =
+      await_state_value(
+        writer.pid,
+        fn runtime ->
+          work = Aikido.Agent.resource_attributes(runtime.agent).last_work
+          if work && work.channel == :roster, do: work
+        end,
+        timeout: 5_000
+      )
+
+    assert [%{kind: :roster, payload: %{event: :bootstrap, members: [member]}} | _] = work.entries
+    assert member.name == :existing
+    assert member.active?
+    assert member.incarnation == retained.incarnations.existing
+    assert member.reference.id == "#{restored.id}/existing"
+    assert member.reference.resource == Aikido.ThreadFollowTest.Source
+    discovered = Enum.map(snapshot(writer).journal_consumer.sources, & &1.source.id)
+    assert "#{restored.id}/existing" in discovered
+    assert "#{restored.id}/later" in discovered
+    assert work.metadata == configured.metadata
+    assert snapshot(restored).team.membership_journal.generation == initialized.generation
   end
 
   defp drain_until_entry(_writer, _actor, _id, _count, 0),

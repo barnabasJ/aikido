@@ -173,3 +173,13 @@ route "other.changed", {OtherSlice, :change}, name: :other_change
 The verifier rejects an ambiguous override. Alternate concrete signal spellings
 for one target retain their individual predicates and owning admission metadata.
 Private aliases remain private; public wildcard routes remain unsupported.
+
+### Enabling roster replay on retained teams
+
+Use the owning team's public `configure_roster_replay` command with
+`%{path: :team, metadata: %{routing: %{storage: "writer"}}}`. This explicitly
+initializes a previously disabled journal through the native embedded resource
+update. It preserves an existing journal's generation, entries, receipts and
+metadata, merging only the supplied metadata patch. Enabling replay atomically records the current topology before later membership
+changes can append facts. It does not invent earlier member joins or exits. Normal owner authorization is required even for a repeated,
+no-op configuration. Sources still authorize each reader independently.
