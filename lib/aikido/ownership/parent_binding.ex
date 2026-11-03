@@ -28,8 +28,8 @@ defmodule Aikido.Ownership.ParentBinding do
 
   def announce(%{parent: %ParentRef{} = parent}, context) do
     [
-      %Aikido.Directives.Emit{
-        target: parent.pid,
+      %Aikido.Ownership.Directives.AnnounceChild{
+        parent: parent,
         signal: %Aikido.Signal{
           type: "aikido.agent.child.started",
           data: %{

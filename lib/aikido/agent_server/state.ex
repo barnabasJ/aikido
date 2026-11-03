@@ -19,9 +19,14 @@ defmodule Aikido.AgentServer.State do
 
   @type status :: Aikido.AgentServer.Types.Status.t()
 
+  @derive {Inspect, except: [:bound_execution_scope]}
   use Ash.TypedStruct
 
   typed_struct do
+    field :bound_execution_scope, :map do
+      description "Transient authority authenticated by the durable scope adapter for this activation; never checkpointed."
+    end
+
     field :sync, Aikido.Durable.SyncPolicy do
       description "DurableServer synchronization policy used by this agent and inherited by spawned children."
       default %Aikido.Durable.SyncPolicy{}
@@ -140,6 +145,7 @@ defmodule Aikido.AgentServer.State do
       agent_module: agent_module,
       agent: agent,
       middleware_chain: Keyword.get(extra, :middleware_chain),
+      bound_execution_scope: Keyword.get(extra, :bound_execution_scope),
       debug_max_events: Aikido.Telemetry.Config.debug_max_events(opts.aikido)
     })
     |> new()

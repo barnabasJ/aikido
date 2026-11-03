@@ -379,7 +379,22 @@ authorization options reach Aikido's nested actions. The pinned Ash AI executor
 forwards actor, tenant and context to tool actions; its underlying calls do not
 forward per-call authorization or tracer options. Those actions use their own
 configured authorization and tracing. A later command supplies its own scope;
-startup and command scope are not durable agent identity.
+startup and command scope alone are not durable agent identity.
+When a durable ScopeAdapter authenticates a non-nil actor, the activation binds
+that execution scope in transient runtime state. Correlated team assignments
+execute as the receiving worker; results resume the receiving coordinator under
+its own bound identity. The sending agent is retained as provenance, not caller
+authority. Public commands keep their supplied scope and authorization, and an
+AI command with another actor or tenant is rejected with
+`Aikido.Agent.Errors.ExecutionIdentityRequiresRestart`. A staged credential change takes effect
+only after stopping and restarting the activation; restore authenticates the
+saved credential again. The bound runtime scope itself is not checkpointed.
+The generated `execution_identity_matches` command compares the native caller's
+actor and tenant against that immutable binding and returns only a boolean:
+`Domain.worker_execution_identity_matches!(worker, scope: requested_scope)`.
+It is authorized like other public commands and returns `false` when unbound.
+It reads neither staged identity attributes nor the AI run's caller. A matching
+result proves actor and tenant only, not token revision or credential freshness.
 Queued messages and deliveries must match the active run's actor and tenant;
 a different scope is rejected with `:scope_mismatch`. Worker queues retain each
 task's original scope in memory and discard those queued executions on restoration.
@@ -393,7 +408,12 @@ request_id)` starts a run when idle and queues input when busy; teams use this
 same interface to wake an orchestrator. `replace_context(messages)` installs
 caller-supplied conversation history while idle and refreshes the cached token
 estimate, such as after an externally prepared summary. It rejects replacement
-during an active or todo-waiting run.
+during an active or todo-waiting run. A successfully accepted
+delivery request ID is retained across subsequent runs and checkpoints: repeating
+it does not append the text or start another model run. Supply a new ID for new
+input. These receipts remain until the saved agent identity is deleted, so their
+storage grows with the number of distinct incoming deliveries. Authorization is
+checked before duplicate suppression.
 
 Pass `options` at agent startup, in `ai`, or per `ask`:
 

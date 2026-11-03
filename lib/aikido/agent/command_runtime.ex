@@ -19,6 +19,7 @@ defmodule Aikido.Agent.CommandRuntime do
 
   def reference(resource, id, pid), do: %{id: id, pid: pid, resource: resource}
 
+  def resolve(resource, %{pid: pid}) when is_pid(pid), do: resolve(resource, pid)
   def resolve(resource, %{id: id}), do: resolve(resource, id)
 
   def resolve(resource, id) when is_binary(id) do

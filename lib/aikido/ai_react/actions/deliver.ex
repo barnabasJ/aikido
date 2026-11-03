@@ -6,6 +6,10 @@ defmodule Aikido.AiReact.Actions.Deliver do
   request and records the incoming message's request ID and metadata. Otherwise,
   starts a new run with that text, request ID and metadata. Incoming messages
   must respect the active run's actor and tenant.
+
+  A successfully accepted request ID is retained for the agent's lifetime.
+  Repeating that delivery does not append text or start another model run,
+  including after a checkpoint is restored. Authorization still runs first.
   """
   use Ash.Resource.Actions.Implementation
   alias Aikido.AiReact.{HookQueue, RunState, RunCaller}
@@ -24,14 +28,25 @@ defmodule Aikido.AiReact.Actions.Deliver do
 
   defp accept_incoming_delivery(input) do
     with :ok <- RunCaller.validate_run_caller(input.arguments.state, input) do
-      result =
-        case input.arguments.state.status do
-          status when status in [:setup, :running] -> queue_incoming_conversation_text(input)
-          :waiting -> resume_waiting_conversation(input)
-          _ -> start_run_from_incoming_text(input)
-        end
+      if input.arguments.request_id in input.arguments.state.accepted_delivery_ids do
+        {:ok, input.arguments.state, []}
+      else
+        accept_new_delivery(input)
+      end
+    end
+  end
 
-      validate_incoming_todo_mount(result, input)
+  defp accept_new_delivery(input) do
+    result =
+      case input.arguments.state.status do
+        status when status in [:setup, :running] -> queue_incoming_conversation_text(input)
+        :waiting -> resume_waiting_conversation(input)
+        _ -> start_run_from_incoming_text(input)
+      end
+
+    with {:ok, state, directives} <- validate_incoming_todo_mount(result, input) do
+      accepted = [input.arguments.request_id | state.accepted_delivery_ids]
+      {:ok, %{state | accepted_delivery_ids: accepted}, directives}
     end
   end
 

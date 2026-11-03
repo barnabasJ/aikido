@@ -109,6 +109,7 @@ defmodule Aikido.Durable.AgentServer do
       saved_options
       |> Keyword.put(:parent, saved_parent)
       |> Keyword.put(:initialization_options, scope)
+      |> Keyword.put(:bound_execution_scope, if(adapter && scope[:actor], do: Map.new(scope)))
       |> restore_parent()
 
     unresolved_parent =

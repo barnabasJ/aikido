@@ -6,14 +6,25 @@ defmodule Aikido.Team.TaskDelivery do
   and correlation metadata to deliver. These functions perform no delivery I/O;
   the returned directives send the messages after state adoption.
   """
-  alias Aikido.Directives
   alias Aikido.Signal
 
   @doc "Build delivery directives for the task's configured notification recipient."
   def task_result_delivery_directives(task, state, context) do
     case task_result_recipient_pid(task, state, context) do
-      nil -> []
-      pid -> [Directives.emit_to_pid(conversation_message_for_task_result(task), pid)]
+      nil ->
+        []
+
+      pid ->
+        [
+          Aikido.Team.Delivery.directive(
+            conversation_message_for_task_result(task),
+            pid,
+            :result,
+            context,
+            request_id: task[:recipient_request_id],
+            active?: task[:recipient_active?] || false
+          )
+        ]
     end
   end
 

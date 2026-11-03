@@ -149,6 +149,12 @@ defmodule Aikido.AiReact.Slice do
         default %{}
       end
 
+      attribute :accepted_delivery_ids, {:array, :string} do
+        description "Accepted incoming delivery request IDs, retained across runs and checkpoints to prevent repeated conversation input."
+        default []
+        allow_nil? false
+      end
+
       attribute :options, Aikido.AiReact.Options do
         description "Execution limits, delivery controls and completion policy for this ReAct run."
         public? true

@@ -465,6 +465,8 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
         {:start, Aikido.Agent.Commands.Start, :map, arguments},
         {:inspect, Aikido.Agent.Commands.Inspect, :term,
          [reference_argument(), build_argument!(:fields, {:array, :atom}, [])]},
+        {:execution_identity_matches, Aikido.Agent.Commands.ExecutionIdentityMatches, :boolean,
+         [reference_argument()]},
         {:stop, Aikido.Agent.Commands.Stop, :map, [reference_argument()]},
         {:delete, Aikido.Agent.Commands.Delete, :map, [reference_argument()]},
         {:list, Aikido.Agent.Commands.List, {:array, :term},

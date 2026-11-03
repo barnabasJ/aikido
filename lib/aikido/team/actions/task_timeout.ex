@@ -2,7 +2,6 @@ defmodule Aikido.Team.Actions.TaskTimeout do
   @moduledoc "Fails a correlated task on timeout and returns cancellation and notification directives."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Team.{ActionAdapter, TaskDelivery}
-  alias Aikido.Directives
   alias Aikido.Signal
 
   @impl true
@@ -28,14 +27,16 @@ defmodule Aikido.Team.Actions.TaskTimeout do
 
             pid ->
               [
-                Directives.emit_to_pid(
+                Aikido.Team.Delivery.directive(
                   %Signal{
                     id: nil,
                     type: "harness.cancel_task",
                     data: %{task_id: task.id},
                     source: "/aikido"
                   },
-                  pid
+                  pid,
+                  :cancel,
+                  context
                 )
               ]
           end

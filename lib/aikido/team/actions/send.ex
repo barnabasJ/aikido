@@ -2,7 +2,6 @@ defmodule Aikido.Team.Actions.Send do
   @moduledoc "Returns a signal delivery directive for one running team member."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Team.ActionAdapter
-  alias Aikido.Directives
   alias Aikido.Signal
 
   @impl true
@@ -15,12 +14,12 @@ defmodule Aikido.Team.Actions.Send do
     )
   end
 
-  defp build_member_delivery(data, state, _context, _config) do
+  defp build_member_delivery(data, state, context, _config) do
     with {:ok, pid} <- Aikido.Team.MemberProcesses.fetch_running_member_pid(state, data.member) do
       signal =
         %Signal{id: nil, type: data.type, data: Map.get(data, :payload, %{}), source: "/ash/team"}
 
-      {:ok, state, [Directives.emit_to_pid(signal, pid)]}
+      {:ok, state, [Aikido.Team.Delivery.directive(signal, pid, :message, context)]}
     end
   end
 end

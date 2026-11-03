@@ -6,6 +6,7 @@ defmodule Aikido.Ownership.Messages do
       {%{pid: ^pid} = parent, expected} when is_nil(expected) or expected == ref ->
         Aikido.Ownership.Signals.ParentDied.new!(
           %{former_parent: parent, reason: reason, monitor_ref: ref},
+          scope: runtime.bound_execution_scope || %{},
           source: "/agent/#{runtime.id}"
         )
 
@@ -19,6 +20,7 @@ defmodule Aikido.Ownership.Messages do
       {tag, %{pid: ^pid, ref: expected} = child} when is_nil(expected) or expected == ref ->
         Aikido.Ownership.Signals.ChildExit.new!(
           %{tag: tag, pid: pid, reason: reason, monitor_ref: ref, child_id: child.id},
+          scope: runtime.bound_execution_scope || %{},
           source: "/agent/#{runtime.id}"
         )
 

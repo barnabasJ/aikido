@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Bind authenticated durable activations to their execution scope. Correlated
+  team and ownership messages preserve the recipient's authority, while public
+  commands keep caller authorization. Changing AI execution identity requires
+  a restart and reports an actionable typed forbidden error.
+
+- Generate an authorized `execution_identity_matches` command that checks the
+  caller's actor and tenant against the activation binding without exposing
+  private scope or credentials. Unbound activations return false.
+
+- Retain accepted AI delivery request IDs across runs and checkpoints to avoid
+  appending duplicate incoming text or starting a duplicate model run. Caller
+  authorization remains required before duplicate suppression.
+
 - Notification publication topics support native Ash alternatives and the
   `:_signal` placeholder for the triggering signal type. Subscribers can select
   a concrete topic template for agent-wide or signal-specific typed delivery.

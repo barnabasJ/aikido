@@ -73,12 +73,29 @@ defmodule Aikido.Team.Actions.AssignTask do
 
     with true <- !Map.has_key?(state.tasks, id) || task_exists(id),
          {:ok, pid} <- Aikido.Team.MemberProcesses.fetch_running_member_pid(state, data.member) do
-      task = dispatched_task(id, data, state.incarnations[data.member])
+      task =
+        dispatched_task(id, data, state.incarnations[data.member])
+        |> bind_receiving_run(context)
 
       state
       |> Map.update!(:tasks, &Map.put(&1, id, task))
       |> request_task_execution(task, data, pid, context)
     end
+  end
+
+  defp bind_receiving_run(%{notify: :self} = task, context) do
+    ai = context.agent.state[:ai]
+
+    Map.merge(task, %{
+      recipient_request_id: ai && ai.request_id,
+      recipient_active?: ai && ai.status in [:setup, :running, :waiting]
+    })
+  end
+
+  defp bind_receiving_run(task, context) do
+    request_id = get_in(context, [:context, :aikido, :request_id])
+
+    Map.merge(task, %{recipient_request_id: request_id, recipient_active?: not is_nil(request_id)})
   end
 
   defp task_exists(id) do
@@ -110,7 +127,7 @@ defmodule Aikido.Team.Actions.AssignTask do
     directives =
       task
       |> task_signal(data, context.agent_pid)
-      |> Directives.emit_to_pid(pid)
+      |> Aikido.Team.Delivery.directive(pid, :task, context)
       |> List.wrap()
       |> append_task_deadline(task, Map.get(data, :timeout_ms, 30_000))
 

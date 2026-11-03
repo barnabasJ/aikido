@@ -18,6 +18,9 @@ defmodule Aikido.DurableScopeAdapterTest do
       assert actor_id == actor.id
       assert {:ok, ^actor} = boot_actor(pid)
 
+      assert {:ok, ^actor} =
+               Aikido.AgentServer.state(pid, &{:ok, &1.bound_execution_scope.actor})
+
       assert {:ok, ^pid} = start(pool, id, actor, scope(%{actor | revision: 999}))
       refute_receive {:durable_native_initialize, _}
       assert {:ok, ^actor} = boot_actor(pid)
@@ -39,6 +42,10 @@ defmodule Aikido.DurableScopeAdapterTest do
       replacement = LifecycleWait.crash_and_await_replacement(pid)
       assert replacement != pid
       assert {:ok, ^current} = boot_actor(replacement)
+
+      assert {:ok, ^current} =
+               Aikido.AgentServer.state(replacement, &{:ok, &1.bound_execution_scope.actor})
+
       refute_receive {:durable_native_initialize, _}
 
       assert :ok = Aikido.Durable.stop(pool, replacement, scope: scope)
@@ -94,7 +101,7 @@ defmodule Aikido.DurableScopeAdapterTest do
     refute_receive {:durable_native_initialize, _}
   end
 
-  test "idle binding and credential change together and survive restoration", ctx do
+  test "staged credentials take effect only after restarting the activation", ctx do
     alice = actor(:delegated)
     bob = actor(:autonomous)
     pool = Aikido.durable_supervisor_name(ctx.aikido)
@@ -123,6 +130,7 @@ defmodule Aikido.DurableScopeAdapterTest do
                own = Aikido.Agent.resource_attributes(runtime.agent)
                assert own.actor_id == bob.id
                assert own.execution_credential == credential
+               assert runtime.bound_execution_scope.actor == alice
                {:ok, :rebound}
              end)
 
@@ -132,12 +140,20 @@ defmodule Aikido.DurableScopeAdapterTest do
       |> then(&Aikido.Durable.AgentServer.load_state(nil, &1))
 
     assert saved.credential == credential
+    assert {:ok, true} = execution_identity_matches(pid, scope(alice))
+    assert {:ok, false} = execution_identity_matches(pid, scope(bob))
     assert {:agent, agent} = saved.agent
     assert Aikido.Agent.resource_attributes(agent).execution_credential == nil
     assert :ok = Aikido.Durable.stop(pool, pid, scope: scope(bob))
     assert {:ok, restored} = start(pool, id, alice, scope(alice))
     assert :ok = Aikido.AgentServer.await_ready(restored)
     assert {:ok, ^bob} = boot_actor(restored)
+
+    assert {:ok, ^bob} =
+             Aikido.AgentServer.state(restored, &{:ok, &1.bound_execution_scope.actor})
+
+    assert {:ok, true} = execution_identity_matches(restored, scope(bob))
+    assert {:ok, false} = execution_identity_matches(restored, scope(alice))
     refute_receive {:durable_native_initialize, _}
   end
 
@@ -342,6 +358,12 @@ defmodule Aikido.DurableScopeAdapterTest do
   defp boot_actor(pid),
     do:
       Aikido.AgentServer.state(pid, &{:ok, Aikido.Agent.resource_attributes(&1.agent).boot_actor})
+
+  defp execution_identity_matches(pid, scope) do
+    DurableScopeAgent
+    |> Ash.ActionInput.for_action(:execution_identity_matches, %{agent: pid}, scope: scope)
+    |> Ash.run_action(scope: scope)
+  end
 
   defp actor(mode),
     do: %{id: Ash.UUIDv7.generate(), mode: mode, allowed: true, revision: 1}

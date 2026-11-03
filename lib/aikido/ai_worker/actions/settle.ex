@@ -51,7 +51,9 @@ defmodule Aikido.AiWorker.Actions.Settle do
     state
     |> Map.put(:pending, nil)
     |> Map.update!(:completed, &(&1 + 1))
-    |> start_next_queued_task(context, [Aikido.Directives.emit_to_pid(reply, task.reply_to)])
+    |> start_next_queued_task(context, [
+      Aikido.Team.Delivery.directive(reply, task.reply_to, :completion, context)
+    ])
   end
 
   defp task_result_signal(task, status, result) do

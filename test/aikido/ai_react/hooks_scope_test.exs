@@ -130,7 +130,7 @@ defmodule Aikido.HooksScopeTest do
 
       pid =
         start_server(ctx, Aikido.HooksScopeTest.Agent,
-          initialization_options: [actor: %{id: "initializer"}]
+          initialization_options: [actor: %{id: "alice"}, tenant: "org-a"]
         )
 
       assert {:error, _} =
@@ -243,7 +243,7 @@ defmodule Aikido.HooksScopeTest do
         ] do
       pid =
         start_server(ctx, Aikido.HooksScopeTest.Agent,
-          initialization_options: [actor: %{id: "initializer"}]
+          initialization_options: [actor: %{id: "alice"}, tenant: "org-a"]
         )
 
       scope = %{
@@ -363,7 +363,7 @@ defmodule Aikido.HooksScopeTest do
 
     pid =
       start_server(ctx, Aikido.HooksScopeTest.Agent,
-        initialization_options: [actor: %{id: "initializer"}]
+        initialization_options: [actor: %{id: "alice"}, tenant: "org-a"]
       )
 
     actor = %{id: "alice"}

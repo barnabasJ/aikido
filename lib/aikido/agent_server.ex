@@ -830,6 +830,7 @@ defmodule Aikido.AgentServer do
         raw_opts
       end
 
+    {bound_execution_scope, opts} = Keyword.pop(opts, :bound_execution_scope)
     {initialization_options, opts} = Keyword.pop(opts, :initialization_options, [])
     initialization_options = Map.new(initialization_options)
 
@@ -846,7 +847,10 @@ defmodule Aikido.AgentServer do
          chain = build_middleware_chain(agent_module, options),
          agent = restored_agent || build_agent(agent_module, options, initialization_options),
          {:ok, state} <-
-           State.from_options(options, agent_module, agent, middleware_chain: chain) do
+           State.from_options(options, agent_module, agent,
+             middleware_chain: chain,
+             bound_execution_scope: bound_execution_scope
+           ) do
       # Lifecycle observers see restored domain state before schedules start.
       signal_router = SignalRouter.build(state)
       state = %{state | signal_router: signal_router}
@@ -1150,6 +1154,13 @@ defmodule Aikido.AgentServer do
     end
   end
 
+  def handle_info({Aikido.Signal.Delivery, protocol, sender, signal, delivery}, state) do
+    case Aikido.Signal.Delivery.receive_signal(state, protocol, sender, signal, delivery) do
+      {:ok, signal} -> handle_info({:signal, signal}, state)
+      :ignore -> {:noreply, state}
+    end
+  end
+
   def handle_info({:signal, %Signal{} = signal}, state) do
     case process_signal(state, signal) do
       {:ok, new_state, _directives} ->
@@ -1416,6 +1427,7 @@ defmodule Aikido.AgentServer do
       orphaned_from: Aikido.Ownership.orphaned_from(state),
       aikido: state.aikido,
       skip_schedules: state.skip_schedules,
+      execution_scope: state.bound_execution_scope,
       __signal_router__: state.signal_router
     }
 

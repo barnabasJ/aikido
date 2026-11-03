@@ -4,6 +4,24 @@ A standalone OTP app using the Aikido checkout two directories above it. Its
 `AgentExamples.Agents` Ash domain is the public interface to agent and team resources.
 No external database, network services, or model API keys are required.
 
+The playground's scope adapter binds a signed browser identity when an agent
+starts. From `iex -S mix`, the existing counter demonstrates the generated
+read-only identity command:
+
+```elixir
+alias AgentExamples.Agents
+scope = %{actor: %{id: "demo-browser"}, tenant: "playground"}
+counter = Agents.counter_start!(%{}, scope: scope)
+true = Agents.counter_execution_identity_matches!(counter, scope: scope)
+false = Agents.counter_execution_identity_matches!(counter,
+  scope: %{scope | actor: %{id: "another-browser"}})
+Agents.counter_stop!(counter, scope: scope)
+```
+
+The query checks the running activation's actor and tenant, including for team
+members. It returns no private scope or credentials and does not prove token
+freshness. Agents started without an authenticated actor return false.
+
 The example app directly selects the EKV cleanup optimization from
 [`barnabasJ/ekv`](https://github.com/barnabasJ/ekv/pull/1), commit
 `648a3db4e1f788acde88a75a3f59c4f55213e58c`. This is an unmerged fork change

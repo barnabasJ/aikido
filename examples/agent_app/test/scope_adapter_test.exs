@@ -10,6 +10,12 @@ defmodule AgentExamples.ScopeAdapterTest do
     team = command!(Team, :start, %{id: Ash.UUIDv7.generate()}, scope)
     cleanup(Team, team.id, scope)
     assert_authenticated_snapshot(team.pid, actor)
+    assert command!(Team, :execution_identity_matches, %{agent: team}, scope)
+
+    refute command!(Team, :execution_identity_matches, %{agent: team},
+             actor: %{id: "another-browser"},
+             tenant: "playground"
+           )
 
     current = command!(Team, :inspect, %{agent: team}, scope)
     assert %{counter: counter, notebook: notebook, worker: worker} = current.team.members
@@ -18,6 +24,8 @@ defmodule AgentExamples.ScopeAdapterTest do
       assert Process.alive?(child)
       assert_authenticated_snapshot(child, actor)
     end
+
+    assert command!(Counter, :execution_identity_matches, %{agent: counter}, scope)
 
     command!(Counter, :add, %{agent: counter, amount: 3}, scope)
     assert %{count: 13} = command!(Counter, :inspect, %{agent: counter}, scope)

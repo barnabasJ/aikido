@@ -21,7 +21,7 @@ defmodule Aikido.AiReact.Signals.Deliver do
       end
 
       attribute :request_id, :string do
-        description "Request identifier used when delivery opens a new ReAct run."
+        description "Stable delivery identifier, accepted once for the agent's lifetime; also identifies the run when delivery opens one."
         allow_nil? false
       end
     end

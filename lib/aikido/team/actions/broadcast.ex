@@ -2,7 +2,6 @@ defmodule Aikido.Team.Actions.Broadcast do
   @moduledoc "Returns signal delivery directives for the selected running team members."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Team.ActionAdapter
-  alias Aikido.Directives
   alias Aikido.Signal
 
   @impl true
@@ -15,7 +14,7 @@ defmodule Aikido.Team.Actions.Broadcast do
     )
   end
 
-  defp build_member_deliveries(data, state, _context, _config) do
+  defp build_member_deliveries(data, state, context, _config) do
     targets = data[:members] || Map.keys(state.members)
 
     with {:ok, pids} <-
@@ -28,7 +27,7 @@ defmodule Aikido.Team.Actions.Broadcast do
       signal =
         %Signal{id: nil, type: data.type, data: Map.get(data, :payload, %{}), source: "/ash/team"}
 
-      {:ok, state, Enum.map(pids, &Directives.emit_to_pid(signal, &1))}
+      {:ok, state, Enum.map(pids, &Aikido.Team.Delivery.directive(signal, &1, :message, context))}
     end
   end
 end
