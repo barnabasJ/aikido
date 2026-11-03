@@ -1112,6 +1112,19 @@ defmodule Aikido.ThreadFollowTest do
     assert failed.status == :failed
     assert failed.retry_attempt == 0
     assert failed.retry_at == nil
+
+    Domain.writer_retry_journal!(writer, Map.take(work, [:source, :path, :channel]),
+      scope: scope(ctx.writer_actor)
+    )
+
+    work = await_work_count(writer, 3)
+    data = work |> Map.take([:source, :path, :channel, :batch]) |> Map.put(:message, "permanent")
+    refute Map.has_key?(data, :retry_after_ms)
+    Domain.writer_failed!(writer, data, scope: scope(ctx.writer_actor))
+    [failed] = snapshot(writer).journal_consumer.sources
+    assert failed.status == :failed
+    assert failed.retry_attempt == 0
+    assert snapshot(writer).journal_consumer.credits == []
   end
 
   test "automatic sink retries are finite and stale deadlines cannot bypass manual reset", ctx do
@@ -1218,7 +1231,10 @@ defmodule Aikido.ThreadFollowTest do
     data =
       work
       |> Map.take([:source, :path, :channel, :batch])
-      |> Map.merge(%{message: "public sink failure", retry_after_ms: delay})
+      |> Map.put(:message, "public sink failure")
+      |> then(fn data ->
+        if is_nil(delay), do: data, else: Map.put(data, :retry_after_ms, delay)
+      end)
 
     signal = Aikido.Thread.Consumer.Signals.Failed.new!(data, scope: scope(actor))
 

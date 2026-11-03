@@ -7,14 +7,16 @@ defmodule Aikido.Thread.Consumer.Retries do
     do: %{source | retry_id: nil, retry_at: nil, retry_generation: nil}
 
   def failed(source, data, limit, signal) do
-    if data.retry_after_ms && source.retry_attempt < limit do
+    delay = Map.get(data, :retry_after_ms)
+
+    if delay && source.retry_attempt < limit do
       %{
         source
         | status: :retrying,
           error: data.message,
           retry_attempt: source.retry_attempt + 1,
           retry_id: signal.id,
-          retry_at: Aikido.Signal.timestamp(signal) + data.retry_after_ms,
+          retry_at: Aikido.Signal.timestamp(signal) + delay,
           retry_generation: data.batch.generation
       }
     else

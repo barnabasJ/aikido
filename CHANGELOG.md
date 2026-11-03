@@ -7,6 +7,9 @@
   field values and explicit nils while applying defaults to newly declared
   fields; no claim is made about presence lost by an earlier typed decode.
 
+- Accept permanent sink failures whose optional retry hint is omitted, through
+  both native settlement commands and direct typed signals.
+
 - Require runtime-correlated self delivery and an active writing credit before
   journal Work reaches an application action. Direct typed Work cannot start
   database work, including when it copies an existing batch range.
