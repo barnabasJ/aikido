@@ -112,6 +112,25 @@ descriptors. On Append failure return the original context and discard both
 sets of effects. Queuing Append as a later self-signal creates a separate turn
 and does not provide that atomic terminal-history contract.
 
+### Bounded sink retries
+
+Automatic sink retries are disabled by default (`retry_limit: 0`). Configure a
+fresh consumer with `retry_limit: 3`, or use its public
+`configure_journal_retry` command with `%{retry_limit: 3}` for a retained identity.
+The application classifies transient database failures and sends `Failed` with
+`retry_after_ms` (1 to 3,600,000 ms). Omit the delay for permanent failures,
+authorization failures or errors requiring intervention. Only send a public,
+masked error message; the SDK does not inspect SQL exceptions.
+
+The source's persisted retry count survives restart. Retrying releases the old
+writing credit, waits until the correlated deadline, then requests a fresh
+source-authorized batch. Availability hints do not bypass the delay. A
+successful `Committed` or explicit manual `retry_journal` resets the count;
+automatic deadlines and lifecycle readiness do not. Lowering the limit cancels
+pending retries beyond the new limit. Exhausted/permanent failures block a drain
+rather than report successful catch-up. A pending retry does not prevent an
+explicit stop; readiness rearms its remaining delay after restoration.
+
 ## Explicit drain and shutdown
 
 `drain_journals` is an optional consumer command. It requests a fresh authorized

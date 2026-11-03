@@ -1,18 +1,22 @@
 defmodule Aikido.Thread.Consumer.Demand do
   @moduledoc "Owns one global replay/SQL credit window and durable per-source checkpoints."
-  alias Aikido.Thread.Consumer.{Membership, Types.Credit}
+  alias Aikido.Thread.Consumer.{Membership, Retries, Types.Credit}
 
   def ready(state, context) do
     sources =
       Enum.map(state.sources, fn source ->
-        if source.status in [:gap, :rejected, :failed],
+        if source.status in [:gap, :rejected, :failed, :retrying],
           do: source,
           else: %{source | status: :ready}
       end)
 
-    %{state | sources: sources, credits: []}
-    |> Membership.bootstrap_roots(context)
-    |> fill(context)
+    {updated, effects} =
+      %{state | sources: sources, credits: []}
+      |> Membership.bootstrap_roots(context)
+      |> fill(context)
+
+    timers = Enum.flat_map(updated.sources, &Retries.schedule(&1, context.signal))
+    {updated, timers ++ effects}
   end
 
   def drain(%{drain_request_id: id} = state, context) when not is_nil(id) do
@@ -24,7 +28,7 @@ defmodule Aikido.Thread.Consumer.Demand do
   def drain(state, context) do
     sources =
       Enum.map(state.sources, fn source ->
-        if source.status in [:gap, :rejected, :failed, :unavailable],
+        if source.status in [:gap, :rejected, :failed, :unavailable, :retrying],
           do: source,
           else: %{source | status: :ready}
       end)
@@ -68,7 +72,7 @@ defmodule Aikido.Thread.Consumer.Demand do
         cursor =
           if arguments.reset? || arguments[:after], do: arguments[:after], else: source.cursor
 
-        %{source | cursor: cursor, status: :ready, error: nil}
+        %{Retries.cancel(source) | cursor: cursor, status: :ready, error: nil}
       end)
 
     fill(state, context)
@@ -106,7 +110,7 @@ defmodule Aikido.Thread.Consumer.Demand do
             | head: data.cursor,
               cursor: cursor,
               status:
-                if(source.status in [:gap, :failed, :rejected],
+                if(source.status in [:gap, :failed, :rejected, :retrying],
                   do: source.status,
                   else: if(pending?, do: :ready, else: :watching)
                 )
@@ -171,7 +175,10 @@ defmodule Aikido.Thread.Consumer.Demand do
 
           work = %Aikido.Signal{
             type: "aikido.thread.consumer.work",
-            data: Map.take(data, [:source, :path, :channel, :batch, :entries, :metadata])
+            data:
+              data
+              |> Map.take([:source, :path, :channel, :batch, :entries, :metadata])
+              |> Map.put(:retry_attempt, source.retry_attempt)
           }
 
           delivery =
@@ -227,7 +234,7 @@ defmodule Aikido.Thread.Consumer.Demand do
                     else: :watching
                   )
 
-            %{source | cursor: cursor, status: status, error: nil}
+            %{Retries.reset(source) | cursor: cursor, status: status, error: nil}
           end)
 
         state = %{state | credits: List.delete(state.credits, credit)}
@@ -289,15 +296,44 @@ defmodule Aikido.Thread.Consumer.Demand do
          &(same?(&1, data) && &1.phase == :writing && &1.batch == data.batch)
        ) do
       state = %{state | credits: Enum.reject(state.credits, &same?(&1, data))}
-      fail_request(state, data, :failed, data.message, context)
+
+      state =
+        update_source(state, data, &Retries.failed(&1, data, state.retry_limit, context.signal))
+
+      {updated, effects} = fill(state, context)
+      {updated, Retries.schedule(find_source(updated, data), context.signal) ++ effects}
     else
       {state, []}
     end
   end
 
   def retry(state, data, context) do
-    state = update_source(state, data, &%{&1 | status: :ready, error: nil})
+    state = update_source(state, data, &%{Retries.reset(&1) | status: :ready, error: nil})
     fill(state, context)
+  end
+
+  def retry_due(state, data, context) do
+    source = find_source(state, data)
+
+    cond do
+      is_nil(source) || !Retries.current?(source, data) ->
+        {state, []}
+
+      true ->
+        state = update_source(state, data, &%{Retries.cancel(&1) | status: :ready})
+        fill(state, context)
+    end
+  end
+
+  def configure_retry(state, data, context) do
+    sources =
+      Enum.map(state.sources, fn source ->
+        if source.status == :retrying && source.retry_attempt > data.retry_limit,
+          do: %{Retries.cancel(source) | status: :failed},
+          else: source
+      end)
+
+    fill(%{state | retry_limit: data.retry_limit, sources: sources}, context)
   end
 
   def request_timeout(state, arguments, context) do
@@ -397,7 +433,7 @@ defmodule Aikido.Thread.Consumer.Demand do
   end
 
   defp fail_request(state, data, status, message, context) do
-    state = update_source(state, data, &%{&1 | status: status, error: message})
+    state = update_source(state, data, &%{Retries.cancel(&1) | status: status, error: message})
     state = remove_requests(state, data)
     fill(state, context)
   end

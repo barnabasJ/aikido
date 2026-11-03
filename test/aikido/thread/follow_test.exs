@@ -1054,6 +1054,174 @@ defmodule Aikido.ThreadFollowTest do
     assert snapshot(writer).last_actor == ctx.writer_actor.id
   end
 
+  test "sink retries are opt-in and permanent failures never schedule replay", ctx do
+    source = start_source(ctx.publisher)
+    Domain.source_append!(source, %{entry: %{id: "retry-disabled"}}, scope: scope(ctx.publisher))
+    writer = start_writer(ctx.writer_actor, [reference(source)])
+    work = await_work(writer, ["retry-disabled"])
+
+    fail_work(writer, work, ctx.writer_actor, 3_600_000)
+    [failed] = snapshot(writer).journal_consumer.sources
+    assert failed.status == :failed
+    assert failed.retry_attempt == 0
+    assert failed.retry_id == nil
+
+    Domain.writer_configure_journal_retry!(writer, %{retry_limit: 3},
+      scope: scope(ctx.writer_actor)
+    )
+
+    Domain.writer_retry_journal!(writer, Map.take(work, [:source, :path, :channel]),
+      scope: scope(ctx.writer_actor)
+    )
+
+    work = await_work_count(writer, 2)
+    fail_work(writer, work, ctx.writer_actor, nil)
+    [failed] = snapshot(writer).journal_consumer.sources
+    assert failed.status == :failed
+    assert failed.retry_attempt == 0
+    assert failed.retry_at == nil
+  end
+
+  test "automatic sink retries are finite and stale deadlines cannot bypass manual reset", ctx do
+    source = start_source(ctx.publisher)
+    Domain.source_append!(source, %{entry: %{id: "retry-bounded"}}, scope: scope(ctx.publisher))
+    writer = start_writer(ctx.writer_actor, [reference(source)])
+
+    Domain.writer_configure_journal_retry!(writer, %{retry_limit: 3},
+      scope: scope(ctx.writer_actor)
+    )
+
+    work = await_work(writer, ["retry-bounded"])
+
+    work =
+      Enum.reduce(1..3, work, fn attempt, offered ->
+        fail_work(writer, offered, ctx.writer_actor, 3_600_000)
+        [retrying] = snapshot(writer).journal_consumer.sources
+        assert retrying.status == :retrying
+        assert retrying.retry_attempt == attempt
+        assert snapshot(writer).journal_consumer.credits == []
+        deliver_retry_due(writer, retrying, ctx.writer_actor)
+        next = await_work_count(writer, attempt + 1)
+        assert next.retry_attempt == attempt
+        next
+      end)
+
+    fail_work(writer, work, ctx.writer_actor, 3_600_000)
+    [failed] = snapshot(writer).journal_consumer.sources
+    assert failed.status == :failed
+    assert failed.retry_attempt == 3
+    assert failed.retry_id == nil
+    assert snapshot(writer).works_received == 4
+
+    Domain.writer_retry_journal!(writer, Map.take(work, [:source, :path, :channel]),
+      scope: scope(ctx.writer_actor)
+    )
+
+    next = await_work_count(writer, 5)
+    assert next.retry_attempt == 0
+    fail_work(writer, next, ctx.writer_actor, 3_600_000)
+    [stale] = snapshot(writer).journal_consumer.sources
+
+    Domain.writer_retry_journal!(writer, Map.take(work, [:source, :path, :channel]),
+      scope: scope(ctx.writer_actor)
+    )
+
+    final = await_work_count(writer, 6)
+    deliver_retry_due(writer, stale, ctx.writer_actor)
+    assert snapshot(writer).works_received == 6
+    assert [%{phase: :writing}] = snapshot(writer).journal_consumer.credits
+    commit(writer, final, ctx.writer_actor)
+    [settled] = snapshot(writer).journal_consumer.sources
+    assert settled.retry_attempt == 0
+    assert settled.retry_id == nil
+  end
+
+  test "the actual native Schedule delivery advances a sink retry", ctx do
+    source = start_source(ctx.publisher)
+    Domain.source_append!(source, %{entry: %{id: "retry-timer"}}, scope: scope(ctx.publisher))
+    writer = start_writer(ctx.writer_actor, [reference(source)])
+
+    Domain.writer_configure_journal_retry!(writer, %{retry_limit: 1},
+      scope: scope(ctx.writer_actor)
+    )
+
+    work = await_work(writer, ["retry-timer"])
+    fail_work(writer, work, ctx.writer_actor, 1)
+    retried = await_work_count(writer, 2)
+    assert retried.retry_attempt == 1
+    assert retried.entries == work.entries
+    assert [%{phase: :writing}] = snapshot(writer).journal_consumer.credits
+    commit(writer, retried, ctx.writer_actor)
+  end
+
+  test "restart preserves a pending sink retry count and deadline", ctx do
+    source = start_source(ctx.publisher)
+    Domain.source_append!(source, %{entry: %{id: "retry-restored"}}, scope: scope(ctx.publisher))
+    writer = start_writer(ctx.writer_actor, [reference(source)])
+
+    Domain.writer_configure_journal_retry!(writer, %{retry_limit: 3},
+      scope: scope(ctx.writer_actor)
+    )
+
+    work = await_work(writer, ["retry-restored"])
+    fail_work(writer, work, ctx.writer_actor, 3_600_000)
+    [pending] = snapshot(writer).journal_consumer.sources
+    Domain.writer_stop!(writer, scope: scope(ctx.writer_actor))
+    restored = start_writer(ctx.writer_actor, [reference(source)])
+    [retained] = snapshot(restored).journal_consumer.sources
+    assert retained.retry_attempt == pending.retry_attempt
+    assert retained.retry_id == pending.retry_id
+    assert retained.retry_at == pending.retry_at
+    assert retained.status == :retrying
+    assert snapshot(restored).journal_consumer.credits == []
+    deliver_retry_due(restored, retained, ctx.writer_actor)
+    next = await_work_count(restored, 2)
+    assert next.retry_attempt == 1
+    commit(restored, next, ctx.writer_actor)
+    [settled] = snapshot(restored).journal_consumer.sources
+    assert settled.retry_attempt == 0
+  end
+
+  defp fail_work(writer, work, actor, delay) do
+    data =
+      work
+      |> Map.take([:source, :path, :channel, :batch])
+      |> Map.merge(%{message: "public sink failure", retry_after_ms: delay})
+
+    signal = Aikido.Thread.Consumer.Signals.Failed.new!(data, scope: scope(actor))
+
+    assert {:ok, :failed} =
+             Aikido.AgentServer.call(writer.pid, signal, fn _ -> {:ok, :failed} end)
+  end
+
+  defp deliver_retry_due(writer, source, actor) do
+    signal =
+      Aikido.Thread.Consumer.Signals.RetryDue.new!(
+        %{
+          source: source.source,
+          path: source.path,
+          channel: source.channel,
+          retry_id: source.retry_id,
+          generation: source.retry_generation
+        },
+        scope: scope(actor),
+        time: DateTime.from_unix!(source.retry_at, :millisecond) |> DateTime.to_iso8601()
+      )
+
+    assert {:ok, :due} = Aikido.AgentServer.call(writer.pid, signal, fn _ -> {:ok, :due} end)
+  end
+
+  defp await_work_count(writer, count) do
+    await_state_value(
+      writer.pid,
+      fn runtime ->
+        own = Aikido.Agent.resource_attributes(runtime.agent)
+        if own.works_received == count, do: own.last_work
+      end,
+      timeout: 5_000
+    )
+  end
+
   defp drain_until_entry(_writer, _actor, _id, _count, 0),
     do: flunk("Retained entry was not discovered through roster replay")
 

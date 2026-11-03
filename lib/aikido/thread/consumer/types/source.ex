@@ -40,6 +40,25 @@ defmodule Aikido.Thread.Consumer.Types.Source do
       allow_nil? false
     end
 
+    field :retry_attempt, :integer do
+      description "Automatic sink retries consumed since successful commit or explicit manual retry."
+      default 0
+      allow_nil? false
+      constraints min: 0
+    end
+
+    field :retry_at, :integer do
+      description "Persisted UTC millisecond deadline for a pending sink retry."
+    end
+
+    field :retry_id, :string do
+      description "Failure signal identity correlating the pending retry timer."
+    end
+
+    field :retry_generation, :string do
+      description "Journal generation whose failed write is being retried."
+    end
+
     field :error, :string do
       description "Public request or write failure explanation."
       constraints max_length: 4096

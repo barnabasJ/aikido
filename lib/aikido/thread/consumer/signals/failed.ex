@@ -28,6 +28,11 @@ defmodule Aikido.Thread.Consumer.Signals.Failed do
         allow_nil? false
       end
 
+      attribute :retry_after_ms, :integer do
+        description "Application-classified transient failure delay; nil requires manual intervention."
+        constraints min: 1, max: 3_600_000
+      end
+
       attribute :message, :string do
         description "Public write error, with secrets masked by the application."
         allow_nil? false

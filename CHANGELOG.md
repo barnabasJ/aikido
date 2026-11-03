@@ -6,6 +6,11 @@
   journal Work reaches an application action. Direct typed Work cannot start
   database work, including when it copies an existing batch range.
 
+- Add opt-in bounded sink retries to journal consumers. Application-classified
+  transient failures may provide a retry delay; persisted attempt counts survive
+  restart and stale timer deliveries do not reset the budget. Success or an
+  explicit manual retry resets the count. Default retry limit remains zero.
+
 - Add native retained-thread replay configuration preserving existing entry
   identity and sequence. Confirm source metadata with replay batches for
   application routing as data, preserving application authorization boundaries.

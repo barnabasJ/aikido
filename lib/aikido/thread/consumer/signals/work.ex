@@ -34,6 +34,13 @@ defmodule Aikido.Thread.Consumer.Signals.Work do
         allow_nil? false
       end
 
+      attribute :retry_attempt, :integer do
+        description "Automatic sink retries consumed for this source before the offered work."
+        default 0
+        allow_nil? false
+        constraints min: 0
+      end
+
       attribute :entries, {:array, Aikido.Thread.Types.Entry} do
         description "Original immutable entries; the application masks and writes these in its scoped effect."
         allow_nil? false

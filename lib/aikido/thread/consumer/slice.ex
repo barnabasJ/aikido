@@ -72,6 +72,13 @@ defmodule Aikido.Thread.Consumer.Slice do
         constraints min: 1, max: 1000
       end
 
+      attribute :retry_limit, :integer do
+        description "Maximum automatic sink retries per source; zero requires explicit manual retry."
+        default 0
+        allow_nil? false
+        constraints min: 0, max: 100
+      end
+
       attribute :request_timeout_ms, :integer do
         description "Retry a source request that produced no response, without polling source state."
         default 5_000
@@ -91,6 +98,12 @@ defmodule Aikido.Thread.Consumer.Slice do
 
     route Aikido.Thread.Consumer.Signals.Watch, Aikido.Thread.Consumer.Actions.Watch,
       name: :watch_journal
+
+    route Aikido.Thread.Consumer.Signals.ConfigureRetry,
+          Aikido.Thread.Consumer.Actions.ConfigureRetry, name: :configure_journal_retry
+
+    route Aikido.Thread.Consumer.Signals.RetryDue,
+          Aikido.Thread.Consumer.Actions.RetryDue, public?: false
 
     route Aikido.Thread.Consumer.Signals.Retry, Aikido.Thread.Consumer.Actions.Retry,
       name: :retry_journal
