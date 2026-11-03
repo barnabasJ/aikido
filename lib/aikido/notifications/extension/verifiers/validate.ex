@@ -24,10 +24,6 @@ defmodule Aikido.Notifications.Extension.Verifiers.Validate do
         do: fail!(resource, "The subscription slice must use the reserved :notifications mount")
     end
 
-    for publication <- publications do
-      validate_topic!(resource, publication.topic)
-    end
-
     for projection <- Info.projections(dsl) do
       calculation = Ash.Resource.Info.calculation(projection.resource, :notification_data)
 
@@ -66,8 +62,9 @@ defmodule Aikido.Notifications.Extension.Verifiers.Validate do
           "Unknown publication #{inspect(subscription.resource)}.#{subscription.publication}"
         )
 
-    validate_topic!(resource, publication.topic)
-    fields = publication.topic |> List.wrap() |> Enum.filter(&is_atom/1) |> Enum.uniq()
+    topic = subscription.topic || publication.topic
+    validate_subscription_topic!(resource, topic)
+    fields = topic |> List.wrap() |> Enum.filter(&is_atom/1) |> Enum.uniq()
 
     if Enum.sort(Keyword.keys(subscription.bindings)) != Enum.sort(fields) do
       fail!(resource, "Subscription bindings must name exactly the publisher's topic attributes")
@@ -83,11 +80,11 @@ defmodule Aikido.Notifications.Extension.Verifiers.Validate do
     end
   end
 
-  defp validate_topic!(resource, topic) do
+  defp validate_subscription_topic!(resource, topic) do
     if List.wrap(topic) == [] || !Enum.all?(List.wrap(topic), &(is_binary(&1) || is_atom(&1))) do
       fail!(
         resource,
-        "Agent subscriptions support a single topic template of strings and attribute atoms"
+        "Choose one concrete subscription topic with `topic` when a publication has alternatives; subscription templates contain strings and receiver-bound field atoms"
       )
     end
   end

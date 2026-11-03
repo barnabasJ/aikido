@@ -23,7 +23,8 @@ defmodule AgentExamplesWeb.Components.Notifications do
         <:title>Native publications</:title>
         <span>Publisher → Ash PubSub → observer</span>
       </.section_heading>
-      <p>The publisher exposes only its count calculation. The child subscribes during startup,
+      <p>The publisher exposes only its count calculation. Ash publishes to both the agent topic
+        and a topic ending in the triggering signal name. The child subscribes only to increments,
         adopts the typed value, and sends an acknowledgement through a normal signal.</p>
       <dl>
         <dt>Publisher count</dt><dd id="published-count">{own(@run)[:count] || 0}</dd>

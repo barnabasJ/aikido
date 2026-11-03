@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Notification publication topics support native Ash alternatives and the
+  `:_signal` placeholder for the triggering signal type. Subscribers can select
+  a concrete topic template for agent-wide or signal-specific typed delivery.
+
 - Omit normally retiring agents from native list results when their final exit
   uses DurableServer's shutdown tuple. Keep timeouts and unexpected crashes as
   typed runtime errors.

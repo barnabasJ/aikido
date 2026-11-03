@@ -50,7 +50,7 @@ defmodule AgentExamples.NotificationCounter do
     pubsub_name(AgentExamples.PubSub)
 
     publish :changed do
-      topic(["aikido", "example-counter", :id])
+      topic(["aikido", "example-counter", :id, [:_signal, nil]])
     end
   end
 end

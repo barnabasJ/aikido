@@ -5,6 +5,7 @@ defmodule Aikido.Notifications.Subscription do
     :name,
     :resource,
     :publication,
+    :topic,
     bindings: [],
     __identifier__: nil,
     __spark_metadata__: nil
@@ -26,6 +27,11 @@ defmodule Aikido.Notifications.Subscription do
         type: :atom,
         required: true,
         doc: "Name of the publisher's notification declaration."
+      ],
+      topic: [
+        type: {:custom, Ash.Notifier.PubSub.Publication, :topic, []},
+        doc:
+          "One concrete topic template to subscribe to, using publisher field names and receiver bindings. Required when the publication contains alternatives."
       ],
       bindings: [
         type: :keyword_list,

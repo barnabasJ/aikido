@@ -717,6 +717,34 @@ inherited by the receiving signal. Joining a topic does not evaluate a read poli
 for every listener. Applications must authorize topic access or publish minimal
 invalidation data followed by an authorized read.
 
+Publication topics use Ash's native templates, including nested alternatives and
+`nil` to omit a segment. Aikido provides `:_signal`, a calculated topic value
+containing the type of the signal whose changes are being adopted. It is derived
+from the update context and is not stored in agent state.
+
+```elixir
+publish :changed do
+  topic ["agents", :id, [:_signal, nil]]
+end
+```
+
+An update triggered by `"work.completed"` publishes to both `"agents:123"` and
+`"agents:123:work.completed"` for agent `"123"`. Ash expands these alternatives;
+Phoenix PubSub still uses exact topic subscriptions. A receiver chooses one
+concrete emitted template when a publication offers alternatives:
+
+```elixir
+subscribe MyApp.Publisher, :changed do
+  topic ["agents", :id, "work.completed"]
+  bindings id: :publisher_id
+end
+```
+
+Use `topic ["agents", :id]` for every update instead. A receiver can bind the
+signal segment from its own attribute using `topic ["agents", :id, :_signal]`
+and `bindings id: :publisher_id, _signal: :signal_type`. Existing declarations
+with a single publication topic need no subscription `topic` override.
+
 Use the generated signal in an ordinary route. When its payload contains `:state`
 (the default root path), use an explicit native action accepting typed `:data`,
 or the existing signal-list route contract, to preserve the receiver's separate

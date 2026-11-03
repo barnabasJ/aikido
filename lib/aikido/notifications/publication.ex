@@ -14,7 +14,8 @@ defmodule Aikido.Notifications.Publication do
       topic: [
         type: {:custom, Ash.Notifier.PubSub.Publication, :topic, []},
         required: true,
-        doc: "Native Ash PubSub topic template, including any resource attribute bindings."
+        doc:
+          "Native Ash PubSub topic template. Nested alternatives and nil are expanded by Ash; :_signal resolves to the triggering signal type."
       ]
     ]
   end

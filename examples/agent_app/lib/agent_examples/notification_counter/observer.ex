@@ -25,6 +25,7 @@ defmodule AgentExamples.NotificationCounter.Observer do
     scope({AgentExamples.NotificationCounter.Observer.Scope, :resolve, []})
 
     subscribe AgentExamples.NotificationCounter, :changed do
+      topic(["aikido", "example-counter", :id, "example.notifications.increment"])
       bindings(id: :publisher_id)
     end
   end

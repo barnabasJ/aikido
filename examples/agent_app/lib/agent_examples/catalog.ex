@@ -10,7 +10,7 @@ defmodule AgentExamples.Catalog do
       description:
         "Publish an explicit calculation and watch a child agent adopt it through native Ash PubSub.",
       detail:
-        "The generated changed signal carries only opted-in calculation data. The observer binds its publisher topic, resolves its own scope, and sends a normal acknowledgement signal. Stopping the root stops the observer and removes its subscriptions.",
+        "The generated changed signal carries only opted-in calculation data. Ash topic alternatives publish both agent-wide and signal-specific notifications. The observer selects increments, resolves its own scope, and sends a normal acknowledgement signal. Stopping the root stops the observer and removes its subscriptions.",
       flow: ["Native update", "Explicit calculation", "Ash PubSub", "Typed receiving action"]
     },
     %{

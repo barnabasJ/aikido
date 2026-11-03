@@ -52,7 +52,8 @@ defmodule Aikido.Notifications.Extension.Transformers.Build do
         message: "Publication names must generate distinct signal module names"
     end
 
-    with {:ok, dsl} <-
+    with {:ok, dsl} <- add_signal_topic_calculation(dsl, publications),
+         {:ok, dsl} <-
            Ash.Resource.Builder.add_calculation(
              dsl,
              Info.projection(resource),
@@ -79,6 +80,20 @@ defmodule Aikido.Notifications.Extension.Transformers.Build do
           {:error, _} = error -> {:halt, error}
         end
       end)
+    end
+  end
+
+  defp add_signal_topic_calculation(dsl, publications) do
+    if Enum.any?(publications, &(:_signal in List.flatten(&1.topic))) do
+      Ash.Resource.Builder.add_calculation(
+        dsl,
+        :_signal,
+        :string,
+        Aikido.Notifications.Calculations.SignalType,
+        public?: false
+      )
+    else
+      {:ok, dsl}
     end
   end
 

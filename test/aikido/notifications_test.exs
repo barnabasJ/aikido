@@ -115,6 +115,9 @@ defmodule Aikido.NotificationsTest.Publisher do
 
     route Aikido.NotificationsTest.Signals.SetCount,
           Aikido.NotificationsTest.Actions.AdvanceRevision
+
+    route Aikido.NotificationsTest.Signals.Rebind,
+          Aikido.NotificationsTest.Actions.AdvanceRevision
   end
 
   calculations do
@@ -133,6 +136,10 @@ defmodule Aikido.NotificationsTest.Publisher do
 
     publish :audited do
       topic(["notification-test", :id])
+    end
+
+    publish :caused do
+      topic(["notification-causes", :id, [:_signal, nil]])
     end
   end
 end
@@ -255,6 +262,64 @@ defmodule Aikido.NotificationsTest.Receiver do
   end
 end
 
+defmodule Aikido.NotificationsTest.Actions.RecordCause do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _options, _context) do
+    Aikido.Types.ActionResult.new(changes: %{projection: input.arguments.data})
+  end
+end
+
+defmodule Aikido.NotificationsTest.SignalReceiver do
+  use Aikido.Agent
+
+  agent do
+    name "signal_notification_receiver"
+
+    schema do
+      attribute :publisher_id, :string do
+        description "Publisher whose signal-specific topic is observed."
+        allow_nil? false
+      end
+
+      attribute :signal_type, :string do
+        description "Exact triggering signal type selected by this receiver."
+        default "notifications.set_count"
+      end
+
+      attribute :receiving_actor, :string do
+        description "Receiver authority resolved independently of the publisher."
+        default "receiver-authority"
+      end
+
+      attribute :projection, :map do
+        description "Latest typed publication received on the selected topic."
+      end
+    end
+
+    route Aikido.NotificationsTest.Publisher.Signals.Caused, :record_cause, public?: false
+  end
+
+  actions do
+    action :record_cause, Aikido.Types.ActionResult do
+      public? false
+      argument :state, :term, allow_nil?: false
+      argument :data, Aikido.NotificationsTest.Publisher.Signals.Caused, allow_nil?: false
+      run Aikido.NotificationsTest.Actions.RecordCause
+    end
+  end
+
+  notifications do
+    scope({Aikido.NotificationsTest.Scope, :resolve, []})
+
+    subscribe Aikido.NotificationsTest.Publisher, :caused do
+      topic(["notification-causes", :id, :_signal])
+      bindings(id: :publisher_id, _signal: :signal_type)
+    end
+  end
+end
+
 defmodule Aikido.NotificationsTest do
   use AikidoTest.Case, async: false
 
@@ -263,6 +328,45 @@ defmodule Aikido.NotificationsTest do
   setup do
     start_supervised!({Phoenix.PubSub, name: Aikido.NotificationsTest.PubSub})
     :ok
+  end
+
+  test "Ash expands signal topic alternatives for broad and selective typed subscriptions",
+       context do
+    publisher_id = unique_id("cause-publisher")
+    broad = "notification-causes:" <> publisher_id
+    selected = broad <> ":notifications.set_count"
+    other = broad <> ":notifications.rebind"
+    :ok = Phoenix.PubSub.subscribe(Aikido.NotificationsTest.PubSub, broad)
+    :ok = Phoenix.PubSub.subscribe(Aikido.NotificationsTest.PubSub, selected)
+
+    receiver =
+      start_server(context, Aikido.NotificationsTest.SignalReceiver,
+        initial_state: %{publisher_id: publisher_id}
+      )
+
+    assert [%{topic: ^selected}] = await_registration(receiver)
+
+    refute Enum.any?(
+             Registry.lookup(Aikido.NotificationsTest.PubSub, broad),
+             &(elem(&1, 0) == receiver)
+           )
+
+    assert Registry.lookup(Aikido.NotificationsTest.PubSub, other) == []
+    publisher = start_server(context, Publisher, id: publisher_id)
+
+    signal = Signals.SetCount.new!(%{count: 17})
+    assert {:ok, _} = Aikido.AgentServer.call(publisher, signal, &{:ok, &1.agent.state})
+    assert_receive %{topic: ^broad, event: "caused", payload: %{counter: 17, state: 1}}
+    assert_receive %{topic: ^selected, event: "caused", payload: %{counter: 17, state: 1}}
+
+    await_state_value(receiver, fn runtime ->
+      if runtime.agent.state.state.projection == %{counter: 17, state: 1}, do: true
+    end)
+
+    other_signal = Signals.Rebind.new!(%{publisher_id: "unrelated"})
+    assert {:ok, _} = Aikido.AgentServer.call(publisher, other_signal, &{:ok, &1.agent.state})
+    assert_receive %{topic: ^broad, event: "caused", payload: %{counter: 17, state: 2}}
+    refute_received %{topic: ^selected, event: "caused", payload: %{state: 2}}
   end
 
   test "native PubSub is registered once across ordinary and simple notifiers" do

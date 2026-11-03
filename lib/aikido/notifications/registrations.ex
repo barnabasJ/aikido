@@ -29,7 +29,8 @@ defmodule Aikido.Notifications.Registrations do
   defp registration(subscription, attributes) do
     publication = Info.publication(subscription.resource, subscription.publication)
 
-    with {:ok, topic} <- topic(publication.topic, subscription.bindings, attributes) do
+    with {:ok, topic} <-
+           topic(subscription.topic || publication.topic, subscription.bindings, attributes) do
       {:ok,
        %{
          topic: topic,
