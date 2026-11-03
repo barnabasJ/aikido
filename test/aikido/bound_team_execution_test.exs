@@ -287,6 +287,60 @@ defmodule Aikido.BoundTeamExecutionTest do
              )
   end
 
+  test "configured delivery types must match before recipient authority is applied", %{team: team} do
+    assert {:ok, {sender, worker}} =
+             Aikido.AgentServer.state(team.pid, fn runtime ->
+               sender = %{
+                 id: runtime.id,
+                 pid: team.pid,
+                 resource: runtime.agent_module,
+                 aikido: runtime.aikido,
+                 partition: runtime.partition
+               }
+
+               {:ok, {sender, runtime.agent.state.team.members.worker}}
+             end)
+
+    configured =
+      Aikido.Signal.new!("application.custom_task", %{
+        task_id: "configured-task",
+        member: :worker,
+        reply_to: team.pid,
+        text: "custom work"
+      })
+
+    altered = %{configured | type: "ai.react.cancel"}
+
+    assert {:ok, :checked} =
+             Aikido.AgentServer.state(worker, fn runtime ->
+               for kind <- [:task, :message] do
+                 correlation = %{kind: kind, signal_type: configured.type}
+
+                 assert {:ok, received} =
+                          Aikido.Signal.Delivery.receive_signal(
+                            runtime,
+                            Aikido.Team.Delivery,
+                            sender,
+                            configured,
+                            correlation
+                          )
+
+                 assert received.scope.actor.id == "worker-B"
+
+                 assert :ignore =
+                          Aikido.Signal.Delivery.receive_signal(
+                            runtime,
+                            Aikido.Team.Delivery,
+                            sender,
+                            altered,
+                            correlation
+                          )
+               end
+
+               {:ok, :checked}
+             end)
+  end
+
   test "execution identity query uses the immutable binding and native command authorization", %{
     team: team,
     scope: scope

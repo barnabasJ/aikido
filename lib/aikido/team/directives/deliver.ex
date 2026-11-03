@@ -18,6 +18,11 @@ defmodule Aikido.Team.Directives.Deliver do
       allow_nil? false
     end
 
+    field :signal_type, :string do
+      description "Signal type selected by the originating team action."
+      allow_nil? false
+    end
+
     field :request_id, :string do
       description "Receiving conversation request that owned the assignment."
     end
@@ -39,7 +44,7 @@ defmodule Aikido.Team.Directives.Deliver do
       delivery.target,
       signal,
       runtime,
-      Map.take(delivery, [:kind, :request_id, :active?])
+      Map.take(delivery, [:kind, :signal_type, :request_id, :active?])
     )
 
     :ok

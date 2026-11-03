@@ -8,12 +8,17 @@ defmodule Aikido.Team.Delivery do
     if is_nil(context[:execution_scope]) do
       Aikido.Directives.emit_to_pid(signal, target)
     else
-      Deliver.new!(Keyword.merge([signal: signal, target: target, kind: kind], options))
+      Deliver.new!(
+        Keyword.merge(
+          [signal: signal, target: target, kind: kind, signal_type: signal.type],
+          options
+        )
+      )
     end
   end
 
-  def permitted?(runtime, sender, signal, %{kind: :task}) do
-    coordinator?(runtime, sender) && signal.data[:reply_to] == sender.pid
+  def permitted?(runtime, sender, signal, %{kind: :task, signal_type: type}) do
+    signal.type == type && coordinator?(runtime, sender) && signal.data[:reply_to] == sender.pid
   end
 
   def permitted?(runtime, sender, signal, %{kind: :completion}) do
@@ -53,8 +58,8 @@ defmodule Aikido.Team.Delivery do
          Enum.any?(work.queue, &(&1.task_id == signal.data.task_id)))
   end
 
-  def permitted?(runtime, sender, _signal, %{kind: :message}),
-    do: coordinator?(runtime, sender)
+  def permitted?(runtime, sender, signal, %{kind: :message, signal_type: type}),
+    do: signal.type == type && coordinator?(runtime, sender)
 
   def permitted?(_runtime, _sender, _signal, _delivery), do: false
 
