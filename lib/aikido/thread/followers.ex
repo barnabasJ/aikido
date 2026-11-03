@@ -181,7 +181,8 @@ defmodule Aikido.Thread.Followers do
         Map.merge(envelope(follower, context, channel), %{
           request_id: context.signal.id,
           batch: batch,
-          entries: entries
+          entries: entries,
+          metadata: thread.metadata
         })
     }
 

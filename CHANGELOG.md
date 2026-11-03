@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add native retained-thread replay configuration preserving existing entry
+  identity and sequence. Confirm source metadata with replay batches for
+  application routing as data, preserving application authorization boundaries.
+
+- Add explicit consumer journal drain and resume commands. Drain confirms fresh
+  live source heads and application commits before pausing; offline sources,
+  replay gaps and sink failures report a blocked drain instead of success.
+
 - Add transient per-call attempt timing for deterministic model I/O deadlines,
   progress windows and retry backoff. Production keeps System/Process defaults;
   clock capabilities never become persisted AI configuration.

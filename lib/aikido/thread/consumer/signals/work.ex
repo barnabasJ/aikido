@@ -28,6 +28,12 @@ defmodule Aikido.Thread.Consumer.Signals.Work do
         allow_nil? false
       end
 
+      attribute :metadata, :map do
+        description "Confirmed source Thread metadata carried as data; applications retain their own authorization and masking."
+        default %{}
+        allow_nil? false
+      end
+
       attribute :entries, {:array, Aikido.Thread.Types.Entry} do
         description "Original immutable entries; the application masks and writes these in its scoped effect."
         allow_nil? false

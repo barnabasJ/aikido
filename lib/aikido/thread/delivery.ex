@@ -38,6 +38,7 @@ defmodule Aikido.Thread.Delivery do
     journal = if data.channel == :roster && mount, do: mount.membership_journal, else: mount
 
     if match?(%Aikido.Thread.Slice{}, journal) && journal.generation == data.batch.generation &&
+         journal.metadata == Map.get(data, :metadata, %{}) &&
          Enum.filter(
            journal.entries,
            &(&1.seq >= data.batch.first_sequence && &1.seq <= data.batch.last_sequence)

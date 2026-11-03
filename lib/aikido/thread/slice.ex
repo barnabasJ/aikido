@@ -136,6 +136,8 @@ defmodule Aikido.Thread.Slice do
 
     route Aikido.Thread.Signals.Append, Aikido.Thread.Actions.Append
     route Aikido.Thread.Signals.Clear, Aikido.Thread.Actions.Clear
+    route Aikido.Thread.Signals.ConfigureReplay, Aikido.Thread.Actions.ConfigureReplay
+
     route Aikido.Thread.Signals.Follow, Aikido.Thread.Actions.Follow
     route Aikido.Thread.Signals.Ack, Aikido.Thread.Actions.Ack
     route Aikido.Thread.Signals.Unfollow, Aikido.Thread.Actions.Unfollow

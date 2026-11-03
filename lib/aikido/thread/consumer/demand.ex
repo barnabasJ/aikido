@@ -15,6 +15,51 @@ defmodule Aikido.Thread.Consumer.Demand do
     |> fill(context)
   end
 
+  def drain(%{drain_request_id: id} = state, context) when not is_nil(id) do
+    if id == context.signal.id,
+      do: {:ok, state, []},
+      else: drain_in_progress()
+  end
+
+  def drain(state, context) do
+    sources =
+      Enum.map(state.sources, fn source ->
+        if source.status in [:gap, :rejected, :failed, :unavailable],
+          do: source,
+          else: %{source | status: :ready}
+      end)
+
+    {updated, effects} =
+      fill(
+        %{
+          state
+          | sources: sources,
+            credits: Enum.filter(state.credits, &(&1.phase == :writing)),
+            paused?: false,
+            drain_request_id: context.signal.id
+        },
+        context
+      )
+
+    {:ok, updated, effects}
+  end
+
+  def resume(%{drain_request_id: id}, _context) when not is_nil(id), do: drain_in_progress()
+
+  def resume(state, context) do
+    {updated, effects} = fill(%{state | paused?: false}, context)
+    {:ok, updated, effects}
+  end
+
+  defp drain_in_progress do
+    {:error,
+     Ash.Error.Action.InvalidArgument.exception(
+       field: :state,
+       message:
+         "A journal drain is already in progress. Await its Drained or DrainBlocked signal before starting another operation."
+     )}
+  end
+
   def watch(state, arguments, context) do
     state = Membership.add(state, arguments.source, arguments.path, arguments.channel)
 
@@ -126,7 +171,7 @@ defmodule Aikido.Thread.Consumer.Demand do
 
           work = %Aikido.Signal{
             type: "aikido.thread.consumer.work",
-            data: Map.take(data, [:source, :path, :channel, :batch, :entries])
+            data: Map.take(data, [:source, :path, :channel, :batch, :entries, :metadata])
           }
 
           {%{state | credits: credits}, [Aikido.Directives.emit(work)]}
@@ -163,7 +208,11 @@ defmodule Aikido.Thread.Consumer.Demand do
             status =
               if source.status == :gap,
                 do: :gap,
-                else: if(source.head && behind?(cursor, source.head), do: :ready, else: :watching)
+                else:
+                  if(state.drain_request_id || (source.head && behind?(cursor, source.head)),
+                    do: :ready,
+                    else: :watching
+                  )
 
             %{source | cursor: cursor, status: status, error: nil}
           end)
@@ -254,6 +303,42 @@ defmodule Aikido.Thread.Consumer.Demand do
   end
 
   def fill(state, context) do
+    blocked = Enum.find(state.sources, &(&1.status in [:gap, :rejected, :failed, :unavailable]))
+
+    cond do
+      state.drain_request_id && blocked ->
+        signal = %Aikido.Signal{
+          type: "aikido.thread.consumer.drain_blocked",
+          data: %{request_id: state.drain_request_id, source: blocked}
+        }
+
+        {%{state | paused?: true, drain_request_id: nil}, [Aikido.Directives.emit(signal)]}
+
+      state.drain_request_id && state.credits == [] &&
+          Enum.all?(state.sources, &(&1.status == :watching)) ->
+        signal = %Aikido.Signal{
+          type: "aikido.thread.consumer.drained",
+          data: %{request_id: state.drain_request_id, checkpoints: state.sources}
+        }
+
+        updated = %{
+          state
+          | paused?: true,
+            drained_request_id: state.drain_request_id,
+            drain_request_id: nil
+        }
+
+        {updated, [Aikido.Directives.emit(signal)]}
+
+      state.paused? ->
+        {state, []}
+
+      true ->
+        plan_requests(state, context)
+    end
+  end
+
+  defp plan_requests(state, context) do
     capacity = state.window - length(state.credits)
 
     sources =

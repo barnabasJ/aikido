@@ -18,6 +18,20 @@ defmodule Aikido.Thread.Consumer.Slice do
     singleton?(true)
 
     schema do
+      attribute :paused?, :boolean do
+        description "A completed or blocked explicit drain pauses fresh demand."
+        default false
+        allow_nil? false
+      end
+
+      attribute :drain_request_id, :string do
+        description "Drain signal currently waiting for fresh confirmed source heads and sink commits."
+      end
+
+      attribute :drained_request_id, :string do
+        description "Last successfully completed drain, checked from native state when awaiting completion."
+      end
+
       attribute :roots, {:array, Aikido.Agent.Reference} do
         description "Explicit root sources to follow on activation, without granting read permission."
         default []
@@ -65,6 +79,15 @@ defmodule Aikido.Thread.Consumer.Slice do
         constraints min: 1
       end
     end
+
+    route Aikido.Thread.Consumer.Signals.Drain, Aikido.Thread.Consumer.Actions.Drain,
+      name: :drain_journals
+
+    route Aikido.Thread.Consumer.Signals.Resume, Aikido.Thread.Consumer.Actions.Resume,
+      name: :continue_journals
+
+    route [Aikido.Thread.Consumer.Signals.Drained, Aikido.Thread.Consumer.Signals.DrainBlocked],
+          Aikido.Thread.Consumer.Actions.DrainResult, name: :journal_drain_result, public?: false
 
     route Aikido.Thread.Consumer.Signals.Watch, Aikido.Thread.Consumer.Actions.Watch,
       name: :watch_journal

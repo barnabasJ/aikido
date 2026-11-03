@@ -31,6 +31,7 @@ defmodule AikidoTest.Thread.SliceTest do
                MapSet.new([
                  {Aikido.Thread.Slice, :append},
                  {Aikido.Thread.Slice, :clear},
+                 {Aikido.Thread.Slice, :configure_replay},
                  {Aikido.Thread.Slice, :follow},
                  {Aikido.Thread.Slice, :ack},
                  {Aikido.Thread.Slice, :unfollow},

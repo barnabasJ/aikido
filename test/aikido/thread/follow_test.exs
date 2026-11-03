@@ -232,6 +232,65 @@ defmodule Aikido.ThreadFollowTest.HoldRequest do
   def run(_input, _options, _context), do: Aikido.Types.ActionResult.new(changes: nil)
 end
 
+defmodule Aikido.ThreadFollowTest.ReplyAvailability do
+  use Aikido.Signal
+
+  signal do
+    type "test.journal.reply_availability"
+
+    schema do
+      attribute :consumer, Aikido.Agent.Reference do
+        description "Actual consumer expecting this delayed source response."
+        allow_nil? false
+      end
+
+      attribute :request_id, :string do
+        description "Follow request whose response this source is now releasing."
+        allow_nil? false
+      end
+    end
+  end
+end
+
+defmodule Aikido.ThreadFollowTest.SendAvailability do
+  use Ash.Resource.Actions.Implementation
+  @impl true
+  def run(input, _options, _context) do
+    context = input.context.aikido
+
+    source =
+      Aikido.Agent.Reference.new!(
+        id: context.agent_id,
+        resource: context.agent_module,
+        aikido: context.aikido,
+        partition: context.partition
+      )
+
+    data = %{
+      source: source,
+      consumer: input.arguments.consumer,
+      request_id: input.arguments.request_id,
+      path: :thread,
+      channel: :thread,
+      batch: nil,
+      cursor: Aikido.Thread.Types.Cursor.new!(generation: "pending", sequence: -1),
+      pending?: false
+    }
+
+    reply = %Aikido.Signal{type: "aikido.thread.available", data: data}
+
+    Aikido.Types.ActionResult.new(
+      directives: [
+        Aikido.Thread.Directives.Deliver.new!(
+          target: input.arguments.consumer,
+          signal: reply,
+          kind: :batch
+        )
+      ]
+    )
+  end
+end
+
 defmodule Aikido.ThreadFollowTest.PendingSource do
   use Aikido.Agent, domain: Aikido.ThreadFollowTest.Domain
 
@@ -246,6 +305,7 @@ defmodule Aikido.ThreadFollowTest.PendingSource do
     end
 
     route Aikido.Thread.Signals.Follow, Aikido.ThreadFollowTest.HoldRequest
+    route Aikido.ThreadFollowTest.ReplyAvailability, Aikido.ThreadFollowTest.SendAvailability
   end
 end
 
@@ -333,7 +393,19 @@ defmodule Aikido.ThreadFollowTest do
   end
 
   test "an offered prefix survives abrupt source death before its periodic snapshot", ctx do
-    source = start_source(ctx.publisher)
+    source =
+      Domain.source_start!(
+        %{
+          id: ctx.publisher.id,
+          actor_id: ctx.publisher.id,
+          thread: %{retry_ms: 60_000, replay?: true},
+          sync: %{mode: :periodic, interval_ms: 3_600_000}
+        },
+        scope: scope(ctx.publisher)
+      )
+
+    assert {:ok, %{mode: :periodic, interval_ms: 3_600_000}} =
+             Aikido.AgentServer.state(source.pid, &{:ok, &1.sync})
 
     Domain.source_append!(source, %{entry: %{id: "durable-before-delivery"}},
       scope: scope(ctx.publisher)
@@ -392,6 +464,235 @@ defmodule Aikido.ThreadFollowTest do
     assert Exception.message(error) =~ "runtime-correlated source delivery"
     assert snapshot(writer).works_received == 0
     assert [%{phase: :requesting}] = snapshot(writer).journal_consumer.credits
+  end
+
+  test "a pre-drain availability cannot satisfy its replacement head request", ctx do
+    source =
+      Domain.pending_source_start!(%{id: ctx.publisher.id, actor_id: ctx.publisher.id},
+        scope: scope(ctx.publisher)
+      )
+
+    writer = start_writer(ctx.writer_actor, [])
+
+    Domain.writer_watch_journal!(writer, %{source: reference(source)},
+      scope: scope(ctx.writer_actor)
+    )
+
+    [old] = snapshot(writer).journal_consumer.credits
+    drain = Domain.writer_drain_journals!(writer, %{}, scope: scope(ctx.writer_actor))
+    [fresh] = snapshot(writer).journal_consumer.credits
+    refute fresh.id == old.id
+
+    Domain.pending_source_reply_availability!(
+      source,
+      %{consumer: reference(writer), request_id: old.id},
+      scope: scope(ctx.publisher)
+    )
+
+    await_state_value(writer.pid, fn runtime ->
+      if hd(runtime.agent.state.journal_consumer.sources).status == :watching, do: true
+    end)
+
+    consumer = snapshot(writer).journal_consumer
+    assert consumer.drain_request_id == drain.signal_id
+    assert consumer.credits == [fresh]
+    refute consumer.drained_request_id == drain.signal_id
+
+    Domain.pending_source_reply_availability!(
+      source,
+      %{consumer: reference(writer), request_id: fresh.id},
+      scope: scope(ctx.publisher)
+    )
+
+    await_state_value(writer.pid, fn runtime ->
+      if runtime.agent.state.journal_consumer.drained_request_id == drain.signal_id, do: true
+    end)
+  end
+
+  test "native configuration enables retained history without replacing its entries", ctx do
+    original_metadata = %{user: %{label: "preserved"}, routing: %{display: "existing"}}
+
+    source =
+      Domain.source_start!(
+        %{
+          id: ctx.publisher.id,
+          actor_id: ctx.publisher.id,
+          thread: %{metadata: original_metadata}
+        },
+        scope: scope(ctx.publisher)
+      )
+
+    Domain.source_append!(source, %{entry: [%{id: "old-a", at: 1}, %{id: "old-b", at: 2}]},
+      scope: scope(ctx.publisher)
+    )
+
+    original = snapshot(source).thread
+    refute original.replay?
+    assert original.entry_receipts == []
+
+    patch = %{routing: %{organization: "example-org", thread: "example-thread"}}
+    Domain.source_configure_replay!(source, %{metadata: patch}, scope: scope(ctx.publisher))
+    configured = snapshot(source).thread
+    assert configured.replay?
+    assert configured.entries == original.entries
+    assert configured.generation == original.generation
+    assert configured.next_sequence == 2
+    assert length(configured.entry_receipts) == 2
+    assert configured.metadata.user == original_metadata.user
+    assert configured.metadata.routing.display == "existing"
+    assert configured.metadata.routing.thread == "example-thread"
+
+    assert {:error, %Ash.Error.Forbidden{}} =
+             Domain.source_configure_replay(
+               source,
+               %{metadata: %{routing: %{thread: "forbidden"}}}, scope: scope(ctx.writer_actor))
+
+    assert snapshot(source).thread == configured
+    Domain.source_configure_replay!(source, %{metadata: patch}, scope: scope(ctx.publisher))
+    assert snapshot(source).thread == configured
+
+    writer = start_writer(ctx.writer_actor, [reference(source)])
+    work = await_work(writer, ["old-a", "old-b"])
+    assert work.entries == original.entries
+    assert work.metadata == configured.metadata
+  end
+
+  test "invalid legacy identity cannot be silently rewritten by replay configuration", ctx do
+    source =
+      Domain.source_start!(%{id: ctx.publisher.id, actor_id: ctx.publisher.id},
+        scope: scope(ctx.publisher)
+      )
+
+    Domain.source_append!(source, %{entry: [%{id: "duplicate"}, %{id: "duplicate"}]},
+      scope: scope(ctx.publisher)
+    )
+
+    original = snapshot(source).thread
+
+    assert {:error, %Ash.Error.Invalid{} = error} =
+             Domain.source_configure_replay(source, %{}, scope: scope(ctx.publisher))
+
+    assert Exception.message(error) =~ "unique entry IDs"
+    assert snapshot(source).thread == original
+  end
+
+  test "confirmed source metadata accompanies replay as data", ctx do
+    metadata = %{
+      routing: %{organization: "example-org", thread: "example-thread"},
+      user: %{label: "retained"}
+    }
+
+    source =
+      Domain.source_start!(
+        %{
+          id: ctx.publisher.id,
+          actor_id: ctx.publisher.id,
+          thread: %{replay?: true, metadata: metadata}
+        },
+        scope: scope(ctx.publisher)
+      )
+
+    Domain.source_append!(source, %{entry: %{id: "routed"}}, scope: scope(ctx.publisher))
+    writer = start_writer(ctx.writer_actor, [reference(source)])
+    assert await_work(writer, ["routed"]).metadata == metadata
+    restored = AikidoTest.LifecycleWait.crash_and_await_replacement(source.pid)
+
+    assert {:ok, ^metadata} =
+             Aikido.AgentServer.state(restored, &{:ok, &1.agent.state.thread.metadata})
+  end
+
+  test "drain checks a fresh source head, commits its suffix and pauses demand", ctx do
+    source = start_source(ctx.publisher)
+    Domain.source_append!(source, %{entry: %{id: "first"}}, scope: scope(ctx.publisher))
+    writer = start_writer(ctx.writer_actor, [reference(source)])
+    commit(writer, await_work(writer, ["first"]), ctx.writer_actor)
+
+    assert {:ok, _} =
+             Aikido.AgentServer.call_until(
+               writer.pid,
+               fn ->
+                 Domain.writer_drain_journals(writer, %{}, scope: scope(ctx.writer_actor))
+               end,
+               "aikido.thread.consumer.drained",
+               fn runtime ->
+                 consumer = runtime.agent.state.journal_consumer
+
+                 if consumer.paused? && consumer.drained_request_id,
+                   do: {:ok, consumer},
+                   else: :skip
+               end
+             )
+
+    Domain.source_append!(source, %{entry: %{id: "while-paused"}}, scope: scope(ctx.publisher))
+
+    await_state_value(writer.pid, fn runtime ->
+      if hd(runtime.agent.state.journal_consumer.sources).head.sequence == 1, do: true
+    end)
+
+    assert snapshot(writer).works_received == 1
+
+    receipt = Domain.writer_drain_journals!(writer, %{}, scope: scope(ctx.writer_actor))
+    work = await_work(writer, ["while-paused"])
+    refute snapshot(writer).journal_consumer.drained_request_id == receipt.signal_id
+    assert [%{phase: :writing}] = snapshot(writer).journal_consumer.credits
+    commit(writer, work, ctx.writer_actor)
+
+    await_state_value(writer.pid, fn runtime ->
+      consumer = runtime.agent.state.journal_consumer
+
+      if consumer.paused? && consumer.drained_request_id == receipt.signal_id &&
+           consumer.credits == [],
+         do: true
+    end)
+
+    Domain.source_append!(source, %{entry: %{id: "after-drain"}}, scope: scope(ctx.publisher))
+    Domain.writer_continue_journals!(writer, %{}, scope: scope(ctx.writer_actor))
+    assert await_work(writer, ["after-drain"]).batch.first_sequence == 2
+  end
+
+  test "drain reports an offline source and normal authorized restart permits catch-up", ctx do
+    source = start_source(ctx.publisher)
+    Domain.source_append!(source, %{entry: %{id: "retained"}}, scope: scope(ctx.publisher))
+    Domain.source_stop!(source, scope: scope(ctx.publisher))
+    writer = start_writer(ctx.writer_actor, [reference(source)])
+
+    await_state_value(writer.pid, fn runtime ->
+      if hd(runtime.agent.state.journal_consumer.sources).status == :unavailable, do: true
+    end)
+
+    receipt = Domain.writer_drain_journals!(writer, %{}, scope: scope(ctx.writer_actor))
+    consumer = snapshot(writer).journal_consumer
+    assert consumer.paused?
+    assert is_nil(consumer.drained_request_id)
+    assert is_nil(consumer.drain_request_id)
+    refute consumer.drained_request_id == receipt.signal_id
+    assert hd(consumer.sources).status == :unavailable
+
+    restored = start_source(ctx.publisher)
+
+    Domain.writer_retry_journal!(writer, %{source: reference(restored)},
+      scope: scope(ctx.writer_actor)
+    )
+
+    Domain.writer_continue_journals!(writer, %{}, scope: scope(ctx.writer_actor))
+    work = await_work(writer, ["retained"])
+    commit(writer, work, ctx.writer_actor)
+
+    assert {:ok, _} =
+             Aikido.AgentServer.call_until(
+               writer.pid,
+               fn ->
+                 Domain.writer_drain_journals(writer, %{}, scope: scope(ctx.writer_actor))
+               end,
+               "aikido.thread.consumer.drained",
+               fn runtime ->
+                 consumer = runtime.agent.state.journal_consumer
+
+                 if consumer.paused? && consumer.drained_request_id,
+                   do: {:ok, consumer},
+                   else: :skip
+               end
+             )
   end
 
   test "immutable entry IDs ignore identical retries and reject conflicts including after pruning",
