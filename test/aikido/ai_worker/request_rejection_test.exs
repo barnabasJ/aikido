@@ -148,6 +148,152 @@ defmodule Aikido.AiWorker.RequestRejectionTest do
     assert await_task(ctx.team, "queued", :completed).result == "queued done"
   end
 
+  test "a delegated Ask materializes its envelope before application journal middleware", ctx do
+    metadata = %{display: "preserved task metadata"}
+
+    Domain.team_assign_task!(
+      ctx.team,
+      %{
+        member: :worker,
+        task_id: "envelope",
+        metadata: metadata,
+        payload: %{text: "materialized task payload"}
+      },
+      scope: scope(ctx.owner)
+    )
+
+    assert_receive {:worker_ask_envelope, worker, ask, journal_id}, 5_000
+    assert worker == ctx.worker
+    assert is_binary(ask.id)
+    assert ask.id != ""
+    assert journal_id == ask.id <> "/journal"
+    assert {:ok, _, _} = DateTime.from_iso8601(ask.time)
+    assert ask.data.request_id == "envelope"
+    assert ask.data.query == "materialized task payload"
+    assert ask.data.metadata == metadata
+    assert ask.scope.actor == ctx.receiver
+    assert ask.scope.tenant == "request-rejection"
+    assert_receive {:worker_provider, provider, _messages}, 5_000
+    send(provider, {:provider_result, {:ok, Responses.final_answer_response("materialized")}})
+    assert await_task(ctx.team, "envelope", :completed).result == "materialized"
+  end
+
+  test "native request processing preserves an existing envelope and its scope and trace metadata",
+       ctx do
+    tracer = Aikido.WorkerRequestRejectionTest.Tracer
+
+    scope =
+      Map.merge(scope(ctx.receiver), %{
+        context: %{marker: "original application context"},
+        tracer: [tracer]
+      })
+
+    ask =
+      Aikido.AiReact.Signals.Ask.new!(
+        %{
+          query: "supplied envelope",
+          request_id: "supplied",
+          metadata: %{display: "caller metadata"}
+        },
+        id: "supplied-envelope-id",
+        time: "2026-11-04T10:11:12.000000Z",
+        source: "/application",
+        subject: "original-subject",
+        scope: scope,
+        tracer_context: %{tracer => :original_ancestry}
+      )
+
+    assert {:signals, []} =
+             Aikido.AiWorker.RequestAdmission.request(ctx.worker, ask, %{
+               task_id: "supplied",
+               member: :worker,
+               attempt: "supplied-attempt"
+             })
+
+    assert_receive {:worker_ask_envelope, worker, received, journal_id}, 5_000
+    assert worker == ctx.worker
+    assert received.id == ask.id
+    assert received.time == ask.time
+    assert received.source == ask.source
+    assert received.subject == ask.subject
+    assert received.data == ask.data
+    assert received.scope == ask.scope
+    assert received.tracer_context == ask.tracer_context
+    assert journal_id == ask.id <> "/journal"
+    assert_receive {:worker_provider, provider, _messages}, 5_000
+    send(provider, {:provider_result, {:ok, Responses.final_answer_response("preserved")}})
+
+    await_state_value(ctx.worker, fn runtime ->
+      ai = runtime.agent.state.ai
+      if ai.request_id == "supplied" && ai.status == :completed, do: ai
+    end)
+  end
+
+  test "an invalid envelope produces finite invalid rejection before delivery", ctx do
+    # Deliberately malformed native envelope exercises the I/O input-rejection boundary.
+    ask =
+      Aikido.AiReact.Signals.Ask.new!(
+        %{query: "private-invalid-envelope-payload", request_id: "invalid"},
+        scope: scope(ctx.receiver)
+      )
+
+    for malformed <- [%{type: nil}, %{scope: nil}] do
+      invalid = Map.merge(ask, malformed)
+
+      assert %Aikido.Signal{type: "harness.ai.request_rejected", data: data, scope: %{}} =
+               result =
+               Aikido.AiWorker.RequestAdmission.request(ctx.worker, invalid, %{
+                 task_id: "invalid",
+                 member: :worker,
+                 attempt: "invalid-attempt"
+               })
+
+      assert result.scope == %{}
+
+      assert data == %{
+               task_id: "invalid",
+               member: :worker,
+               attempt: "invalid-attempt",
+               failure: :invalid
+             }
+
+      refute inspect(result, limit: :infinity) =~ "private-invalid-envelope-payload"
+    end
+
+    refute_receive {:worker_ask_envelope, _, _, _}
+    refute_receive {:worker_provider, _, _}
+    assert {:ok, nil} = Aikido.AgentServer.state(ctx.worker, &{:ok, &1.agent.state.ai.request_id})
+  end
+
+  test "actual owner loss remains ambiguous rather than reporting admission rejection", ctx do
+    pid =
+      spawn(fn ->
+        receive do
+          :finish -> :ok
+        end
+      end)
+
+    monitor = Process.monitor(pid)
+    send(pid, :finish)
+    assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}, 5_000
+
+    ask =
+      Aikido.AiReact.Signals.Ask.new!(
+        %{query: "dead target", request_id: "absent"},
+        scope: scope(ctx.receiver)
+      )
+
+    assert {:signals, []} =
+             Aikido.AiWorker.RequestAdmission.request(pid, ask, %{
+               task_id: "absent",
+               member: :worker,
+               attempt: "absent-attempt"
+             })
+
+    refute_receive {:worker_ask_envelope, _, _, _}
+    refute_receive {:worker_provider, _, _}
+  end
+
   defp scope(actor), do: %{actor: actor, tenant: "request-rejection"}
 
   defp message_text(messages),

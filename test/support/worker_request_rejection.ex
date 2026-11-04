@@ -64,6 +64,47 @@ defmodule Aikido.WorkerRequestRejectionTest.Client do
   end
 end
 
+defmodule Aikido.WorkerRequestRejectionTest.ObserveEnvelope do
+  @moduledoc "Requires materialized Ask metadata at the same middleware boundary as application journal routing."
+  use Aikido.Middleware
+
+  @impl true
+  def on_signal(%{type: "ai.react.ask"} = signal, context, _options, next) do
+    journal_id = signal.id <> "/journal"
+    {:ok, _timestamp, _offset} = DateTime.from_iso8601(signal.time)
+
+    send(
+      Process.whereis(Aikido.WorkerRequestRejectionTest.Observer),
+      {:worker_ask_envelope, self(), signal, journal_id}
+    )
+
+    next.(signal, context)
+  end
+
+  def on_signal(signal, context, _options, next), do: next.(signal, context)
+end
+
+defmodule Aikido.WorkerRequestRejectionTest.Tracer do
+  @moduledoc "Process-local native tracer preserving supplied ancestry for envelope assertions."
+  @behaviour Ash.Tracer
+
+  @impl true
+  def start_span(_type, _name), do: :ok
+  @impl true
+  def stop_span, do: :ok
+  @impl true
+  def set_metadata(_type, _metadata), do: :ok
+  @impl true
+  def set_error(_error, _options), do: :ok
+  @impl true
+  def get_span_context, do: Process.get(__MODULE__)
+  @impl true
+  def set_span_context(context) do
+    Process.put(__MODULE__, context)
+    :ok
+  end
+end
+
 defmodule Aikido.WorkerRequestRejectionTest.Worker do
   @moduledoc "A normal AI worker whose native Ask policy may deny an already accepted Team task."
   use Ash.Resource,
@@ -75,6 +116,7 @@ defmodule Aikido.WorkerRequestRejectionTest.Worker do
     name "request_rejection_worker"
     instance Aikido.WorkerRequestRejectionTest.Instance
     persistence :temporary
+    middleware [Aikido.WorkerRequestRejectionTest.ObserveEnvelope]
 
     schema do
       attribute :actor_id, :string do

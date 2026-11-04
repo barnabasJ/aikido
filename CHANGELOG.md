@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Materialize worker AI request envelopes at the supervised admission boundary,
+  preserving supplied identity, timestamps and scope before owning middleware runs.
+
 - Settle accepted worker tasks when their inner AI request is rejected before
   adoption, with a finite actionable failure instead of waiting for the task
   deadline. Keep unrelated AI runs and queued work intact.
