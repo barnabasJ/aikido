@@ -113,6 +113,11 @@ defmodule Aikido.AgentServer do
   waiting; a tagged result finishes the one-shot subscription. There are no
   repeated state queries. Matching the request ID keeps other runs separate.
 
+  With `check_current?: true`, the waiter evaluates its selector once against the
+  current state after dispatch, returning an already-terminal result immediately.
+  Subscription still happens before that read; `:skip` waits on the existing
+  one-shot subscription rather than querying state again.
+
   Other workflows can expose their own completion state and selectors; the AI
   fields above are not required on every agent. Waiting is optional and belongs
   in an external caller, never inside a reducer or directive callback.
@@ -305,6 +310,7 @@ defmodule Aikido.AgentServer do
       when (is_struct(command, Signal) or is_function(command, 0)) and is_binary(pattern) and
              is_function(selector, 1) do
     timeout = Keyword.get(opts, :timeout, Defaults.agent_server_call_timeout_ms())
+    check_current? = Keyword.get(opts, :check_current?, false)
     caller = self()
     request = make_ref()
 
@@ -315,7 +321,10 @@ defmodule Aikido.AgentServer do
     {waiter, monitor} =
       spawn_monitor(fn ->
         Ash.ProcessHelpers.transfer_context(transfer)
-        result = wait_for_command_result(server, command, pattern, selector, timeout)
+
+        result =
+          wait_for_command_result(server, command, pattern, selector, timeout, check_current?)
+
         send(caller, {request, result})
       end)
 
@@ -359,18 +368,26 @@ defmodule Aikido.AgentServer do
     end
   end
 
-  defp wait_for_command_result(server, command, pattern, selector, timeout) do
+  defp wait_for_command_result(server, command, pattern, selector, timeout, check_current?) do
     with {:ok, pid} <- resolve(server),
          {:ok, ref} <- subscribe(pid, pattern, selector, once: true) do
       monitor = Process.monitor(pid)
 
       try do
         with :ok <- dispatch_command(pid, command, timeout) do
-          receive do
-            {:aikido_subscription, ^ref, %{result: result}} -> result
-            {:DOWN, ^monitor, :process, ^pid, reason} -> {:error, {:server_stopped, reason}}
-          after
-            timeout -> {:error, :timeout}
+          current = if check_current?, do: state(pid, selector, timeout: timeout), else: :skip
+
+          case current do
+            :skip ->
+              receive do
+                {:aikido_subscription, ^ref, %{result: result}} -> result
+                {:DOWN, ^monitor, :process, ^pid, reason} -> {:error, {:server_stopped, reason}}
+              after
+                timeout -> {:error, :timeout}
+              end
+
+            result ->
+              result
           end
         end
       after
@@ -819,6 +836,29 @@ defmodule Aikido.AgentServer do
     end
   end
 
+  @doc false
+  def start_initial_topology(server, %Signal{type: "aikido.ash.team.start"} = signal) do
+    with {:ok, pid} <- resolve(server) do
+      GenServer.call(pid, {:start_initial_topology, Aikido.Signal.capture_tracing(signal)})
+    end
+  end
+
+  @doc false
+  def finish_initial_topology(server, operation_id) do
+    with {:ok, pid} <- resolve(server) do
+      GenServer.call(pid, {:finish_initial_topology, operation_id})
+    end
+  end
+
+  @doc false
+  def prepare_failed_start_stop(server, operation_id) do
+    signal = LifecycleStopping.new!(%{reason: :normal}) |> Aikido.Signal.capture_tracing()
+
+    with {:ok, pid} <- resolve(server) do
+      GenServer.call(pid, {:prepare_failed_start_stop, operation_id, signal})
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # ---------------------------------------------------------------------------
   @impl true
@@ -853,7 +893,13 @@ defmodule Aikido.AgentServer do
            ) do
       # Lifecycle observers see restored domain state before schedules start.
       signal_router = SignalRouter.build(state)
-      state = %{state | signal_router: signal_router}
+
+      startup_operation =
+        if is_nil(restored_agent) && !is_nil(Aikido.Agent.Info.team_config(agent_module)),
+          do: %{scope: activation_scope},
+          else: nil
+
+      state = %{state | signal_router: signal_router, startup_operation: startup_operation}
 
       ownership =
         Aikido.Ownership.Signals.Configure.new!(
@@ -972,6 +1018,63 @@ defmodule Aikido.AgentServer do
     # to whatever the caller asked for. Wrap in try/rescue so a raising
     # selector doesn't crash the agent.
     {:reply, invoke_selector(selector, state), state}
+  end
+
+  def handle_call(
+        {:start_initial_topology, %Signal{type: "aikido.ash.team.start"} = signal},
+        from,
+        state
+      ) do
+    if initial_topology_available?(state) do
+      scope = state.startup_operation.scope
+      state = %{state | startup_operation: Map.put(state.startup_operation, :id, signal.id)}
+      signal = Aikido.Signal.put_ctx(signal, scope)
+
+      handle_call(
+        {:signal_with_selector, signal, fn _runtime -> {:ok, :accepted} end},
+        from,
+        state
+      )
+    else
+      {:reply,
+       initial_topology_error(
+         "Initial topology may only be configured once on an untouched fresh team."
+       ), state}
+    end
+  end
+
+  def handle_call({:finish_initial_topology, operation_id}, _from, state) do
+    if is_map(state.startup_operation) && Map.get(state.startup_operation, :id) == operation_id &&
+         !is_nil(operation_id) do
+      {:reply, :ok, %{state | startup_operation: nil}}
+    else
+      {:reply,
+       initial_topology_error("The initial topology operation no longer belongs to this start."),
+       state}
+    end
+  end
+
+  def handle_call({:prepare_failed_start_stop, operation_id, %Signal{} = signal}, _from, state) do
+    if is_map(state.startup_operation) && Map.get(state.startup_operation, :id) == operation_id &&
+         !is_nil(operation_id) do
+      scope = state.startup_operation.scope
+      state = %{state | startup_operation: nil}
+
+      signal =
+        signal
+        |> Map.put(:source, "/agent/#{state.id}")
+        |> Aikido.Signal.put_ctx(scope)
+
+      case prepare_graceful_stop(state, signal.data.reason, signal) do
+        {:ok, stopped_state} -> {:reply, :ok, stopped_state}
+        {:error, committed_state, reason} -> {:reply, {:error, reason}, committed_state}
+      end
+    else
+      {:reply,
+       initial_topology_error(
+         "Failed-start cleanup requires this activation's pending initial topology operation."
+       ), state}
+    end
   end
 
   def handle_call({:prepare_stop, %Signal{} = signal}, _from, %State{} = state) do
@@ -1188,6 +1291,40 @@ defmodule Aikido.AgentServer do
     end
   end
 
+  def handle_info(
+        {Aikido.Signal.Delivery, Aikido.Team.Delivery, sender, signal,
+         %{kind: :inheritance} = delivery},
+        state
+      ) do
+    case Aikido.Signal.Delivery.receive_signal(
+           state,
+           Aikido.Team.Delivery,
+           sender,
+           signal,
+           delivery
+         ) do
+      {:ok, signal} ->
+        case process_signal(state, signal, %{
+               protocol: Aikido.Team.Delivery,
+               sender: sender,
+               kind: :inheritance
+             }) do
+          {:ok, next, _directives} ->
+            {:noreply, next}
+
+          {:error, next, error} ->
+            :ok = Aikido.Team.Delivery.reject_inheritance(next, sender, signal, error)
+            {:noreply, next}
+
+          {:stop, reason, next} ->
+            {:stop, reason, finish_signal_stop(next, reason, signal)}
+        end
+
+      :ignore ->
+        {:noreply, state}
+    end
+  end
+
   def handle_info({Aikido.Signal.Delivery, protocol, sender, signal, delivery}, state) do
     case Aikido.Signal.Delivery.receive_signal(state, protocol, sender, signal, delivery) do
       {:ok, signal} ->
@@ -1240,6 +1377,22 @@ defmodule Aikido.AgentServer do
     _state = finish_stop(state, reason, stopping)
     :ok
   end
+
+  defp initial_topology_available?(state) do
+    team = state.agent.state[:team]
+
+    !is_nil(Aikido.Agent.Info.team_config(state.agent_module)) &&
+      is_map(state.startup_operation) && is_nil(Map.get(state.startup_operation, :id)) &&
+      match?(%{operation: %{id: nil, status: :idle}}, team) &&
+      map_size(team.topology.nodes) == 0 && map_size(team.members) == 0
+  end
+
+  defp initial_topology_error(message),
+    do:
+      {:error,
+       Ash.Error.to_error_class(
+         Ash.Error.Action.InvalidArgument.exception(field: :topology, message: message)
+       )}
 
   defp finish_signal_stop(state, reason, signal) do
     finish_stop(state, reason, lifecycle_stopping_signal(state, reason, signal))
@@ -1714,6 +1867,7 @@ defmodule Aikido.AgentServer do
   @doc false
   def apply_actions(%Signal{} = signal, ctx, targets) do
     with :ok <- Aikido.Thread.Delivery.admit(signal, ctx),
+         :ok <- Aikido.Team.Delivery.admit(signal, ctx),
          :ok <- Aikido.Agent.SignalAdmission.authorize(signal, ctx, targets) do
       case Ash.transact(ctx.agent_module, fn -> stage_actions!(signal, ctx, targets) end,
              return_notifications?: true,

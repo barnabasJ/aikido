@@ -61,6 +61,12 @@ defmodule Aikido.Team.Extension do
         doc:
           "Own-state attributes copied to members at creation; explicit member initial values take precedence."
       ],
+      reconcile_inherit: [
+        type: {:list, :atom},
+        default: [],
+        doc:
+          "Explicit subset of creation inheritance reconciled into existing members; only nonsensitive own-state configuration may be declared."
+      ],
       max_members: [type: :pos_integer, default: 128],
       roster_history?: [
         type: :boolean,
@@ -77,16 +83,58 @@ defmodule Aikido.Team.Extension do
     verifiers: [Aikido.Team.Extension.Verifiers.Validate]
 
   @doc false
-  def start(resource, pid, topology, context \\ %{}) do
-    signal =
-      Aikido.Signal.new!("aikido.ash.team.start", %{topology: topology})
-      |> Aikido.Signal.put_ctx(context)
+  def start(resource, pid, %Aikido.Signal{type: "aikido.ash.team.start"} = signal) do
+    command = fn -> Aikido.AgentServer.start_initial_topology(pid, signal) end
 
-    dispatch_and_await_operation(resource, pid, signal)
+    with {:ok, _} = result <- await_operation(resource, pid, signal, command),
+         :ok <- Aikido.AgentServer.finish_initial_topology(pid, signal.id) do
+      result
+    end
   end
 
   @doc false
-  def dispatch_and_await_operation(resource, pid, signal) do
+  def await_restored_topology(resource, pid) do
+    timeout = Aikido.Agent.Info.team_config(resource).timeout + 1_000
+
+    with :ok <- Aikido.AgentServer.await_ready(pid, timeout: timeout) do
+      Aikido.AgentServer.call_until(
+        pid,
+        fn -> :ok end,
+        "aikido.ash.team.**",
+        &restored_operation_result/1,
+        timeout: timeout,
+        check_current?: true
+      )
+    end
+    |> expose_operation_failure()
+  end
+
+  defp restored_operation_result(runtime) do
+    case runtime.agent.state.team.operation do
+      %{status: :running} ->
+        :skip
+
+      %{status: :completed} ->
+        {:ok, :completed}
+
+      %{status: :failed, error: error} ->
+        {:error, error}
+
+      _ ->
+        {:error,
+         Ash.Error.Action.InvalidArgument.exception(
+           field: :topology,
+           message:
+             "The restored team did not begin its saved topology reconciliation. Inspect its lifecycle errors before retrying."
+         )}
+    end
+  end
+
+  @doc false
+  def dispatch_and_await_operation(resource, pid, signal),
+    do: await_operation(resource, pid, signal, signal)
+
+  defp await_operation(resource, pid, signal, command) do
     selector = fn runtime ->
       operation = runtime.agent.state.team.operation
 
@@ -98,7 +146,7 @@ defmodule Aikido.Team.Extension do
       end
     end
 
-    Aikido.AgentServer.call_until(pid, signal, "aikido.ash.team.**", selector,
+    Aikido.AgentServer.call_until(pid, command, "aikido.ash.team.**", selector,
       timeout: Aikido.Agent.Info.team_config(resource).timeout + 1_000
     )
     |> expose_operation_failure()

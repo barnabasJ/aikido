@@ -272,7 +272,7 @@ defmodule Aikido.Durable do
               {runtime.durable_server, runtime.durable_key, runtime.partition,
                keep_snapshot?(runtime.agent_module)}}
            end),
-         :ok <- Aikido.AgentServer.prepare_stop(pid, :normal, Keyword.get(opts, :scope, %{})) do
+         :ok <- prepare_stop(pid, opts) do
       if keep_snapshot?,
         do: DurableServer.Supervisor.terminate_child_permanent(supervisor, pid),
         else: delete(supervisor, key, partition: partition)
@@ -283,6 +283,13 @@ defmodule Aikido.Durable do
     case lookup(name, key, opts) do
       {:ok, pid} -> stop(name, pid, opts)
       :error -> {:error, :not_found}
+    end
+  end
+
+  defp prepare_stop(pid, opts) do
+    case Keyword.fetch(opts, :startup_operation_id) do
+      {:ok, operation_id} -> Aikido.AgentServer.prepare_failed_start_stop(pid, operation_id)
+      :error -> Aikido.AgentServer.prepare_stop(pid, :normal, Keyword.get(opts, :scope, %{}))
     end
   end
 

@@ -37,14 +37,20 @@ defmodule Aikido.Signal.Delivery do
   defp delivery_scope(_runtime, Aikido.Thread.Delivery, _sender, signal, %{kind: :request}),
     do: signal
 
+  defp delivery_scope(runtime, Aikido.Team.Delivery, sender, signal, %{kind: kind})
+       when kind in [:inheritance, :inheritance_result],
+       do: bind_recipient_scope(runtime, sender, signal)
+
   defp delivery_scope(runtime, _protocol, sender, signal, _correlation),
     do: bind_scope(runtime, sender, signal)
 
   defp bind_scope(%{bound_execution_scope: nil}, _sender, signal), do: signal
 
-  defp bind_scope(runtime, sender, signal) do
+  defp bind_scope(runtime, sender, signal), do: bind_recipient_scope(runtime, sender, signal)
+
+  defp bind_recipient_scope(runtime, sender, signal) do
     provenance = Map.take(sender, [:id, :resource, :aikido, :partition])
-    scope = runtime.bound_execution_scope
+    scope = runtime.bound_execution_scope || %{}
     context = Map.put(scope[:context] || %{}, :aikido_sender, provenance)
     Aikido.Signal.put_ctx(signal, Map.put(scope, :context, context))
   end

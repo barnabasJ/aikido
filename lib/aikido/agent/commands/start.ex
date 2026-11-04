@@ -114,21 +114,24 @@ defmodule Aikido.Agent.Commands.Start do
            configure_initial_topology(resource, input, context, topology, pid, runtime_options) do
       {:ok, CommandRuntime.reference(resource, input.arguments.id, pid)}
     else
-      error ->
+      {:error, _} = error ->
+        error
+
+      {:error, error, operation_id} ->
         cleanup =
           CommandRuntime.catch_runtime_exit(fn ->
-            Aikido.Durable.stop(pool, pid, scope: CommandRuntime.command_context(input, context))
+            Aikido.Durable.stop(pool, pid, startup_operation_id: operation_id)
           end)
 
         case cleanup do
           :ok ->
-            error
+            {:error, error}
 
           {:error, cleanup_error} ->
             {:error,
              StartupCleanupFailed.exception(
                agent_id: input.arguments.id,
-               startup: error,
+               startup: {:error, error},
                cleanup: cleanup_error
              )}
         end
@@ -141,15 +144,24 @@ defmodule Aikido.Agent.Commands.Start do
     restored? =
       Process.whereis(pool) && Aikido.Durable.restored?(pool, input.arguments.id, runtime_options)
 
-    if !is_nil(Aikido.Agent.Info.team_config(resource)) && !restored? do
-      Aikido.Team.Extension.start(
-        resource,
-        pid,
-        topology.nodes,
-        CommandRuntime.command_context(input, context)
-      )
-    else
-      {:ok, :ready}
+    cond do
+      is_nil(Aikido.Agent.Info.team_config(resource)) ->
+        {:ok, :ready}
+
+      restored? ->
+        Aikido.Team.Extension.await_restored_topology(resource, pid)
+
+      true ->
+        signal =
+          Aikido.Team.Signals.Start.new!(%{topology: topology.nodes},
+            scope: CommandRuntime.command_context(input, context)
+          )
+          |> Aikido.Signal.capture_tracing()
+
+        case Aikido.Team.Extension.start(resource, pid, signal) do
+          {:ok, _} = result -> result
+          {:error, error} -> {:error, error, signal.id}
+        end
     end
   end
 

@@ -24,11 +24,44 @@ defmodule Aikido.Team.Extension.Verifiers.Validate do
       true ->
         config = Verifier.get_persisted(dsl, :aikido_team_config)
 
-        case Aikido.Team.Topology.build(config.topology.nodes, instance, config.max_members) do
-          {:ok, _topology} -> :ok
+        with :ok <- validate_reconciled_inheritance(dsl, config),
+             {:ok, _topology} <-
+               Aikido.Team.Topology.build(config.topology.nodes, instance, config.max_members) do
+          :ok
+        else
+          {:error, %Spark.Error.DslError{}} = failure -> failure
           {:error, reason} -> error(inspect(reason))
         end
     end
+  end
+
+  defp validate_reconciled_inheritance(dsl, config) do
+    fields = Verifier.get_persisted(dsl, :aikido_state_fields, [])
+
+    Enum.reduce_while(config.reconcile_inherit, :ok, fn field, :ok ->
+      attribute = Ash.Resource.Info.attribute(dsl, field)
+
+      cond do
+        field not in config.inherit ->
+          {:halt,
+           error("reconcile_inherit fields must also be declared in inherit: #{inspect(field)}")}
+
+        field not in fields || is_nil(attribute) ->
+          {:halt, error("reconcile_inherit requires an own-state attribute: #{inspect(field)}")}
+
+        Aikido.Team.InheritedAttributes.restricted_attribute?(attribute) ->
+          {:halt,
+           error(
+             "reconcile_inherit cannot change identity or sensitive fields: #{inspect(field)}"
+           )}
+
+        !attribute.writable? ->
+          {:halt, error("reconcile_inherit requires a writable attribute: #{inspect(field)}")}
+
+        true ->
+          {:cont, :ok}
+      end
+    end)
   end
 
   defp error(message),

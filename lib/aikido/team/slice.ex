@@ -89,6 +89,13 @@ defmodule Aikido.Team.Slice do
     name "ash_team"
     route Aikido.Team.Signals.Start, Aikido.Team.Actions.Start, name: :configure_topology
     route Aikido.Team.Signals.Reconcile, Aikido.Team.Actions.Reconcile
+    route Aikido.Team.Signals.ReconcileInherited, Aikido.Team.Actions.ReconcileInherited
+
+    route Aikido.Agent.Signals.Inherit, Aikido.Team.Actions.CascadeInherited,
+      name: :cascade_inherited,
+      public?: false
+
+    route Aikido.Team.Signals.Inherited, Aikido.Team.Actions.Inherited, public?: false
     route Aikido.Team.Signals.AddMember, Aikido.Team.Actions.AddMember
     route Aikido.Team.Signals.RemoveMember, Aikido.Team.Actions.RemoveMember
     route Aikido.Team.Signals.EnsureMember, Aikido.Team.Actions.EnsureMember

@@ -48,21 +48,23 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
     Enum.reduce(
       [
         {Aikido.Ownership.Signals.QueryChildren, Aikido.Ownership.Actions.ReplyChildren,
-         :__aikido_query_children__},
+         :__aikido_query_children__, false, -20},
         {Aikido.AgentServer.Signals.StopSelf, Aikido.Actions.Lifecycle.StopSelf,
-         :__aikido_stop_self__}
+         :__aikido_stop_self__, false, -20},
+        {Aikido.Agent.Signals.Inherit, Aikido.Agent.Actions.AdoptInherited, :adopt_inherited,
+         true, 20}
       ],
       dsl,
-      fn {signal, implementation, name}, dsl ->
-        if declared_runtime_route?(dsl, signal) do
+      fn {signal, implementation, name, public?, priority}, dsl ->
+        if signal != Aikido.Agent.Signals.Inherit && declared_runtime_route?(dsl, signal) do
           dsl
         else
           Transformer.add_entity(dsl, [:agent], %Aikido.Agent.Route{
             type: signal,
             action: implementation,
             name: name,
-            public?: false,
-            priority: -20
+            public?: public?,
+            priority: priority
           })
         end
       end

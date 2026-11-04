@@ -24,6 +24,8 @@ defmodule Aikido.Team.TopologyOperation do
     with {:ok, topology, stop, requested, paused} <- plan.(),
          :ok <- validate_worker_limits(topology, config),
          {:ok, steps} <- order_member_steps(state.topology, topology, stop, requested) do
+      steps = include_inheritance_steps(steps, config)
+
       state
       |> adopt_topology(topology, paused)
       |> begin_operation(signal.id, steps)
@@ -36,6 +38,61 @@ defmodule Aikido.Team.TopologyOperation do
         {:ok, state, directives}
     end
   end
+
+  @doc "Track opt-in inherited changes across currently running members and nested teams."
+  def reconcile_inherited(signal, state, context, config, reply \\ nil)
+
+  def reconcile_inherited(
+        signal,
+        %{operation: %{status: :running}} = state,
+        _context,
+        _config,
+        nil
+      ) do
+    {:ok, Map.update(state, :queued_operations, [signal], &(&1 ++ [signal])), []}
+  end
+
+  def reconcile_inherited(_signal, %{operation: %{status: :running}}, _context, _config, _reply) do
+    {:error,
+     Ash.Error.Action.InvalidArgument.exception(
+       field: :state,
+       message:
+         "The receiving team's topology operation is busy. Await its completion before reconciling inherited configuration."
+     )}
+  end
+
+  def reconcile_inherited(signal, state, context, config, reply) do
+    names = for {name, pid} <- state.members, is_pid(pid), do: name
+
+    with {:ok, ordered} <- Topology.order(state.topology.nodes, names) do
+      steps =
+        if Map.get(config, :reconcile_inherit, []) == [],
+          do: [],
+          else: Enum.map(ordered, &{:inherit, &1})
+
+      state
+      |> begin_operation(signal.id, steps)
+      |> put_inheritance_reply(reply)
+      |> advance_member_lifecycle(context, config)
+      |> append_operation_deadline(signal.id, config.timeout)
+    end
+  end
+
+  defp include_inheritance_steps(steps, config) do
+    if Map.get(config, :reconcile_inherit, []) == [] do
+      steps
+    else
+      Enum.flat_map(steps, fn
+        {:start, name} = start -> [start, {:inherit, name}]
+        step -> [step]
+      end)
+    end
+  end
+
+  defp put_inheritance_reply(state, nil), do: state
+
+  defp put_inheritance_reply(state, reply),
+    do: put_in(state.operation, Map.put(state.operation, :inheritance_reply, reply))
 
   @doc "Release scoped topology commands after the current lifecycle operation settles."
   def release_queued_operations(state, context) do
@@ -138,7 +195,8 @@ defmodule Aikido.Team.TopologyOperation do
       [Directives.emit_to_pid(completed, context.agent_pid)] ++
         pending_task_assignments(state) ++ recovered_task_notifications(state, context)
 
-    {:ok, Map.put(state, :recovered_tasks, []), directives}
+    {state, inherited} = settle_inheritance_reply(state, nil)
+    {:ok, Map.put(state, :recovered_tasks, []), directives ++ inherited}
   end
 
   def advance_member_lifecycle(
@@ -160,6 +218,16 @@ defmodule Aikido.Team.TopologyOperation do
 
       {:start, nil} ->
         request_member_start(state, name, context, config)
+
+      {:inherit, pid} when is_pid(pid) ->
+        request_member_inheritance(state, name, pid, context, config)
+
+      {:inherit, nil} ->
+        fail_operation_and_pending_tasks(
+          %{operation_id: state.operation.id, reason: {:member_not_running, name}},
+          state,
+          context
+        )
     end
   end
 
@@ -215,6 +283,49 @@ defmodule Aikido.Team.TopologyOperation do
       )
 
     {:ok, put_in(state.operation.awaiting, {:start, name}), [effect]}
+  end
+
+  defp request_member_inheritance(state, name, pid, context, config) do
+    changes =
+      state.topology.nodes[name]
+      |> inherited_member_state(context, config)
+      |> Map.take(Map.get(config, :reconcile_inherit, []))
+
+    signal = %Signal{
+      type: "aikido.agent.inherit",
+      data: %{operation_id: state.operation.id, member: name, changes: changes},
+      source: "/aikido"
+    }
+
+    effect =
+      Aikido.Team.Directives.Deliver.new!(
+        signal: signal,
+        target: pid,
+        kind: :inheritance,
+        signal_type: signal.type
+      )
+
+    {:ok, put_in(state.operation.awaiting, {:inherit, name}), [effect]}
+  end
+
+  @doc "Adopt only a correlated active member acknowledgement before advancing the tracked plan."
+  def inherited(data, state, context, config) do
+    if awaited?(state, data.operation_id, {:inherit, data.member}) do
+      if is_nil(data.error) do
+        advance_member_lifecycle(state, context, config)
+      else
+        fail_operation_and_pending_tasks(
+          %{
+            operation_id: data.operation_id,
+            reason: {:inheritance_failed, data.member, data.error}
+          },
+          state,
+          context
+        )
+      end
+    else
+      {:ok, state, []}
+    end
   end
 
   defp member_parent(state, name, owner, context, config) do
@@ -287,9 +398,39 @@ defmodule Aikido.Team.TopologyOperation do
         &TaskDelivery.task_result_delivery_directives(state.tasks[&1], state, context)
       )
 
+    {state, inherited} = settle_inheritance_reply(state, inheritance_error(state.operation.error))
     {state, queued} = release_queued_operations(state, context)
-    {:ok, state, directives ++ queued}
+    {:ok, state, directives ++ inherited ++ queued}
   end
+
+  defp settle_inheritance_reply(state, error) do
+    case Map.get(state.operation, :inheritance_reply) do
+      nil ->
+        {state, []}
+
+      reply ->
+        effect =
+          Aikido.Team.Delivery.inheritance_result(
+            reply.pid,
+            reply.operation_id,
+            reply.member,
+            error
+          )
+
+        {put_in(state.operation, Map.delete(state.operation, :inheritance_reply)), [effect]}
+    end
+  end
+
+  defp inheritance_error(:timeout),
+    do:
+      "The nested team's inherited configuration operation timed out before all members acknowledged it."
+
+  defp inheritance_error({:inheritance_failed, member, message}),
+    do: "Inherited configuration was rejected by member #{inspect(member)}: #{message}"
+
+  defp inheritance_error(_reason),
+    do:
+      "The nested team could not reconcile inherited configuration. Inspect its failed operation before retrying."
 
   def awaited?(state, id, step),
     do:

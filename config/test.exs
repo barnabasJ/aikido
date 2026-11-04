@@ -32,5 +32,6 @@ config :aikido,
     AikidoTest.GeneratedAIBootstrap.Domain,
     AikidoTest.HookActions.Domain,
     Aikido.CommandRuntimeErrorTest.Domain,
-    AikidoTest.LegacyCheckpoint.Domain
+    AikidoTest.LegacyCheckpoint.Domain,
+    Aikido.InheritedConfigurationTest.Domain
   ]

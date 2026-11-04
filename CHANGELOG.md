@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Wait for receiver-owned saved topology reconciliation when starting restored
+  teams, including nested members. Restoration failures retain the existing
+  identity for inspection instead of applying fresh-start cleanup.
+
+- Bind fresh nested team initialization and correlated failed-start cleanup to
+  the receiving activation's native authority. Preserve normal public caller
+  authorization and saved topology on restoration.
+
 - Restore physically older mounted records returned by opaque checkpoint
   callbacks through native create actions after authentication. Preserve saved
   field values and explicit nils while applying defaults to newly declared
@@ -9,6 +17,12 @@
 
 - Accept permanent sink failures whose optional retry hint is omitted, through
   both native settlement commands and direct typed signals.
+
+- Add explicit `reconcile_inherit` Team configuration and tracked
+  `reconcile_inherited` commands. Running nested members acknowledge opted-in
+  nonidentity fields under their own native authority; creation overrides remain
+  authoritative, receiver casts validate values, and failures/timeouts remain
+  observable instead of reporting completion early.
 
 - Require runtime-correlated self delivery and an active writing credit before
   journal Work reaches an application action. Direct typed Work cannot start

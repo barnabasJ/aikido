@@ -25,6 +25,7 @@ defmodule Aikido.Team.Extension.Transformers.Build do
       resource: Transformer.get_persisted(dsl, :module),
       instance: instance,
       inherit: Transformer.get_option(dsl, [:team], :inherit, []),
+      reconcile_inherit: Transformer.get_option(dsl, [:team], :reconcile_inherit, []),
       state_path: Transformer.get_option(dsl, [:agent], :path, :state),
       topology: %Aikido.Team.Topology{nodes: Map.merge(raw, definitions)},
       max_members: limit,

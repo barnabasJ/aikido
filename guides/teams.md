@@ -151,3 +151,51 @@ conversation with its original request ID, deadline, iteration count and prepare
 tools. The team's assigning parent receives a terminal result after synthesis,
 not an interim "waiting for results" answer. Fire-and-forget work and assignments
 requested by other members do not hold that team's answer.
+
+## Reconciling opted-in inherited configuration
+
+`inherit` copies own-state values at member creation. Retained members keep their
+saved values unless the team explicitly opts fields into reconciliation:
+
+```elixir
+team do
+  inherit [:storage_id, :storage_replay?]
+  reconcile_inherit [:storage_id, :storage_replay?]
+end
+```
+
+Update the parent's own values through an ordinary routed application action,
+then call its generated `reconcile_inherited` command. Aikido tracks each current
+member's acknowledgement, including opted-in nested teams, before completing the
+operation. Member initial values still take precedence. An empty opt-in leaves
+running members unchanged. Only writable, nonsensitive own attributes already
+listed in `inherit` may be reconciled; primary keys, sensitive attributes and
+known identity/scope binding names are excluded. Applications must additionally
+protect any custom identity fields through their own policies and declarations.
+
+Inheritance requests retain the receiving agent's activation authority. Native
+Ash authorization runs even when the proposed values are unchanged, and the
+receiving resource's ordinary types reject incompatible values. Failed members
+or operation deadlines fail the tracked operation rather than imply completion.
+
+An application middleware may stage its own follow-on native configuration by
+calling its existing `next` continuation against the proposed context and
+combining deferred directives. If that configuration fails, return the original
+context and discard all effects. The inheritance acknowledgement is a deferred
+directive, so it is sent only after the complete middleware chain and native
+state adoption succeed; no application callback is stored in SDK configuration.
+
+Fresh team startup runs its initial topology under the receiving activation's
+native scope after the outer start command is authorized. An independently
+owned nested team therefore uses its own principal for its initial state
+updates. Failure cleanup is correlated to that in-flight start and follows the
+same native retention path. Normal public topology commands retain the actual
+caller's scope. Restoration preserves the saved graph and does not apply a
+new caller's constructor topology; use an authorized public topology command
+for an explicit change.
+
+Restoring a team through its public start command waits for the receiver-owned
+saved-topology reconciliation, including restored nested teams. Fresh constructor
+topology does not replace that saved graph. If saved reconciliation fails, start
+returns the failure and retains the existing identity for inspection and repair;
+it does not run fresh-start cleanup or delete the retained agent.

@@ -202,8 +202,148 @@ defmodule AikidoTest.AshVerifiersTest do
     assert output =~ "Domain agents must use the Aikido.Agent.Extension extension"
   end
 
+  test "team reconciled inheritance is opt-in and preserves native route ownership" do
+    for declaration <- ["", "reconcile_inherit [:storage_id, :storage_replay?]"] do
+      module = Module.concat(__MODULE__, "InheritedTeam#{System.unique_integer([:positive])}")
+
+      output =
+        compile_resource(
+          [Aikido.Agent.Extension, Aikido.Team.Extension],
+          inherited_team_body(declaration),
+          module: module
+        )
+
+      assert output == ""
+      expected = if declaration == "", do: [], else: [:storage_id, :storage_replay?]
+      assert Aikido.Agent.Info.team_config(module).reconcile_inherit == expected
+
+      routes = Aikido.Agent.Info.signal_routes(module) ++ Aikido.Agent.Info.routes(module)
+      router = Aikido.Signal.Router.new!(routes)
+
+      assert {:ok, [own, cascade]} =
+               Aikido.Signal.Router.route(router, %{type: "aikido.agent.inherit"})
+
+      paths = Aikido.Agent.Info.slice_paths_for_action(module)
+      assert paths[own] == [:state]
+      assert paths[cascade] == [:team]
+
+      admission = Spark.Dsl.Extension.get_persisted(module, :aikido_public_admission_routes, [])
+
+      assert Enum.any?(admission, fn route ->
+               route.type == "aikido.agent.inherit" && route.name == :adopt_inherited &&
+                 route.public? && route.action == own
+             end)
+
+      refute Enum.any?(admission, fn route ->
+               route.type == "aikido.agent.inherit" && route.public? && route.action == cascade
+             end)
+    end
+  end
+
+  test "team reconciled inheritance rejects attributes outside its creation contract" do
+    output =
+      compile_resource(
+        [Aikido.Agent.Extension, Aikido.Team.Extension],
+        inherited_team_body("reconcile_inherit [:other]")
+      )
+
+    assert output =~ "reconcile_inherit fields must also be declared in inherit"
+  end
+
+  test "team reconciled inheritance rejects missing attributes and mounted state" do
+    for field <- [:missing, :todos] do
+      output =
+        compile_resource(
+          [Aikido.Agent.Extension, Aikido.Team.Extension],
+          inherited_team_body("reconcile_inherit [#{inspect(field)}]")
+        )
+
+      assert output =~ "reconcile_inherit requires an own-state attribute"
+    end
+  end
+
+  test "team reconciled inheritance rejects sensitive and identity attributes" do
+    for field <- [
+          :secret,
+          :actor_id,
+          :org_id,
+          :thread_id,
+          :principal_id,
+          :definition_ref,
+          :execution_credential
+        ] do
+      output =
+        compile_resource(
+          [Aikido.Agent.Extension, Aikido.Team.Extension],
+          inherited_team_body("reconcile_inherit [#{inspect(field)}]")
+        )
+
+      assert output =~ "reconcile_inherit cannot change identity or sensitive fields"
+    end
+  end
+
+  defp inherited_team_body(reconciliation) do
+    """
+    agent do
+      name "inherited_configuration"
+      slice :todos, Aikido.Todo.Slice
+
+      schema do
+        attribute :storage_id, :string do
+          description "Shared storage configuration inherited by this team's members."
+        end
+
+        attribute :storage_replay?, :boolean do
+          description "Whether members retain journal facts for their storage consumer."
+          default false
+        end
+
+        attribute :secret, :string do
+          description "Sensitive application data excluded from inherited reconciliation."
+          sensitive? true
+        end
+
+        attribute :actor_id, :string do
+          description "Execution identity excluded from inherited reconciliation."
+        end
+
+        attribute :org_id, :string do
+          description "Known immutable execution binding excluded even without a sensitive flag."
+        end
+
+        attribute :thread_id, :string do
+          description "Known immutable execution binding excluded even without a sensitive flag."
+        end
+
+        attribute :principal_id, :string do
+          description "Known immutable execution binding excluded even without a sensitive flag."
+        end
+
+        attribute :definition_ref, :string do
+          description "Known immutable execution binding excluded even without a sensitive flag."
+        end
+
+        attribute :execution_credential, :string do
+          description "Known immutable execution binding excluded even without a sensitive flag."
+        end
+
+        attribute :other, :string do
+          description "Own-state configuration not selected for creation inheritance."
+        end
+      end
+    end
+
+    team do
+      inherit [:storage_id, :storage_replay?, :secret, :actor_id, :org_id, :thread_id, :principal_id, :definition_ref, :execution_credential, :missing, :todos]
+      #{reconciliation}
+    end
+    """
+  end
+
   defp compile_resource(extensions, body, opts \\ []) do
-    module = Module.concat(__MODULE__, "Resource#{System.unique_integer([:positive])}")
+    module =
+      opts[:module] || Module.concat(__MODULE__, "Resource#{System.unique_integer([:positive])}")
+
     layer = if opts[:embedded?], do: ":embedded", else: "Ash.DataLayer.Simple"
 
     ExUnit.CaptureIO.capture_io(:stderr, fn ->

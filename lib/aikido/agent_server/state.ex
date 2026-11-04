@@ -19,12 +19,17 @@ defmodule Aikido.AgentServer.State do
 
   @type status :: Aikido.AgentServer.Types.Status.t()
 
-  @derive {Inspect, except: [:bound_execution_scope]}
+  @derive {Inspect, except: [:bound_execution_scope, :startup_operation]}
   use Ash.TypedStruct
 
   typed_struct do
     field :bound_execution_scope, :map do
       description "Transient authority authenticated by the durable scope adapter for this activation; never checkpointed."
+    end
+
+    field :startup_operation, :map do
+      description "Transient fresh Team startup slot and existing operation identity, cleared after completion or cleanup; never checkpointed."
+      constraints fields: [id: [type: :string, allow_nil?: true], scope: [type: :term]]
     end
 
     field :sync, Aikido.Durable.SyncPolicy do

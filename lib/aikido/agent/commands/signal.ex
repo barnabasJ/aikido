@@ -45,7 +45,7 @@ defmodule Aikido.Agent.Commands.Signal do
 
   defp dispatch(resource, pid, signal) do
     if !is_nil(Aikido.Agent.Info.team_config(resource)) &&
-         signal.type in ~w(aikido.ash.team.start aikido.ash.team.reconcile aikido.ash.team.add_member aikido.ash.team.remove_member aikido.ash.team.ensure_member aikido.ash.team.stop_member) do
+         signal.type in ~w(aikido.ash.team.start aikido.ash.team.reconcile aikido.ash.team.reconcile_inherited aikido.ash.team.add_member aikido.ash.team.remove_member aikido.ash.team.ensure_member aikido.ash.team.stop_member) do
       Aikido.Team.Extension.dispatch_and_await_operation(resource, pid, signal)
     else
       Aikido.AgentServer.call(pid, signal, fn _ -> {:ok, :processed} end)
