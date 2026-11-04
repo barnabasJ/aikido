@@ -25,7 +25,7 @@ defmodule Aikido.Team.TopologyOperation do
          :ok <- validate_worker_limits(topology, config),
          {:ok, steps} <- order_member_steps(state.topology, topology, stop, requested) do
       steps = include_inheritance_steps(steps, config)
-      stop_targets = Aikido.Team.MemberStop.targets(state, stop, context, config)
+      stop_targets = Aikido.Team.MemberStop.targets(state, stop, context)
 
       state
       |> adopt_topology(topology, paused)
@@ -274,7 +274,7 @@ defmodule Aikido.Team.TopologyOperation do
             Aikido.Agent.Reference.new!(
               id: Topology.member_id(state.topology, context.agent_id, name),
               resource: spec.resource,
-              aikido: config.instance,
+              aikido: context.aikido,
               partition: context.partition
             )
         }

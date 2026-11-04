@@ -6,7 +6,7 @@ defmodule Aikido.Agent.Commands.TeamCoordination do
   @impl true
   def run(input, _options, context) do
     CommandRuntime.catch_runtime_exit(fn ->
-      with {:ok, {_id, pid}} <- CommandRuntime.resolve(input.resource, input.arguments.agent) do
+      with {:ok, {_id, pid}} <- CommandRuntime.resolve(input) do
         Aikido.AgentServer.state(pid, fn runtime ->
           if runtime.agent_module == input.resource do
             current_input =

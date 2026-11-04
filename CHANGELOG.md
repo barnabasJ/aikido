@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Let trusted Ash application context select a running Aikido instance for
+  generated agent commands. Start team members in the coordinator's runtime
+  and honor the declared instance module's configured supervisor name.
+
 - Deliver retained Inspector projections even when concurrent agents publish
   them out of sequence.
 

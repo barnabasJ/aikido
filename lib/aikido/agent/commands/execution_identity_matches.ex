@@ -8,7 +8,7 @@ defmodule Aikido.Agent.Commands.ExecutionIdentityMatches do
     scope = CommandRuntime.command_context(input, context)
 
     CommandRuntime.catch_runtime_exit(fn ->
-      with {:ok, {_id, pid}} <- CommandRuntime.resolve(input.resource, input.arguments.agent) do
+      with {:ok, {_id, pid}} <- CommandRuntime.resolve(input) do
         Aikido.AgentServer.state(pid, fn runtime ->
           {:ok, ExecutionIdentity.matches?(runtime.bound_execution_scope, scope)}
         end)

@@ -8,7 +8,7 @@ defmodule Aikido.Agent.Commands.Inspect do
     options = Ash.Scope.to_opts(context, context: input.context)
 
     CommandRuntime.catch_runtime_exit(fn ->
-      with {:ok, {_id, pid}} <- CommandRuntime.resolve(input.resource, input.arguments.agent),
+      with {:ok, {_id, pid}} <- CommandRuntime.resolve(input),
            :ok <- CommandRuntime.authorize_resolved(input, context, pid),
            {:ok, record} <- CommandRuntime.snapshot(input.resource, pid, options) do
         {:ok,

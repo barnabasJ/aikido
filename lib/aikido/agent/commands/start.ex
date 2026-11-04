@@ -27,7 +27,7 @@ defmodule Aikido.Agent.Commands.Start do
   end
 
   defp start_process(resource, input, topology, context) do
-    pool = Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource))
+    pool = Aikido.durable_supervisor_name(CommandRuntime.instance(input))
 
     runtime_options =
       input.context
@@ -48,7 +48,7 @@ defmodule Aikido.Agent.Commands.Start do
       case Aikido.Durable.start(pool, input.arguments.id, options) do
         {:ok, pid} ->
           configure_topology_or_stop_agent(
-            resource,
+            pool,
             input,
             context,
             topology,
@@ -107,12 +107,10 @@ defmodule Aikido.Agent.Commands.Start do
     ]
   end
 
-  defp configure_topology_or_stop_agent(resource, input, context, topology, pid, runtime_options) do
-    pool = Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource))
-
+  defp configure_topology_or_stop_agent(pool, input, context, topology, pid, runtime_options) do
     with {:ok, _} <-
-           configure_initial_topology(resource, input, context, topology, pid, runtime_options) do
-      {:ok, CommandRuntime.reference(resource, input.arguments.id, pid)}
+           configure_initial_topology(pool, input, context, topology, pid, runtime_options) do
+      {:ok, CommandRuntime.reference(input.resource, input.arguments.id, pid)}
     else
       {:error, _} = error ->
         error
@@ -138,8 +136,8 @@ defmodule Aikido.Agent.Commands.Start do
     end
   end
 
-  defp configure_initial_topology(resource, input, context, topology, pid, runtime_options) do
-    pool = Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource))
+  defp configure_initial_topology(pool, input, context, topology, pid, runtime_options) do
+    resource = input.resource
 
     restored? =
       Process.whereis(pool) && Aikido.Durable.restored?(pool, input.arguments.id, runtime_options)

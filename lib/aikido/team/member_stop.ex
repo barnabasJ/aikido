@@ -4,13 +4,13 @@ defmodule Aikido.Team.MemberStop do
   alias Aikido.Team.TopologyOperation
 
   @doc "Capture stop addresses before the proposed topology removes their declarations."
-  def targets(state, names, context, config) do
+  def targets(state, names, context) do
     for name <- names, pid = state.members[name], is_pid(pid), into: %{} do
       reference =
         Aikido.Agent.Reference.new!(
           id: Aikido.Team.Topology.member_id(state.topology, context.agent_id, name),
           resource: state.topology.nodes[name].resource,
-          aikido: config.instance,
+          aikido: context.aikido,
           partition: context.partition
         )
 
@@ -22,7 +22,7 @@ defmodule Aikido.Team.MemberStop do
             Aikido.Agent.Reference.new!(
               id: Aikido.Team.Topology.member_id(state.topology, context.agent_id, owner),
               resource: state.topology.nodes[owner].resource,
-              aikido: config.instance,
+              aikido: context.aikido,
               partition: context.partition
             )
 

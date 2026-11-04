@@ -30,7 +30,7 @@ defmodule Aikido.Agent.Commands.Signal do
       end
 
     CommandRuntime.catch_runtime_exit(fn ->
-      with {:ok, {id, pid}} <- CommandRuntime.resolve(resource, input.arguments.agent),
+      with {:ok, {id, pid}} <- CommandRuntime.resolve(input),
            {:ok, signal} <- Aikido.Signal.new(definition.type, payload, source: "/ash"),
            signal = Aikido.Signal.put_ctx(signal, CommandRuntime.command_context(input, context)),
            {:ok, _} <- dispatch(resource, pid, signal) do

@@ -9,39 +9,39 @@ defmodule Aikido.Agent.Commands.Delete do
     agent = input.arguments.agent
 
     CommandRuntime.catch_runtime_exit(fn ->
-      with {:ok, {id, target}} <- resolve_deletion_target(resource, agent),
-           :ok <- delete_durable_identity(resource, target) do
+      with {:ok, {id, target}} <- resolve_deletion_target(input, agent),
+           :ok <- delete_durable_identity(input, target) do
         {:ok, %{id: id, resource: resource, status: :deleted}}
       end
     end)
   end
 
-  defp resolve_deletion_target(resource, pid) when is_pid(pid) do
-    with {:ok, {id, _pid}} <- CommandRuntime.resolve(resource, pid), do: {:ok, {id, pid}}
+  defp resolve_deletion_target(input, pid) when is_pid(pid) do
+    with {:ok, {id, _pid}} <- CommandRuntime.resolve(input, pid), do: {:ok, {id, pid}}
   end
 
-  defp resolve_deletion_target(resource, %{id: id}), do: resolve_deletion_target(resource, id)
-  defp resolve_deletion_target(_resource, id) when is_binary(id), do: {:ok, {id, id}}
+  defp resolve_deletion_target(input, %{id: id}), do: resolve_deletion_target(input, id)
+  defp resolve_deletion_target(_input, id) when is_binary(id), do: {:ok, {id, id}}
 
-  defp resolve_deletion_target(_resource, _),
+  defp resolve_deletion_target(_input, _),
     do: {:error, "Expected an agent ID, PID, or reference"}
 
-  defp delete_durable_identity(resource, pid) when is_pid(pid) do
+  defp delete_durable_identity(input, pid) when is_pid(pid) do
     with {:ok, {pool, key, partition}} <-
            Aikido.AgentServer.state(pid, fn runtime ->
              {:ok, {runtime.durable_server, runtime.durable_key, runtime.partition}}
            end) do
       Aikido.Durable.delete(pool, key,
-        agent: resource,
+        agent: input.resource,
         partition: partition
       )
     end
   end
 
-  defp delete_durable_identity(resource, id) do
-    instance = Aikido.Agent.Info.agent_instance!(resource)
+  defp delete_durable_identity(input, id) do
+    instance = CommandRuntime.instance(input)
     pool = Aikido.durable_supervisor_name(instance)
 
-    Aikido.Durable.delete(pool, id, agent: resource)
+    Aikido.Durable.delete(pool, id, agent: input.resource)
   end
 end

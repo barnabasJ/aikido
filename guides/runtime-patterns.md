@@ -779,3 +779,23 @@ Drive real provider work and wait for its rearmed timer before advancing virtual
 time. Assertion receive timeouts then serve only as failure ceilings. This lets
 a stream last longer than one progress window while proving every actual content
 gap stays inside that window, without sleeps or fabricated agent state.
+
+
+### Selecting a running instance for a command
+
+Generated Ash agent commands normally use the instance declared on the resource,
+including the instance module's configured supervisor name. Trusted application
+code can address a separately supervised runtime by passing its registered name
+in the Ash context.
+
+```elixir
+options = [scope: scope, context: %{aikido_runtime_options: [instance: MyApp.Isolated]}]
+agent = MyApp.Agents.worker_start!(%{id: "worker-1"}, options)
+MyApp.Agents.worker_inspect!(agent.id, options)
+MyApp.Agents.worker_stop!(agent.id, options)
+```
+
+Pass the same selection to subsequent ID-based commands. Team members start in
+their coordinator's runtime. Use application-controlled names and keep this
+context at the trusted server boundary. Ash continues to authorize the caller
+using the supplied scope.

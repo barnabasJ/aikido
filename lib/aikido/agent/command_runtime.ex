@@ -19,28 +19,49 @@ defmodule Aikido.Agent.CommandRuntime do
 
   def reference(resource, id, pid), do: %{id: id, pid: pid, resource: resource}
 
-  def resolve(resource, %{pid: pid}) when is_pid(pid), do: resolve(resource, pid)
-  def resolve(resource, %{id: id}), do: resolve(resource, id)
+  def instance(input) do
+    instance_override(input) || configured_instance(input.resource)
+  end
 
-  def resolve(resource, id) when is_binary(id) do
-    case Aikido.Durable.lookup(
-           Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource)),
-           id
-         ) do
+  defp configured_instance(resource) do
+    declared = Aikido.Agent.Info.agent_instance!(resource)
+
+    if Spark.Dsl.is?(declared, Aikido.Instance.Host),
+      do: Aikido.config(declared)[:name],
+      else: declared
+  end
+
+  defp instance_override(input), do: input.context[:aikido_runtime_options][:instance]
+
+  def resolve(input), do: resolve(input, input.arguments.agent)
+
+  def resolve(resource, target) when is_atom(resource) do
+    resolve(%{resource: resource, context: %{}}, target)
+  end
+
+  def resolve(input, %{pid: pid}) when is_pid(pid), do: resolve(input, pid)
+  def resolve(input, %{id: id}), do: resolve(input, id)
+
+  def resolve(input, id) when is_binary(id) do
+    case Aikido.Durable.lookup(Aikido.durable_supervisor_name(instance(input)), id) do
       :error -> {:error, RuntimeUnavailable.exception(reason: :not_running)}
-      {:ok, pid} -> resolve(resource, pid)
+      {:ok, pid} -> resolve(input, pid)
     end
   end
 
-  def resolve(resource, pid) when is_pid(pid) do
+  def resolve(input, pid) when is_pid(pid) do
+    selected = instance_override(input)
+
     AgentServer.state(pid, fn state ->
-      if state.agent.agent_module == resource,
-        do: {:ok, {state.agent.id, pid}},
-        else: {:error, :different_resource}
+      cond do
+        state.agent.agent_module != input.resource -> {:error, :different_resource}
+        selected && state.aikido != selected -> {:error, :different_instance}
+        true -> {:ok, {state.agent.id, pid}}
+      end
     end)
   end
 
-  def resolve(_resource, _), do: {:error, "Expected an agent ID, PID, or reference"}
+  def resolve(_input, _), do: {:error, "Expected an agent ID, PID, or reference"}
 
   @doc "Authorize the same public command against its exact resolved process before I/O."
   def authorize_resolved(input, context, pid) when is_pid(pid) do

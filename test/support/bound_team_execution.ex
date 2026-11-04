@@ -1,3 +1,7 @@
+defmodule Aikido.BoundTeamExecutionTest.Instance do
+  use Aikido, otp_app: :aikido
+end
+
 defmodule Aikido.BoundTeamExecutionTest.Authority do
   @behaviour Aikido.Durable.ScopeAdapter
 

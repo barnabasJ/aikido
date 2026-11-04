@@ -10,20 +10,20 @@ defmodule Aikido.Agent.Commands.List do
     options = Ash.Scope.to_opts(context, context: input.context)
 
     CommandRuntime.catch_runtime_exit(fn ->
-      with {:ok, records} <- collect_live_snapshots(resource, options),
+      with {:ok, records} <- collect_live_snapshots(input, options),
            {:ok, records} <- filter_snapshots(records, resource, arguments[:filter], options) do
         {:ok, sort_and_paginate(records, arguments)}
       end
     end)
   end
 
-  defp collect_live_snapshots(resource, options) do
-    resource
-    |> Aikido.Agent.Info.agent_instance!()
+  defp collect_live_snapshots(input, options) do
+    input
+    |> CommandRuntime.instance()
     |> Aikido.durable_supervisor_name()
     |> Aikido.Durable.members()
     |> Enum.reduce_while({:ok, []}, fn {_id, pid}, {:ok, records} ->
-      case live_snapshot(resource, pid, options) do
+      case live_snapshot(input.resource, pid, options) do
         {:ok, record} ->
           {:cont, {:ok, [record | records]}}
 

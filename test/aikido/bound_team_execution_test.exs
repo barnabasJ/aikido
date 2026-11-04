@@ -23,6 +23,77 @@ defmodule Aikido.BoundTeamExecutionTest do
     {:ok, team: team, scope: scope}
   end
 
+  test "generated commands can address a team in a separate runtime", %{
+    team: default,
+    scope: scope
+  } do
+    instance = __MODULE__.Isolated
+    durable = Keyword.put(durable_options(), :scope_adapter, __MODULE__.Authority)
+    start_supervised!({Aikido, name: instance, durable: durable})
+
+    context = Map.put(scope.context, :aikido_runtime_options, instance: instance)
+    options = [scope: scope, context: context]
+    id = default.id
+    attributes = %{id: id, actor_id: scope.actor.id}
+
+    assert {:error, _} =
+             Domain.bound_team_start(
+               attributes,
+               Keyword.put(options, :scope, %{
+                 scope
+                 | actor: %{id: scope.actor.id, allowed: false}
+               })
+             )
+
+    root = Domain.bound_team_start!(attributes, options)
+
+    assert {:ok, {^instance, worker}} =
+             Aikido.AgentServer.state(
+               root.pid,
+               &{:ok, {&1.aikido, &1.agent.state.team.members.worker}}
+             )
+
+    assert {:ok, ^instance} = Aikido.AgentServer.state(worker, &{:ok, &1.aikido})
+    assert Domain.bound_team_execution_identity_matches!(id, options)
+
+    refute Domain.bound_team_execution_identity_matches!(
+             id,
+             Keyword.put(options, :scope, %{scope | tenant: "other-tenant"})
+           )
+
+    assert {:error, _} = Domain.bound_team_inspect(default.pid, options)
+    assert [%{id: ^id}] = Domain.bound_team_list!(%{}, options)
+
+    monitor = Process.monitor(worker)
+    Domain.bound_team_remove_member!(id, %{member: :worker}, options)
+    assert_receive {:DOWN, ^monitor, :process, ^worker, _reason}, 5_000
+
+    assert %{status: :stopped} = Domain.bound_team_stop!(id, options)
+    assert %{status: :deleted} = Domain.bound_team_delete!(id, options)
+    assert Process.alive?(default.pid)
+  end
+
+  test "generated commands honor the declared instance's configured supervisor name" do
+    declared = __MODULE__.Instance
+    instance = __MODULE__.Configured
+    previous = Application.get_env(:aikido, declared)
+    Application.put_env(:aikido, declared, name: instance, durable: durable_options())
+
+    on_exit(fn ->
+      if previous,
+        do: Application.put_env(:aikido, declared, previous),
+        else: Application.delete_env(:aikido, declared)
+    end)
+
+    start_supervised!({declared, []})
+
+    ref = Domain.unbound_start!(%{})
+    assert {:ok, ^instance} = Aikido.AgentServer.state(ref.pid, &{:ok, &1.aikido})
+    assert %{id: id} = Domain.unbound_inspect!(ref.id)
+    assert id == ref.id
+    assert %{status: :stopped} = Domain.unbound_stop!(ref.id)
+  end
+
   test "caller A assigns, worker B executes, and the correlated result resumes A", %{
     team: team,
     scope: scope

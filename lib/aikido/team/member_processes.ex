@@ -10,7 +10,7 @@ defmodule Aikido.Team.MemberProcesses do
     options =
       scope
       |> Ash.Scope.to_opts(context: Map.get(scope, :context) || %{})
-      |> attach_parent_options(parent)
+      |> attach_parent_options(parent, scope.aikido)
 
     with {:ok, %{pid: pid}} <-
            resource
@@ -25,11 +25,12 @@ defmodule Aikido.Team.MemberProcesses do
     end
   end
 
-  defp attach_parent_options(options, parent) do
+  defp attach_parent_options(options, parent, instance) do
     context =
       options
       |> Keyword.get(:context, %{})
       |> Map.put(:aikido_runtime_options,
+        instance: instance,
         parent: parent,
         partition: parent.partition,
         on_parent_death: :stop,

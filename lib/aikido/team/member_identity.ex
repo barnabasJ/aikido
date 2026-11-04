@@ -18,7 +18,7 @@ defmodule Aikido.Team.MemberIdentity do
 
       _ ->
         CommandRuntime.catch_runtime_exit(fn ->
-          with {:ok, {_id, pid}} <- CommandRuntime.resolve(input.resource, input.arguments.agent) do
+          with {:ok, {_id, pid}} <- CommandRuntime.resolve(input) do
             Aikido.AgentServer.state(pid, fn runtime ->
               if runtime.agent_module == input.resource do
                 {:ok, coordinator_context(runtime, pid)}
@@ -34,8 +34,7 @@ defmodule Aikido.Team.MemberIdentity do
   @doc "Check the actual member incarnation against the authenticated actor and tenant."
   def matches?(coordinator, requester, scope, timeout_ms) do
     cond do
-      is_nil(Aikido.Agent.Info.team_config(coordinator.agent_module)) or
-          coordinator.aikido != Aikido.Agent.Info.agent_instance!(coordinator.agent_module) ->
+      is_nil(Aikido.Agent.Info.team_config(coordinator.agent_module)) ->
         {:ok, false}
 
       requester in [nil, :self] ->
