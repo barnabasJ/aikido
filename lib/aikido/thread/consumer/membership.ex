@@ -86,6 +86,21 @@ defmodule Aikido.Thread.Consumer.Membership do
 
   defp apply_member(state, %{event: event, reference: reference}, _context)
        when event in [:removed, :stopped] do
+    retire_resource(state, reference)
+  end
+
+  defp apply_member(state, member, context) do
+    state =
+      if member.previous_reference,
+        do: retire_resource(state, member.previous_reference),
+        else: state
+
+    if member.active?,
+      do: watch_resource(state, member.reference, context),
+      else: retire_resource(state, member.reference)
+  end
+
+  defp retire_resource(state, reference) do
     %{
       state
       | sources:
@@ -99,16 +114,6 @@ defmodule Aikido.Thread.Consumer.Membership do
               else: source
           end)
     }
-  end
-
-  defp apply_member(state, member, context) do
-    state =
-      if member.previous_reference,
-        do:
-          apply_member(state, %{event: :removed, reference: member.previous_reference}, context),
-        else: state
-
-    watch_resource(state, member.reference, context)
   end
 
   defp parent_root(%{follow_parent?: false}, _context), do: []

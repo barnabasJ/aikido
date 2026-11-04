@@ -1293,6 +1293,7 @@ defmodule Aikido.AgentServer do
         end
 
       :ignore ->
+        :ok = Aikido.Thread.Delivery.reject_address_mismatch(state, sender, signal, delivery)
         {:noreply, state}
     end
   end

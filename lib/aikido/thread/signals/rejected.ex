@@ -7,7 +7,7 @@ defmodule Aikido.Thread.Signals.Rejected do
 
     schema do
       attribute :source, Aikido.Agent.Reference do
-        description "Actual source resource and durable identity."
+        description "Source address whose journal request was rejected."
         allow_nil? false
       end
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Discover roster-declared journal sources only after their actual active
+  incarnation. Preserve known retired checkpoints and uncommitted credits;
+  inactive replacements do not borrow the old process's resource address.
+
 - Prepare tracked member stops under the exact receiving activation's authority.
   Require successful native cleanup and its verified clean process exit before
   completing the topology operation. Reject cleanup without terminating the

@@ -183,3 +183,23 @@ update. It preserves an existing journal's generation, entries, receipts and
 metadata, merging only the supplied metadata patch. Enabling replay atomically records the current topology before later membership
 changes can append facts. It does not invent earlier member joins or exits. Normal owner authorization is required even for a repeated,
 no-op configuration. Sources still authorize each reader independently.
+
+### Lazy and replaced members
+
+Roster declarations do not activate journal demand. A member contributes its
+Thread and roster channels only after an active native membership fact. Lazy
+members that have never run therefore create no unavailable-source records.
+Replacement declarations retire the previous address but do not follow the new
+resource until its own incarnation starts.
+
+Inactive facts retain every already known source, cursor and outstanding write
+credit. A stopped source with uncommitted work remains visible and may report
+unavailability; discovery does not discard that debt to make a drain succeed.
+When the same source starts again, following resumes from the saved committed
+cursor rather than skipping its unacknowledged entries.
+
+If a different resource occupies the same durable key, the receiver rejects the
+request for the old resource without reading the new resource's journal. The
+reply retains the original request ID and address, so only its matching demand
+credit is released. The retired source stays visible as rejected with its cursor
+intact; other source requests can proceed within the existing global window.

@@ -46,6 +46,7 @@ spark_locals_without_parens = [
   priority: 1,
   public?: 1,
   reconcile_inherit: 1,
+  roster_history?: 1,
   route: 2,
   route: 3,
   schedule: 2,

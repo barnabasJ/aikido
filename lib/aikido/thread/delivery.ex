@@ -104,6 +104,40 @@ defmodule Aikido.Thread.Delivery do
     end
   end
 
+  @doc "Reject a verified request addressed to a different resource at this same live durable key."
+  def reject_address_mismatch(
+        runtime,
+        %{pid: pid} = sender,
+        %{type: type, id: id, data: %{consumer: consumer, path: path}} = request,
+        %{kind: :request, target: target}
+      )
+      when type in @requests and is_pid(pid) and is_binary(id) do
+    with true <-
+           Reference.matches?(consumer, sender) &&
+             wrong_resource?(target, Reference.from_runtime(runtime)),
+         {:ok, signal} <-
+           Aikido.Thread.Signals.Rejected.new(%{
+             source: target,
+             consumer: consumer,
+             path: path,
+             request_id: request.id,
+             request_type: type,
+             channel: channel(type),
+             failure: :invalid,
+             message:
+               "The requested journal resource has no running incarnation at this address. A different resource now occupies its durable key; no replay was accepted."
+           }) do
+      Aikido.Signal.Delivery.send(__MODULE__, sender.pid, signal, runtime, %{
+        kind: :batch,
+        address_mismatch?: true
+      })
+    else
+      _ -> :ok
+    end
+  end
+
+  def reject_address_mismatch(_runtime, _sender, _request, _delivery), do: :ok
+
   def permitted?(runtime, sender, %{type: type, data: %{consumer: consumer}}, %{
         kind: :request,
         target: target
@@ -111,16 +145,26 @@ defmodule Aikido.Thread.Delivery do
       when type in @requests,
       do: Reference.matches?(consumer, sender) && target == Reference.from_runtime(runtime)
 
-  def permitted?(runtime, sender, %{type: type, data: %{consumer: consumer, source: source}}, %{
-        kind: :batch
-      })
+  def permitted?(
+        runtime,
+        sender,
+        %{type: type, data: %{consumer: consumer, source: source}},
+        %{
+          kind: :batch
+        } = delivery
+      )
       when type in [
              "aikido.thread.batch",
              "aikido.thread.gap",
              "aikido.thread.available",
              "aikido.thread.rejected"
            ] do
-    Reference.matches?(source, sender) &&
+    source_verified? =
+      if delivery[:address_mismatch?],
+        do: type == "aikido.thread.rejected" && wrong_resource?(source, sender),
+        else: Reference.matches?(source, sender)
+
+    source_verified? &&
       Reference.matches?(consumer, %{
         id: runtime.id,
         resource: runtime.agent_module,
@@ -154,6 +198,18 @@ defmodule Aikido.Thread.Delivery do
 
     Aikido.Signal.Delivery.send(__MODULE__, sender.pid, signal, runtime, %{kind: :batch})
   end
+
+  defp wrong_resource?(%Reference{} = target, %{
+         id: id,
+         resource: resource,
+         aikido: aikido,
+         partition: partition
+       }),
+       do:
+         target.id == id && target.aikido == aikido && target.partition == partition &&
+           target.resource != resource
+
+  defp wrong_resource?(_target, _actual), do: false
 
   defp rejection(%Ash.Error.Forbidden{}),
     do:

@@ -1,361 +1,3 @@
-defmodule Aikido.ThreadFollowTest.Role do
-  use Ash.Type.Enum, values: [:publisher, :writer, :outsider]
-end
-
-defmodule Aikido.ThreadFollowTest.Access do
-  @moduledoc "External application access records used by native source policies."
-  use Ash.Resource, domain: Aikido.ThreadFollowTest.Domain, data_layer: Ash.DataLayer.Ets
-
-  attributes do
-    attribute :id, :string do
-      description "Application actor identity."
-      primary_key? true
-      allow_nil? false
-      public? true
-    end
-
-    attribute :role, Aikido.ThreadFollowTest.Role do
-      description "Explicit application permission role."
-      allow_nil? false
-      public? true
-    end
-
-    attribute :reader?, :boolean do
-      description "Current permission to read source journals."
-      default false
-      allow_nil? false
-      public? true
-    end
-
-    attribute :active?, :boolean do
-      description "Current business actor activity, checked natively rather than resolved into agent scope."
-      default true
-      allow_nil? false
-      public? true
-    end
-  end
-
-  actions do
-    defaults [
-      :read,
-      :destroy,
-      create: [:id, :role, :reader?, :active?],
-      update: [:reader?, :active?]
-    ]
-  end
-end
-
-defmodule Aikido.ThreadFollowTest.SourcePolicy do
-  use Ash.Policy.SimpleCheck
-
-  @requests [
-    "aikido.thread.follow",
-    "aikido.thread.ack",
-    "aikido.thread.unfollow",
-    "aikido.ash.team.follow_roster",
-    "aikido.ash.team.ack_roster",
-    "aikido.ash.team.unfollow_roster"
-  ]
-
-  @impl true
-  def describe(_options),
-    do: "current application grant allows publishing or this journal read operation"
-
-  @impl true
-  def match?(%{id: id}, %{subject: subject}, _options) do
-    case Ash.get(Aikido.ThreadFollowTest.Access, id, authorize?: false) do
-      {:ok, %{active?: true, role: :publisher}} ->
-        true
-
-      {:ok, %{active?: true, role: :writer, reader?: true}} ->
-        subject.action.name in [
-          :follow,
-          :ack,
-          :unfollow,
-          :follow_roster,
-          :ack_roster,
-          :unfollow_roster
-        ] ||
-          get_in(subject.context, [:aikido, :signal, Access.key(:type)]) in @requests
-
-      _ ->
-        false
-    end
-  end
-
-  def match?(_actor, _context, _options), do: false
-end
-
-defmodule Aikido.ThreadFollowTest.WriterPolicy do
-  use Ash.Policy.SimpleCheck
-  @impl true
-  def describe(_options), do: "the current application writer principal is active"
-  @impl true
-  def match?(%{id: id}, _context, _options) do
-    case Ash.get(Aikido.ThreadFollowTest.Access, id, authorize?: false) do
-      {:ok, %{active?: true, role: role}} when role in [:writer, :publisher] -> true
-      _ -> false
-    end
-  end
-
-  def match?(_actor, _context, _options), do: false
-end
-
-defmodule Aikido.ThreadFollowTest.Authority do
-  @behaviour Aikido.Durable.ScopeAdapter
-
-  @impl true
-  def prepare(attributes, options, identity) do
-    id = get_in(attributes, [:state, :actor_id])
-    options = if id, do: Keyword.put(options, :actor, %{id: id, allowed: true}), else: options
-    AikidoTest.DurableScopeAuthority.prepare(attributes, options, identity)
-  end
-
-  @impl true
-  defdelegate restore(credential, saved, identity), to: AikidoTest.DurableScopeAuthority
-  @impl true
-  defdelegate checkpoint(agent, credential, identity), to: AikidoTest.DurableScopeAuthority
-end
-
-defmodule Aikido.ThreadFollowTest.Source do
-  use Aikido.Agent, domain: Aikido.ThreadFollowTest.Domain, authorizers: [Ash.Policy.Authorizer]
-
-  agent do
-    name "journal_source"
-    persistence :permanent
-    slice :thread, Aikido.Thread.Slice
-
-    schema do
-      attribute :actor_id, :string do
-        description "Identity authenticated by the durable scope adapter."
-        allow_nil? false
-      end
-    end
-  end
-
-  policies do
-    policy always() do
-      authorize_if Aikido.ThreadFollowTest.SourcePolicy
-    end
-  end
-end
-
-defmodule Aikido.ThreadFollowTest.HoldWork do
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(input, _options, _context) do
-    Aikido.Types.ActionResult.new(
-      changes: %{
-        last_work: Map.delete(input.arguments, :state),
-        works_received: input.arguments.state.works_received + 1,
-        last_actor: input.context.aikido.actor.id
-      }
-    )
-  end
-end
-
-defmodule Aikido.ThreadFollowTest.Writer do
-  use Aikido.Agent, domain: Aikido.ThreadFollowTest.Domain, authorizers: [Ash.Policy.Authorizer]
-
-  agent do
-    name "journal_writer"
-    persistence :permanent
-    slice :journal_consumer, Aikido.Thread.Consumer.Slice
-
-    schema do
-      attribute :actor_id, :string do
-        description "Authenticated writer principal."
-        allow_nil? false
-      end
-
-      attribute :last_work, :map do
-        description "One held external work batch for explicit commit-boundary tests, not a source backlog."
-      end
-
-      attribute :works_received, :integer do
-        description "Number of work batches offered to this test application."
-        default 0
-        allow_nil? false
-      end
-
-      attribute :last_actor, :string do
-        description "Actual native receiving principal."
-      end
-    end
-
-    route Aikido.Thread.Consumer.Signals.Work, Aikido.ThreadFollowTest.HoldWork, public?: false
-  end
-
-  policies do
-    policy always() do
-      authorize_if Aikido.ThreadFollowTest.WriterPolicy
-    end
-  end
-end
-
-defmodule Aikido.ThreadFollowTest.Team do
-  use Ash.Resource,
-    domain: Aikido.ThreadFollowTest.Domain,
-    authorizers: [Ash.Policy.Authorizer],
-    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
-
-  agent do
-    name "journal_team"
-    persistence :permanent
-
-    schema do
-      attribute :actor_id, :string do
-        description "Authenticated team publisher."
-        allow_nil? false
-      end
-    end
-  end
-
-  team do
-    roster_history?(true)
-    inherit [:actor_id]
-    worker :source, Aikido.ThreadFollowTest.Source
-    worker :writer, Aikido.ThreadFollowTest.Writer
-  end
-
-  policies do
-    policy always() do
-      authorize_if Aikido.ThreadFollowTest.SourcePolicy
-    end
-  end
-end
-
-defmodule Aikido.ThreadFollowTest.OptionalRosterTeam do
-  @moduledoc "An ordinary team initially configured without retained roster history."
-  use Ash.Resource,
-    domain: Aikido.ThreadFollowTest.Domain,
-    authorizers: [Ash.Policy.Authorizer],
-    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
-
-  agent do
-    name "optional_roster_team"
-    persistence :permanent
-
-    schema do
-      attribute :actor_id, :string do
-        description "Authenticated owner of the retained team."
-        allow_nil? false
-      end
-    end
-  end
-
-  team do
-    inherit [:actor_id]
-    worker :source, Aikido.ThreadFollowTest.Source
-  end
-
-  policies do
-    policy always() do
-      authorize_if Aikido.ThreadFollowTest.SourcePolicy
-    end
-  end
-end
-
-defmodule Aikido.ThreadFollowTest.HoldRequest do
-  use Ash.Resource.Actions.Implementation
-
-  @impl true
-  def run(_input, _options, _context), do: Aikido.Types.ActionResult.new(changes: nil)
-end
-
-defmodule Aikido.ThreadFollowTest.ReplyAvailability do
-  use Aikido.Signal
-
-  signal do
-    type "test.journal.reply_availability"
-
-    schema do
-      attribute :consumer, Aikido.Agent.Reference do
-        description "Actual consumer expecting this delayed source response."
-        allow_nil? false
-      end
-
-      attribute :request_id, :string do
-        description "Follow request whose response this source is now releasing."
-        allow_nil? false
-      end
-    end
-  end
-end
-
-defmodule Aikido.ThreadFollowTest.SendAvailability do
-  use Ash.Resource.Actions.Implementation
-  @impl true
-  def run(input, _options, _context) do
-    context = input.context.aikido
-
-    source =
-      Aikido.Agent.Reference.new!(
-        id: context.agent_id,
-        resource: context.agent_module,
-        aikido: context.aikido,
-        partition: context.partition
-      )
-
-    data = %{
-      source: source,
-      consumer: input.arguments.consumer,
-      request_id: input.arguments.request_id,
-      path: :thread,
-      channel: :thread,
-      batch: nil,
-      cursor: Aikido.Thread.Types.Cursor.new!(generation: "pending", sequence: -1),
-      pending?: false
-    }
-
-    reply = %Aikido.Signal{type: "aikido.thread.available", data: data}
-
-    Aikido.Types.ActionResult.new(
-      directives: [
-        Aikido.Thread.Directives.Deliver.new!(
-          target: input.arguments.consumer,
-          signal: reply,
-          kind: :batch
-        )
-      ]
-    )
-  end
-end
-
-defmodule Aikido.ThreadFollowTest.PendingSource do
-  use Aikido.Agent, domain: Aikido.ThreadFollowTest.Domain
-
-  agent do
-    name "pending_journal_source"
-
-    schema do
-      attribute :actor_id, :string do
-        description "Identity authenticated at source activation."
-        allow_nil? false
-      end
-    end
-
-    route Aikido.Thread.Signals.Follow, Aikido.ThreadFollowTest.HoldRequest
-    route Aikido.ThreadFollowTest.ReplyAvailability, Aikido.ThreadFollowTest.SendAvailability
-  end
-end
-
-defmodule Aikido.ThreadFollowTest.Domain do
-  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Domain.Extension]
-
-  resources do
-    resource Aikido.ThreadFollowTest.Access
-  end
-
-  agents do
-    agent :source, Aikido.ThreadFollowTest.Source
-    agent :pending_source, Aikido.ThreadFollowTest.PendingSource
-    agent :writer, Aikido.ThreadFollowTest.Writer
-    agent :journal_team, Aikido.ThreadFollowTest.Team
-    agent :optional_roster_team, Aikido.ThreadFollowTest.OptionalRosterTeam
-  end
-end
-
 defmodule Aikido.ThreadFollowTest do
   use AikidoTest.Case, async: false
   alias Aikido.ThreadFollowTest.Domain
@@ -1086,6 +728,446 @@ defmodule Aikido.ThreadFollowTest do
     assert snapshot(writer).last_actor == ctx.writer_actor.id
   end
 
+  test "lazy declarations in a real roster bootstrap create no demand until actual start", ctx do
+    topology =
+      Map.new([:coder, :reviewer], fn name ->
+        {name,
+         %{
+           resource: Aikido.ThreadFollowTest.JournalSquad,
+           activation: :lazy,
+           initial_state: %{thread: %{replay?: true, retry_ms: 60_000}}
+         }}
+      end)
+
+    team =
+      Domain.optional_roster_team_start!(
+        %{id: ctx.publisher.id, actor_id: ctx.publisher.id, topology: topology},
+        scope: scope(ctx.publisher)
+      )
+
+    Domain.optional_roster_team_configure_roster_replay!(team, %{}, scope: scope(ctx.publisher))
+    writer = start_writer(ctx.writer_actor, [])
+
+    Domain.writer_watch_journal!(
+      writer,
+      %{source: reference(team), path: :team, channel: :roster},
+      scope: scope(ctx.writer_actor)
+    )
+
+    bootstrap = await_work_count(writer, 1)
+    assert [%{kind: :roster, payload: %{members: members}}] = bootstrap.entries
+    assert Enum.sort(Enum.map(members, & &1.name)) == [:coder, :reviewer]
+    assert Enum.all?(members, &(!&1.active?))
+    assert Enum.all?(snapshot(writer).journal_consumer.sources, &(&1.source == reference(team)))
+    pool = Aikido.durable_supervisor_name(Aikido.Default)
+    assert :error = Aikido.Durable.lookup(pool, "#{team.id}/coder")
+    assert :error = Aikido.Durable.lookup(pool, "#{team.id}/reviewer")
+    commit(writer, bootstrap, ctx.writer_actor)
+
+    assert {:ok, consumer} =
+             Aikido.AgentServer.call_until(
+               writer.pid,
+               fn ->
+                 Domain.writer_drain_journals(writer, %{}, scope: scope(ctx.writer_actor))
+               end,
+               "aikido.thread.consumer.drained",
+               fn runtime ->
+                 consumer = runtime.agent.state.journal_consumer
+
+                 if consumer.paused? && consumer.drained_request_id,
+                   do: {:ok, consumer},
+                   else: :skip
+               end
+             )
+
+    assert [%{channel: :roster, status: :watching}] = consumer.sources
+    assert consumer.credits == []
+    Domain.writer_continue_journals!(writer, %{}, scope: scope(ctx.writer_actor))
+
+    Domain.optional_roster_team_ensure_member!(team, %{member: :coder},
+      scope: scope(ctx.publisher)
+    )
+
+    started = await_work_count(writer, 2)
+
+    assert Enum.any?(
+             started.entries,
+             &(&1.kind == :membership && &1.payload.event == :started && &1.payload.active?)
+           )
+
+    coder = %{
+      id: "#{team.id}/coder",
+      pid: snapshot(team).team.members.coder,
+      resource: Aikido.ThreadFollowTest.JournalSquad
+    }
+
+    discovered =
+      Enum.filter(snapshot(writer).journal_consumer.sources, &(&1.source == reference(coder)))
+
+    assert Enum.sort(Enum.map(discovered, & &1.channel)) == [:roster, :thread]
+
+    refute Enum.any?(
+             snapshot(writer).journal_consumer.sources,
+             &(&1.source.id == "#{team.id}/reviewer")
+           )
+
+    commit(writer, started, ctx.writer_actor)
+    squad_roster = await_work_count(writer, 3)
+    assert squad_roster.channel == :roster
+    assert squad_roster.source == reference(coder)
+
+    Domain.journal_squad_append!(coder, %{entry: %{id: "live-coder"}},
+      scope: scope(ctx.publisher)
+    )
+
+    commit(writer, squad_roster, ctx.writer_actor)
+    assert await_work(writer, ["live-coder"]).source == reference(coder)
+    assert :error = Aikido.Durable.lookup(pool, "#{team.id}/reviewer")
+  end
+
+  test "a lazy added membership entry does not follow either declared journal channel", ctx do
+    team =
+      Domain.journal_team_start!(%{id: ctx.publisher.id, actor_id: ctx.publisher.id},
+        scope: scope(ctx.publisher)
+      )
+
+    writer = start_writer(ctx.writer_actor, [reference(team)])
+    commit(writer, await_work_count(writer, 1), ctx.writer_actor)
+
+    Domain.journal_team_add_member!(
+      team,
+      %{
+        member: :lazy,
+        resource: Aikido.ThreadFollowTest.JournalSquad,
+        activation: :lazy,
+        initial_state: %{thread: %{replay?: true}}
+      },
+      scope: scope(ctx.publisher)
+    )
+
+    added = await_work_count(writer, 2)
+    assert [%{kind: :membership, payload: %{event: :added, active?: false}}] = added.entries
+    assert Enum.all?(snapshot(writer).journal_consumer.sources, &(&1.source == reference(team)))
+    commit(writer, added, ctx.writer_actor)
+
+    await_state_value(writer.pid, fn runtime ->
+      consumer = runtime.agent.state.journal_consumer
+
+      if consumer.credits == [] && Enum.all?(consumer.sources, &(&1.status == :watching)),
+        do: true
+    end)
+
+    assert :error =
+             Aikido.Durable.lookup(
+               Aikido.durable_supervisor_name(Aikido.Default),
+               "#{team.id}/lazy"
+             )
+  end
+
+  test "retired source debt and its cursor survive removal and consumer restoration", ctx do
+    team =
+      Domain.journal_team_start!(
+        %{
+          id: ctx.publisher.id,
+          actor_id: ctx.publisher.id,
+          topology: %{
+            worker: %{
+              resource: Aikido.ThreadFollowTest.Source,
+              initial_state: %{thread: %{replay?: true, retry_ms: 60_000}}
+            }
+          }
+        },
+        scope: scope(ctx.publisher)
+      )
+
+    source = %{
+      id: "#{team.id}/worker",
+      pid: snapshot(team).team.members.worker,
+      resource: Aikido.ThreadFollowTest.Source
+    }
+
+    Domain.source_append!(source, %{entry: [%{id: "debt-a"}, %{id: "debt-b"}]},
+      scope: scope(ctx.publisher)
+    )
+
+    writer =
+      Domain.writer_start!(
+        %{
+          id: ctx.writer_actor.id,
+          actor_id: ctx.writer_actor.id,
+          journal_consumer: %{
+            roots: [reference(team)],
+            follow_parent?: false,
+            batch_size: 2,
+            window: 2,
+            paused?: true,
+            request_timeout_ms: 60_000
+          }
+        },
+        scope: scope(ctx.writer_actor)
+      )
+
+    {:ok, roster_ref} =
+      Aikido.AgentServer.subscribe(
+        writer.pid,
+        "aikido.thread.consumer.work",
+        fn _, event ->
+          if event.signal.data.channel == :roster, do: {:ok, event.signal.data}, else: :skip
+        end,
+        once: true
+      )
+
+    {:ok, debt_ref} =
+      Aikido.AgentServer.subscribe(
+        writer.pid,
+        "aikido.thread.consumer.work",
+        fn _, event ->
+          if event.signal.data.channel == :thread, do: {:ok, event.signal.data}, else: :skip
+        end,
+        once: true
+      )
+
+    Domain.writer_continue_journals!(writer, %{}, scope: scope(ctx.writer_actor))
+    assert_receive {:aikido_subscription, ^roster_ref, %{result: {:ok, roster}}}, 5_000
+    commit(writer, roster, ctx.writer_actor)
+    assert_receive {:aikido_subscription, ^debt_ref, %{result: {:ok, debt}}}, 5_000
+    assert Enum.map(debt.entries, & &1.id) == ["debt-a", "debt-b"]
+
+    before =
+      Enum.find(snapshot(writer).journal_consumer.sources, &(&1.source == reference(source)))
+
+    Domain.journal_team_remove_member!(team, %{member: :worker}, scope: scope(ctx.publisher))
+
+    removed =
+      await_state_value(writer.pid, fn runtime ->
+        work = Aikido.Agent.resource_attributes(runtime.agent).last_work
+
+        if work && work.channel == :roster &&
+             Enum.any?(work.entries, &(&1.kind == :membership && &1.payload.event == :removed)),
+           do: work
+      end)
+
+    assert [%{payload: %{reference: removed_reference, active?: false}}] = removed.entries
+    assert removed_reference == reference(source)
+
+    stopped =
+      Enum.find(snapshot(writer).journal_consumer.sources, &(&1.source == reference(source)))
+
+    assert stopped.retired?
+    assert stopped.cursor == before.cursor
+
+    assert Enum.any?(
+             snapshot(writer).journal_consumer.credits,
+             &(&1.phase == :writing && &1.batch == debt.batch)
+           )
+
+    commit(writer, removed, ctx.writer_actor)
+    Domain.writer_stop!(writer, scope: scope(ctx.writer_actor))
+    restored = start_writer(ctx.writer_actor, [reference(team)])
+
+    unavailable =
+      await_state_value(restored.pid, fn runtime ->
+        Enum.find(
+          runtime.agent.state.journal_consumer.sources,
+          &(&1.source == reference(source) && &1.status == :unavailable)
+        )
+      end)
+
+    assert unavailable.retired?
+    assert unavailable.cursor == before.cursor
+
+    assert :error =
+             Aikido.Durable.lookup(Aikido.durable_supervisor_name(Aikido.Default), source.id)
+
+    {:ok, replay_ref} =
+      Aikido.AgentServer.subscribe(
+        restored.pid,
+        "aikido.thread.consumer.work",
+        fn _, event ->
+          if event.signal.data.source == reference(source) && event.signal.data.channel == :thread,
+            do: {:ok, event.signal.data},
+            else: :skip
+        end,
+        once: true
+      )
+
+    Domain.journal_team_add_member!(
+      team,
+      %{member: :worker, template: :source, initial_state: %{thread: %{replay?: true}}},
+      scope: scope(ctx.publisher)
+    )
+
+    assert_receive {:aikido_subscription, ^replay_ref, %{result: {:ok, replayed}}}, 5_000
+    assert replayed.batch == debt.batch
+    assert Enum.map(replayed.entries, & &1.id) == ["debt-a", "debt-b"]
+
+    assert Enum.find(
+             snapshot(restored).journal_consumer.sources,
+             &(&1.source == reference(source))
+           ).cursor == before.cursor
+  end
+
+  test "a desired replacement does not borrow the old process's active incarnation", ctx do
+    team =
+      Domain.journal_team_start!(
+        %{
+          id: ctx.publisher.id,
+          actor_id: ctx.publisher.id,
+          topology: %{
+            worker: %{
+              resource: Aikido.ThreadFollowTest.TransientSource,
+              initial_state: %{thread: %{replay?: true}}
+            }
+          }
+        },
+        scope: scope(ctx.publisher)
+      )
+
+    writer = start_writer(ctx.writer_actor, [reference(team)])
+    commit(writer, await_work_count(writer, 1), ctx.writer_actor)
+
+    await_state_value(writer.pid, fn runtime ->
+      consumer = runtime.agent.state.journal_consumer
+
+      if consumer.credits == [] && Enum.all?(consumer.sources, &(&1.status == :watching)),
+        do: true
+    end)
+
+    Process.register(self(), Aikido.ThreadFollowTest.SquadStartObserver)
+
+    task =
+      Task.async(fn ->
+        Domain.journal_team_configure_topology(
+          team,
+          %{
+            topology: %{
+              worker: %{
+                resource: Aikido.ThreadFollowTest.JournalSquad,
+                initial_state: %{thread: %{replay?: true}}
+              }
+            }
+          },
+          scope: scope(ctx.publisher)
+        )
+      end)
+
+    assert_receive {:squad_start_waiting, replacement}, 5_000
+    on_exit(fn -> send(replacement, :continue_squad_start) end)
+    replaced = await_work_count(writer, 2)
+
+    assert [
+             %{
+               payload: %{
+                 event: :replaced,
+                 active?: false,
+                 incarnation: nil,
+                 reference: new_reference,
+                 previous_reference: old_reference
+               }
+             }
+           ] = replaced.entries
+
+    assert old_reference.resource == Aikido.ThreadFollowTest.TransientSource
+    assert new_reference.resource == Aikido.ThreadFollowTest.JournalSquad
+    refute Enum.any?(snapshot(writer).journal_consumer.sources, &(&1.source == new_reference))
+    journal = snapshot(team).team.membership_journal
+
+    stopped =
+      Enum.find(journal.entries, &(&1.kind == :membership && &1.payload.event == :stopped))
+
+    assert stopped.payload.reference == old_reference
+    send(replacement, :continue_squad_start)
+    assert {:ok, _} = Task.await(task, 5_000)
+
+    current = %{
+      id: "#{team.id}/worker",
+      pid: snapshot(team).team.members.worker,
+      resource: Aikido.ThreadFollowTest.JournalSquad
+    }
+
+    Domain.journal_squad_append!(current, %{entry: %{id: "replacement-live"}},
+      scope: scope(ctx.publisher)
+    )
+
+    commit(writer, replaced, ctx.writer_actor)
+
+    work =
+      try do
+        drain_until_entry(writer, ctx.writer_actor, "replacement-live", 2, 12)
+      rescue
+        error in ExUnit.AssertionError ->
+          flunk(
+            "#{Exception.message(error)} Consumer: #{inspect(snapshot(writer).journal_consumer, limit: :infinity)}"
+          )
+      end
+
+    assert work.source == new_reference
+
+    retired = Enum.find(snapshot(writer).journal_consumer.sources, &(&1.source == old_reference))
+    assert retired.retired?
+    assert retired.status == :rejected
+    assert retired.error =~ "different resource"
+    assert retired.cursor.sequence == -1
+    assert retired.cursor.generation != work.batch.generation
+  end
+
+  test "an address-mismatch rejection cannot claim a different durable key", ctx do
+    source = start_source(ctx.publisher)
+    writer = start_writer(ctx.writer_actor, [reference(source)])
+
+    other =
+      Domain.journal_squad_start!(
+        %{id: Ash.UUIDv7.generate(), actor_id: ctx.publisher.id, thread: %{replay?: true}},
+        scope: scope(ctx.publisher)
+      )
+
+    sender = reference(other) |> Map.from_struct() |> Map.put(:pid, other.pid)
+
+    rejected =
+      Aikido.Thread.Signals.Rejected.new!(%{
+        source: reference(source),
+        consumer: reference(writer),
+        path: :thread,
+        channel: :thread,
+        request_id: "fabricated",
+        request_type: "aikido.thread.follow",
+        failure: :invalid,
+        message: "not this source"
+      })
+
+    assert {:ok, false} =
+             Aikido.AgentServer.state(writer.pid, fn runtime ->
+               {:ok,
+                Aikido.Thread.Delivery.permitted?(runtime, sender, rejected, %{
+                  kind: :batch,
+                  address_mismatch?: true
+                })}
+             end)
+
+    writer_sender = reference(writer) |> Map.from_struct() |> Map.put(:pid, writer.pid)
+
+    target =
+      Reference.new!(
+        id: other.id,
+        resource: Aikido.ThreadFollowTest.Source,
+        aikido: Aikido.Default
+      )
+
+    malformed = %Aikido.Signal{
+      id: Ash.UUIDv7.generate(),
+      type: "aikido.thread.follow",
+      data: %{consumer: reference(writer), path: %{invalid: true}}
+    }
+
+    send(
+      other.pid,
+      {Aikido.Signal.Delivery, Aikido.Thread.Delivery, writer_sender, malformed,
+       %{kind: :request, target: target}}
+    )
+
+    assert {:ok, :alive} = Aikido.AgentServer.state(other.pid, fn _ -> {:ok, :alive} end)
+  end
+
   test "sink retries are opt-in and permanent failures never schedule replay", ctx do
     source = start_source(ctx.publisher)
     Domain.source_append!(source, %{entry: %{id: "retry-disabled"}}, scope: scope(ctx.publisher))
@@ -1287,7 +1369,9 @@ defmodule Aikido.ThreadFollowTest do
     )
 
     assert snapshot(team).team.membership_journal == nil
+    previous_child = snapshot(team).team.members.existing
     Domain.optional_roster_team_stop!(team, scope: scope(ctx.publisher))
+    AikidoTest.LifecycleWait.await_down(previous_child, 5_000)
 
     restored =
       Domain.optional_roster_team_start!(%{id: ctx.publisher.id, actor_id: ctx.publisher.id},
@@ -1369,7 +1453,20 @@ defmodule Aikido.ThreadFollowTest do
     assert member.reference.resource == Aikido.ThreadFollowTest.Source
     discovered = Enum.map(snapshot(writer).journal_consumer.sources, & &1.source.id)
     assert "#{restored.id}/existing" in discovered
-    assert "#{restored.id}/later" in discovered
+    refute "#{restored.id}/later" in discovered
+    commit(writer, work, ctx.writer_actor)
+    started = await_work_count(writer, 2)
+
+    assert Enum.any?(started.entries, fn entry ->
+             entry.kind == :membership && entry.payload.event == :started && entry.payload.active? &&
+               entry.payload.name == :later
+           end)
+
+    assert Enum.any?(
+             snapshot(writer).journal_consumer.sources,
+             &(&1.source.id == "#{restored.id}/later")
+           )
+
     assert work.metadata == configured.metadata
     assert snapshot(restored).team.membership_journal.generation == initialized.generation
   end

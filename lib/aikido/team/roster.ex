@@ -127,27 +127,36 @@ defmodule Aikido.Team.Roster do
       if event do
         spec = after_spec || before
 
-        payload = member(name, spec, current, context) |> Map.put(:event, event)
+        payload =
+          if event == :removed,
+            do:
+              member(name, spec, previous, context)
+              |> Map.merge(%{active?: false, incarnation: nil}),
+            else: member(name, spec, current, context)
+
+        payload = Map.put(payload, :event, event)
 
         payload =
           case {event, previous.members[name]} do
             {:stopped, pid} when is_pid(pid) ->
-              Map.put(payload, :reference, reference(name, before.resource, previous, context))
+              Map.put(
+                payload,
+                :reference,
+                binding_reference(name, before.resource, previous, context)
+              )
 
             {:removed, pid} when is_pid(pid) ->
-              Map.put(payload, :reference, reference(name, before.resource, previous, context))
+              Map.put(
+                payload,
+                :reference,
+                binding_reference(name, before.resource, previous, context)
+              )
 
             {:replaced, _} ->
-              old_resource =
-                case previous.members[name] do
-                  %{resource: resource} -> resource
-                  _ -> before.resource
-                end
-
               Map.put(
                 payload,
                 :previous_reference,
-                reference(name, old_resource, previous, context)
+                binding_reference(name, before.resource, previous, context)
               )
 
             _ ->
@@ -163,7 +172,9 @@ defmodule Aikido.Team.Roster do
 
   defp member(name, spec, state, context) do
     reference = reference(name, spec.resource, state, context)
-    active? = is_pid(state.members[name])
+    pid = state.members[name]
+    bound_reference = binding_reference(name, spec.resource, state, context)
+    active? = is_pid(pid) && bound_reference == reference
 
     %{
       name: name,
@@ -173,6 +184,18 @@ defmodule Aikido.Team.Roster do
       incarnation: if(active?, do: state.incarnations[name]),
       team?: not is_nil(Aikido.Agent.Info.team_config(spec.resource))
     }
+  end
+
+  defp binding_reference(name, resource, state, context) do
+    case get_in(state.operation, [:stop_targets, name]) do
+      %{pid: pid, reference: reference} when is_pid(pid) ->
+        if state.members[name] == pid,
+          do: reference,
+          else: reference(name, resource, state, context)
+
+      _ ->
+        reference(name, resource, state, context)
+    end
   end
 
   defp reference(name, resource, state, context) do
