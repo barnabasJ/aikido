@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Reauthorize generated inspect and stop commands against the exact resolved
+  live PID with the caller's original native scope. An ID authorization for a
+  retired incarnation cannot authorize its replacement; trusted explicit
+  `authorize?: false` remains supported.
+
 - Discover roster-declared journal sources only after their actual active
   incarnation. Preserve known retired checkpoints and uncommitted credits;
   inactive replacements do not borrow the old process's resource address.

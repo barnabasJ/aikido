@@ -34,5 +34,6 @@ config :aikido,
     Aikido.CommandRuntimeErrorTest.Domain,
     AikidoTest.LegacyCheckpoint.Domain,
     Aikido.InheritedConfigurationTest.Domain,
-    Aikido.ThreadFollowTest.Domain
+    Aikido.ThreadFollowTest.Domain,
+    Aikido.ResolvedCommandAdmissionTest.Domain
   ]

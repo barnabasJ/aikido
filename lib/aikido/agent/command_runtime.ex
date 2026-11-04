@@ -42,6 +42,37 @@ defmodule Aikido.Agent.CommandRuntime do
 
   def resolve(_resource, _), do: {:error, "Expected an agent ID, PID, or reference"}
 
+  @doc "Authorize the same public command against its exact resolved process before I/O."
+  def authorize_resolved(input, context, pid) when is_pid(pid) do
+    options = Ash.Scope.to_opts(context, context: input.context)
+
+    if Keyword.get(options, :authorize?) == false do
+      :ok
+    else
+      pinned =
+        Ash.ActionInput.for_action(
+          input.resource,
+          input.action.name,
+          Map.put(input.arguments, :agent, pid),
+          options
+        )
+
+      case Ash.can(pinned, Keyword.get(options, :actor),
+             scope: context,
+             context: input.context,
+             maybe_is: false,
+             pre_flight?: false,
+             validate?: true,
+             return_forbidden_error?: true
+           ) do
+        {:ok, true} -> :ok
+        {:ok, false, error} -> {:error, Ash.Error.to_error_class(error)}
+        {:error, error} -> {:error, Ash.Error.to_error_class(error)}
+        {:ok, false} -> {:error, Ash.Error.Forbidden.exception([])}
+      end
+    end
+  end
+
   def snapshot(resource, pid, options \\ []) do
     with {:ok, attributes} <-
            AgentServer.state(pid, fn state ->

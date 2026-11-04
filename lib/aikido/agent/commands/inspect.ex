@@ -9,6 +9,7 @@ defmodule Aikido.Agent.Commands.Inspect do
 
     CommandRuntime.catch_runtime_exit(fn ->
       with {:ok, {_id, pid}} <- CommandRuntime.resolve(input.resource, input.arguments.agent),
+           :ok <- CommandRuntime.authorize_resolved(input, context, pid),
            {:ok, record} <- CommandRuntime.snapshot(input.resource, pid, options) do
         {:ok,
          if(input.arguments[:fields],

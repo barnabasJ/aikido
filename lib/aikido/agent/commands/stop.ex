@@ -10,6 +10,7 @@ defmodule Aikido.Agent.Commands.Stop do
 
     CommandRuntime.catch_runtime_exit(fn ->
       with {:ok, {id, pid}} <- CommandRuntime.resolve(resource, agent),
+           :ok <- CommandRuntime.authorize_resolved(input, context, pid),
            :ok <-
              Aikido.Durable.stop(
                Aikido.durable_supervisor_name(Aikido.Agent.Info.agent_instance!(resource)),

@@ -768,3 +768,13 @@ The playground's **Native notifications** example demonstrates a counter publish
 its calculation to a child observer. The observer adopts the typed value and sends
 an acknowledgement through a normal agent signal. The example's counter is public;
 its receiving scope does not claim to implement a private-data authorization policy.
+
+## Live command target admission
+
+Generated inspect and stop commands resolve their target once and authorize the
+same native public action again against that exact PID before reading or
+stopping it. If an ID's original process stops and another incarnation appears
+after the outer policy check, the replacement must satisfy its own current
+policy. Actor, tenant, application context and tracers remain the original
+caller's native scope; no prior authorization result is reused. Explicit trusted
+`authorize?: false` retains its ordinary Ash bypass semantics.
