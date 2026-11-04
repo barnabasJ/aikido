@@ -38,7 +38,16 @@ defmodule Aikido.Signal.Delivery do
     do: signal
 
   defp delivery_scope(runtime, Aikido.Team.Delivery, sender, signal, %{kind: kind})
-       when kind in [:inheritance, :inheritance_result],
+       when kind in [
+              :inheritance,
+              :inheritance_result,
+              :stop,
+              :stop_cleanup,
+              :stop_result,
+              :stop_cleanup_result,
+              :owned_child_exit,
+              :stop_monitor
+            ],
        do: bind_recipient_scope(runtime, sender, signal)
 
   defp delivery_scope(runtime, _protocol, sender, signal, _correlation),

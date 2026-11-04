@@ -19,7 +19,7 @@ defmodule Aikido.Team.Signals.Stopped do
       end
 
       attribute :result, :term do
-        description "Result returned by the stop task."
+        description "Receiver cleanup preparation acknowledgement; process exit is observed separately."
       end
     end
   end

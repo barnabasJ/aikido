@@ -1,12 +1,14 @@
 defmodule Aikido.Team.Actions.Cleanup do
-  @moduledoc "Acknowledges successful cleanup and reports native cleanup errors without changing team state."
+  @moduledoc "Records the native cleanup result of an exact pending late activation."
   use Ash.Resource.Actions.Implementation
+  alias Aikido.Team.{ActionAdapter, MemberStop}
 
   @impl true
-  def run(input, _opts, _context) do
-    case input.arguments[:reason] do
-      nil -> Aikido.Types.ActionResult.new(changes: nil)
-      reason -> {:error, reason}
-    end
+  def run(input, _, _) do
+    {signal, state, context, _config} = ActionAdapter.unpack_team_action(input)
+
+    signal.data
+    |> MemberStop.cleanup_result(state)
+    |> ActionAdapter.to_action_result(state, context)
   end
 end

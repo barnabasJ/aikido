@@ -2,7 +2,6 @@ defmodule Aikido.Team.Actions.Started do
   @moduledoc "Adopts a correlated member activation and advances the lifecycle plan, cleaning up late activations."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Team.{ActionAdapter, TopologyOperation}
-  alias Aikido.Directives
 
   @impl true
   def run(input, _opts, _context) do
@@ -26,7 +25,7 @@ defmodule Aikido.Team.Actions.Started do
       |> record_activation(name, id, pid)
       |> advance_after_activation(data, context, config)
     else
-      cleanup_late_activation(state, pid, config)
+      cleanup_late_activation(state, data)
     end
   end
 
@@ -65,23 +64,20 @@ defmodule Aikido.Team.Actions.Started do
     end
   end
 
-  defp cleanup_late_activation(state, pid, config) do
-    # A timed-out activation must not leave an untracked worker running.
-    instance = config.instance
+  defp cleanup_late_activation(state, %{result: pid} = data) do
+    cond do
+      pid in Map.values(state.members) ->
+        {:ok, state, []}
 
-    directives =
-      if pid in Map.values(state.members),
-        do: [],
-        else: [
-          Directives.async_task(
-            fn task ->
-              Aikido.Team.MemberProcesses.stop_member(instance, pid, task.input_signal)
-            end,
-            success_type: "aikido.ash.team.cleanup",
-            error_type: "aikido.ash.team.cleanup"
-          )
-        ]
+      is_struct(data[:reference], Aikido.Agent.Reference) ->
+        Aikido.Team.MemberStop.cleanup(state, data)
 
-    {:ok, state, directives}
+      true ->
+        {:error,
+         Ash.Error.Action.InvalidArgument.exception(
+           field: :reference,
+           message: "Late activation cleanup requires its original exact member address."
+         )}
+    end
   end
 end

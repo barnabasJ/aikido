@@ -6,6 +6,10 @@ defmodule Aikido.Team.Signals.Started do
     type "aikido.ash.team.started"
 
     schema do
+      attribute :reference, Aikido.Agent.Reference do
+        description "Exact native address retained for cleanup of a late activation."
+      end
+
       attribute :member, :term do
         description "Topology name of the activated member."
       end

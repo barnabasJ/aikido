@@ -23,6 +23,18 @@ defmodule Aikido.Team.Directives.Deliver do
       allow_nil? false
     end
 
+    field :recipient, Aikido.Agent.Reference do
+      description "Exact durable address selected by a member lifecycle operation."
+    end
+
+    field :member, :term do
+      description "Topology name selected by a member lifecycle operation."
+    end
+
+    field :operation_id, :string do
+      description "Tracked member stop operation, absent for late-activation cleanup."
+    end
+
     field :request_id, :string do
       description "Receiving conversation request that owned the assignment."
     end
@@ -44,7 +56,16 @@ defmodule Aikido.Team.Directives.Deliver do
       delivery.target,
       signal,
       runtime,
-      Map.take(delivery, [:kind, :signal_type, :request_id, :active?])
+      Map.take(delivery, [
+        :kind,
+        :signal_type,
+        :request_id,
+        :active?,
+        :recipient,
+        :target,
+        :member,
+        :operation_id
+      ])
     )
 
     :ok

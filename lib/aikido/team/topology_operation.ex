@@ -25,10 +25,12 @@ defmodule Aikido.Team.TopologyOperation do
          :ok <- validate_worker_limits(topology, config),
          {:ok, steps} <- order_member_steps(state.topology, topology, stop, requested) do
       steps = include_inheritance_steps(steps, config)
+      stop_targets = Aikido.Team.MemberStop.targets(state, stop, context, config)
 
       state
       |> adopt_topology(topology, paused)
       |> begin_operation(signal.id, steps)
+      |> put_in([Access.key(:operation), :stop_targets], stop_targets)
       |> advance_member_lifecycle(context, config)
       |> append_operation_deadline(signal.id, config.timeout)
     else
@@ -214,7 +216,7 @@ defmodule Aikido.Team.TopologyOperation do
         advance_member_lifecycle(state, context, config)
 
       {:stop, pid} ->
-        request_member_stop(state, name, pid, config)
+        Aikido.Team.MemberStop.request(state, name, pid)
 
       {:start, nil} ->
         request_member_start(state, name, context, config)
@@ -248,20 +250,6 @@ defmodule Aikido.Team.TopologyOperation do
     end)
   end
 
-  defp request_member_stop(state, name, pid, config) do
-    instance = config.instance
-
-    effect =
-      Directives.async_task(
-        fn task -> Aikido.Team.MemberProcesses.stop_member(instance, pid, task.input_signal) end,
-        success_type: "aikido.ash.team.stopped",
-        error_type: "aikido.ash.team.failed",
-        payload: %{member: name, operation_id: state.operation.id, pid: pid}
-      )
-
-    {:ok, put_in(state.operation.awaiting, {:stop, name}), [effect]}
-  end
-
   defp request_member_start(state, name, context, config) do
     spec = state.topology.nodes[name]
     parent = member_parent(state, name, spec.owner, context, config)
@@ -279,7 +267,17 @@ defmodule Aikido.Team.TopologyOperation do
          ]},
         success_type: "aikido.ash.team.started",
         error_type: "aikido.ash.team.failed",
-        payload: %{member: name, operation_id: state.operation.id}
+        payload: %{
+          member: name,
+          operation_id: state.operation.id,
+          reference:
+            Aikido.Agent.Reference.new!(
+              id: Topology.member_id(state.topology, context.agent_id, name),
+              resource: spec.resource,
+              aikido: config.instance,
+              partition: context.partition
+            )
+        }
       )
 
     {:ok, put_in(state.operation.awaiting, {:start, name}), [effect]}
@@ -400,7 +398,9 @@ defmodule Aikido.Team.TopologyOperation do
 
     {state, inherited} = settle_inheritance_reply(state, inheritance_error(state.operation.error))
     {state, queued} = release_queued_operations(state, context)
-    {:ok, state, directives ++ inherited ++ queued}
+
+    {:ok, state,
+     Aikido.Team.MemberStop.release_monitor(state) ++ directives ++ inherited ++ queued}
   end
 
   defp settle_inheritance_reply(state, error) do

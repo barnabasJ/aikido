@@ -199,3 +199,32 @@ saved-topology reconciliation, including restored nested teams. Fresh constructo
 topology does not replace that saved graph. If saved reconciliation fails, start
 returns the failure and retains the existing identity for inspection and repair;
 it does not run fresh-start cleanup or delete the retained agent.
+
+## Receiver-owned member stops
+
+Team `stop_member`, removal, replacement and retirement deliver graceful cleanup
+to the exact current member address. The receiving activation applies its normal
+native lifecycle policies with its own bound scope. The coordinating operation
+requires both successful cleanup preparation and the matching verified clean
+process exit. An exit alone is not a successful cleanup acknowledgement. Native
+cleanup rejection fails the operation and leaves the member alive for inspection
+and repair; a crash before completion fails it instead of reporting a clean stop.
+
+Each stop installs its own tagged monitor for the exact target, so it does not
+rely on a logical owner remaining alive to forward an exit. Dead-owner subtree
+reconciliation may observe an already absent old incarnation and rebuild it;
+this is recorded as observed absence, not successful cleanup preparation.
+The coordinator retains target and owner addresses inside its current operation,
+including when the desired topology removes them. These transient operation
+facts do not add another persistence path or scope.
+
+Late-activation cleanup first records a pending failure fact through the ordinary
+native owner update. An unauthorized private Started message cannot skip that
+admission merely because it proposes no topology changes. Exact pending cleanup
+addresses correlate the receiving result; repeated pending requests emit no
+additional effect.
+
+Public direct child `stop` commands retain the actual caller's authorization.
+Parent-death handling continues through the child's existing receiver-bound
+Ownership action. The lower-level `StopChild` directive currently uses its
+existing plain signal path; it is not covered by this Team stop contract.

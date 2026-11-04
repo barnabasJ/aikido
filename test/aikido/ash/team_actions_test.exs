@@ -74,7 +74,11 @@ defmodule AikidoTest.AshTeamActionsTest do
 
   test "team routes generate typed reducers and expose only command routes" do
     routes = Spark.Dsl.Extension.get_entities(Aikido.Team.Slice, [:slice])
-    assert length(routes) == 22
+
+    assert Enum.any?(
+             routes,
+             &(&1.signal_module == Aikido.Team.Signals.StopMonitored && !&1.public?)
+           )
 
     for route <- routes do
       assert Aikido.Signal.Routes.valid_definition?(route.signal_module)
@@ -90,10 +94,25 @@ defmodule AikidoTest.AshTeamActionsTest do
     end
 
     public = for route <- routes, route.public?, do: route.name
-    assert :configure_topology in public
-    assert :assign_task in public
-    refute :task_completed in public
-    refute :child_exit in public
+
+    assert Enum.sort(public) ==
+             Enum.sort([
+               :configure_topology,
+               :reconcile,
+               :reconcile_inherited,
+               :add_member,
+               :remove_member,
+               :ensure_member,
+               :stop_member,
+               :send,
+               :broadcast,
+               :configure_roster_replay,
+               :follow_roster,
+               :ack_roster,
+               :unfollow_roster,
+               :assign_task,
+               :background_task
+             ])
   end
 
   test "replaying a queued command preserves its exact scope instead of inheriting the preceding caller" do

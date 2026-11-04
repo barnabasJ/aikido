@@ -7,18 +7,36 @@ defmodule Aikido.Team.Actions.ChildExit do
 
   @impl true
   def run(input, _opts, _context) do
-    {signal, state, context, _config} = ActionAdapter.unpack_team_action(input)
+    {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
     data = Map.put(signal.data, :member, signal.data.tag)
 
     state
-    |> record_member_exit(data, context)
+    |> record_member_exit(data, context, config)
     |> ActionAdapter.to_action_result(state, context)
   end
 
-  defp record_member_exit(state, %{member: name, pid: pid} = data, context) do
+  defp record_member_exit(state, %{member: name, pid: pid} = data, context, config) do
     reason = Map.get(data, :result, Map.get(data, :reason))
 
     cond do
+      Aikido.Team.MemberStop.awaiting?(state, name, pid) &&
+          !match?(%{protocol: Aikido.Team.Delivery, kind: :process_exit}, context[:__delivery__]) ->
+        if match?(
+             %{kind: kind} when kind in [:process_exit, :owned_child_exit],
+             context[:__delivery__]
+           ),
+           do: {:ok, state, []},
+           else: {:error, Ash.Error.Forbidden.exception([])}
+
+      Aikido.Team.MemberStop.awaiting?(state, name, pid) ->
+        affected = Topology.owned_members(state.topology, [name])
+        staged = fail_affected_tasks(state, affected)
+
+        with {:ok, next, directives} <-
+               Aikido.Team.MemberStop.exited(data, staged, context, config) do
+          {:ok, next, failed_task_notifications(next, state, context) ++ directives}
+        end
+
       Map.get(state.members, name) == pid ->
         affected = Topology.owned_members(state.topology, [name])
 

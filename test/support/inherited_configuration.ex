@@ -192,6 +192,26 @@ defmodule Aikido.InheritedConfigurationTest.HoldLeafInheritance do
   end
 end
 
+defmodule Aikido.InheritedConfigurationTest.HoldMemberStop do
+  @moduledoc "Coordinates a real receiving cleanup boundary in native lifecycle tests."
+  use Aikido.Middleware
+
+  @impl true
+  def on_signal(signal, context, _options, next) do
+    observer = Process.whereis(Aikido.InheritedConfigurationTest.MemberStopObserver)
+
+    if signal.type == "aikido.agent.lifecycle.stopping" && observer do
+      send(observer, {:member_stop_waiting, self()})
+
+      receive do
+        :continue_member_stop -> next.(signal, context)
+      end
+    else
+      next.(signal, context)
+    end
+  end
+end
+
 defmodule Aikido.InheritedConfigurationTest.Worker do
   use Ash.Resource,
     domain: Aikido.InheritedConfigurationTest.Domain,
@@ -202,7 +222,11 @@ defmodule Aikido.InheritedConfigurationTest.Worker do
 
   agent do
     name "inherit_worker"
-    middleware [Aikido.InheritedConfigurationTest.HoldLeafInheritance]
+
+    middleware [
+      Aikido.InheritedConfigurationTest.HoldLeafInheritance,
+      Aikido.InheritedConfigurationTest.HoldMemberStop
+    ]
   end
 end
 
@@ -246,6 +270,35 @@ defmodule Aikido.InheritedConfigurationTest.Branch do
   end
 end
 
+defmodule Aikido.InheritedConfigurationTest.HoldStopPlanning do
+  @moduledoc "Exposes a genuine proposed stop before its monitor effect is installed."
+  use Aikido.Middleware
+
+  @impl true
+  def on_signal(signal, context, _options, next) do
+    result = next.(signal, context)
+    observer = Process.whereis(Aikido.InheritedConfigurationTest.StopPlanningObserver)
+
+    case result do
+      {:ok, proposed, directives}
+      when signal.type == "aikido.ash.team.stop_member" and not is_nil(observer) ->
+        operation = proposed.agent.state.team.operation
+
+        send(
+          observer,
+          {:member_stop_planned, self(), operation.id, operation.stop.member, operation.stop.pid}
+        )
+
+        receive do
+          :continue_stop_plan -> {:ok, proposed, directives}
+        end
+
+      _ ->
+        result
+    end
+  end
+end
+
 defmodule Aikido.InheritedConfigurationTest.Root do
   use Ash.Resource,
     domain: Aikido.InheritedConfigurationTest.Domain,
@@ -256,6 +309,7 @@ defmodule Aikido.InheritedConfigurationTest.Root do
 
   agent do
     name "inherit_root"
+    middleware [Aikido.InheritedConfigurationTest.HoldStopPlanning]
   end
 
   team do
@@ -318,6 +372,43 @@ defmodule Aikido.InheritedConfigurationTest.TenantTeam do
   end
 end
 
+defmodule Aikido.InheritedConfigurationTest.HoldMemberStart do
+  @moduledoc "Keeps a real child start pending until the test releases its initial topology."
+  use Aikido.Middleware
+
+  @impl true
+  def on_signal(signal, context, _options, next) do
+    observer = Process.whereis(Aikido.InheritedConfigurationTest.MemberStartObserver)
+
+    if signal.type == "aikido.ash.team.start" && observer do
+      send(observer, {:member_start_waiting, self()})
+
+      receive do
+        :continue_member_start -> next.(signal, context)
+      end
+    else
+      next.(signal, context)
+    end
+  end
+end
+
+defmodule Aikido.InheritedConfigurationTest.DelayedBranch do
+  use Ash.Resource,
+    domain: Aikido.InheritedConfigurationTest.Domain,
+    authorizers: [Ash.Policy.Authorizer],
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
+
+  use Aikido.InheritedConfigurationTest.StorageFields
+
+  agent do
+    name "delayed_branch"
+    middleware [Aikido.InheritedConfigurationTest.HoldMemberStart]
+  end
+
+  team do
+  end
+end
+
 defmodule Aikido.InheritedConfigurationTest.Domain do
   use Ash.Domain, extensions: [Aikido.Domain.Extension]
 
@@ -331,5 +422,6 @@ defmodule Aikido.InheritedConfigurationTest.Domain do
     agent :worker, Aikido.InheritedConfigurationTest.Worker
     agent :opt_out, Aikido.InheritedConfigurationTest.OptOut
     agent :tenant_team, Aikido.InheritedConfigurationTest.TenantTeam
+    agent :delayed_branch, Aikido.InheritedConfigurationTest.DelayedBranch
   end
 end

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Prepare tracked member stops under the exact receiving activation's authority.
+  Require successful native cleanup and its verified clean process exit before
+  completing the topology operation. Reject cleanup without terminating the
+  member, preserve public stop caller policies, and retain exact targets when
+  a proposed topology removes their declarations.
+
 - Wait for receiver-owned saved topology reconciliation when starting restored
   teams, including nested members. Restoration failures retain the existing
   identity for inspection instead of applying fresh-start cleanup.

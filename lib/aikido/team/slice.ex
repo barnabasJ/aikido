@@ -114,6 +114,8 @@ defmodule Aikido.Team.Slice do
     route Aikido.Team.Signals.AssignTask, Aikido.Team.Actions.AssignTask
     route Aikido.Team.Signals.BackgroundTask, Aikido.Team.Actions.BackgroundTask
     route Aikido.Team.Signals.Cleanup, Aikido.Team.Actions.Cleanup, public?: false
+    route Aikido.Team.Signals.StopMonitored, Aikido.Team.Actions.StopMonitored, public?: false
+
     route Aikido.Team.Signals.Started, Aikido.Team.Actions.Started, public?: false
     route Aikido.Team.Signals.Stopped, Aikido.Team.Actions.Stopped, public?: false
     route Aikido.Team.Signals.Failed, Aikido.Team.Actions.Failed, public?: false

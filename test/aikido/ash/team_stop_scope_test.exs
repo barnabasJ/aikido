@@ -6,11 +6,12 @@ defmodule AikidoTest.TeamStopScopeTest do
   @moduletag capture_log: true
 
   setup do
-    start_supervised!({Aikido, name: Aikido.Default, durable: AikidoTest.Case.durable_options()})
+    options = Keyword.put(durable_options(), :scope_adapter, AikidoTest.DurableScopeAuthority)
+    start_supervised!({Aikido, name: Aikido.Default, durable: options})
     :ok
   end
 
-  test "a topology stop carries the current command actor and tenant through its AsyncTask" do
+  test "a topology stop uses the member activation scope after current command admission" do
     team = start_team()
     member = Domain.scope_team_inspect!(team).team.members.worker
     {:ok, id} = Aikido.AgentServer.state(member, &{:ok, &1.id})
@@ -25,18 +26,20 @@ defmodule AikidoTest.TeamStopScopeTest do
 
     assert_receive {:signal,
                     %Aikido.Signal{
-                      data: %{id: ^id, actor: "member-stopper", tenant: "current-tenant"}
+                      data: %{id: ^id, actor: "starter", tenant: "startup-tenant"}
                     }}
 
     assert Domain.scope_team_inspect!(team).team.members == %{}
   end
 
   test "denied member cleanup retains the native policy error and leaves the member alive" do
-    team = start_team()
+    team = start_team(%{}, actor: denied())
     member = Domain.scope_team_inspect!(team).team.members.worker
 
     assert {:error, _} =
-             Domain.scope_team_stop_member(team, %{member: :worker}, actor: denied())
+             Domain.scope_team_stop_member(team, %{member: :worker},
+               actor: permitted("member-stopper")
+             )
 
     assert Process.alive?(member)
     snapshot = Domain.scope_team_inspect!(team)
@@ -47,41 +50,24 @@ defmodule AikidoTest.TeamStopScopeTest do
     assert {:ok, 0} = Aikido.AgentServer.state(member, &{:ok, &1.agent.state.state.cleanups})
     refute_received {:signal, %Aikido.Signal{type: "test.team_stop_scope.cleaned"}}
 
-    assert {:ok, _} =
-             Domain.scope_team_stop_member(team, %{member: :worker}, actor: permitted("retry"))
-
+    assert {:ok, _} = Domain.scope_member_stop(member, actor: permitted("direct-caller"))
     LifecycleWait.await_down(member)
   end
 
-  test "a late activation is cleaned up under the activation result signal's current scope" do
+  test "a raw late Started cannot request cleanup of an unrelated running agent" do
     team = start_team(%{topology: %{}})
     member = Domain.scope_member_start!(%{observer: self()}, actor: permitted("starter"))
-    assert :ok = Aikido.AgentServer.await_ready(member.pid)
 
-    assert {:ok, %{error: nil}} =
-             await_late_cleanup(team, member, permitted("late-cleaner"))
+    signal =
+      Aikido.Team.Signals.Started.new!(
+        %{member: :late_worker, operation_id: "fabricated", result: member.pid},
+        scope: %{actor: permitted("late-cleaner")}
+      )
 
-    LifecycleWait.await_down(member.pid)
-    id = member.id
-    assert_receive {:signal, %Aikido.Signal{data: %{id: ^id, actor: "late-cleaner"}}}
-    assert Process.alive?(team.pid)
-    assert Domain.scope_team_inspect!(team).team.members == %{}
-  end
-
-  test "a denied late activation cleanup reports its actual error instead of acknowledging success" do
-    team = start_team(%{topology: %{}})
-    member = Domain.scope_member_start!(%{observer: self()}, actor: permitted("starter"))
-    assert :ok = Aikido.AgentServer.await_ready(member.pid)
-
-    assert {:ok,
-            %{error: %Ash.Error.Forbidden{} = error, payload: %{reason: %Ash.Error.Forbidden{}}}} =
-             await_late_cleanup(team, member, denied())
-
-    refute Exception.message(error) =~ "CaseClauseError"
-    assert Process.alive?(team.pid)
+    assert {:error, _} = Aikido.AgentServer.call(team.pid, signal, &{:ok, &1.agent})
     assert Process.alive?(member.pid)
     refute_received {:signal, %Aikido.Signal{type: "test.team_stop_scope.cleaned"}}
-    assert {:ok, _} = Domain.scope_member_stop(member, actor: permitted("cleanup"))
+    Domain.scope_member_stop!(member, actor: permitted("direct-caller"))
     LifecycleWait.await_down(member.pid)
   end
 
@@ -111,45 +97,15 @@ defmodule AikidoTest.TeamStopScopeTest do
     LifecycleWait.await_down(pid)
   end
 
-  defp start_team(attributes \\ %{}) do
+  defp start_team(attributes \\ %{}, options \\ []) do
     team =
       Domain.scope_team_start!(Map.put(attributes, :observer, self()),
-        actor: permitted("starter"),
+        actor: Keyword.get(options, :actor, permitted("starter")),
         tenant: "startup-tenant"
       )
 
     :ok = Aikido.AgentServer.await_ready(team.pid)
     team
-  end
-
-  defp await_late_cleanup(team, member, actor) do
-    signal =
-      Aikido.Team.Signals.Started.new!(
-        %{
-          member: :late_worker,
-          operation_id: "expired-activation",
-          result: member.pid
-        },
-        scope: %{actor: actor, tenant: "late-tenant", authorize?: true}
-      )
-
-    assert {:ok, subscription} =
-             Aikido.AgentServer.subscribe(
-               team.pid,
-               "aikido.ash.team.cleanup",
-               fn _runtime, event ->
-                 {:ok, %{error: event.error, payload: event.signal.data}}
-               end,
-               once: true
-             )
-
-    try do
-      assert :ok = Aikido.AgentServer.cast(team.pid, signal)
-      assert_receive {:aikido_subscription, ^subscription, %{result: {:ok, result}}}, 5_000
-      {:ok, result}
-    after
-      Aikido.AgentServer.unsubscribe(team.pid, subscription)
-    end
   end
 
   defp failed_topology(id) do

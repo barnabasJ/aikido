@@ -1245,6 +1245,12 @@ defmodule Aikido.AgentServer do
     end
   end
 
+  def handle_info({{:aikido_team_stop, id, member}, ref, :process, pid, reason}, state),
+    do: handle_member_stop_down(state, id, member, ref, pid, reason, true)
+
+  def handle_info({:aikido_team_stop_deferred, id, member, ref, pid, reason}, state),
+    do: handle_member_stop_down(state, id, member, ref, pid, reason, false)
+
   def handle_info({:DOWN, ref, :process, pid, reason}, state) do
     case Aikido.Cron.Messages.from_down(state, ref, pid, reason) do
       %Signal{} = signal ->
@@ -1284,6 +1290,34 @@ defmodule Aikido.AgentServer do
 
           {:stop, reason, next} ->
             {:stop, reason, finish_signal_stop(next, reason, signal)}
+        end
+
+      :ignore ->
+        {:noreply, state}
+    end
+  end
+
+  def handle_info(
+        {Aikido.Signal.Delivery, Aikido.Team.Delivery, sender, signal, %{kind: kind} = delivery},
+        state
+      )
+      when kind in [:stop, :stop_cleanup] do
+    case Aikido.Signal.Delivery.receive_signal(
+           state,
+           Aikido.Team.Delivery,
+           sender,
+           signal,
+           delivery
+         ) do
+      {:ok, signal} ->
+        case prepare_graceful_stop(state, :normal, signal) do
+          {:ok, prepared} ->
+            :ok = Aikido.Team.Delivery.stop_prepared(prepared, sender, delivery)
+            {:stop, :normal, prepared}
+
+          {:error, committed, error} ->
+            :ok = Aikido.Team.Delivery.stop_failed(committed, sender, delivery, error)
+            {:noreply, committed}
         end
 
       :ignore ->
@@ -2096,10 +2130,52 @@ defmodule Aikido.AgentServer do
     {:error, {:invalid_child, child}}
   end
 
+  defp handle_member_stop_down(state, operation_id, member, ref, pid, reason, defer?) do
+    team = state.agent.state[:team]
+    stop = team && team.operation[:stop]
+
+    if stop && team.operation.id == operation_id && stop.member == member && stop.pid == pid do
+      cond do
+        stop.monitor_ref == ref && is_reference(ref) ->
+          signal =
+            Aikido.Ownership.Signals.ChildExit.new!(
+              %{
+                tag: member,
+                pid: pid,
+                child_id: stop.reference.id,
+                monitor_ref: ref,
+                reason: reason
+              },
+              scope: state.bound_execution_scope || %{},
+              source: "/agent/#{state.id}"
+            )
+
+          handle_signal_info(state, signal, %{protocol: Aikido.Team.Delivery, kind: :process_exit})
+
+        # Registration is already queued by the monitor effect before mailbox dispatch resumes.
+        # Defer once; only its exact adopted reference can authenticate this observation.
+        is_nil(stop.monitor_ref) && defer? ->
+          send(self(), {:aikido_team_stop_deferred, operation_id, member, ref, pid, reason})
+          {:noreply, state}
+
+        true ->
+          {:noreply, state}
+      end
+    else
+      {:noreply, state}
+    end
+  end
+
   defp dispatch_owned_process_exit(state, ref, pid, reason) do
     case Aikido.Ownership.Messages.from_down(state, ref, pid, reason) do
-      %Signal{} = signal -> handle_info({:signal, signal}, state)
-      nil -> {:noreply, state}
+      %Signal{} = signal ->
+        handle_signal_info(state, signal, %{
+          protocol: Aikido.Ownership.Delivery,
+          kind: :process_exit
+        })
+
+      nil ->
+        {:noreply, state}
     end
   end
 
