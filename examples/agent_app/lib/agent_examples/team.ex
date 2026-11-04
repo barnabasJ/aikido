@@ -6,6 +6,18 @@ defmodule AgentExamples.Team do
 
   agent do
     name "example_team"
+
+    schema do
+      attribute :last_message, :string do
+        description "The latest public message received by this coordinator."
+      end
+
+      attribute :last_requester, :term do
+        description "Verified requesting member name, without storing a PID or execution scope."
+      end
+    end
+
+    route AgentExamples.Team.Signals.Message, AgentExamples.Team.Actions.RecordMessage
   end
 
   team do

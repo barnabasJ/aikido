@@ -9,8 +9,7 @@ defmodule Aikido.Team.Actions.BackgroundTask do
 
     case Map.fetch(state.tasks, id) do
       {:ok, %{status: :dispatched} = task} ->
-        task =
-          Map.merge(task, %{mode: :background, notify: task[:notify] || task[:requester] || :self})
+        task = background_assignment(task)
 
         Aikido.Types.ActionResult.new(changes: %{tasks: Map.put(state.tasks, id, task)})
 
@@ -25,8 +24,7 @@ defmodule Aikido.Team.Actions.BackgroundTask do
   defp background_pending_assignment(state, id) do
     case Map.fetch(Map.get(state, :pending_tasks, %{}), id) do
       {:ok, task} ->
-        task =
-          Map.merge(task, %{mode: :background, notify: task[:notify] || task[:requester] || :self})
+        task = background_assignment(task)
 
         Aikido.Types.ActionResult.new(
           changes: %{pending_tasks: Map.put(state.pending_tasks, id, task)}
@@ -40,5 +38,11 @@ defmodule Aikido.Team.Actions.BackgroundTask do
              "Unknown delegated task #{id}. Inspect the team's tracked tasks before retrying."
          )}
     end
+  end
+
+  defp background_assignment(task) do
+    task = Map.put(task, :mode, :background)
+    notify = Aikido.Team.TaskDelivery.notification_recipient(task)
+    Map.put(task, :notify, if(is_nil(notify), do: :self, else: notify))
   end
 end

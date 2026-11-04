@@ -265,8 +265,26 @@ defmodule Aikido.Team.Delivery do
          Enum.any?(work.queue, &(&1.task_id == signal.data.task_id)))
   end
 
-  def permitted?(runtime, sender, signal, %{kind: :message, signal_type: type}),
-    do: signal.type == type && coordinator?(runtime, sender)
+  def permitted?(
+        runtime,
+        sender,
+        signal,
+        %{
+          kind: :message,
+          signal_type: type,
+          target: target,
+          recipient: %Aikido.Agent.Reference{} = recipient,
+          requester: %Aikido.Team.Types.MessageRequester{} = requester
+        }
+      ) do
+    signal.type == type && target == self() && message_coordinator?(runtime, sender) &&
+      exact_recipient?(recipient, runtime) && message_requester?(requester, sender)
+  end
+
+  def permitted?(runtime, sender, signal, %{kind: :message, signal_type: type} = delivery) do
+    is_nil(delivery[:recipient]) && is_nil(delivery[:requester]) &&
+      signal.type == type && coordinator?(runtime, sender)
+  end
 
   def permitted?(
         runtime,
@@ -332,6 +350,38 @@ defmodule Aikido.Team.Delivery do
       sender.partition == runtime.partition &&
       data.child_id == Aikido.Team.Topology.member_id(team.topology, runtime.id, data.tag)
   end
+
+  defp message_coordinator?(runtime, sender) do
+    parent = Aikido.Ownership.parent(runtime)
+
+    resource =
+      if sender.pid == self(),
+        do: runtime.agent_module,
+        else: parent && parent.meta[:team_resource]
+
+    coordinator?(runtime, sender) && sender.resource == resource
+  end
+
+  defp message_requester?(
+         %{member: :self, reference: %Aikido.Agent.Reference{} = reference, incarnation: nil},
+         sender
+       ),
+       do: Aikido.Agent.Reference.matches?(reference, sender)
+
+  defp message_requester?(
+         %{
+           member: member,
+           reference: %Aikido.Agent.Reference{id: id, resource: resource} = reference,
+           incarnation: incarnation
+         },
+         sender
+       )
+       when is_binary(id) and is_atom(resource) and not is_nil(resource) do
+    not is_nil(member) && member != :self && not is_nil(incarnation) &&
+      reference.aikido == sender.aikido && reference.partition == sender.partition
+  end
+
+  defp message_requester?(_requester, _sender), do: false
 
   defp coordinator?(runtime, sender) do
     parent = Aikido.Ownership.parent(runtime)

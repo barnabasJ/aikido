@@ -9,6 +9,9 @@ defmodule Aikido.AiWorker.Slice do
   routing order. Each action writes only its own slice. Internal task signals
   target the worker directly, through direct process delivery; observe their
   processing with `Aikido.AgentServer.subscribe/4`.
+
+  Confirmed rejection of the inner Ask settles its correlated task without
+  writing AI state. Ambiguous transport failures retain the existing task deadline.
   """
   use Ash.Resource,
     data_layer: :embedded,
@@ -45,6 +48,9 @@ defmodule Aikido.AiWorker.Slice do
     route Aikido.Todo.Signals.TodoChanged, Aikido.AiWorker.Actions.Observe, public?: false
 
     route Aikido.AiWorker.Signals.Settle, Aikido.AiWorker.Actions.Settle, public?: false
+
+    route Aikido.AiWorker.Signals.RequestRejected, Aikido.AiWorker.Actions.RejectRequest,
+      public?: false
   end
 
   @doc false

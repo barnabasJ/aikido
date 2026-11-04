@@ -114,6 +114,7 @@ defmodule Aikido.ModelPreparationTest.Worker do
     extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
 
   agent do
+    instance Aikido.ModelPreparationTest.Instance
     name "model_preparation_worker"
     persistence :permanent
 
@@ -148,6 +149,7 @@ defmodule Aikido.ModelPreparationTest.WorkerConfigured do
     extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
 
   agent do
+    instance Aikido.ModelPreparationTest.Instance
     name "configured_model_preparation_worker"
     persistence :permanent
 
@@ -180,6 +182,7 @@ defmodule Aikido.ModelPreparationTest.Team do
     extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
 
   agent do
+    instance Aikido.ModelPreparationTest.Instance
     name "model_preparation_team"
     persistence :permanent
 

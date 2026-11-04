@@ -1,5 +1,6 @@
 defmodule AikidoTest.AshTeamActionsTest do
-  use ExUnit.Case, async: true
+  use AikidoTest.Case, async: true
+  @moduletag aikido_instance: AikidoTest.AshTeamActionsTest.Instance
 
   alias AikidoTest.AshFixtures.DynamicTeam
 
@@ -136,33 +137,44 @@ defmodule AikidoTest.AshTeamActionsTest do
   end
 
   test "the native action owns its operation independently of the signal envelope type" do
-    recipient = self()
-    state = Ash.create!(Aikido.Team.Slice, %{members: %{worker: recipient}})
+    team = AikidoTest.AshTeamActionsTest.Domain.team_start!(%{id: unique_id("native-send")})
+
+    assert {:ok, {state, context}} =
+             Aikido.AgentServer.state(team.pid, fn runtime ->
+               {:ok,
+                {runtime.agent.state.team,
+                 Aikido.Team.MemberIdentity.coordinator_context(runtime, team.pid)}}
+             end)
+
+    recipient = state.members.worker
+
+    context =
+      Map.put(context, :signal, %Aikido.Signal{
+        id: "native-send",
+        type: "unrelated.envelope",
+        data: %{},
+        source: "/test"
+      })
 
     input =
       Ash.ActionInput.for_action(
         Aikido.Team.Slice,
         :send,
         %{state: state, member: :worker, type: "worker.notice", payload: %{value: 7}},
-        context: %{
-          aikido: %{
-            agent_module: DynamicTeam,
-            signal: %Aikido.Signal{
-              id: "native-send",
-              type: "unrelated.envelope",
-              data: %{},
-              source: "/test"
-            }
-          }
-        }
+        context: %{aikido: context}
       )
 
     assert {:ok,
             %Aikido.Types.ActionResult{
               changes: nil,
               directives: [
-                %Aikido.Directives.Emit{
+                %Aikido.Team.Directives.Deliver{
+                  kind: :message,
                   target: ^recipient,
+                  recipient: %Aikido.Agent.Reference{
+                    resource: AikidoTest.AshTeamActionsTest.Worker
+                  },
+                  requester: %Aikido.Team.Types.MessageRequester{member: :self},
                   signal: %Aikido.Signal{type: "worker.notice", data: %{value: 7}}
                 }
               ]

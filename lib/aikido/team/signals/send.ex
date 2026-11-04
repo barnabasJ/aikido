@@ -7,8 +7,12 @@ defmodule Aikido.Team.Signals.Send do
 
     schema do
       attribute :member, :term do
-        description "Topology name of the member to operate on."
+        description "Topology name of the receiving member, or :self for this coordinator."
         allow_nil? false
+      end
+
+      attribute :requester, :term do
+        description "Requesting member name; nil or :self denotes the coordinator's own principal."
       end
 
       attribute :type, :string do

@@ -37,6 +37,20 @@ defmodule Aikido.Signal.Delivery do
   defp delivery_scope(_runtime, Aikido.Thread.Delivery, _sender, signal, %{kind: :request}),
     do: signal
 
+  defp delivery_scope(
+         runtime,
+         Aikido.Team.Delivery,
+         sender,
+         signal,
+         %{kind: :message, requester: %Aikido.Team.Types.MessageRequester{} = requester}
+       ) do
+    signal = bind_recipient_scope(runtime, sender, signal)
+    scope = Aikido.Signal.ctx(signal)
+
+    context = Map.put(scope[:context] || %{}, :aikido_requester, requester)
+    Aikido.Signal.put(signal, :context, context)
+  end
+
   defp delivery_scope(runtime, Aikido.Team.Delivery, sender, signal, %{kind: kind})
        when kind in [
               :inheritance,

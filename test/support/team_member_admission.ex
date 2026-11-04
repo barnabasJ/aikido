@@ -194,6 +194,7 @@ defmodule Aikido.TeamMemberAdmissionTest.DelayedWorker do
 
   agent do
     name "admission_delayed_worker"
+    instance Aikido.TeamMemberAdmissionTest.Instance
     persistence :temporary
     middleware [Aikido.TeamMemberAdmissionTest.HoldInitialTopology]
 
@@ -239,6 +240,7 @@ defmodule Aikido.TeamMemberAdmissionTest.Worker do
 
   agent do
     name "admission_worker"
+    instance Aikido.TeamMemberAdmissionTest.Instance
     persistence :temporary
     middleware [Aikido.TeamMemberAdmissionTest.HoldMailbox]
 
@@ -293,6 +295,7 @@ defmodule Aikido.TeamMemberAdmissionTest.Coordinator do
 
   agent do
     name "admission_coordinator"
+    instance Aikido.TeamMemberAdmissionTest.Instance
     persistence :permanent
 
     schema do

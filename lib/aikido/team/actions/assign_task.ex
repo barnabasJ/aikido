@@ -76,7 +76,7 @@ defmodule Aikido.Team.Actions.AssignTask do
          {:ok, pid} <- Aikido.Team.MemberProcesses.fetch_running_member_pid(state, data.member) do
       task =
         dispatched_task(id, data, state.incarnations[data.member])
-        |> bind_receiving_run(context)
+        |> bind_receiving_run(data, context)
 
       state
       |> Map.update!(:tasks, &Map.put(&1, id, task))
@@ -84,7 +84,7 @@ defmodule Aikido.Team.Actions.AssignTask do
     end
   end
 
-  defp bind_receiving_run(%{notify: :self} = task, context) do
+  defp bind_receiving_run(%{notify: :self} = task, _data, context) do
     ai = context.agent.state[:ai]
 
     Map.merge(task, %{
@@ -93,11 +93,8 @@ defmodule Aikido.Team.Actions.AssignTask do
     })
   end
 
-  defp bind_receiving_run(task, context) do
-    request_id = get_in(context, [:context, :aikido, :request_id])
-
-    Map.merge(task, %{recipient_request_id: request_id, recipient_active?: not is_nil(request_id)})
-  end
+  defp bind_receiving_run(task, data, _context),
+    do: Aikido.Team.TaskDelivery.bind_requester_run(task, data)
 
   defp task_exists(id) do
     {:error,
@@ -115,7 +112,7 @@ defmodule Aikido.Team.Actions.AssignTask do
       member: data.member,
       status: :dispatched,
       result: nil,
-      notify: data[:notify] || if(data[:mode] == :background, do: data[:requester]),
+      notify: Aikido.Team.TaskDelivery.notification_recipient(data),
       requester: data[:requester],
       mode: Map.get(data, :mode, :background),
       worker_lifecycle: Map.get(data, :worker_lifecycle, :keep),

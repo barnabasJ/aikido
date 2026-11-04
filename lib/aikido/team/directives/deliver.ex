@@ -27,6 +27,10 @@ defmodule Aikido.Team.Directives.Deliver do
       description "Exact durable address selected by a member lifecycle operation."
     end
 
+    field :requester, Aikido.Team.Types.MessageRequester do
+      description "Message requester derived from the sending coordinator's adopted membership."
+    end
+
     field :member, :term do
       description "Topology name selected by a member lifecycle operation."
     end
@@ -62,6 +66,7 @@ defmodule Aikido.Team.Directives.Deliver do
         :request_id,
         :active?,
         :recipient,
+        :requester,
         :target,
         :member,
         :operation_id

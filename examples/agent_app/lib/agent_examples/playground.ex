@@ -949,6 +949,8 @@ defmodule AgentExamples.Playground do
            :count,
            :enabled,
            :signals_seen,
+           :last_message,
+           :last_requester,
            :items,
            :completed,
            :title,

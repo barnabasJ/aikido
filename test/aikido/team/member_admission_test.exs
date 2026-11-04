@@ -1,12 +1,11 @@
 defmodule Aikido.TeamMemberAdmissionTest do
-  use AikidoTest.Case, async: false
+  use AikidoTest.Case, async: true
   alias Aikido.TeamMemberAdmissionTest.{Domain, Worker}
 
-  setup do
-    options =
-      Keyword.put(durable_options(), :scope_adapter, Aikido.TeamMemberAdmissionTest.Authority)
+  @moduletag aikido_instance: Aikido.TeamMemberAdmissionTest.Instance,
+             aikido_scope_adapter: Aikido.TeamMemberAdmissionTest.Authority
 
-    start_supervised!({Aikido, name: Aikido.Default, durable: options})
+  setup do
     {:ok, owner: actor(true), alpha: actor(), bravo: actor()}
   end
 

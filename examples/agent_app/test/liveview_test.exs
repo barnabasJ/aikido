@@ -526,6 +526,10 @@ defmodule AgentExamplesWeb.LiveViewTest do
     {:ok, view, _} = live(conn, "/examples/team")
     owner = start(view, "team")
     assert has_element?(view, "#member-count", "3 members")
+    view |> element("#team-message") |> render_click()
+    await(owner, "team", &(&1.snapshot.own.last_message == "Hello from the Team controls"))
+    assert has_element?(view, "#team-last-message", "Requested by counter")
+
     view |> element("#team-add") |> render_click()
     await(owner, "team", &(&1.snapshot.children["counter"].own.count == 11))
     view |> element("#team-tree [data-node=counter]") |> render_click()

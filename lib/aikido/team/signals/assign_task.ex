@@ -46,6 +46,10 @@ defmodule Aikido.Team.Signals.AssignTask do
         description "Requesting member name, or :self for the coordinating team agent."
       end
 
+      attribute :requester_request_id, :string do
+        description "Optional requesting AI run identifier; correlation only, verified by the actual receiving run."
+      end
+
       attribute :notify, :term do
         description "Member name to receive task results, :self for this team, or nil for no notification."
       end

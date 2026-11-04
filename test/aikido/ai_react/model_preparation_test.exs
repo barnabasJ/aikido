@@ -1,5 +1,7 @@
 defmodule Aikido.AiReact.ModelPreparationTest do
-  use AikidoTest.Case, async: false
+  use AikidoTest.Case, async: true
+  @moduletag aikido_instance: Aikido.ModelPreparationTest.Instance
+  @moduletag aikido_scope_adapter: Aikido.ModelPreparationTest.Authority
   alias Aikido.ModelPreparationTest.{Authority, Domain, Preparation}
   alias Aikido.AI.Test.ResponseFixtures, as: Responses
   alias Aikido.AttemptTimingTest.Manual
@@ -24,8 +26,6 @@ defmodule Aikido.AiReact.ModelPreparationTest do
     }
 
     start_supervised!({Authority, [receiver_scope, sender_scope]})
-    options = Keyword.put(durable_options(), :scope_adapter, Authority)
-    start_supervised!({Aikido, name: Aikido.Default, durable: options})
 
     %{
       receiver: receiver,
@@ -65,7 +65,7 @@ defmodule Aikido.AiReact.ModelPreparationTest do
     assert context.aikido == %{
              agent_id: worker.id,
              agent_resource: Aikido.ModelPreparationTest.Worker,
-             aikido: Aikido.Default,
+             aikido: Aikido.ModelPreparationTest.Instance,
              partition: nil,
              metadata: %{profile: "receiver"}
            }

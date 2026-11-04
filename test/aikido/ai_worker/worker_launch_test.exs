@@ -1,57 +1,6 @@
-defmodule Aikido.WorkerLaunchTest.Client do
-  def generate_text(model, _messages, opts) do
-    if observer = opts[:observer], do: send(observer, {:worker_model, model})
-
-    {:ok,
-     %ReqLLM.Response{
-       id: "scripted",
-       model: "offline",
-       context: ReqLLM.Context.new(),
-       message: ReqLLM.Context.assistant("done", tool_calls: []),
-       finish_reason: :stop
-     }}
-  end
-end
-
-defmodule Aikido.WorkerLaunchTest.Worker do
-  use Ash.Resource,
-    domain: Aikido.WorkerLaunchTest.Domain,
-    extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]
-
-  agent do
-    name "worker_launch"
-  end
-
-  ai do
-    client Aikido.WorkerLaunchTest.Client
-  end
-end
-
-defmodule Aikido.WorkerLaunchTest.Team do
-  use Ash.Resource,
-    domain: Aikido.WorkerLaunchTest.Domain,
-    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
-
-  agent do
-    name "worker_launch_team"
-  end
-
-  team do
-    member :worker, Aikido.WorkerLaunchTest.Worker, activation: :lazy
-  end
-end
-
-defmodule Aikido.WorkerLaunchTest.Domain do
-  use Ash.Domain, validate_config_inclusion?: false, extensions: [Aikido.Domain.Extension]
-
-  agents do
-    agent :launch, Aikido.WorkerLaunchTest.Team
-    agent :worker, Aikido.WorkerLaunchTest.Worker
-  end
-end
-
 defmodule Aikido.WorkerLaunchTest do
-  use AikidoTest.Case, async: false
+  use AikidoTest.Case, async: true
+  @moduletag aikido_instance: Aikido.WorkerLaunchTest.Instance
 
   alias Aikido.WorkerLaunchTest.Domain
 
@@ -83,7 +32,6 @@ defmodule Aikido.WorkerLaunchTest do
   end
 
   test "a missing model fails the team's task before its deadline and permits the next task" do
-    start_supervised!({Aikido, name: Aikido.Default, durable: AikidoTest.Case.durable_options()})
     team = Domain.launch_start!(%{})
 
     {:ok, failed} = task_subscription(team.pid, "missing", :failed)
@@ -133,7 +81,8 @@ defmodule Aikido.WorkerLaunchTest do
     assert result.changes.pending.task_id == "valid"
     assert result.changes.completed == 2
 
-    assert [first, second, ask] = result.directives
+    assert [first, second, request] = result.directives
+    ask = request_signal(request)
 
     for {directive, task} <- [{first, missing_one}, {second, missing_two}] do
       assert directive.target == self()
@@ -149,10 +98,10 @@ defmodule Aikido.WorkerLaunchTest do
       assert directive.signal.scope == task.signal_context
     end
 
-    assert ask.signal.type == "ai.react.ask"
-    assert ask.signal.data.request_id == "valid"
-    assert ask.signal.data.model == "offline"
-    assert ask.signal.scope == valid.signal_context
+    assert ask.type == "ai.react.ask"
+    assert ask.data.request_id == "valid"
+    assert ask.data.model == "offline"
+    assert ask.scope == valid.signal_context
   end
 
   test "configured models and per-task overrides launch while duplicate admission is unchanged" do
@@ -171,9 +120,10 @@ defmodule Aikido.WorkerLaunchTest do
 
       assert result.changes.pending.task_id == "valid"
       assert result.changes.completed == 0
-      assert [ask] = result.directives
-      assert ask.signal.type == "ai.react.ask"
-      assert ask.signal.data.model == expected
+      assert [request] = result.directives
+      ask = request_signal(request)
+      assert ask.type == "ai.react.ask"
+      assert ask.data.model == expected
     end
 
     params = task("duplicate", nil, %{}) |> Map.delete(:signal_context)
@@ -190,6 +140,17 @@ defmodule Aikido.WorkerLaunchTest do
 
       assert result.directives == []
     end
+  end
+
+  defp request_signal(%Aikido.Directives.AsyncTask{} = directive) do
+    assert directive.cancel_on_owner_exit?
+
+    assert {Aikido.AiWorker.RequestAdmission, :request,
+            [pid, %Aikido.Signal{} = ask, correlation]} = directive.work
+
+    assert pid == self()
+    assert correlation.task_id == ask.data.request_id
+    ask
   end
 
   defp task(id, model, scope) do

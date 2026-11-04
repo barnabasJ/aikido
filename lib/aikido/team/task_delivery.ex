@@ -8,6 +8,34 @@ defmodule Aikido.Team.TaskDelivery do
   """
   alias Aikido.Signal
 
+  @doc "Bind explicit requester-run correlation without granting authority or copying runtime scope."
+  def bind_requester_run(task, data) do
+    request_id =
+      case Map.fetch(task, :recipient_request_id) do
+        {:ok, captured} ->
+          captured
+
+        :error ->
+          requester = task[:requester]
+
+          if requester not in [nil, :self] && task[:notify] in [nil, requester],
+            do: data[:requester_request_id],
+            else: nil
+      end
+
+    task
+    |> Map.put_new(:recipient_request_id, request_id)
+    |> Map.put_new(:recipient_active?, not is_nil(request_id))
+  end
+
+  @doc "Resolve explicit notification names and the native background requester default."
+  def notification_recipient(data) do
+    case data[:notify] do
+      nil -> if Map.get(data, :mode, :background) == :background, do: data[:requester]
+      member -> member
+    end
+  end
+
   @doc "Build delivery directives for the task's configured notification recipient."
   def task_result_delivery_directives(task, state, context) do
     case task_result_recipient_pid(task, state, context) do

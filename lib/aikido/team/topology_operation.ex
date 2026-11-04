@@ -379,11 +379,12 @@ defmodule Aikido.Team.TopologyOperation do
            status: :failed,
            result: reason,
            attempt: nil,
-           notify: data[:notify],
+           notify: Aikido.Team.TaskDelivery.notification_recipient(data),
            requester: data[:requester],
            mode: Map.get(data, :mode, :background),
            metadata: data[:metadata] || %{}
-         }}
+         }
+         |> Aikido.Team.TaskDelivery.bind_requester_run(data)}
       end)
 
     Map.merge(state, %{pending_tasks: %{}, tasks: Map.merge(state.tasks, tasks)})

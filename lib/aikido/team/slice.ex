@@ -173,11 +173,12 @@ defmodule Aikido.Team.Slice do
       status: :dispatched,
       result: nil,
       attempt: nil,
-      notify: data[:notify],
+      notify: Aikido.Team.TaskDelivery.notification_recipient(data),
       requester: data[:requester],
       mode: Map.get(data, :mode, :background),
       metadata: data[:metadata] || %{}
     }
+    |> Aikido.Team.TaskDelivery.bind_requester_run(data)
   end
 
   defp fail_interrupted_tasks(state) do

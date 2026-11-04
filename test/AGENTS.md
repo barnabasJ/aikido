@@ -14,7 +14,7 @@ Provide stable, reusable testing patterns for pure agents, AgentServer runtime b
 - `cd examples/agent_app && mix test`
 
 ## Support Modules
-- `AikidoTest.Case`: isolated Aikido instance per test (`aikido`, `aikido_pid` context)
+- `AikidoTest.Case`: isolated Aikido instance per test (`aikido`, `aikido_pid` context). Use fixed per-module `@moduletag aikido_instance: MyTest.Instance` for asynchronous native domain fixtures, with optional `aikido_scope_adapter: MyTest.Authority`; each test still gets a fresh backend and runtime.
 - `AikidoTest.AgentWait`: subscription-based state assertions
 - `AikidoTest.LifecycleWait`: process monitors and supervised recovery events
 - `AikidoTest.Support.TestTracer`: lightweight span capture for runtime assertions

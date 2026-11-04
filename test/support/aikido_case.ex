@@ -13,8 +13,16 @@ defmodule AikidoTest.Case do
         end
       end
 
-  Each test gets a unique Aikido instance that is automatically started before
-  the test and stopped after it completes. This ensures complete test isolation.
+  Each test gets an isolated Aikido instance started before the test and stopped
+  after it completes. Native resources compiled against a fixed instance can use
+  per-module tags without allocating a new runtime name atom for every test:
+
+      @moduletag aikido_instance: MyTest.Instance,
+                 aikido_scope_adapter: MyTest.Authority
+
+  Give each asynchronous test module its own fixed name. Tests within that module
+  run sequentially, with a fresh backend directory and runtime for each test.
+  Untagged existing cases retain their unique-name behavior.
 
   ## Context
 
@@ -128,10 +136,16 @@ defmodule AikidoTest.Case do
   end
 
   setup context do
-    test_id = System.unique_integer([:positive])
-    aikido_name = :"aikido_test_#{test_id}"
+    aikido_name =
+      case Map.fetch(context, :aikido_instance) do
+        {:ok, instance} -> instance
+        :error -> :"aikido_test_#{System.unique_integer([:positive])}"
+      end
 
-    aikido_pid = start_supervised!({Aikido, name: aikido_name, durable: durable_options()})
+    durable = durable_options()
+    adapter = Map.get(context, :aikido_scope_adapter, durable[:scope_adapter])
+    durable = Keyword.put(durable, :scope_adapter, adapter)
+    aikido_pid = start_supervised!({Aikido, name: aikido_name, durable: durable})
 
     {:ok, Map.merge(context, %{aikido: aikido_name, aikido_pid: aikido_pid})}
   end

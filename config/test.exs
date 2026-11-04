@@ -37,5 +37,11 @@ config :aikido,
     Aikido.ThreadFollowTest.Domain,
     Aikido.ResolvedCommandAdmissionTest.Domain,
     Aikido.TeamMemberAdmissionTest.Domain,
-    Aikido.ModelPreparationTest.Domain
+    Aikido.ModelPreparationTest.Domain,
+    Aikido.TeamMemberMessagingTest.Domain,
+    AikidoTest.AshTeamActionsTest.Domain,
+    Aikido.WorkerRequestRejectionTest.Domain,
+    Aikido.RequesterCorrelationTest.Domain,
+    Aikido.AncestorLossTest.Domain,
+    Aikido.WorkerLaunchTest.Domain
   ]

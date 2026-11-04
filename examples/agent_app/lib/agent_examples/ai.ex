@@ -117,6 +117,7 @@ defmodule AgentExamples.AI do
           timeout_ms: timeout,
           mode: mode,
           requester: requester,
+          requester_request_id: Keyword.get(opts, :requester_request_id),
           notify: if(mode == :background, do: requester),
           worker_lifecycle: Keyword.get(opts, :worker_lifecycle, :keep),
           metadata: %{aikido_deadline_at: deadline}

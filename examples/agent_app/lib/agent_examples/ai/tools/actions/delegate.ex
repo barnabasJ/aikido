@@ -55,6 +55,7 @@ defmodule AgentExamples.AI.Tools.Actions.Delegate do
            AgentExamples.AI.delegate(team, member, input.arguments[:text],
              mode: input.arguments.mode,
              requester: caller || :self,
+             requester_request_id: get_in(input.context, [:aikido, :request_id]),
              worker_lifecycle: input.arguments.worker_lifecycle,
              deadline_at: get_in(input.context, [:aikido, :deadline_at]),
              ash: Ash.Scope.to_opts(context, context: input.context)

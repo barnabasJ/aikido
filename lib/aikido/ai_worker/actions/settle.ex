@@ -71,6 +71,10 @@ defmodule Aikido.AiWorker.Actions.Settle do
     |> Aikido.Signal.put_ctx(Map.get(task, :signal_context, %{}))
   end
 
+  defp start_next_queued_task(state, %{agent: %{state: %{ai: %{status: status}}}}, effects)
+       when status in [:setup, :running, :waiting],
+       do: {:ok, state, effects}
+
   defp start_next_queued_task(state, context, effects) do
     case Map.get(state, :queue, []) do
       [data | rest] ->

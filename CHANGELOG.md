@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Settle accepted worker tasks when their inner AI request is rejected before
+  adoption, with a finite actionable failure instead of waiting for the task
+  deadline. Keep unrelated AI runs and queued work intact.
+
+- Carry explicit requester-run correlation through Team delegation, backgrounding,
+  activation failure and recovery, without treating it as authorization.
+
+- Recognize missing ownership ancestors when reconciling tracked member stops.
+  Exact monitored orphan exits can complete without an impossible cleanup
+  acknowledgement; healthy members still require receiving cleanup.
+
+- Extend native Team Send with coordinator targeting, requester-bound message
+  policies, and verified requester provenance under receiver-owned execution.
+
 - Prepare transient model/provider options through a native Ash action under
   the actual receiving activation before each supervised model attempt.
 

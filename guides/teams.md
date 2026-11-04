@@ -117,6 +117,20 @@ When a requester is supplied, its result is delivered later through
 `ai.react.deliver`; an explicit `notify` overrides that destination. Existing
 assignments without a requester retain their existing optional-notification behavior.
 
+When a named AI requester needs the result delivered to its current run, pass
+`requester_request_id` with that run's request ID. The team preserves this
+correlation when a foreground task moves to the background, waits for activation,
+or fails during activation or recovery. It is correlation, not permission: native
+requester policies still apply, and the receiver accepts the result only for its
+matching active run. Notifications to `:self` capture the coordinator's adopted
+AI run instead of trusting a caller-supplied ID.
+
+An accepted worker task can still fail before the inner AI request is adopted,
+for example when the worker's model permission has been revoked. The worker
+reports a classified, actionable task failure after confirmed native rejection.
+Ambiguous transport failures retain the existing task deadline; they do not
+claim that a request was rejected or that its effects never ran.
+
 Call the team's generated `background_task` domain command with `task_id` to
 release an existing foreground dependency. This changes neither the task identity
 nor its worker, payload or deadline, and does not cancel the assignment. Subscribers
@@ -228,3 +242,62 @@ Public direct child `stop` commands retain the actual caller's authorization.
 Parent-death handling continues through the child's existing receiver-bound
 Ownership action. The lower-level `StopChild` directive currently uses its
 existing plain signal path; it is not covered by this Team stop contract.
+
+
+## Requester-authorized messages
+
+Use the existing native `send` action for both member and coordinator messages:
+
+```elixir
+MyApp.Agents.squad_send(coordinator_pid, %{
+  member: :self,
+  requester: :researcher,
+  type: "ai.react.deliver",
+  payload: %{text: "Findings ready", request_id: request_id}
+}, scope: researcher_scope)
+```
+
+`:self` targets the actual coordinator, including when a member's logical owner
+is another member. A named target selects a running member. Native nil or
+`:self` requesters retain coordinator-principal semantics. Sending never activates
+an offline target, waits for a reply or redirects an accepted message to a later
+replacement process. A processing receipt is not a delivery acknowledgement.
+
+A child retains its original authenticated principal at the external command and
+owning-resource admission boundaries. Configure the native check together with
+application identity, tenant and payload permission checks:
+
+```elixir
+policy action(:send) do
+  forbid_unless MyApp.CurrentAgentIdentity
+  forbid_unless MyApp.ConversationPayloadPermission
+  authorize_if {Aikido.Team.PolicyChecks.MemberMessaging, types: ["ai.react.deliver"]}
+end
+```
+
+The `types` list is required and matches exact signal names; it has no default
+permission or wildcard expansion. A type grant alone is insufficient: signals
+such as `ai.react.deliver` accept model and execution configuration as well as
+text. Applications must restrict the delivered payload to their grant, for
+example text, request ID and permitted display metadata. The SDK check does not
+claim arbitrary payload fields are safe.
+
+Native member-principal proof uses the current coordinator state and immutable
+member activation identity, with the same bounded-read and intentionally shared
+principal semantics as coordination reads and delegation. The receiving agent
+then executes under its own bound scope and normal native policies. The host
+must not substitute a parent actor or use a direct foreign-scope AI delivery.
+
+The verified message context distinguishes the actual coordinator transport
+sender (`context.aikido_sender`) from its attested requester
+(`context.aikido_requester`). The requester contains only its member name, durable
+reference and recorded incarnation, derived from adopted membership after
+admission. This is provenance at send time, not a separate permission grant or a
+promise the requester is still alive at receive time. Payload `from` fields and
+caller-supplied provenance are not authority. Exact recipient PID and resource
+address prevent delivery to a different replacement incarnation.
+
+The playground's Team page includes **Send as counter to coordinator**. Its
+browser principal is deliberately shared by the public example's members; the
+control acts on behalf of counter and displays the native requester name.
+Private applications should use distinct principals and the policies above.

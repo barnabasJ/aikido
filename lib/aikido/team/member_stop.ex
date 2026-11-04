@@ -32,8 +32,39 @@ defmodule Aikido.Team.MemberStop do
          reference: reference,
          owner_reference: owner_reference,
          owner_pid: if(owner, do: state.members[owner], else: context.agent_pid),
-         orphaned?: !is_nil(owner) && is_nil(state.members[owner])
+         orphaned?: missing_owner_ancestor?(state, name)
        }}
+    end
+  end
+
+  @doc "Whether a declared ownership ancestor is absent from the adopted membership snapshot."
+  def missing_owner_ancestor?(%{topology: %{nodes: nodes}, members: members}, name)
+      when is_map(nodes) and is_map(members) do
+    missing_owner_ancestor?(nodes, members, name, MapSet.new(), false)
+  end
+
+  def missing_owner_ancestor?(_state, _name), do: false
+
+  defp missing_owner_ancestor?(nodes, members, name, visited, missing?) do
+    if MapSet.member?(visited, name) do
+      false
+    else
+      case Map.fetch(nodes, name) do
+        {:ok, %{owner: nil}} ->
+          missing?
+
+        {:ok, %{owner: owner}} ->
+          missing_owner_ancestor?(
+            nodes,
+            members,
+            owner,
+            MapSet.put(visited, name),
+            missing? or not Map.has_key?(members, owner)
+          )
+
+        _malformed_or_undeclared ->
+          false
+      end
     end
   end
 

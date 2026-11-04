@@ -3,7 +3,7 @@ defmodule Aikido.AiWorker.Actions.Accept do
   Pure reducer that accepts a correlated team task and its caller scope.
 
   Ignores duplicate task IDs, queues work while AI is busy, or returns updated
-  worker state and an `Emit` directive starting an AI request on the owning agent.
+  worker state and supervised work processing an AI request on the owning agent.
   Tasks without an effective model fail immediately through the team reply protocol.
   """
   use Ash.Resource.Actions.Implementation
@@ -69,7 +69,13 @@ defmodule Aikido.AiWorker.Actions.Accept do
 
     ask = task_request_signal(data)
 
-    {:ok, %{state | pending: pending}, [Aikido.Directives.emit_to_pid(ask, context.agent_pid)]}
+    request =
+      Aikido.Directives.async_task(
+        {Aikido.AiWorker.RequestAdmission, :request, [context.agent_pid, ask, pending]},
+        cancel_on_owner_exit?: true
+      )
+
+    {:ok, %{state | pending: pending}, [request]}
   end
 
   defp task_request_signal(data) do
