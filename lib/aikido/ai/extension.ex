@@ -26,6 +26,11 @@ defmodule Aikido.AI.Extension do
     name: :ai,
     schema: [
       model: [type: :any],
+      model_preparation: [
+        type: {:tuple, [:atom, :atom]},
+        doc:
+          "Receiver-owned native Ash action preparing each provider attempt; takes precedence over retained or per-request model_preparation options."
+      ],
       options: [type: :map, default: %{}],
       tool_options: [type: :keyword_list, default: []],
       client: [type: :module, default: ReqLLM.Generation],

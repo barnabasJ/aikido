@@ -94,6 +94,9 @@ defmodule Aikido.AiReact.Directives.LLMCall do
     task_sup = Aikido.task_supervisor_name(state.aikido)
     source = "/agent/#{state.id}"
 
+    preparation =
+      Aikido.AiReact.ModelPreparation.descriptor(state, directive.options.model_preparation)
+
     tracers = Aikido.Signal.tracers(input_signal, state.aikido)
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
 
@@ -106,7 +109,8 @@ defmodule Aikido.AiReact.Directives.LLMCall do
                agent_pid,
                source,
                Aikido.Signal.ctx(input_signal),
-               task_sup
+               task_sup,
+               preparation
              )
            end
          end) do
@@ -126,15 +130,22 @@ defmodule Aikido.AiReact.Directives.LLMCall do
     :ok
   end
 
-  defp generate_response_and_send_to_agent(%LLMCall{} = d, agent_pid, source, scope, supervisor) do
+  defp generate_response_and_send_to_agent(
+         %LLMCall{} = d,
+         agent_pid,
+         source,
+         scope,
+         supervisor,
+         preparation
+       ) do
     d
-    |> generate_response(agent_pid, source, scope, supervisor)
+    |> generate_response(agent_pid, source, scope, supervisor, preparation)
     |> send_model_result_to_agent(d, agent_pid, source, scope)
   rescue
     exception -> send_model_result_to_agent({:error, exception}, d, agent_pid, source, scope)
   end
 
-  defp generate_response(d, agent_pid, source, scope, supervisor) do
+  defp generate_response(d, agent_pid, source, scope, supervisor, preparation) do
     messages = Context.to_list(d.context)
     llm_opts = model_options(d)
 
@@ -147,7 +158,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
           dispatch_stream_delta(d, text, thinking, attempt, agent_pid, source, scope)
         end
 
-        request_model_response(d, messages, llm_opts, notify, emit)
+        prepare_and_request(d, messages, llm_opts, notify, emit, preparation)
       end,
       execution_options(d, scope)
     )
@@ -173,11 +184,21 @@ defmodule Aikido.AiReact.Directives.LLMCall do
 
   defp streaming?(d), do: d.options.streaming && d.mode != :handoff
 
-  defp request_model_response(d, messages, options, notify, emit) do
+  defp prepare_and_request(d, messages, options, notify, emit, nil),
+    do: request_model_response(d, d.model, messages, options, notify, emit)
+
+  defp prepare_and_request(d, messages, options, notify, emit, {action, scope}) do
+    with {:ok, prepared} <-
+           Aikido.AiReact.ModelPreparation.prepare(action, d.model, options, scope) do
+      request_model_response(d, prepared.model, messages, prepared.options, notify, emit)
+    end
+  end
+
+  defp request_model_response(d, model, messages, options, notify, emit) do
     if streaming?(d) do
       Aikido.AiReact.ModelStream.call(
         d.client,
-        d.model,
+        model,
         messages,
         options,
         emit,
@@ -186,7 +207,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
         d.options.stream_batch_ms
       )
     else
-      d.client.generate_text(d.model, messages, options)
+      d.client.generate_text(model, messages, options)
     end
   end
 

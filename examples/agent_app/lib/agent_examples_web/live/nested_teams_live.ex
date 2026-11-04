@@ -12,6 +12,7 @@ defmodule AgentExamplesWeb.NestedTeamsLive do
     <.page {assigns}>
       <.nested_teams
         run={@run}
+        coordination={@coordination}
         team_trees={@team_trees}
         tree_parent={@tree_parent}
         tree_kind={@tree_kind}

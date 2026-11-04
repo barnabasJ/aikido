@@ -12,6 +12,8 @@ defmodule AgentExamples.AdaptiveAssistant do
   ai do
     system_prompt "Use the supplied tools and report their evidence."
     max_iterations 12
+
+    model_preparation({AgentExamples.AdaptiveAssistant.ModelPreparation, :prepare})
     options %{tool_preparation: {AgentExamples.AdaptiveAssistant.ToolPreparation, :prepare}}
   end
 end

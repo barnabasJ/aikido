@@ -778,3 +778,101 @@ after the outer policy check, the replacement must satisfy its own current
 policy. Actor, tenant, application context and tracers remain the original
 caller's native scope; no prior authorization result is reused. Explicit trusted
 `authorize?: false` retains its ordinary Ash bypass semantics.
+
+
+## Principal-authorized Team coordination
+
+Team resources expose a native `team_coordination` command. Its required
+`requester` is an authored member name or the explicit coordinator `:self`:
+
+```elixir
+MyApp.Agents.squad_team_coordination(team_pid, %{requester: :researcher}, scope: scope)
+```
+
+The result contains a coordinator address, authored member names and recorded
+running/busy flags, and only that requester's tasks (including pending activation).
+It contains no member startup configuration, sibling PIDs, AI history or execution
+scope. Task metadata exposes only `required_todo` and the explicitly authored
+`public` map; results and public metadata remain application-authored content,
+not an automatic sensitive-data redaction boundary. Availability is advisory;
+read results never authorize a later assignment.
+
+Use native policies to permit this finite read without granting general inspect:
+
+```elixir
+policy action(:team_coordination) do
+  forbid_unless MyApp.CurrentAgentIdentity
+  authorize_if Aikido.Team.PolicyChecks.CoordinatorRead
+end
+
+policy action(:assign_task) do
+  forbid_unless MyApp.CurrentAgentIdentity
+  authorize_if Aikido.Team.PolicyChecks.MemberDelegation
+end
+```
+
+Application policies still own current identity, organization, tenant and domain
+permissions. These checks authorize the immutable actor and tenant to act on
+behalf of a currently bound member. They do not authenticate the BEAM sender.
+Two agents deliberately sharing the same principal share this authority; use
+distinct authenticated principals where member isolation is required.
+
+Member delegation requires a named requester, matching notification member,
+and a declared sibling target. The coordinator retains the native `requester: nil`
+default and may use `notify: :self`; explicit `requester: :self` also works.
+Only the coordinator's immutable principal can use those self forms. Its view
+includes nil and explicit-self tasks, represented as `:self` in the DTO, while
+persisted task requesters retain their original values. Neither check grants topology, stop, arbitrary signal delivery
+or general work permissions. Owning-resource signal admission repeats the native
+policy against current membership before a reducer plans effects.
+
+The member proof reads the actual member PID under its recorded resource,
+partition, coordinator binding and immutable activation authority. It performs
+one bounded child read (100 ms by default; configure the check with
+`timeout_ms: 250`). A busy child can cause a typed runtime-unavailable error;
+this check is not wait-free and never widens permission on timeout. Coordinator
+policies use their own adopted runtime context rather than calling themselves.
+The query reauthorizes and projects the same coordinator mailbox turn, so a
+removed or replaced member cannot reuse an earlier check to read a new view.
+
+The playground's Nested teams page includes **Read coordination view** to inspect
+the finite result independently of the full topology inspector.
+
+## Receiver-owned model preparation
+
+The resource's `ai.model_preparation` names a native Ash action to resolve transient
+model options under the receiving agent's immutable activation actor and tenant:
+
+```elixir
+ai do
+  model_preparation {MyApp.ProviderConfiguration, :prepare}
+end
+```
+
+This compiled resource setting takes precedence over saved or per-request
+`options.model_preparation`, so it also covers retained agents whose saved
+options predate the feature. When no resource setting is declared, the optional
+saved/per-request setting remains available. No other saved options, history or
+synchronization policy are reset or merged with new defaults.
+
+The action accepts `model` and `options` and returns
+`Aikido.AiReact.Types.ModelRequest` (a typed model/options value). It runs inside
+the existing supervised, cancellable model attempt before provider I/O. Its
+`context.aikido` contains only the receiver's `agent_id`, `agent_resource`,
+`aikido`, `partition`, and its own application `metadata`. It receives no parent
+history, AI state, sender-supplied identity or copied sibling configuration.
+
+The application uses its receiver-owned credential reference from that metadata
+and its normal Ash policies to resolve or refresh provider credentials. It must
+not accept a foreign credential identifier from the assignment payload. Prepared
+options remain local to the attempt; they do not replace persisted AI options or
+conversation state. With neither preparation setting configured, provider calls keep existing behavior.
+Delegated and restored agents use the same receiving activation boundary.
+
+This is distinct from `tool_preparation`, which prepares native Ash AI tool
+options and registry. It is also distinct from Lua lifecycle hooks; no function
+or closure is stored in the model-preparation configuration.
+
+The playground's Adaptive tools example configures both native preparation
+actions: tools are prepared per run, and a transient output-token limit default is
+applied per model attempt. Its original saved options remain unchanged.

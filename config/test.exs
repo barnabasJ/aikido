@@ -35,5 +35,7 @@ config :aikido,
     AikidoTest.LegacyCheckpoint.Domain,
     Aikido.InheritedConfigurationTest.Domain,
     Aikido.ThreadFollowTest.Domain,
-    Aikido.ResolvedCommandAdmissionTest.Domain
+    Aikido.ResolvedCommandAdmissionTest.Domain,
+    Aikido.TeamMemberAdmissionTest.Domain,
+    Aikido.ModelPreparationTest.Domain
   ]

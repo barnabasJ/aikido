@@ -3,6 +3,15 @@ defmodule Aikido.AiReact.Options do
   use Ash.TypedStruct
 
   typed_struct do
+    field :model_preparation, :tuple do
+      description "Optional receiver-scoped native Ash action {resource, action} preparing transient model and provider options inside each cancellable attempt."
+
+      constraints fields: [
+                    resource: [type: :atom, allow_nil?: false],
+                    action: [type: :atom, allow_nil?: false]
+                  ]
+    end
+
     field :tool_preparation, :tuple do
       description "Optional native Ash action {resource, action} accepting options and metadata and returning native Ash AI options."
 

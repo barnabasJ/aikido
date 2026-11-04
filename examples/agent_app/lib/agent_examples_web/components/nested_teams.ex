@@ -3,16 +3,31 @@ defmodule AgentExamplesWeb.Components.NestedTeams do
   use Phoenix.Component
   import Phoenix.LiveView
   import AgentExamplesWeb.ExampleComponents
+  import Aikido.Inspector.CodeBlock, only: [inspected_value: 1]
   alias AgentExamplesWeb.ExamplePage
 
   def on_mount(:default, _params, _session, socket) do
     {:cont,
      attach_hook(
-       assign(socket, tree_parent: "[]", tree_kind: "agent", tree_name: ""),
+       assign(socket, tree_parent: "[]", tree_kind: "agent", tree_name: "", coordination: nil),
        :nested_teams_commands,
        :handle_event,
        &handle_event/3
-     )}
+     )
+     |> attach_hook(:coordination_result, :handle_async, &handle_async/3)}
+  end
+
+  defp handle_event("read_coordination", _, %{assigns: %{run: run}} = socket) do
+    {:halt,
+     start_async(socket, {:team_coordination, run.record.pid}, fn ->
+       run.record.resource
+       |> Ash.ActionInput.for_action(
+         :team_coordination,
+         %{agent: run.record.pid, requester: :self},
+         run.scope
+       )
+       |> Ash.run_action(run.scope)
+     end)}
   end
 
   defp handle_event("spawn_squad", _, socket) do
@@ -63,8 +78,28 @@ defmodule AgentExamplesWeb.Components.NestedTeams do
 
   defp handle_event(_, _, socket), do: {:cont, socket}
 
+  defp handle_async({:team_coordination, pid}, result, socket) do
+    if socket.assigns.run && socket.assigns.run.record.pid == pid && active?(socket.assigns.run) do
+      case result do
+        {:ok, {:ok, view}} ->
+          {:halt, assign(socket, coordination: %{pid: pid, view: view}, error: nil)}
+
+        {:ok, {:error, error}} ->
+          {:halt, assign(socket, error: error)}
+
+        {:exit, reason} ->
+          {:halt, assign(socket, error: inspect(reason))}
+      end
+    else
+      {:halt, socket}
+    end
+  end
+
+  defp handle_async(_, _, socket), do: {:cont, socket}
+
   attr :run, :any, required: true
   attr :team_trees, :map, default: %{}
+  attr :coordination, :any, default: nil
   attr :tree_parent, :string, default: "[]"
   attr :tree_kind, :string, default: "agent"
   attr :tree_name, :string, default: ""
@@ -94,6 +129,11 @@ defmodule AgentExamplesWeb.Components.NestedTeams do
         </form>
         <details class="root-team-controls">
           <summary>Root team commands</summary>
+          <button id="read-coordination" phx-click="read_coordination" class="button secondary" disabled={!active?(@run)}>
+            Read coordination view
+          </button>
+          <p>Names, recorded availability and the coordinator's own tasks; no member startup configuration.</p>
+          <div :if={@coordination && active?(@run) && @coordination.pid == @run.record.pid} id="coordination-view"><.inspected_value value={@coordination.view} /></div>
           <button
             id="spawn-squad"
             phx-click="spawn_squad"

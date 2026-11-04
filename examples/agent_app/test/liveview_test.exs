@@ -775,6 +775,15 @@ defmodule AgentExamplesWeb.LiveViewTest do
   test "nested teams expose fixed and dynamic subtrees and remove all descendants", %{conn: conn} do
     {:ok, view, _} = live(conn, "/examples/nested-teams")
     owner = start(view, "nested-teams")
+
+    view |> element("#read-coordination") |> render_click()
+    render_async(view, 5_000)
+    assert has_element?(view, "#coordination-view")
+    coordination_html = view |> element("#coordination-view") |> render()
+    assert coordination_html =~ "busy?"
+    refute coordination_html =~ "initial_state"
+    refute coordination_html =~ "tool_context"
+
     assert has_element?(view, "#member-count", "2 members")
     assert has_element?(view, "#tree-form option", "home / counter (agent)")
     assert has_element?(view, "#tree-form option", "home / notebook (agent)")

@@ -7,6 +7,7 @@ defmodule AgentExamples.Agents do
   resources do
     resource AgentExamples.InteractiveAssistant.Approvals
     resource AgentExamples.LuaAssistant.Tools
+    resource AgentExamples.AdaptiveAssistant.ModelPreparation
     resource AgentExamples.AdaptiveAssistant.ToolPreparation
     resource AgentExamples.VerifiedAssistant.Verification
     resource AgentExamples.VerifiedTeam.Tools

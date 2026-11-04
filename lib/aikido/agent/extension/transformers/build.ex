@@ -483,23 +483,35 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
           )
         ]
 
+    coordination_actions =
+      if Transformer.get_persisted(dsl, :aikido_team_config) do
+        [
+          {:team_coordination, Aikido.Agent.Commands.TeamCoordination,
+           Aikido.Team.Types.Coordination,
+           [reference_argument(), build_argument!(:requester, :term, allow_nil?: false)]}
+        ]
+      else
+        []
+      end
+
     Enum.reduce_while(
-      [
-        {:start, Aikido.Agent.Commands.Start, :map, arguments},
-        {:inspect, Aikido.Agent.Commands.Inspect, :term,
-         [reference_argument(), build_argument!(:fields, {:array, :atom}, [])]},
-        {:execution_identity_matches, Aikido.Agent.Commands.ExecutionIdentityMatches, :boolean,
-         [reference_argument()]},
-        {:stop, Aikido.Agent.Commands.Stop, :map, [reference_argument()]},
-        {:delete, Aikido.Agent.Commands.Delete, :map, [reference_argument()]},
-        {:list, Aikido.Agent.Commands.List, {:array, :term},
-         [
-           build_argument!(:filter, :term, []),
-           build_argument!(:sort, :term, default: []),
-           build_argument!(:limit, :integer, constraints: [min: 0]),
-           build_argument!(:offset, :integer, default: 0, constraints: [min: 0])
-         ]}
-      ],
+      coordination_actions ++
+        [
+          {:start, Aikido.Agent.Commands.Start, :map, arguments},
+          {:inspect, Aikido.Agent.Commands.Inspect, :term,
+           [reference_argument(), build_argument!(:fields, {:array, :atom}, [])]},
+          {:execution_identity_matches, Aikido.Agent.Commands.ExecutionIdentityMatches, :boolean,
+           [reference_argument()]},
+          {:stop, Aikido.Agent.Commands.Stop, :map, [reference_argument()]},
+          {:delete, Aikido.Agent.Commands.Delete, :map, [reference_argument()]},
+          {:list, Aikido.Agent.Commands.List, {:array, :term},
+           [
+             build_argument!(:filter, :term, []),
+             build_argument!(:sort, :term, default: []),
+             build_argument!(:limit, :integer, constraints: [min: 0]),
+             build_argument!(:offset, :integer, default: 0, constraints: [min: 0])
+           ]}
+        ],
       {:ok, dsl},
       fn {name, implementation, returns, arguments}, {:ok, dsl} ->
         case Builder.add_new_action(dsl, :action, name,

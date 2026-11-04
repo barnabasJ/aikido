@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Prepare transient model/provider options through a native Ash action under
+  the actual receiving activation before each supervised model attempt.
+
+- Add finite Team coordination reads and native principal-on-behalf membership
+  and requester-bound delegation policy checks.
+
 - Reauthorize generated inspect and stop commands against the exact resolved
   live PID with the caller's original native scope. An ID authorization for a
   retired incarnation cannot authorize its replacement; trusted explicit
