@@ -68,8 +68,16 @@ defmodule Aikido.Inspector.History do
       execution: execution
     }
 
-    %{history | sequence: sequence, entries: Enum.take([entry | history.entries], @limit)}
+    %{history | sequence: sequence, entries: retain_entry(history.entries, entry)}
   end
+
+  defp retain_entry([%{sequence: newest} | _] = entries, %{sequence: sequence} = entry)
+       when sequence < newest do
+    {newer, older} = Enum.split_while(entries, &(&1.sequence > sequence))
+    Enum.take(newer ++ [entry | older], @limit)
+  end
+
+  defp retain_entry(entries, entry), do: Enum.take([entry | entries], @limit)
 
   def new, do: %{sequence: 0, entries: []}
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Deliver retained Inspector projections even when concurrent agents publish
+  them out of sequence.
+
 - Materialize worker AI request envelopes at the supervised admission boundary,
   preserving supplied identity, timestamps and scope before owning middleware runs.
 

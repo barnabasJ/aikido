@@ -73,6 +73,15 @@ defmodule AikidoTest.Inspector.HistoryTest do
     assert projected["samples"] == Enum.to_list(1..30) ++ ["[list truncated]"]
   end
 
+  test "history displays a late entry in sequence order" do
+    snapshot = %{id: "counter", inspected_state: %{}}
+
+    history = History.record(%{History.new() | sequence: 2}, snapshot, [], %{}, nil)
+    history = History.record(%{history | sequence: 1}, snapshot, [], %{}, nil)
+
+    assert Enum.map(history.entries, & &1.sequence) == [3, 2]
+  end
+
   test "JSON bounds count escaped and multibyte content without flattening values" do
     value = %{"nested" => [%{"text" => String.duplicate("雪\n\"", 300)}]}
     bounded = Aikido.Inspector.History.Bounds.limit(value, 512)

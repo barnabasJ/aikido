@@ -12,9 +12,10 @@ defmodule Aikido.Inspector do
   the inspector never needs to retain raw agent state.
 
   The target receives `{:aikido_inspection, ref, %{sequence: count, entries:
-  entries}}` batches, oldest first. Each entry includes its sequence, agent ID,
-  PID, signal type and projected result. `limit` bounds retained entries across
-  the whole attachment. High-volume runs may overwrite older entries between
+  entries}}` batches, ordered by sequence within each batch. Concurrent producers
+  can publish a lower sequence in a later batch. Each entry includes its
+  sequence, agent ID, PID, signal type and projected result. `limit` bounds
+  retained entries across the whole attachment. High-volume runs may overwrite older entries between
   batches; sequence counts still include them. No effects are replayed.
 
   Existing members are discovered at attachment. New descendants are observed
@@ -106,7 +107,7 @@ defmodule Aikido.Inspector do
         timer = Process.send_after(self(), {:flush, ref}, attachment.flush_interval_ms)
 
         {:reply, {:ok, ref},
-         Map.put(state, ref, %{monitors: monitors, timer: timer, sequence: 0})}
+         Map.put(state, ref, %{monitors: monitors, timer: timer, delivered: %{}})}
 
       {:error, reason} ->
         erase(ref)
@@ -123,10 +124,10 @@ defmodule Aikido.Inspector do
         {:noreply, state}
 
       session ->
-        sequence = flush(ref, session.sequence)
+        delivered = flush(ref, session.delivered)
         [{^ref, attachment}] = :ets.lookup(@registry, ref)
         timer = Process.send_after(self(), {:flush, ref}, attachment.flush_interval_ms)
-        {:noreply, Map.put(state, ref, %{session | sequence: sequence, timer: timer})}
+        {:noreply, Map.put(state, ref, %{session | delivered: delivered, timer: timer})}
     end
   end
 
@@ -134,7 +135,7 @@ defmodule Aikido.Inspector do
     state =
       Enum.reduce(state, state, fn {ref, session}, state ->
         if monitor in session.monitors do
-          flush(ref, session.sequence)
+          flush(ref, session.delivered)
           release(state, ref)
         else
           state
@@ -229,25 +230,30 @@ defmodule Aikido.Inspector do
     kind, reason -> {:error, {:selector_failed, kind, reason}}
   end
 
-  defp flush(ref, previous) do
+  defp flush(ref, delivered) do
     [{^ref, attachment}] = :ets.lookup(@registry, ref)
 
-    entries =
+    # Producers reserve sequences before writing. Only advance a slot past a
+    # projection that actually appeared in the batch.
+    pending =
       :ets.match_object(@events, {{ref, :_}, :_, :_})
-      |> Enum.map(fn {_, _, entry} -> entry end)
-      |> Enum.filter(&(&1.sequence > previous))
-      |> Enum.sort_by(& &1.sequence)
+      |> Enum.filter(fn {{_, slot}, sequence, _} -> sequence > Map.get(delivered, slot, 0) end)
+      |> Enum.sort_by(fn {_, sequence, _} -> sequence end)
 
-    sequence = :atomics.get(attachment.counter, 1)
+    if pending != [] do
+      send(
+        attachment.target,
+        {:aikido_inspection, ref,
+         %{
+           sequence: :atomics.get(attachment.counter, 1),
+           entries: Enum.map(pending, fn {_, _, entry} -> entry end)
+         }}
+      )
+    end
 
-    if entries != [],
-      do:
-        send(
-          attachment.target,
-          {:aikido_inspection, ref, %{sequence: sequence, entries: entries}}
-        )
-
-    sequence
+    Enum.reduce(pending, delivered, fn {{_, slot}, sequence, _}, acc ->
+      Map.put(acc, slot, sequence)
+    end)
   end
 
   defp release(state, ref) do

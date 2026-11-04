@@ -103,6 +103,39 @@ defmodule AgentExamples.InspectorAttachmentTest do
     refute :ets.member(Aikido.Inspector, ref)
   end
 
+  test "a delayed projection is delivered after a newer one without repeating it" do
+    root = Agents.counter_start!(%{})
+    on_exit(fn -> Agents.counter_stop(root) end)
+
+    {:ok, ref} =
+      Aikido.Inspector.attach(
+        root,
+        fn
+          _, %{signal: %{type: "counter.add"}} -> {:ok, :added}
+          _, _ -> :skip
+        end,
+        limit: 3
+      )
+
+    on_exit(fn -> Aikido.Inspector.detach(ref) end)
+
+    # Hold the first producer between reserving a sequence and inserting its row.
+    [{^ref, attachment}] = :ets.lookup(Aikido.Inspector.Attachments, ref)
+    assert :atomics.add_get(attachment.counter, 1, 1) == 1
+
+    Agents.counter_add!(root, %{amount: 1})
+    assert_receive {:aikido_inspection, ^ref, %{sequence: 2, entries: [newer]}}, 5000
+    assert %{sequence: 2, result: {:ok, :added}} = newer
+
+    delayed = %{newer | sequence: 1, agent_pid: self(), agent_id: root.id <> "/child"}
+    :ets.insert(Aikido.Inspector.Events, {{ref, 1}, 1, delayed})
+
+    assert_receive {:aikido_inspection, ^ref, %{sequence: 2, entries: [^delayed]}}, 5000
+
+    Agents.counter_add!(root, %{amount: 1})
+    assert_receive {:aikido_inspection, ^ref, %{sequence: 3, entries: [%{sequence: 3}]}}, 5000
+  end
+
   defp await_entries(ref, entries, ready?) do
     if ready?.(entries) do
       entries

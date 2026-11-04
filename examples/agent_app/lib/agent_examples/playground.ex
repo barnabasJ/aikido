@@ -512,7 +512,7 @@ defmodule AgentExamples.Playground do
       {:aikido_inspection, ^ref, newer} ->
         latest_inspection_batch(ref, %{
           newer
-          | entries: Enum.take(batch.entries ++ newer.entries, -100)
+          | entries: Enum.take(Enum.sort_by(batch.entries ++ newer.entries, & &1.sequence), -100)
         })
     after
       0 -> batch
