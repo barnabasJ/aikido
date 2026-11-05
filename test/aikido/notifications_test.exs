@@ -114,10 +114,14 @@ defmodule Aikido.NotificationsTest.Publisher do
     slice :private, Aikido.NotificationsTest.Private
 
     route Aikido.NotificationsTest.Signals.SetCount,
-          Aikido.NotificationsTest.Actions.AdvanceRevision
+          Aikido.NotificationsTest.Actions.AdvanceRevision,
+          name: :advance_count_revision,
+          public?: false
 
     route Aikido.NotificationsTest.Signals.Rebind,
-          Aikido.NotificationsTest.Actions.AdvanceRevision
+          Aikido.NotificationsTest.Actions.AdvanceRevision,
+          name: :advance_binding_revision,
+          public?: false
   end
 
   calculations do

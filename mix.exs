@@ -13,6 +13,7 @@ defmodule Aikido.MixProject do
       version: @version,
       elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
+      test_ignore_filters: ["test/fixtures/legacy_checkpoint/generate.exs"],
       consolidate_protocols: Mix.env() != :test,
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),

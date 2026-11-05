@@ -224,7 +224,11 @@ defmodule Aikido.StateAdoptionTest.Agent do
 
     slice :counter, Aikido.StateAdoptionTest.Counter
     slice :other_counter, Aikido.StateAdoptionTest.Counter
-    route Aikido.StateAdoptionTest.Signals.Propose, Aikido.StateAdoptionTest.Actions.RecordAttempt
+
+    route Aikido.StateAdoptionTest.Signals.Propose,
+          Aikido.StateAdoptionTest.Actions.RecordAttempt,
+          name: :record_attempt,
+          public?: false
   end
 end
 
