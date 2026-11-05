@@ -60,7 +60,7 @@ defmodule Aikido.Team.MemberIdentity do
         )
 
       CommandRuntime.catch_runtime_exit(fn ->
-        with {:ok, ^pid} <- Reference.lookup(reference) do
+        with {:ok, ^pid} <- lookup_member(reference) do
           Aikido.AgentServer.state(
             pid,
             fn child ->
@@ -77,6 +77,12 @@ defmodule Aikido.Team.MemberIdentity do
     else
       _not_a_current_member -> {:ok, false}
     end
+  end
+
+  defp lookup_member(reference) do
+    Reference.lookup(reference)
+  rescue
+    ArgumentError -> :error
   end
 
   defp current_member?(child, coordinator, requester, reference) do
