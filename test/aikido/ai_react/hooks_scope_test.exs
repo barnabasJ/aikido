@@ -124,13 +124,18 @@ defmodule Aikido.HooksScopeTest do
   setup :verify_on_exit!
   alias AikidoTest.Support.TestTracer
 
+  setup do
+    {:ok, actor: %{id: unique_id("hook-scope")}}
+  end
+
   for style <- [:scope, :options] do
     test "public ask with #{style} preserves async hook scope and the originating trace", ctx do
       start_supervised!(TestTracer)
+      actor = ctx.actor
 
       pid =
         start_server(ctx, Aikido.HooksScopeTest.Agent,
-          initialization_options: [actor: %{id: "alice"}, tenant: "org-a"]
+          initialization_options: [actor: actor, tenant: "org-a"]
         )
 
       assert {:error, _} =
@@ -155,8 +160,7 @@ defmodule Aikido.HooksScopeTest do
           "hook.notice",
           fn runtime ->
             case {runtime.agent.state.state.observed, runtime.agent.state.ai.hook_context} do
-              {%{actor: %{id: "alice"}, tenant: "org-a", marker: "application"},
-               [%{text: "evidence"}]} ->
+              {%{actor: ^actor, tenant: "org-a", marker: "application"}, [%{text: "evidence"}]} ->
                 {:ok, :observed}
 
               _ ->
@@ -167,7 +171,7 @@ defmodule Aikido.HooksScopeTest do
         )
 
       scope = %{
-        actor: %{id: "alice"},
+        actor: actor,
         tenant: "org-a",
         context: %{shared: %{marker: "application"}},
         tracer: TestTracer
@@ -225,6 +229,7 @@ defmodule Aikido.HooksScopeTest do
 
   test "tool preparation accepts traced scopes without stripping native callback context", ctx do
     start_supervised!(TestTracer)
+    actor = ctx.actor
 
     tool =
       ReqLLM.Tool.new!(
@@ -243,11 +248,11 @@ defmodule Aikido.HooksScopeTest do
         ] do
       pid =
         start_server(ctx, Aikido.HooksScopeTest.Agent,
-          initialization_options: [actor: %{id: "alice"}, tenant: "org-a"]
+          initialization_options: [actor: actor, tenant: "org-a"]
         )
 
       scope = %{
-        actor: %{id: "alice"},
+        actor: actor,
         tenant: "org-a",
         authorize?: authorize?,
         tracer: TestTracer,
@@ -320,8 +325,7 @@ defmodule Aikido.HooksScopeTest do
           assert_receive {:aikido_subscription, ^notice,
                           %{
                             result:
-                              {:ok,
-                               %{application: "ordinary", actor: %{id: "alice"}, tenant: "org-a"}}
+                              {:ok, %{application: "ordinary", actor: ^actor, tenant: "org-a"}}
                           }},
                          5_000
 
@@ -333,7 +337,7 @@ defmodule Aikido.HooksScopeTest do
 
       assert_receive {:tool_scope,
                       %{
-                        actor: %{id: "alice"},
+                        actor: ^actor,
                         tenant: "org-a",
                         authorize?: ^authorize?,
                         tracer: tracers,
@@ -360,13 +364,12 @@ defmodule Aikido.HooksScopeTest do
 
   test "public queue_message preserves native options and explicit overrides", ctx do
     start_supervised!(TestTracer)
+    actor = ctx.actor
 
     pid =
       start_server(ctx, Aikido.HooksScopeTest.Agent,
-        initialization_options: [actor: %{id: "alice"}, tenant: "org-a"]
+        initialization_options: [actor: actor, tenant: "org-a"]
       )
-
-    actor = %{id: "alice"}
 
     assert {:ok, _} =
              Aikido.AI.ask(pid, "hold",
