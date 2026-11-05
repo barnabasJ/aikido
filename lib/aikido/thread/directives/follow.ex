@@ -51,7 +51,9 @@ defmodule Aikido.Thread.Directives.Follow do
           path: directive.path,
           after: directive.after,
           batch_size: directive.batch_size
-        }, id: directive.request_id)
+        },
+        id: directive.request_id
+      )
 
     Aikido.Thread.Delivery.send(directive.source, signal, :request, input, runtime)
   end

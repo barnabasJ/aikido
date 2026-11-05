@@ -301,7 +301,10 @@ defmodule Aikido.AgentServer do
   The command may be a signal or a zero-arity function returning `{:ok, receipt}`,
   `:ok`, or `{:error, reason}`. Use a function to dispatch through a public Ash
   action with its policies and caller scope. It runs in the isolated waiter after
-  subscription registration.
+  subscription registration. The waiter is an unlinked Task that inherits the
+  caller's standard Task ancestry and transfers its Ash tracer context. This
+  preserves caller-based access such as SQL Sandbox allowances; it does not
+  supply or replace the actor, tenant or scope passed to the command.
   """
   @type dispatch_command :: Signal.t() | (-> :ok | {:ok, term()} | {:error, term()})
   @spec call_until(server(), dispatch_command(), String.t(), subscribe_selector(), keyword()) ::
@@ -318,16 +321,27 @@ defmodule Aikido.AgentServer do
 
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: tracers)
 
-    {waiter, monitor} =
-      spawn_monitor(fn ->
-        Ash.ProcessHelpers.transfer_context(transfer)
+    {:ok, waiter} =
+      Task.start(fn ->
+        caller_monitor = Process.monitor(caller)
 
-        result =
-          wait_for_command_result(server, command, pattern, selector, timeout, check_current?)
+        receive do
+          {^request, :start} ->
+            Process.demonitor(caller_monitor, [:flush])
+            Ash.ProcessHelpers.transfer_context(transfer)
 
-        send(caller, {request, result})
+            result =
+              wait_for_command_result(server, command, pattern, selector, timeout, check_current?)
+
+            send(caller, {request, result})
+
+          {:DOWN, ^caller_monitor, :process, ^caller, _reason} ->
+            :ok
+        end
       end)
 
+    monitor = Process.monitor(waiter)
+    send(waiter, {request, :start})
     await_command_waiter(waiter, monitor, request, timeout)
   end
 

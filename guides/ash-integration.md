@@ -267,6 +267,15 @@ a command and waits for its selector to return a result. It handles process exit
 timeout and subscription cleanup. Use it from external callers for asynchronous
 completion; selectors return `:skip` while waiting. Team lifecycle commands use it.
 
+A callback command runs in an unlinked Task with the caller's standard Task
+ancestry and transferred Ash tracer context. Existing caller-based access, such
+as SQL Sandbox allowances, remains available without manually setting
+`$callers`. Pass the actor, tenant and application scope to the Ash command
+normally; process ancestry does not supply authorization scope. A callback
+failure stays isolated from the caller, and timeout stops and joins the waiter
+before returning. The timeout does not cancel a command already accepted by the
+agent.
+
 ## Signal matching
 
 Native `Aikido.Signal.new/1` and `new!/1` validate envelopes without generating
@@ -778,7 +787,6 @@ after the outer policy check, the replacement must satisfy its own current
 policy. Actor, tenant, application context and tracers remain the original
 caller's native scope; no prior authorization result is reused. Explicit trusted
 `authorize?: false` retains its ordinary Ash bypass semantics.
-
 
 ## Principal-authorized Team coordination
 

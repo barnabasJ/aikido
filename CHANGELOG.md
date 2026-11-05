@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Update locked Ecto, JSV and Phoenix.HTML dependencies to their security-fixed
+  versions and remove unused lock entries through native Mix dependency checks.
+
+- Preserve native Task caller ancestry in `AgentServer.call_until/5` callbacks,
+  including caller-based SQL Sandbox access, while retaining isolated failures,
+  timeout cleanup and Ash tracer propagation.
+
 - Allow runtime startup to supply a transient timing backend for scheduled
   directives, using the existing I/O clock contract. Team deadlines retain their
   actual signals and correlation while tests can advance a case-owned clock.
@@ -166,7 +173,6 @@
 - Reduce inspector capture work for empty and untyped maps and measure JSON size
   without flattening the encoded value. Keep native sensitive-field redaction and
   exact known credential keys, replacing heuristic credential-name regex checks.
-
 
 - Bound AI attempt preflight registration and the following owner-state read by
   one monotonic window, clamped to any absolute deadline. Report preflight budget
