@@ -49,7 +49,8 @@ defmodule Aikido.PureActionsTest do
         assert first.at == timestamp
         assert second.at == timestamp
         cleared = replay(Aikido.Thread.Slice, :clear, %{state: updated}, signal)
-        assert cleared.changes.updated_at == timestamp
+        cleared_state = Ash.update!(updated, cleared.changes, action: :update)
+        assert cleared_state.updated_at == timestamp
       end
     end
   end
@@ -62,8 +63,8 @@ defmodule Aikido.PureActionsTest do
       state = AikidoTest.SliceState.new(resource)
       result = replay(resource, action, Map.put(params, :state, state), nil)
       refute Map.has_key?(result.changes, :created_at)
-      assert result.changes.updated_at == 0
       updated = Ash.update!(state, result.changes, action: :update)
+      assert updated.updated_at == 0
       assert updated.created_at == state.created_at
     end
   end

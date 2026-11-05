@@ -482,12 +482,18 @@ defmodule AikidoTest.AshTest do
   test "mounted slices expose public actions once without duplicate agent routes" do
     resource = AikidoTest.AshFixtures.Composed
 
-    [signal] =
+    signals =
       Enum.filter(
         Spark.Dsl.Extension.get_entities(resource, [:agent]),
         &match?(%Aikido.Agent.Route{public?: true}, &1)
       )
 
+    assert Enum.sort(Enum.map(signals, &{&1.name, &1.action})) == [
+             {:adopt_inherited, {resource, :inherit}},
+             {:increment, {AikidoTest.AshFixtures.CounterSlice, :increment}}
+           ]
+
+    signal = Enum.find(signals, &(&1.name == :increment))
     assert signal.name == :increment
     assert signal.action == {AikidoTest.AshFixtures.CounterSlice, :increment}
     refute Ash.Resource.Info.action(resource, :internal)
@@ -495,6 +501,7 @@ defmodule AikidoTest.AshTest do
     refute function_exported?(AikidoTest.AshFixtures.Domain, :composed_internal, 1)
 
     assert Aikido.Agent.Info.signal_routes(resource) == [
+             {"aikido.agent.inherit", {resource, :inherit}, 20},
              {"aikido.agent.stop", {resource, :__aikido_stop_self__}, -20},
              {"aikido.agent.query.children", {resource, :__aikido_query_children__}, -20}
            ]

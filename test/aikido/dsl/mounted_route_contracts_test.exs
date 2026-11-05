@@ -190,6 +190,7 @@ defmodule Aikido.Dsl.MountedRouteContractsTest do
     %{resource: resource, domain: domain, reference: reference} = context
 
     assert Aikido.Agent.Info.signal_routes(resource) == [
+             {"aikido.agent.inherit", {resource, :inherit}, 20},
              {"aikido.agent.stop", {resource, :__aikido_stop_self__}, -20},
              {"aikido.agent.query.children", {resource, :__aikido_query_children__}, -20}
            ]

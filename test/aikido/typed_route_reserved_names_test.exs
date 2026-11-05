@@ -118,6 +118,7 @@ defmodule AikidoTest.TypedRouteReservedNamesTest do
     assert Ash.Resource.Info.action(resource, :inspect).run == {Noop, []}
 
     assert Spark.Dsl.Extension.get_persisted(resource, :aikido_generated_handlers, %{}) == %{
+             inherit: Aikido.Agent.Actions.AdoptInherited,
              __aikido_query_children__: Aikido.Ownership.Actions.ReplyChildren,
              __aikido_stop_self__: Aikido.Actions.Lifecycle.StopSelf
            }

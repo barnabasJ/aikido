@@ -97,6 +97,7 @@ defmodule AikidoTest.AgentTest do
 
   defp native_runtime_routes(agent) do
     [
+      {"aikido.agent.inherit", {agent, :inherit}, 20},
       {"aikido.agent.query.children", {agent, :__aikido_query_children__}, -20},
       {"aikido.agent.stop", {agent, :__aikido_stop_self__}, -20}
     ]
