@@ -221,6 +221,7 @@ defmodule Aikido do
   defp durable_options(opts, name) do
     opts
     |> Keyword.get(:durable, Application.get_env(:aikido, :durable, []))
+    |> Keyword.merge(Keyword.take(opts, [:timing]))
     |> Keyword.merge(name: Aikido.durable_supervisor_name(name), aikido: name)
   end
 

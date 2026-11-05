@@ -1,13 +1,18 @@
 defmodule Aikido.AiReact.AttemptTiming do
   @moduledoc """
-  Per-call timing for cancellable I/O attempts.
+  Timing backend for cancellable I/O attempts and runtime scheduled directives.
 
   A trusted application can supply `{backend, private_context}` in the native
   call's `scope.context[:aikido_attempt_timing]`. LLMCall forwards it only to the
   transient attempt options. It is never an AI option, state attribute, provider
   option or checkpoint field. The default backend uses System and Process.
 
-  A test backend controls both time reads and delivery of private deadline tags.
+  A runtime can also supply `timing: {backend, private_context}` at startup.
+  Scheduled directives resolve this capability from live supervisor configuration
+  and deliver their ordinary scheduled messages. It is never an agent option or
+  checkpoint field.
+
+  A test backend controls time reads and delivery of deadline messages.
   `control_timeout/2` bounds actual subscribe/state transport calls separately
   from logical business deadlines. Production keeps the existing remaining
   budget; tests may use a bounded failure ceiling for those actual control calls.

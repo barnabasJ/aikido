@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Allow runtime startup to supply a transient timing backend for scheduled
+  directives, using the existing I/O clock contract. Team deadlines retain their
+  actual signals and correlation while tests can advance a case-owned clock.
+
 - Let trusted Ash application context select a running Aikido instance for
   generated agent commands. Start team members in the coordinator's runtime
   and honor the declared instance module's configured supervisor name.

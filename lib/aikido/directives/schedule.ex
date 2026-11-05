@@ -46,7 +46,16 @@ defmodule Aikido.Directives.Schedule do
       |> Aikido.Directive.materialize_signal()
       |> Aikido.Signal.inherit(input_signal)
 
-    Process.send_after(self(), {:scheduled_signal, signal}, delay)
+    timing = Aikido.Durable.timing(Map.get(state, :durable_server))
+    deadline = Aikido.AiReact.AttemptTiming.monotonic_ms(timing) + delay
+
+    Aikido.AiReact.AttemptTiming.schedule_at(
+      timing,
+      self(),
+      {:scheduled_signal, signal},
+      deadline
+    )
+
     :ok
   end
 end

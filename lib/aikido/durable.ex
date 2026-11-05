@@ -14,6 +14,7 @@ defmodule Aikido.Durable do
     agent: [type: :atom],
     agent_opts: [type: :keyword_list, default: []],
     scope_adapter: [type: :module],
+    timing: [type: {:tuple, [:atom, :any]}],
     aikido: [type: :atom],
     partition: [type: :any],
     permanent: [type: :boolean, default: true],
@@ -71,7 +72,11 @@ defmodule Aikido.Durable do
 
   defp durable_supervisor_options(opts, name, backend) do
     durable = Keyword.get(opts, :durable_options, [])
-    info = Map.put(durable[:init_info] || %{}, :aikido_config, activation_defaults(opts))
+
+    info =
+      (durable[:init_info] || %{})
+      |> Map.put(:aikido_config, activation_defaults(opts))
+      |> Map.put(:aikido_timing, Aikido.AiReact.AttemptTiming.resolve(opts[:timing]))
 
     Keyword.merge(durable,
       name: name,
@@ -355,6 +360,18 @@ defmodule Aikido.Durable do
         _ -> []
       end
     end)
+  end
+
+  @doc false
+  @spec timing(supervisor :: atom() | nil) :: Aikido.AiReact.AttemptTiming.capability()
+  def timing(nil), do: Aikido.AiReact.AttemptTiming.resolve(nil)
+
+  def timing(name) do
+    name
+    |> DurableServer.Supervisor.__get_config__()
+    |> Map.fetch!(:init_info)
+    |> Map.get(:aikido_timing)
+    |> Aikido.AiReact.AttemptTiming.resolve()
   end
 
   defp config(name), do: DurableServer.Supervisor.__get_config__(name).init_info.aikido_config

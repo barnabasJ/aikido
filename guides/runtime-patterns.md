@@ -799,3 +799,17 @@ Pass the same selection to subsequent ID-based commands. Team members start in
 their coordinator's runtime. Use application-controlled names and keep this
 context at the trusted server boundary. Ash continues to authorize the caller
 using the supplied scope.
+
+
+### Controlling scheduled time in runtime tests
+
+Trusted runtime startup can supply `timing: {backend, private_context}` using the
+`Aikido.AiReact.AttemptTiming` contract. Scheduled directives use that runtime's
+clock to deliver their ordinary messages. The default uses System time and
+Process timers. Keep a test clock alive until its runtime has stopped.
+
+Subscribe before starting the work, wait for the clock to acknowledge scheduling,
+then advance it and await the agent's resulting signal or state transition.
+The timing capability stays in the live supervisor configuration and is omitted
+from activation options, agent scope and checkpoints. DurableServer's storage
+and heartbeat timers continue to use their configured production intervals.

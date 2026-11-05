@@ -369,6 +369,137 @@ defmodule Aikido.BoundTeamExecutionTest do
     refute Map.has_key?(state.ai.run_metadata, :deliveries)
   end
 
+  test "a runtime clock delivers the real task deadline with inherited scope", %{scope: scope} do
+    {team, clock, options} = timed_team(scope)
+    pid = team.pid
+
+    {:ok, timeout_ref} =
+      Aikido.AgentServer.subscribe(
+        pid,
+        "aikido.ash.team.task.timeout",
+        fn runtime, event ->
+          {:ok, {runtime.agent.state.team.tasks["timed"], Aikido.Signal.ctx(event.signal)}}
+        end,
+        once: true
+      )
+
+    Domain.bound_team_assign_task!(
+      team,
+      %{
+        member: :worker,
+        task_id: "timed",
+        timeout_ms: 100,
+        metadata: %{hold: true},
+        payload: %{text: "hold"}
+      },
+      options
+    )
+
+    assert_receive {:armed, ^pid, {:scheduled_signal, signal}, 100}, 5_000
+    assert signal.type == "aikido.ash.team.task.timeout"
+    assert %{task_id: "timed", attempt: attempt} = signal.data
+    assert is_binary(attempt)
+    assert_receive {:preparing, "worker-B", _, child_work, _}, 5_000
+    monitor = Process.monitor(child_work)
+
+    :ok = Aikido.AttemptTimingTest.Manual.advance(clock, 99)
+
+    assert {:ok, :dispatched} =
+             Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.team.tasks["timed"].status})
+
+    refute_received {:aikido_subscription, ^timeout_ref, _}
+
+    :ok = Aikido.AttemptTimingTest.Manual.advance(clock, 100)
+
+    assert_receive {:aikido_subscription, ^timeout_ref,
+                    %{result: {:ok, {%{status: :failed, result: :timeout}, inherited}}}},
+                   5_000
+
+    assert inherited.actor == scope.actor
+    assert inherited.tenant == scope.tenant
+    assert_receive {:DOWN, ^monitor, :process, ^child_work, _}, 5_000
+  end
+
+  test "an actual late deadline leaves completed work and the next task intact", %{scope: scope} do
+    {team, clock, options} = timed_team(scope)
+    pid = team.pid
+
+    Domain.bound_team_assign_task!(
+      team,
+      %{
+        member: :worker,
+        task_id: "finished",
+        timeout_ms: 100,
+        metadata: %{hold: true},
+        payload: %{text: "finish"}
+      },
+      options
+    )
+
+    assert_receive {:armed, ^pid, {:scheduled_signal, %{data: %{task_id: "finished"}}}, 100},
+                   5_000
+
+    assert_receive {:preparing, "worker-B", _, child_work, _}, 5_000
+    send(child_work, :release)
+
+    await_state_value(pid, fn runtime ->
+      if runtime.agent.state.team.tasks["finished"].status == :completed, do: true
+    end)
+
+    Domain.bound_team_assign_task!(
+      team,
+      %{
+        member: :worker,
+        task_id: "next",
+        timeout_ms: 200,
+        metadata: %{hold: true},
+        payload: %{text: "continue"}
+      },
+      options
+    )
+
+    assert_receive {:armed, ^pid, {:scheduled_signal, %{data: %{task_id: "next"}}}, 200}, 5_000
+    assert_receive {:preparing, "worker-B", _, next_work, _}, 5_000
+
+    {:ok, timeout_ref} =
+      Aikido.AgentServer.subscribe(
+        pid,
+        "aikido.ash.team.task.timeout",
+        fn runtime, _event ->
+          {:ok, runtime.agent.state.team.tasks}
+        end,
+        once: true
+      )
+
+    :ok = Aikido.AttemptTimingTest.Manual.advance(clock, 100)
+
+    assert_receive {:aikido_subscription, ^timeout_ref,
+                    %{
+                      result:
+                        {:ok,
+                         %{"finished" => %{status: :completed}, "next" => %{status: :dispatched}}}
+                    }},
+                   5_000
+
+    assert Process.alive?(next_work)
+    send(next_work, :release)
+  end
+
+  defp timed_team(scope) do
+    clock = start_supervised!({Aikido.AttemptTimingTest.Manual, self()})
+    instance = __MODULE__.Timed
+    durable = Keyword.put(durable_options(), :scope_adapter, __MODULE__.Authority)
+
+    start_supervised!(
+      {Aikido, name: instance, durable: durable, timing: {Aikido.AttemptTimingTest.Manual, clock}}
+    )
+
+    context = Map.put(scope.context, :aikido_runtime_options, instance: instance)
+    options = [scope: scope, context: context]
+    team = Domain.bound_team_start!(%{actor_id: scope.actor.id}, options)
+    {team, clock, options}
+  end
+
   test "a correlated timeout cancels worker B using B's bound identity", %{
     team: team,
     scope: scope
