@@ -7,7 +7,7 @@ defmodule Aikido.AiReact.RunState do
   `Aikido.AiReact.TodoRequirements` and clears transient tools and handoff data
   only when the resulting run is completed or failed. Every operation is pure.
   """
-  alias Aikido.AiReact.Conversation
+  alias Aikido.AiReact.{Conversation, UserMessage}
 
   @doc "Initialize conversation state and request tool setup before the first model call."
   def begin_run(data, state) do
@@ -16,7 +16,7 @@ defmodule Aikido.AiReact.RunState do
     with {:ok, configuration} <- resolve_configuration(data, state) do
       state
       |> refresh_conversation(configuration.system_prompt)
-      |> append_opening_messages(data.query)
+      |> append_opening_messages(UserMessage.content(data.query, data[:content_parts] || []))
       |> reset_run(data, configuration)
       |> request_tool_setup()
     end
@@ -180,7 +180,9 @@ defmodule Aikido.AiReact.RunState do
       handoff_count: 0,
       handoff_regenerations: 0,
       last_handoff: nil,
-      opening_messages: Map.get(state, :queued_messages, []) ++ [data.query],
+      opening_messages:
+        Map.get(state, :queued_messages, []) ++
+          [UserMessage.content(data.query, data[:content_parts] || [])],
       queued_messages: [],
       streaming_text: "",
       streaming_thinking: "",

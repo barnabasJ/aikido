@@ -155,11 +155,19 @@ defmodule Aikido.Directives.AsyncTaskTest do
     assert_receive {:DOWN, ^worker_ref, :process, ^worker, :killed}, 1_000
   end
 
-  test("wraps {:ok, result} in the configured success signal", %{agent: agent}) do
+  test("wraps {:ok, result} in the configured success signal", %{agent: agent, aikido: aikido}) do
     test_pid = self()
 
     directive =
-      Aikido.Directives.async_task({Aikido.Directives.AsyncTaskTest.Work, :ok, [test_pid]},
+      Aikido.Directives.async_task(
+        fn ->
+          send(test_pid, {:owned_result_started, self()})
+
+          receive do
+            :finish -> Aikido.Directives.AsyncTaskTest.Work.ok(test_pid)
+          end
+        end,
+        cancel_on_owner_exit?: true,
         success_type: "work.completed",
         error_type: "work.failed",
         payload: %{request_id: "req_1"}
@@ -167,11 +175,20 @@ defmodule Aikido.Directives.AsyncTaskTest do
 
     assert :ok = run_directive(agent, directive)
 
+    assert_receive {:owned_result_started, worker}, 1000
+    [runner] = Task.Supervisor.children(Aikido.task_supervisor_name(aikido))
+    worker_ref = Process.monitor(worker)
+    runner_ref = Process.monitor(runner)
+    send(worker, :finish)
+
     assert_receive :ok_work_ran, 1000
     assert_receive {:aikido_subscription, _, %{result: {:ok, signal}}}, 1000
     assert signal.type == "work.completed"
     assert signal.source == "/agent/async-task-agent/async_task"
     assert signal.data == %{request_id: "req_1", result: %{answer: 42}}
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, :normal}, 1000
+    assert_receive {:DOWN, ^runner_ref, :process, ^runner, :normal}, 1000
+    assert Process.alive?(agent)
   end
 
   test("wraps {:error, reason} in the configured error signal", %{agent: agent}) do

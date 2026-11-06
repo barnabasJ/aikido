@@ -131,9 +131,11 @@ defmodule Aikido.Directives.AsyncTask do
           run_work_and_send_result_signals(directive, input_signal, state, agent_pid)
         end)
 
+      %Task{ref: task_ref} = task
+
       receive do
-        {ref, :ok} when ref == task.ref ->
-          Process.demonitor(task.ref, [:flush])
+        {^task_ref, :ok} ->
+          Task.ignore(task)
           Process.demonitor(owner_ref, [:flush])
           :ok
 

@@ -26,7 +26,16 @@ defmodule Aikido.AI.Extension.Transformers.Build do
 
   defp add_ask_command(dsl) do
     add_action(dsl, :ask, [
-      arg(:query, :string, allow_nil?: false),
+      arg(:query, :string,
+        allow_nil?: false,
+        constraints: [trim?: false, allow_empty?: false]
+      ),
+      arg(:content_parts, {:array, :struct},
+        default: [],
+        allow_nil?: false,
+        sensitive?: true,
+        constraints: [items: [instance_of: ReqLLM.Message.ContentPart]]
+      ),
       arg(:metadata, :map, default: %{}),
       arg(:request_id, :string, allow_nil?: false, default: &Ash.UUIDv7.generate/0)
     ])

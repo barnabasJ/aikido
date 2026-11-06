@@ -6,6 +6,14 @@ defmodule Aikido.AiReact.Signals.Deliver do
     type "ai.react.deliver"
 
     schema do
+      attribute :content_parts, {:array, :struct} do
+        description "Ordered native ReqLLM content parts appended after the delivered text in one user message."
+        sensitive? true
+        constraints items: [instance_of: ReqLLM.Message.ContentPart]
+        default []
+        allow_nil? false
+      end
+
       attribute :todo, Aikido.Todo.Item do
         description "Optional blocking work item added atomically with this incoming conversation message."
       end
@@ -18,6 +26,7 @@ defmodule Aikido.AiReact.Signals.Deliver do
       attribute :text, :string do
         description "Delivered application message to append or queue for the model."
         allow_nil? false
+        constraints trim?: false, allow_empty?: false
       end
 
       attribute :request_id, :string do

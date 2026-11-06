@@ -203,8 +203,8 @@ defmodule Aikido.MixProject do
       # Run to check the quality of your code
       q: ["quality"],
       quality: [
-        "format --check-formatted",
         "compile --warnings-as-errors",
+        "format --check-formatted",
         "credo --min-priority high",
         "argus --all --fail-above 0",
         "dialyzer"

@@ -12,7 +12,7 @@ defmodule Aikido.AiReact.Actions.Deliver do
   including after a checkpoint is restored. Authorization still runs first.
   """
   use Ash.Resource.Actions.Implementation
-  alias Aikido.AiReact.{HookQueue, RunState, RunCaller}
+  alias Aikido.AiReact.{HookQueue, RunState, RunCaller, UserMessage}
 
   @impl true
   def run(input, _opts, _context) do
@@ -67,12 +67,16 @@ defmodule Aikido.AiReact.Actions.Deliver do
   defp resume_waiting_conversation(input) do
     input.arguments.state
     |> record_incoming_message_metadata(input.arguments)
-    |> RunState.resume_waiting_run(input.arguments.text)
+    |> RunState.resume_waiting_run(
+      UserMessage.content(input.arguments.text, input.arguments.content_parts)
+    )
   end
 
   defp queue_incoming_conversation_text(input) do
     input.arguments.state
-    |> queue_text_for_next_model_request(input.arguments.text)
+    |> queue_text_for_next_model_request(
+      UserMessage.content(input.arguments.text, input.arguments.content_parts)
+    )
     |> record_incoming_message_metadata(input.arguments)
     |> then(&{:ok, &1, []})
   end
@@ -94,6 +98,7 @@ defmodule Aikido.AiReact.Actions.Deliver do
            RunState.begin_run(
              %{
                query: input.arguments.text,
+               content_parts: input.arguments.content_parts,
                request_id: input.arguments.request_id,
                metadata: input.arguments.metadata
              },

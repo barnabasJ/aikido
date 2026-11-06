@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Accept optional native ReqLLM content parts alongside authored AI prompts,
+  queued messages and deliveries, preserving one ordered user turn and the
+  existing caller-scope and delivery-deduplication boundaries.
+
+- Preserve authored AI query/message whitespace through native string
+  constraints while retaining required blank-input rejection.
+
 - Update locked Ecto, JSV and Phoenix.HTML dependencies to their security-fixed
   versions and remove unused lock entries through native Mix dependency checks.
 

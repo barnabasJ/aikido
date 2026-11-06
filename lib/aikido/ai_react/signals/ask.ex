@@ -29,6 +29,15 @@ defmodule Aikido.AiReact.Signals.Ask do
       attribute :query, :string do
         description "User request used to open the ReAct conversation."
         allow_nil? false
+        constraints trim?: false, allow_empty?: false
+      end
+
+      attribute :content_parts, {:array, :struct} do
+        description "Ordered native ReqLLM content parts appended after the authored query in one user message."
+        sensitive? true
+        constraints items: [instance_of: ReqLLM.Message.ContentPart]
+        default []
+        allow_nil? false
       end
 
       attribute :request_id, :string do

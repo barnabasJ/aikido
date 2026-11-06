@@ -98,6 +98,7 @@ defmodule Aikido.AI do
           max_iterations: pos_integer() | nil,
           llm_opts: keyword(),
           hooks: [map()],
+          content_parts: [ReqLLM.Message.ContentPart.t()],
           timeout: timeout()
         ]
 
@@ -172,7 +173,12 @@ defmodule Aikido.AI do
 
   @doc "Queue a user message for the next model request, or the next run when idle."
   def queue_message(pid, text, opts \\ []) do
-    signal = Aikido.Signal.new!("ai.react.message", %{text: text})
+    signal =
+      Aikido.Signal.new!("ai.react.message", %{
+        text: text,
+        content_parts: Keyword.get(opts, :content_parts, [])
+      })
+
     signal = Aikido.Signal.put_ctx(signal, caller_scope(opts))
 
     Aikido.AgentServer.call(pid, signal, fn _ ->
@@ -189,6 +195,7 @@ defmodule Aikido.AI do
       tool_context: Keyword.get(opts, :tool_context),
       tool_options: Keyword.get(opts, :tool_options),
       query: query,
+      content_parts: Keyword.get(opts, :content_parts, []),
       request_id: request_id,
       model: Keyword.get(opts, :model),
       client: Keyword.get(opts, :client),

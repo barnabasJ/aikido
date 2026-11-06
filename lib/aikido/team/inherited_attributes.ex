@@ -48,15 +48,15 @@ defmodule Aikido.Team.InheritedAttributes do
         end
       end)
 
-    if !permitted? do
+    if permitted? do
+      :ok
+    else
       {:error,
        Ash.Error.Action.InvalidArgument.exception(
          field: :changes,
          message:
            "Inherited configuration may only change declared writable, nonsensitive own-state attributes outside agent identity."
        )}
-    else
-      :ok
     end
   end
 end

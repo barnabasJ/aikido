@@ -123,8 +123,9 @@ defmodule Aikido.AiReact.Slice do
         description "Digest of the provider-visible request shape for the latest model response."
       end
 
-      attribute :opening_messages, {:array, :string} do
-        description "Current-turn user input retained until an ordinary model request consumes it."
+      attribute :opening_messages, {:array, Aikido.AiReact.Types.UserContent} do
+        description "Current-turn text or native multipart user input retained until an ordinary model request consumes it."
+        sensitive? true
         default []
         allow_nil? false
       end
@@ -162,8 +163,9 @@ defmodule Aikido.AiReact.Slice do
         allow_nil? false
       end
 
-      attribute :queued_messages, {:array, :string} do
-        description "User messages waiting to be appended at the next safe model boundary."
+      attribute :queued_messages, {:array, Aikido.AiReact.Types.UserContent} do
+        description "Ordered text or native multipart user messages waiting for the next safe model boundary."
+        sensitive? true
         public? true
         default []
         allow_nil? false
