@@ -165,7 +165,7 @@ defmodule Aikido.MixProject do
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test]},
-      {:argus_beam, "~> 0.24.0", only: [:dev, :test], runtime: false},
+      {:argus_beam, "~> 0.25.0", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.21", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
