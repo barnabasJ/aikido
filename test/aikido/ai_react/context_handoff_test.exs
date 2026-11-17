@@ -347,7 +347,7 @@ defmodule Aikido.ContextHandoffTest do
       assert {:error, {:context_handoff_failed, ^reason}} = Task.await(task)
       assert {:ok, after_failure} = ai(pid)
       assert after_failure.context == before.context
-      assert text(List.last(after_failure.context.messages)) == String.trim(original)
+      assert text(List.last(after_failure.context.messages)) == original
       refute_received {:request, _, _, _}
     end
   end

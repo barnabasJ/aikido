@@ -8,6 +8,25 @@ defmodule Aikido.Team.TaskDelivery do
   """
   alias Aikido.Signal
 
+  @doc "Capture the result recipient's run when the assignment is accepted."
+  def capture_recipient_run(data, context) do
+    # A foreground assignment can later be backgrounded to its requester.
+    notify = notification_recipient(Map.put(data, :mode, :background))
+
+    task = %{requester: data[:requester], notify: notify}
+
+    if notify in [nil, :self] do
+      ai = context.agent.state[:ai]
+
+      %{
+        recipient_request_id: ai && ai.request_id,
+        recipient_active?: ai && ai.status in [:setup, :running, :waiting]
+      }
+    else
+      task |> bind_requester_run(data) |> Map.take([:recipient_request_id, :recipient_active?])
+    end
+  end
+
   @doc "Bind explicit requester-run correlation without granting authority or copying runtime scope."
   def bind_requester_run(task, data) do
     request_id =
@@ -18,7 +37,7 @@ defmodule Aikido.Team.TaskDelivery do
         :error ->
           requester = task[:requester]
 
-          if task[:notify] == :self || (requester not in [nil, :self] && task[:notify] in [nil, requester]),
+          if requester not in [nil, :self] && task[:notify] in [nil, requester],
             do: data[:requester_request_id],
             else: nil
       end
@@ -26,6 +45,13 @@ defmodule Aikido.Team.TaskDelivery do
     task
     |> Map.put_new(:recipient_request_id, request_id)
     |> Map.put_new(:recipient_active?, not is_nil(request_id))
+  end
+
+  @doc "Adopt the saved result correlation, or apply named requester correlation for older records."
+  def bind_saved_recipient_run(task, data) do
+    task
+    |> Map.merge(Map.take(data, [:recipient_request_id, :recipient_active?]))
+    |> bind_requester_run(data)
   end
 
   @doc "Resolve explicit notification names and the native background requester default."

@@ -178,7 +178,7 @@ defmodule Aikido.Team.Slice do
       mode: Map.get(data, :mode, :background),
       metadata: data[:metadata] || %{}
     }
-    |> Aikido.Team.TaskDelivery.bind_requester_run(data)
+    |> Aikido.Team.TaskDelivery.bind_saved_recipient_run(data)
   end
 
   defp fail_interrupted_tasks(state) do

@@ -384,11 +384,11 @@ defmodule Aikido.TodoContinuationTest do
       assert resumed.ai.queued_messages == []
       assert resumed.ai.hook_sequence == before.ai.hook_sequence + 1
       texts = Enum.map(messages, &delivery_text/1)
-      assert Enum.count(texts, &(&1 == String.trim(delivered))) == 1
+      assert Enum.count(texts, &(&1 == delivered)) == 1
       hook_message = String.trim("[Hook context: delivery gate]\n" <> hook_text)
       assert Enum.count(texts, &(&1 == hook_message)) == 1
 
-      assert Enum.find_index(texts, &(&1 == String.trim(delivered))) <
+        assert Enum.find_index(texts, &(&1 == delivered)) <
                Enum.find_index(texts, &(&1 == hook_message))
 
       if unquote(handoff?) do

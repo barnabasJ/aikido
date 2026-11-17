@@ -2,6 +2,7 @@ defmodule Aikido.Team.Actions.AssignTask do
   @moduledoc "Tracks a task and dispatches it to its member, activating a lazy member when needed."
   use Ash.Resource.Actions.Implementation
   alias Aikido.Team.ActionAdapter
+  alias Aikido.Team.TaskDelivery
   alias Aikido.Directives
   alias Aikido.Signal
 
@@ -9,7 +10,7 @@ defmodule Aikido.Team.Actions.AssignTask do
   def run(input, _opts, _context) do
     {signal, state, context, config} = ActionAdapter.unpack_team_action(input)
 
-    signal = preserve_pending_task_mode(signal, state)
+    signal = restore_pending_assignment(signal, state)
 
     with :ok <- Aikido.Team.TaskDependencies.validate_assignment(state, signal.data) do
       ActionAdapter.to_action_result(
@@ -20,10 +21,17 @@ defmodule Aikido.Team.Actions.AssignTask do
     end
   end
 
-  defp preserve_pending_task_mode(signal, state) do
+  defp restore_pending_assignment(signal, state) do
     id = signal.data[:task_id] || signal.id
     pending = Map.get(Map.get(state, :pending_tasks, %{}), id, %{})
-    %{signal | data: Map.merge(signal.data, Map.take(pending, [:mode, :notify, :requester]))}
+
+    binding =
+      Map.take(pending, [:mode, :notify, :requester, :recipient_request_id, :recipient_active?])
+
+    data =
+      signal.data |> Map.drop([:recipient_request_id, :recipient_active?]) |> Map.merge(binding)
+
+    %{signal | data: data}
   end
 
   defp assign_or_activate_member(signal, state, context, config) do
@@ -34,7 +42,6 @@ defmodule Aikido.Team.Actions.AssignTask do
         task_exists(id)
 
       Map.has_key?(state.members, signal.data.member) ->
-        state = Map.update(state, :pending_tasks, %{}, &Map.delete(&1, id))
         assign_task(signal, state, context)
 
       Map.has_key?(Map.get(state, :pending_tasks, %{}), id) ->
@@ -47,8 +54,8 @@ defmodule Aikido.Team.Actions.AssignTask do
          )}
 
       Map.has_key?(state.topology.nodes, signal.data.member) ->
-        state =
-          Map.update(state, :pending_tasks, %{id => signal.data}, &Map.put(&1, id, signal.data))
+        data = Map.merge(signal.data, TaskDelivery.capture_recipient_run(signal.data, context))
+        state = Map.update(state, :pending_tasks, %{id => data}, &Map.put(&1, id, data))
 
         Aikido.Team.Actions.EnsureMember.activate_member(
           %{signal | data: %{member: signal.data.member}},
@@ -74,27 +81,23 @@ defmodule Aikido.Team.Actions.AssignTask do
 
     with true <- !Map.has_key?(state.tasks, id) || task_exists(id),
          {:ok, pid} <- Aikido.Team.MemberProcesses.fetch_running_member_pid(state, data.member) do
+      pending = Map.get(state, :pending_tasks, %{})
+
+      data =
+        if Map.has_key?(pending, id),
+          do: data,
+          else: Map.merge(data, TaskDelivery.capture_recipient_run(data, context))
+
       task =
         dispatched_task(id, data, state.incarnations[data.member])
-        |> bind_receiving_run(data, context)
+        |> TaskDelivery.bind_saved_recipient_run(data)
 
       state
+      |> Map.put(:pending_tasks, Map.delete(pending, id))
       |> Map.update!(:tasks, &Map.put(&1, id, task))
       |> request_task_execution(task, data, pid, context)
     end
   end
-
-  defp bind_receiving_run(%{notify: :self} = task, _data, context) do
-    ai = context.agent.state[:ai]
-
-    Map.merge(task, %{
-      recipient_request_id: ai && ai.request_id,
-      recipient_active?: ai && ai.status in [:setup, :running, :waiting]
-    })
-  end
-
-  defp bind_receiving_run(task, data, _context),
-    do: Aikido.Team.TaskDelivery.bind_requester_run(task, data)
 
   defp task_exists(id) do
     {:error,

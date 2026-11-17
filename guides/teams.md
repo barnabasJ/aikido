@@ -123,7 +123,9 @@ correlation when a foreground task moves to the background, waits for activation
 or fails during activation or recovery. It is correlation, not permission: native
 requester policies still apply, and the receiver accepts the result only for its
 matching active run. Notifications to `:self` capture the coordinator's adopted
-AI run instead of trusting a caller-supplied ID.
+AI run when the assignment is accepted. The same binding is used when a
+worker is ready, when it needs activation, and when activation fails. A result
+from the original assignment cannot resume a replacement run.
 
 An accepted worker task can still fail before the inner AI request is adopted,
 for example when the worker's model permission has been revoked. The worker

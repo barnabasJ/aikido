@@ -238,7 +238,8 @@ defmodule Aikido.Team.TopologyOperation do
       Directives.emit(%Signal{
         id: nil,
         type: "aikido.ash.team.assign_task",
-        data: Map.put(data, :task_id, id),
+        data:
+          data |> Map.drop([:recipient_request_id, :recipient_active?]) |> Map.put(:task_id, id),
         source: "/aikido"
       })
     end)
@@ -384,7 +385,7 @@ defmodule Aikido.Team.TopologyOperation do
            mode: Map.get(data, :mode, :background),
            metadata: data[:metadata] || %{}
          }
-         |> Aikido.Team.TaskDelivery.bind_requester_run(data)}
+         |> TaskDelivery.bind_saved_recipient_run(data)}
       end)
 
     Map.merge(state, %{pending_tasks: %{}, tasks: Map.merge(state.tasks, tasks)})

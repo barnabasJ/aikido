@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Bind team task results to the receiving run at assignment. Lazy activation
+  failures can resume the original waiting coordinator without waking a
+  replacement run.
+
 - Accept optional native ReqLLM content parts alongside authored AI prompts,
   queued messages and deliveries, preserving one ordered user turn and the
   existing caller-scope and delivery-deduplication boundaries.

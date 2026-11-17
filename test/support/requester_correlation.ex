@@ -96,6 +96,16 @@ defmodule Aikido.RequesterCorrelationTest.RejectStartup do
   @impl true
   def on_signal(signal, context, _options, next) do
     if signal.type == "aikido.ash.team.start" do
+      if Aikido.Agent.resource_attributes(context.agent).pause_rejection? do
+        send(Process.whereis(Aikido.RequesterCorrelationTest.Observer), {:rejecting, self()})
+
+        receive do
+          :reject_startup -> :ok
+        after
+          5_000 -> raise "Expected the test to release worker activation"
+        end
+      end
+
       {:error, context,
        Ash.Error.Action.InvalidArgument.exception(
          field: :topology,
@@ -124,6 +134,12 @@ defmodule Aikido.RequesterCorrelationTest.FailingWorker do
         description "The native principal of the application-rejected activation."
         allow_nil? false
       end
+
+      attribute :pause_rejection?, :boolean do
+        description "Wait until the test releases this application rejection."
+        allow_nil? false
+        default false
+      end
     end
   end
 
@@ -140,13 +156,14 @@ end
 defmodule Aikido.RequesterCorrelationTest.Coordinator do
   use Ash.Resource,
     domain: Aikido.RequesterCorrelationTest.Domain,
-    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension],
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension, Aikido.AI.Extension],
     authorizers: [Ash.Policy.Authorizer]
 
   agent do
     name "correlation_coordinator"
     instance Aikido.RequesterCorrelationTest.Instance
     persistence :permanent
+    slice :todos, Aikido.Todo.Slice
 
     schema do
       attribute :actor_id, :string do
@@ -158,6 +175,12 @@ defmodule Aikido.RequesterCorrelationTest.Coordinator do
 
   team do
     worker :worker, Aikido.RequesterCorrelationTest.Worker
+  end
+
+  ai do
+    model "offline:correlation"
+    client Aikido.RequesterCorrelationTest.Client
+    options %{completion: :todos, model_max_retries: 0}
   end
 
   policies do

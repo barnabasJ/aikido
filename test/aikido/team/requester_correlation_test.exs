@@ -56,8 +56,8 @@ defmodule Aikido.RequesterCorrelationTest do
         data
       )
 
-    assert self_notified.recipient_request_id == "caller-correlation"
-    assert self_notified.recipient_active?
+    assert self_notified.recipient_request_id == nil
+    refute self_notified.recipient_active?
 
     for notify <- [nil, :member] do
       task =
@@ -203,6 +203,102 @@ defmodule Aikido.RequesterCorrelationTest do
     assert_receive {:requester_model, resumed, _}, 5_000
     assert ai(ctx.requester).request_id == request_id
     finish_requester(ctx, resumed)
+  end
+
+  test "lazy activation failure resumes the coordinator using the run captured at assignment",
+       ctx do
+    receiver = %{ctx | requester: ctx.root.pid, requester_actor: ctx.owner}
+
+    todo(receiver, Aikido.Todo.Signals.TodoAdd, %{
+      id: "evidence",
+      text: "Wait for worker evidence"
+    })
+
+    request_id = wait_for_coordinator(ctx)
+    id = assign_failing_worker(ctx, false)
+
+    assert_receive {:requester_model, resumed, _}, 5_000
+
+    assert %{status: :failed, recipient_request_id: ^request_id, recipient_active?: true} =
+             state(ctx.root.pid).team.tasks[id]
+
+    finish_requester(receiver, resumed)
+  end
+
+  test "a pending activation failure cannot resume a replacement coordinator run", ctx do
+    receiver = %{ctx | requester: ctx.root.pid, requester_actor: ctx.owner}
+
+    todo(receiver, Aikido.Todo.Signals.TodoAdd, %{
+      id: "evidence",
+      text: "Wait for worker evidence"
+    })
+
+    old_request_id = wait_for_coordinator(ctx)
+    id = assign_failing_worker(ctx, true)
+    assert_receive {:rejecting, worker}, 5_000
+
+    Domain.coordinator_cancel!(ctx.root, %{request_id: old_request_id}, scope: scope(ctx.owner))
+    new_request_id = wait_for_coordinator(ctx)
+    send(worker, :reject_startup)
+
+    await_state_value(ctx.root.pid, fn runtime ->
+      case runtime.agent.state.team.tasks[id] do
+        %{status: :failed, recipient_request_id: ^old_request_id} -> :failed
+        _ -> nil
+      end
+    end)
+
+    assert %{status: :waiting, request_id: ^new_request_id} = ai(ctx.root.pid)
+    refute_received {:requester_model, _, _}
+  end
+
+  defp wait_for_coordinator(ctx) do
+    request_id = Ash.UUIDv7.generate()
+
+    Domain.coordinator_ask!(ctx.root, %{query: "Need evidence", request_id: request_id},
+      scope: scope(ctx.owner)
+    )
+
+    assert_receive {:requester_model, model, _}, 5_000
+    send(model, {:respond, Responses.final_answer_response("Waiting for evidence")})
+
+    await_state_value(ctx.root.pid, fn runtime ->
+      if runtime.agent.state.ai.status == :waiting, do: :waiting
+    end)
+
+    request_id
+  end
+
+  defp assign_failing_worker(ctx, pause_rejection?) do
+    Domain.coordinator_add_member!(
+      ctx.root,
+      %{
+        member: :failing,
+        resource: FailingWorker,
+        activation: :lazy,
+        initial_state: %{actor_id: ctx.worker_actor.id, pause_rejection?: pause_rejection?}
+      },
+      scope: scope(ctx.owner)
+    )
+
+    id = Ash.UUIDv7.generate()
+
+    Domain.coordinator_assign_task!(
+      ctx.root,
+      %{
+        task_id: id,
+        member: :failing,
+        requester: :self,
+        notify: :self,
+        mode: :background,
+        requester_request_id: "stale-caller-id",
+        type: "test.member.work",
+        payload: %{result: "evidence"}
+      },
+      scope: scope(ctx.owner)
+    )
+
+    id
   end
 
   defp wait_for_answer(ctx) do
