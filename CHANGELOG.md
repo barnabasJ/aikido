@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Retain bounded handoff response classification so empty text and unexpected
+  tool turns can be distinguished when a context summary is rejected.
+
 - Exclude internal signal sender metadata from durable activation scopes so
   authenticated agents can start nested children and teams.
 

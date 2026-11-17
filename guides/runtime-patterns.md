@@ -467,6 +467,10 @@ On success, an action replaces model context with the existing system messages
 and one takeover message containing the document, appends messages queued during
 the handoff, and continues the same run with its prepared tools and todo state.
 `handoff_count` and `last_handoff` expose the swap. No tool batch is interrupted.
+
+`handoff_response` retains the latest summary response's classified turn type,
+finish reason, text byte count, tool-call count and bounded model identifier.
+It is available after a rejected summary and resets when a new run begins.
 The slice stores its local count in `estimated_tokens` and updates it for each
 message appended to model context, including tool results and hook context.
 Handoff checks read that cached count instead of rescanning history. Context

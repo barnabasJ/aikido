@@ -331,9 +331,14 @@ defmodule Aikido.ContextHandoffTest do
           {{:ok,
             %ReqLLM.Response{
               id: "scripted",
-              model: "offline",
+              model: String.duplicate("m", 300),
               context: ReqLLM.Context.new(),
-              message: ReqLLM.Context.assistant("not a document", tool_calls: []),
+              message:
+                ReqLLM.Context.assistant("not a document",
+                  tool_calls: [
+                    ReqLLM.ToolCall.new("unexpected", "test_add", ~s({"private":"value"}))
+                  ]
+                ),
               finish_reason: :tool_calls
             }}, :empty_or_invalid_document}
         ] do
@@ -348,6 +353,23 @@ defmodule Aikido.ContextHandoffTest do
       assert {:ok, after_failure} = ai(pid)
       assert after_failure.context == before.context
       assert text(List.last(after_failure.context.messages)) == original
+
+      case result do
+        {:ok, response} ->
+          turn = ReqLLM.Response.classify(response)
+
+          assert after_failure.handoff_response == %{
+                   type: turn.type,
+                   finish_reason: turn.finish_reason,
+                   text_bytes: byte_size(turn.text),
+                   tool_call_count: length(turn.tool_calls),
+                   model: String.slice(response.model, 0, 256)
+                 }
+
+        {:error, _} ->
+          assert after_failure.handoff_response == nil
+      end
+
       refute_received {:request, _, _, _}
     end
   end
@@ -453,6 +475,7 @@ defmodule Aikido.ContextHandoffTest do
       assert failed.context == original.context
       assert failed.handoff_regenerations == 1
       assert failed.usage.input_tokens == 40
+      assert failed.handoff_response.text_bytes == byte_size(document)
       refute_received {:request, _, _, _}
     end
   end

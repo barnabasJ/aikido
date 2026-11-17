@@ -107,6 +107,19 @@ defmodule Aikido.AiReact.Slice do
         public? true
       end
 
+      attribute :handoff_response, :map do
+        description "Bounded classification of the last handoff response, without its text or tool arguments."
+        public? true
+
+        constraints fields: [
+                      type: [type: :atom],
+                      finish_reason: [type: :atom],
+                      text_bytes: [type: :integer, constraints: [min: 0]],
+                      tool_call_count: [type: :integer, constraints: [min: 0]],
+                      model: [type: :string, constraints: [max_length: 256]]
+                    ]
+      end
+
       attribute :estimated_tokens, :integer do
         description "Estimated token count used to decide when context needs a handoff."
         public? true

@@ -180,6 +180,7 @@ defmodule Aikido.AiReact.RunState do
       handoff_count: 0,
       handoff_regenerations: 0,
       last_handoff: nil,
+      handoff_response: nil,
       opening_messages:
         Map.get(state, :queued_messages, []) ++
           [UserMessage.content(data.query, data[:content_parts] || [])],

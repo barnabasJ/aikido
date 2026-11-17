@@ -26,9 +26,14 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
   @doc false
   def adopt_handoff_and_resume(state, data) do
     if ConversationHandoff.active?(state, data) do
-      state = accumulate_usage(state, data.turn)
+      turn = ReqLLM.Response.classify(data.turn)
 
-      with {:ok, document} <- extract_handoff_document(data.turn),
+      state =
+        state
+        |> accumulate_usage(data.turn)
+        |> Map.put(:handoff_response, response_classification(data.turn, turn))
+
+      with {:ok, document} <- extract_handoff_document(turn),
            replacement = replace_conversation(state, document),
            :ok <- check_context_capacity(replacement) do
         replacement
@@ -53,9 +58,7 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
     end
   end
 
-  defp extract_handoff_document(response) do
-    turn = ReqLLM.Response.classify(response)
-
+  defp extract_handoff_document(turn) do
     cond do
       turn.finish_reason == :length ->
         {:error, :truncated_document}
@@ -66,6 +69,16 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
       true ->
         {:ok, String.trim(turn.text)}
     end
+  end
+
+  defp response_classification(response, turn) do
+    %{
+      type: turn.type,
+      finish_reason: turn.finish_reason,
+      text_bytes: byte_size(turn.text),
+      tool_call_count: length(turn.tool_calls),
+      model: response.model && String.slice(response.model, 0, 256)
+    }
   end
 
   defp replace_conversation(state, document) do
