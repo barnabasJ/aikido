@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Exclude internal signal sender metadata from durable activation scopes so
+  authenticated agents can start nested children and teams.
+
 - Bind team task results to the receiving run at assignment. Lazy activation
   failures can resume the original waiting coordinator without waking a
   replacement run.

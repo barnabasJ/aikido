@@ -139,10 +139,11 @@ defmodule Aikido.Durable do
     {initialization_options, agent_opts} = Keyword.pop(agent_opts, :initialization_options, [])
     initialization_options = Map.new(initialization_options)
 
+    # Sender provenance describes the current delivery, not the new activation.
+    context = Map.delete(initialization_options[:context] || %{}, :aikido_sender)
+
     initialization_options =
-      Ash.Scope.to_opts(initialization_options,
-        context: Map.get(initialization_options, :context, %{})
-      )
+      Ash.Scope.to_opts(initialization_options, context: context)
 
     validate_activation_context!(start_options)
     start_options = Keyword.delete(start_options, :init_context)
