@@ -50,6 +50,15 @@ defmodule Aikido.RequesterCorrelationTest do
       refute task.recipient_active?
     end
 
+    self_notified =
+      Aikido.Team.TaskDelivery.bind_requester_run(
+        %{requester: :self, notify: :self},
+        data
+      )
+
+    assert self_notified.recipient_request_id == "caller-correlation"
+    assert self_notified.recipient_active?
+
     for notify <- [nil, :member] do
       task =
         Aikido.Team.TaskDelivery.bind_requester_run(%{requester: :member, notify: notify}, data)

@@ -18,7 +18,7 @@ defmodule Aikido.Team.TaskDelivery do
         :error ->
           requester = task[:requester]
 
-          if requester not in [nil, :self] && task[:notify] in [nil, requester],
+          if task[:notify] == :self || (requester not in [nil, :self] && task[:notify] in [nil, requester]),
             do: data[:requester_request_id],
             else: nil
       end
