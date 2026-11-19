@@ -116,7 +116,16 @@ defmodule Aikido.AiReact.Slice do
                       finish_reason: [type: :atom],
                       text_bytes: [type: :integer, constraints: [min: 0]],
                       tool_call_count: [type: :integer, constraints: [min: 0]],
-                      model: [type: :string, constraints: [max_length: 256]]
+                      model: [type: :string, constraints: [max_length: 256]],
+                      error: [
+                        type: :map,
+                        constraints: [
+                          fields: [
+                            type: [type: :string, constraints: [max_length: 128]],
+                            code: [type: :string, constraints: [max_length: 128]]
+                          ]
+                        ]
+                      ]
                     ]
       end
 

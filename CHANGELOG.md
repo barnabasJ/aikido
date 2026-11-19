@@ -4,6 +4,8 @@
 
 - Fail context handoffs with `:response_error` when a model response finishes
   with `:error`, preserving diagnostics without regenerating the summary.
+  Retain bounded structured provider error type/code when supplied by ReqLLM,
+  excluding provider messages, bodies and credentials.
 
 - Retain bounded handoff response classification so empty text and unexpected
   tool turns can be distinguished when a context summary is rejected.

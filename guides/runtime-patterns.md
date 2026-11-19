@@ -488,6 +488,10 @@ no automatic trimming fallback. Cancellation also stops an active handoff.
 A model response with `finish_reason: :error` fails with
 `{:context_handoff_failed, :response_error}` without regenerating the summary;
 the bounded `ai.handoff_response` diagnostics remain available for inspection.
+When ReqLLM retains structured provider error details, `handoff_response.error`
+contains only `type` and `code`, each limited to 128 characters through Ash types.
+Invalid or oversized details are omitted. Provider messages, bodies and credentials
+are excluded; absent codes or HTTP statuses are not inferred.
 The public `replace_context` action installs caller-supplied history while idle; automatic
 context handoff operates within an active run through its own result actions.
 

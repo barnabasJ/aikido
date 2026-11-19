@@ -482,12 +482,30 @@ defmodule Aikido.ContextHandoffTest do
   end
 
   test "truncated documents and response or provider failures are not summary-regenerated", ctx do
-    for {response, reason} <- [
-          {{:ok, summary_response("partial", :length)}, :truncated_document},
-          {{:ok, summary_response("", :length)}, :truncated_document},
-          {{:ok, summary_response("", :error)}, :response_error},
-          {{:ok, summary_response("partial", :error)}, :response_error},
-          {{:error, :provider_unavailable}, :provider_unavailable}
+    private = "private-provider-message-and-body"
+
+    details = %{
+      "type" => "invalid_request_error",
+      "code" => "context_length_exceeded",
+      "message" => private,
+      "body" => private,
+      "api_key" => private
+    }
+
+    for {response, reason, error_details} <- [
+          {{:ok, summary_response("partial", :length)}, :truncated_document, nil},
+          {{:ok, summary_response("", :length)}, :truncated_document, nil},
+          {{:ok, summary_response("", :error)}, :response_error, nil},
+          {{:ok, summary_response("partial", :error)}, :response_error, nil},
+          {{:ok, errored_codex_response("response.failed", details)}, :response_error,
+           %{type: "invalid_request_error", code: "context_length_exceeded"}},
+          {{:ok,
+            errored_codex_response("response.failed", %{
+              details
+              | "code" => String.duplicate("x", 129)
+            })}, :response_error, nil},
+          {{:ok, errored_codex_response("error", details)}, :response_error, nil},
+          {{:error, :provider_unavailable}, :provider_unavailable, nil}
         ] do
       pid = start_server(ctx, Agent)
       opts = regeneration_options(self())
@@ -506,8 +524,10 @@ defmodule Aikido.ContextHandoffTest do
         {:ok, turn} = response
         assert failed.handoff_response.finish_reason == turn.finish_reason
         assert failed.handoff_response.text_bytes == byte_size(ReqLLM.Response.text(turn))
+        assert failed.handoff_response[:error] == error_details
       end
 
+      refute inspect(failed) =~ private
       refute_received {:request, _, _, _}
     end
   end
@@ -721,6 +741,29 @@ defmodule Aikido.ContextHandoffTest do
   defp regeneration_options(observer) do
     options(observer)
     |> Keyword.update!(:options, &Map.put(&1, :handoff_max_regenerations, 1))
+  end
+
+  defp errored_codex_response(event_type, details) do
+    context = ReqLLM.Context.new()
+
+    request =
+      Req.new()
+      |> Req.Request.register_options([:model, :context])
+      |> Req.merge(model: "gpt-5.6-terra", context: context)
+
+    payload =
+      if event_type == "response.failed",
+        do: %{"type" => event_type, "response" => %{"id" => "fixture", "error" => details}},
+        else: %{"type" => event_type, "error" => details}
+
+    body = "event: #{event_type}\ndata: #{Jason.encode!(payload)}\n\n"
+
+    {_, %Req.Response{body: %ReqLLM.Response{} = response}} =
+      ReqLLM.Providers.OpenAICodex.decode_response(
+        {request, Req.Response.new(status: 200, body: body)}
+      )
+
+    response
   end
 
   defp summary_response(text, finish_reason \\ :stop) do

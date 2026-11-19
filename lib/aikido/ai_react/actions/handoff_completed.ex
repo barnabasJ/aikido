@@ -82,7 +82,24 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
       tool_call_count: length(turn.tool_calls),
       model: response.model && String.slice(response.model, 0, 256)
     }
+    |> Map.merge(response_error_classification(response))
   end
+
+  defp response_error_classification(%{provider_meta: %{"error" => details}}) do
+    constraints =
+      Ash.Resource.Info.attribute(Aikido.AiReact.Slice, :handoff_response).constraints[:fields][
+        :error
+      ][:constraints]
+
+    with {:ok, error} <- Ash.Type.cast_input(:map, details, constraints),
+         {:ok, error} <- Ash.Type.apply_constraints(:map, error, constraints) do
+      %{error: error}
+    else
+      _ -> %{}
+    end
+  end
+
+  defp response_error_classification(_response), do: %{}
 
   defp replace_conversation(state, document) do
     system = Enum.filter(state.context.messages, &(&1.role == :system))
