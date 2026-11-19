@@ -485,6 +485,9 @@ context ceiling. Estimates are not provider-enforced limits.
 A failed, empty, truncated or oversized handoff fails the run with
 `{:context_handoff_failed, reason}` and preserves its original context. There is
 no automatic trimming fallback. Cancellation also stops an active handoff.
+A model response with `finish_reason: :error` fails with
+`{:context_handoff_failed, :response_error}` without regenerating the summary;
+the bounded `ai.handoff_response` diagnostics remain available for inspection.
 The public `replace_context` action installs caller-supplied history while idle; automatic
 context handoff operates within an active run through its own result actions.
 

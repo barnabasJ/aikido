@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fail context handoffs with `:response_error` when a model response finishes
+  with `:error`, preserving diagnostics without regenerating the summary.
+
 - Retain bounded handoff response classification so empty text and unexpected
   tool turns can be distinguished when a context summary is rejected.
 

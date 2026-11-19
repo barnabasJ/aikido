@@ -60,6 +60,9 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
 
   defp extract_handoff_document(turn) do
     cond do
+      turn.finish_reason == :error ->
+        {:error, :response_error}
+
       turn.finish_reason == :length ->
         {:error, :truncated_document}
 

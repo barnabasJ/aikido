@@ -312,6 +312,7 @@ defmodule Aikido.ContextHandoffTest do
   test "failed or unusable handoffs preserve the original history instead of trimming", ctx do
     for {result, reason} <- [
           {{:error, :provider_unavailable}, :provider_unavailable},
+          {{:ok, summary_response("", :error)}, :response_error},
           {{:ok,
             %ReqLLM.Response{
               id: "scripted",
@@ -480,10 +481,12 @@ defmodule Aikido.ContextHandoffTest do
     end
   end
 
-  test "truncated documents and provider failures are not summary-regenerated", ctx do
+  test "truncated documents and response or provider failures are not summary-regenerated", ctx do
     for {response, reason} <- [
           {{:ok, summary_response("partial", :length)}, :truncated_document},
           {{:ok, summary_response("", :length)}, :truncated_document},
+          {{:ok, summary_response("", :error)}, :response_error},
+          {{:ok, summary_response("partial", :error)}, :response_error},
           {{:error, :provider_unavailable}, :provider_unavailable}
         ] do
       pid = start_server(ctx, Agent)
@@ -493,9 +496,18 @@ defmodule Aikido.ContextHandoffTest do
         Task.async(fn -> Aikido.AI.ask_sync(pid, String.duplicate("evidence ", 1_400), opts) end)
 
       assert_receive {:request, writer, _, []}, 5_000
+      assert {:ok, original} = ai(pid)
       send(writer, {:answer, response})
       assert {:error, {:context_handoff_failed, ^reason}} = Task.await(task)
-      assert {:ok, %{handoff_regenerations: 0}} = ai(pid)
+      assert {:ok, %{handoff_regenerations: 0} = failed} = ai(pid)
+      assert failed.context == original.context
+
+      if match?({:ok, _}, response) do
+        {:ok, turn} = response
+        assert failed.handoff_response.finish_reason == turn.finish_reason
+        assert failed.handoff_response.text_bytes == byte_size(ReqLLM.Response.text(turn))
+      end
+
       refute_received {:request, _, _, _}
     end
   end
