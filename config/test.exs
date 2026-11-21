@@ -46,5 +46,6 @@ config :aikido,
     Aikido.RequesterCorrelationTest.Domain,
     Aikido.AncestorLossTest.Domain,
     Aikido.WorkerLaunchTest.Domain,
-    Aikido.BoundTeamExecutionTest.Domain
+    Aikido.BoundTeamExecutionTest.Domain,
+    Aikido.DurableScopeRefusalRenderTest.Domain
   ]

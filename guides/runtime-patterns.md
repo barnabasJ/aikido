@@ -682,12 +682,50 @@ error instead of parsing its message. Direct `Aikido.Durable` calls retain their
 existing error transport; unrelated startup failures and `:noproc` are not
 reclassified as authorization refusals.
 
-An adapter may attach `vars: [denial_facts: "...", request_id: "..."]` to the
-typed refusal. Native startup preserves only these two vars and appends nonempty
-`denial_facts` to the rendered error message. Without facts, the base message is
-unchanged. The application owns the facts' size and contents: provide bounded,
-safe-to-display text and request references, never credentials or private metadata.
-All other vars are excluded from the public startup error.
+An adapter may attach public `denial_facts`, `request_id`, and `request_ids` vars
+to the typed refusal. Native startup casts and constrains them through Ash:
+rendered facts may contain up to 65,536 bytes; request IDs up to 256 bytes each;
+the plural list up to 64 IDs. Nonempty rendered facts are appended to the error
+message. Absent facts preserve its base message.
+
+For structured `vars[:denial]`, supply an application-owned Ash type through
+`denial_type`. The type owns the public field projection and nested bounds:
+
+```elixir
+defmodule MyApp.PublicDenial do
+  use Ash.Type.NewType,
+    subtype_of: :map,
+    constraints: [
+      fields: [
+        subject: [type: :string, constraints: [max_length: 128, length_count: :bytes]],
+        permissions: [
+          type: {:array, :string},
+          constraints: [max_length: 8, items: [max_length: 128, length_count: :bytes]]
+        ]
+      ]
+    ]
+end
+
+{:error,
+ Aikido.Durable.ScopeAdapter.Error.exception(
+   operation: :prepare,
+   reason: :review_required,
+   denial_type: MyApp.PublicDenial,
+   vars: [
+     request_id: "review-one",
+     request_ids: ["review-one", "review-two"],
+     denial_facts: "Two approvals are required.",
+     denial: %{subject: "document-seven", permissions: ["documents.read"]}
+   ]
+ )}
+```
+
+Without `denial_type`, structured denial is omitted. Invalid public values omit
+all diagnostic vars while preserving the typed refusal. Other adapter vars and
+the type configuration are excluded from the rebuilt public error. Applications
+must select safe-to-display facts, never credentials or private metadata, and
+declare bounds for every nested part of their denial type. The SDK neither
+infers domain-specific fields nor grants authority from these diagnostics.
 
 `checkpoint/3` receives the live agent, previous opaque credential and SDK identity
 before path codecs clear transient values. Return `{:ok, current_credential}` only

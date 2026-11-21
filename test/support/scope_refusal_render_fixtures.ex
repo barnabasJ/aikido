@@ -28,6 +28,21 @@ defmodule Aikido.DurableScopeRefusalRenderTest.Domain do
   end
 end
 
+defmodule Aikido.DurableScopeRefusalRenderTest.Denial do
+  @moduledoc "Application-owned constrained public facts for a denied operation."
+  use Ash.Type.NewType,
+    subtype_of: :map,
+    constraints: [
+      fields: [
+        subject: [type: :string, constraints: [max_length: 128, length_count: :bytes]],
+        permissions: [
+          type: {:array, :string},
+          constraints: [max_length: 8, items: [max_length: 128, length_count: :bytes]]
+        ]
+      ]
+    ]
+end
+
 defmodule Aikido.DurableScopeRefusalRenderTest.Authority do
   @moduledoc """
   Scope adapter whose `prepare/3` denies with caller-configured vars, so tests
@@ -40,15 +55,19 @@ defmodule Aikido.DurableScopeRefusalRenderTest.Authority do
   @prepare_key {__MODULE__, :prepare}
 
   @doc "Configure the vars the next prepare denial carries."
-  def deny(vars), do: :persistent_term.put(@prepare_key, vars)
+  def deny(vars, denial_type \\ nil),
+    do: :persistent_term.put(@prepare_key, {vars, denial_type})
 
   @impl true
   def prepare(_attributes, _options, _identity) do
+    {vars, denial_type} = :persistent_term.get(@prepare_key, {[], nil})
+
     {:error,
      ScopeRefusal.exception(
        operation: :prepare,
        reason: :autonomous_worker_review_required,
-       vars: :persistent_term.get(@prepare_key, [])
+       vars: vars,
+       denial_type: denial_type
      )}
   end
 

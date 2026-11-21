@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Preserve bounded plural approval request IDs in native startup refusals.
+  Applications may supply an Ash `denial_type` to project structured public
+  denial facts; untyped maps and internal adapter vars remain excluded.
+
 - Describe delegated `:timeout` results without assuming the workflow budget
   expired or cancellation occurred; workers may report their own timeouts.
 
