@@ -1,5 +1,5 @@
 defmodule AgentExamples.Reviewer do
-  @moduledoc "A fixed AI reviewer with the same public interface as every AI resource."
+  @moduledoc "A standalone AI reviewer for checking supplied findings."
   use Ash.Resource,
     domain: AgentExamples.Agents,
     extensions: [Aikido.Agent.Extension, Aikido.AI.Extension]

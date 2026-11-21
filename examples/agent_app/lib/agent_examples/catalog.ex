@@ -302,7 +302,7 @@ defmodule AgentExamples.Catalog do
       kind: :ai,
       description: "Try a research worker directly through the same interface as a team.",
       detail:
-        "This is the resource used for fixed and dynamic researchers. Here it runs independently, with its own role prompt and the tools supplied when started.",
+        "Research teams spawn this resource for specialist assignments. Here it runs independently, with its own role prompt and the tools supplied when started.",
       flow: ["Research task", "Evidence tools", "Model turn", "Findings"]
     },
     %{
@@ -313,9 +313,9 @@ defmodule AgentExamples.Catalog do
       tool_policy: :optional_lua,
       tools: [:text_stats, :stamp],
       kind: :ai,
-      description: "Try the fixed reviewer role as an independently addressable agent.",
+      description: "Review supplied findings with an independently addressable AI agent.",
       detail:
-        "The reviewer checks supplied findings. It shares the assistant/team ask interface while retaining a role-specific system prompt.",
+        "This standalone reviewer checks supplied findings with its own role prompt and the shared ask interface. The research-team example assigns verification dynamically to squads and researchers.",
       flow: ["Findings", "Check evidence", "Review", "Assessment"]
     },
     %{

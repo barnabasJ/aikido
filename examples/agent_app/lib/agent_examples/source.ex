@@ -176,7 +176,6 @@ defmodule AgentExamples.Source do
   defp supporting_modules("research-team"),
     do: [
       AgentExamples.Researcher,
-      AgentExamples.Reviewer,
       AgentExamples.ResearchSquad,
       Aikido.Team
     ]

@@ -8,10 +8,10 @@ and reload; Stop releases the processes.
 
 The **AI provider** form on every AI page configures the provider, model and
 key once for the browser. Choose the z.ai standard or coding-plan
-endpoint matching your key, save, and start any AI example. Fixed workers,
-dynamically spawned workers and nested AI teams inherit the same model/client
-configuration. Live requests resolve the encrypted SQLite settings at the I/O
-boundary; snapshots and public run data contain no API key. Saved settings apply
+endpoint matching your key, save, and start any AI example. Standalone roles
+use these settings; dynamically spawned workers and nested AI teams inherit
+their parent's model/client configuration. Live requests resolve the encrypted
+SQLite settings at the I/O boundary; snapshots and public run data contain no API key. Saved settings apply
 when starting examples; restart an active example to change its configuration.
 The settings and encrypted key survive server restarts for the same browser.
 
@@ -60,21 +60,18 @@ team = Agents.research_team_start!(%{
   model: runtime_model,
   system_prompt: caller_prompt,
   max_iterations: iteration_limit,
-  tools: runtime_tools,
-  topology: %{
-    "analyst" => %{resource: AgentExamples.Researcher},
-    "reviewer" => %{resource: AgentExamples.Reviewer, depends_on: ["analyst"]}
-  }
+  tools: runtime_tools
 })
 ```
 
 The optional startup `topology` replaces the declared member graph. Omit it for
-DSL defaults, or pass `%{}` for an initially empty team. A nested team node can
-supply another graph through `initial_state: %{topology: child_graph}`.
+DSL defaults, or pass `%{}` for an initially empty team. The research-team
+example already defaults to an empty roster; its orchestrator creates the
+necessary squads and researchers. A nested team node can supply another graph through `initial_state: %{topology: child_graph}`.
 
 The playground exposes the system prompt and iteration limit in its creation
-form. Its mode selector chooses the offline or live client. Fixed and dynamic
-workers inherit model/client/tools/iteration settings; their role prompts remain
+form. Its mode selector chooses the offline or live client. Spawned workers
+inherit model/client/tools/iteration settings; their role prompts remain
 separate from the orchestrator prompt.
 
 Both resource kinds accept runtime configuration and tools:

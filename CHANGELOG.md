@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Remove the unused reviewer definition from the research-team source panels
+  and align example descriptions and AI startup documentation with dynamic teams.
+
 - Allow `team.operation_timeout :infinity` to disable topology-operation timers
   while preserving task deadlines and lifecycle cleanup. Team startup, restore
   and topology commands accept a caller wait budget through
