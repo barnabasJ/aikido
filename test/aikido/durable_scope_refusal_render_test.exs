@@ -25,13 +25,16 @@ defmodule Aikido.DurableScopeRefusalRenderTest do
   test "start retains bounded denial facts and request id, drops unknown internal vars" do
     Authority.deny(
       request_id: "req-123",
-      denial_facts: "role=coder definition=db:5f8e2b1e-1111-4222-8333-444455556666@7 request=req-123",
+      denial_facts:
+        "role=coder definition=db:5f8e2b1e-1111-4222-8333-444455556666@7 request=req-123",
       internal: "never-render-this-sentinel"
     )
 
     assert {:error, reason} = Domain.recorder_start(%{id: unique_id("refusal-facts")})
     refusal = scope_refusal(reason)
-    assert %ScopeRefusal{operation: :prepare, reason: :autonomous_worker_review_required} = refusal
+
+    assert %ScopeRefusal{operation: :prepare, reason: :autonomous_worker_review_required} =
+             refusal
 
     assert refusal.vars[:request_id] == "req-123"
     assert refusal.vars[:denial_facts] =~ "role=coder"
@@ -42,21 +45,30 @@ defmodule Aikido.DurableScopeRefusalRenderTest do
     assert rendered =~ "role=coder"
     assert rendered =~ "request=req-123"
     refute rendered =~ "never-render-this-sentinel"
+    assert Exception.message(reason) =~ "role=coder"
+    refute Exception.message(reason) =~ "never-render-this-sentinel"
+    refute inspect(reason, limit: :infinity) =~ "never-render-this-sentinel"
   end
 
-  test "a refusal without facts keeps the historical message unchanged" do
-    Authority.deny([])
+  test "absent or empty facts keep the base message unchanged" do
+    for vars <- [[], [denial_facts: ""]] do
+      Authority.deny(vars)
 
-    assert {:error, reason} = Domain.recorder_start(%{id: unique_id("refusal-plain")})
-    refusal = scope_refusal(reason)
-    assert %ScopeRefusal{operation: :prepare, reason: :autonomous_worker_review_required} = refusal
-    refute Keyword.get(refusal.vars || [], :denial_facts)
+      assert {:error, reason} = Domain.recorder_start(%{id: unique_id("refusal-plain")})
+      refusal = scope_refusal(reason)
 
-    assert Exception.message(refusal) ==
-             "Durable scope prepare rejected: autonomous_worker_review_required"
+      assert %ScopeRefusal{operation: :prepare, reason: :autonomous_worker_review_required} =
+               refusal
+
+      assert Keyword.get(refusal.vars || [], :denial_facts) in [nil, ""]
+
+      assert Exception.message(%{refusal | bread_crumbs: []}) ==
+               "Durable scope prepare rejected: autonomous_worker_review_required"
+    end
   end
 
   defp scope_refusal(%ScopeRefusal{} = refusal), do: refusal
+
   defp scope_refusal(%{errors: errors}) when is_list(errors),
     do: Enum.find_value(errors, &scope_refusal/1)
 

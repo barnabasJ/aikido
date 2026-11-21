@@ -673,6 +673,13 @@ error instead of parsing its message. Direct `Aikido.Durable` calls retain their
 existing error transport; unrelated startup failures and `:noproc` are not
 reclassified as authorization refusals.
 
+An adapter may attach `vars: [denial_facts: "...", request_id: "..."]` to the
+typed refusal. Native startup preserves only these two vars and appends nonempty
+`denial_facts` to the rendered error message. Without facts, the base message is
+unchanged. The application owns the facts' size and contents: provide bounded,
+safe-to-display text and request references, never credentials or private metadata.
+All other vars are excluded from the public startup error.
+
 `checkpoint/3` receives the live agent, previous opaque credential and SDK identity
 before path codecs clear transient values. Return `{:ok, current_credential}` only
 when its complete binding matches the live identity. To rebind an idle agent,

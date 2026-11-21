@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Preserve application-authored scope denial facts and request references through
+  native agent startup errors, rendering the facts while excluding other vars.
+
 - Fail context handoffs with `:response_error` when a model response finishes
   with `:error`, preserving diagnostics without regenerating the summary.
   Retain bounded structured provider error type/code when supplied by ReqLLM,
