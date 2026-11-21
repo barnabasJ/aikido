@@ -92,6 +92,25 @@ defmodule Aikido.TeamDeliveryTest do
     refute signal.data.text =~ "private-provider-key"
   end
 
+  test "bare timeout narration is non-prescriptive and typed causes keep their own details" do
+    task = %{id: "timed-task", member: :worker, status: :failed, result: :timeout}
+    text = Aikido.Team.TaskDelivery.conversation_message_for_task_result(task).data.text
+    assert text =~ "does not specify which timer fired"
+    refute text =~ "expired"
+    refute text =~ "retry"
+    refute text =~ "larger budget"
+
+    error =
+      Aikido.AiReact.Errors.ProviderRequestFailed.exception(
+        timeout_phase: :receive,
+        timeout_ms: 20_000
+      )
+
+    typed = Aikido.Team.TaskDelivery.conversation_message_for_task_result(%{task | result: error})
+    assert typed.data.text =~ AshAi.ToToolError.to_tool_error(error)
+    refute typed.data.text =~ "does not specify which timer fired"
+  end
+
   test "delegation activates a lazy worker and its result wakes the team through its AI interface" do
     team = Domain.delivery_start!(%{})
 
@@ -364,7 +383,7 @@ defmodule Aikido.TeamDeliveryTest do
     assert_receive {:team_model, next, _}, 2_000
     assert_receive {:aikido_subscription, ^delivered, %{result: {:ok, message}}}, 2_000
     assert message =~ "reported a timeout"
-    assert message =~ "Inspect the assignment and worker deadlines"
+    assert message =~ "does not specify which timer fired"
 
     send(
       next,

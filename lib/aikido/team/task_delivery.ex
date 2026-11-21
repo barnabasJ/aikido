@@ -114,9 +114,8 @@ defmodule Aikido.Team.TaskDelivery do
   end
 
   defp describe_task_result(%{status: :failed, result: :timeout}) do
-    "The delegated task reported a timeout. Inspect the assignment and worker deadlines " <>
-      "and provider/tool errors to identify which limit fired. Verify remaining workflow budget " <>
-      "and worker status before retrying; do not retry work with an expired deadline."
+    "The delegated task reported a timeout. This result does not specify which timer fired, " <>
+      "whether a workflow or assignment deadline was reached, or whether the worker was cancelled."
   end
 
   defp describe_task_result(%{status: :failed, result: :member_exited}) do

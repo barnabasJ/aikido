@@ -8,6 +8,8 @@
 
 - Describe delegated `:timeout` results without assuming the workflow budget
   expired or cancellation occurred; workers may report their own timeouts.
+  Bare timeout narration makes no retry recommendation; typed errors retain
+  their existing specific descriptions.
 
 - Preserve application-authored scope denial facts and request references through
   native agent startup errors, rendering the facts while excluding other vars.

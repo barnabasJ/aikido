@@ -456,6 +456,8 @@ application's workflow budget. A worker may report `:timeout` through
 failed task result of `:timeout`, so that result alone cannot identify which
 deadline fired or establish workflow-budget exhaustion. Inspect the originating
 signal and the worker's error before deciding whether another attempt is useful.
+Bare timeout narration therefore describes that uncertainty without retry advice.
+Typed worker errors retain their own specific public descriptions and guidance.
 
 Streaming clients implement `stream_text/3` and return `ReqLLM.StreamResponse`.
 The native response builder assembles tool calls, reasoning and usage. Aikido
