@@ -5,6 +5,7 @@ defmodule Aikido.TeamDeliveryTest.Client do
 
       receive do
         {:answer, turn} -> {:ok, turn}
+        {:failure, reason} -> {:error, reason}
       end
     else
       answer(messages)
@@ -280,6 +281,52 @@ defmodule Aikido.TeamDeliveryTest do
     send(finish_second, {:answer, final})
   end
 
+  test "a worker-reported timeout does not claim that the assignment budget expired" do
+    team = Domain.delivery_start!(%{})
+
+    {:ok, failed_ref} =
+      Aikido.AgentServer.subscribe(
+        team.pid,
+        "aikido.ash.team.task.failed",
+        fn runtime -> {:ok, runtime.agent.state.team.tasks["worker-timeout"]} end,
+        once: true
+      )
+
+    Domain.delivery_assign_task!(team, %{
+      member: :worker,
+      task_id: "worker-timeout",
+      payload: %{text: "work", llm_opts: [observer: self()]},
+      notify: :self,
+      timeout_ms: 13_814_000
+    })
+
+    assert_receive {:team_model, model, _}, 5_000
+
+    assert {:ok, worker} =
+             Aikido.AgentServer.state(team.pid, &{:ok, &1.agent.state.team.members.worker})
+
+    {:ok, cancelled_ref} =
+      Aikido.AgentServer.subscribe(worker, "harness.cancel_task", fn _ -> {:ok, :cancelled} end,
+        once: true
+      )
+
+    send(model, {:failure, :timeout})
+
+    assert_receive {:aikido_subscription, ^failed_ref,
+                    %{result: {:ok, %{status: :failed, result: :timeout}}}},
+                   5_000
+
+    state =
+      AikidoTest.AgentWait.await_state_value(team.pid, fn runtime ->
+        if runtime.agent.state.ai.status == :completed, do: runtime.agent.state
+      end)
+
+    assert state.ai.result =~ "reported a timeout"
+    refute state.ai.result =~ "deadline expired"
+    refute state.ai.result =~ "cancellation was requested"
+    refute_received {:aikido_subscription, ^cancelled_ref, _}
+  end
+
   test "task timeout cancels active work and releases the next queued job" do
     team = Domain.delivery_start!(%{})
     Domain.delivery_ensure_member!(team, %{member: :worker})
@@ -316,8 +363,8 @@ defmodule Aikido.TeamDeliveryTest do
     assert_receive {:DOWN, ^monitor, :process, ^slow, _}, 2_000
     assert_receive {:team_model, next, _}, 2_000
     assert_receive {:aikido_subscription, ^delivered, %{result: {:ok, message}}}, 2_000
-    assert message =~ "remaining deadline expired"
-    assert message =~ "do not retry with the expired deadline"
+    assert message =~ "reported a timeout"
+    assert message =~ "Inspect the assignment and worker deadlines"
 
     send(
       next,

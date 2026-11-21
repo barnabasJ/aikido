@@ -369,6 +369,87 @@ defmodule Aikido.BoundTeamExecutionTest do
     refute Map.has_key?(state.ai.run_metadata, :deliveries)
   end
 
+  test "a public lazy assignment retains its long budget through activation and scheduling", %{
+    scope: scope
+  } do
+    {team, clock, options} = timed_team(scope)
+    pid = team.pid
+    budget = 13_814_000
+
+    Domain.bound_team_add_member!(
+      team,
+      %{
+        member: :delayed,
+        resource: Worker,
+        activation: :lazy,
+        initial_state: %{actor_id: "worker-B"}
+      },
+      options
+    )
+
+    {:ok, assignment_ref} =
+      Aikido.AgentServer.subscribe(
+        pid,
+        "aikido.ash.team.assign_task",
+        fn runtime, _event -> {:ok, runtime.agent.state.team.pending_tasks} end,
+        once: true
+      )
+
+    {:ok, timeout_ref} =
+      Aikido.AgentServer.subscribe(
+        pid,
+        "aikido.ash.team.task.timeout",
+        fn runtime, event ->
+          {:ok, {runtime.agent.state.team.tasks["long-budget"], Aikido.Signal.ctx(event.signal)}}
+        end,
+        once: true
+      )
+
+    Domain.bound_team_assign_task!(
+      team,
+      %{
+        member: :delayed,
+        task_id: "long-budget",
+        timeout_ms: budget,
+        metadata: %{hold: true},
+        payload: %{text: "hold until the caller's deadline"}
+      },
+      options
+    )
+
+    assert_receive {:aikido_subscription, ^assignment_ref,
+                    %{result: {:ok, %{"long-budget" => %{timeout_ms: ^budget}}}}},
+                   5_000
+
+    assert_receive {:armed, ^pid,
+                    {:scheduled_signal,
+                     %{type: "aikido.ash.team.task.timeout", data: %{task_id: "long-budget"}}},
+                    ^budget},
+                   5_000
+
+    assert_receive {:preparing, "worker-B", _, child_work, _}, 5_000
+    monitor = Process.monitor(child_work)
+
+    :ok = Aikido.AttemptTimingTest.Manual.advance(clock, 30_001)
+
+    assert {:ok, :dispatched} =
+             Aikido.AgentServer.state(
+               pid,
+               &{:ok, &1.agent.state.team.tasks["long-budget"].status}
+             )
+
+    refute_received {:aikido_subscription, ^timeout_ref, _}
+    :ok = Aikido.AttemptTimingTest.Manual.advance(clock, budget)
+
+    assert_receive {:aikido_subscription, ^timeout_ref,
+                    %{result: {:ok, {%{status: :failed, result: :timeout}, inherited}}}},
+                   5_000
+
+    assert inherited.actor == scope.actor
+    assert inherited.tenant == scope.tenant
+    assert_receive {:DOWN, ^monitor, :process, ^child_work, _}, 5_000
+  end
+
   test "a runtime clock delivers the real task deadline with inherited scope", %{scope: scope} do
     {team, clock, options} = timed_team(scope)
     pid = team.pid

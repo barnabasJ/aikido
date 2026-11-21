@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Describe delegated `:timeout` results without assuming the workflow budget
+  expired or cancellation occurred; workers may report their own timeouts.
+
 - Preserve application-authored scope denial facts and request references through
   native agent startup errors, rendering the facts while excluding other vars.
 

@@ -448,6 +448,15 @@ streaming cancellation also closes
 the ReqLLM stream. A custom client can wrap provider-specific concurrency limits.
 Applications still own cancellation and deadlines inside actions exposed to Lua.
 
+Team assignments retain their supplied `timeout_ms` through lazy member activation.
+That assignment limit is separate from model/tool attempt timeouts and the
+application's workflow budget. A worker may report `:timeout` through
+`aikido.ash.team.task.failed`; the coordinator's own assignment timer uses
+`aikido.ash.team.task.timeout` and requests worker cancellation. Both retain a
+failed task result of `:timeout`, so that result alone cannot identify which
+deadline fired or establish workflow-budget exhaustion. Inspect the originating
+signal and the worker's error before deciding whether another attempt is useful.
+
 Streaming clients implement `stream_text/3` and return `ReqLLM.StreamResponse`.
 The native response builder assembles tool calls, reasoning and usage. Aikido
 batches text/thinking updates by bytes or elapsed time (`stream_batch_bytes`,

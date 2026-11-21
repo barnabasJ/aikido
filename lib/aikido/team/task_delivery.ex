@@ -114,8 +114,9 @@ defmodule Aikido.Team.TaskDelivery do
   end
 
   defp describe_task_result(%{status: :failed, result: :timeout}) do
-    "The task's remaining deadline expired and cancellation was requested. Report partial " <>
-      "findings or request a new run with a smaller assignment or larger budget; do not retry with the expired deadline."
+    "The delegated task reported a timeout. Inspect the assignment and worker deadlines " <>
+      "and provider/tool errors to identify which limit fired. Verify remaining workflow budget " <>
+      "and worker status before retrying; do not retry work with an expired deadline."
   end
 
   defp describe_task_result(%{status: :failed, result: :member_exited}) do
