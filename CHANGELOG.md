@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Retain safe parameter names from native ReqLLM invalid-parameter failures,
+  including nested errors, without exposing parameter values or raw messages.
+
 - Preserve bounded plural approval request IDs in native startup refusals.
   Applications may supply an Ash `denial_type` to project structured public
   denial facts; untyped maps and internal adapter vars remain excluded.

@@ -1,6 +1,8 @@
 defmodule Aikido.AiReact.Errors.ProviderRequestFailed do
   @moduledoc "Public provider failure details without request bodies, headers or raw provider messages."
-  use Splode.Error, fields: [:cause_type, :status, :timeout_phase, :timeout_ms], class: :invalid
+  use Splode.Error,
+    fields: [:cause_type, :status, :timeout_phase, :timeout_ms, :parameter],
+    class: :invalid
 
   @doc "Convert native ReqLLM failures at the model-call boundary; retain application error contracts."
   def from_reason(%{__struct__: module} = error) when is_atom(module) and is_exception(error) do
@@ -12,7 +14,8 @@ defmodule Aikido.AiReact.Errors.ProviderRequestFailed do
           cause_type: error.__struct__,
           status: public_status(Map.get(error, :status)),
           timeout_phase: public_timeout_phase(Map.get(error, :kind)),
-          timeout_ms: public_timeout(Map.get(error, :timeout))
+          timeout_ms: public_timeout(Map.get(error, :timeout)),
+          parameter: public_parameter(error)
         )
 
       _ ->
@@ -23,7 +26,9 @@ defmodule Aikido.AiReact.Errors.ProviderRequestFailed do
   def from_reason(error), do: error
 
   def message(error) do
-    [failure_description(error), recovery(error)] |> Enum.join(" ")
+    [failure_description(error), parameter_description(error), recovery(error)]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(" ")
   end
 
   @doc "Recovery instructions based only on the public HTTP or timeout classification."
@@ -73,6 +78,19 @@ defmodule Aikido.AiReact.Errors.ProviderRequestFailed do
 
   defp first_provider_error(error), do: error
 
+  defp public_parameter(%ReqLLM.Error.Invalid.Parameter{parameter: name})
+       when is_binary(name) or (is_atom(name) and name not in [nil, true, false]) do
+    case Ash.Type.cast_input(Aikido.AiReact.Types.ProviderParameterName, name) do
+      {:ok, name} -> name
+      _ -> nil
+    end
+  end
+
+  defp public_parameter(_error), do: nil
+
+  defp parameter_description(%{parameter: name}) when is_binary(name), do: "Parameter: #{name}."
+  defp parameter_description(_error), do: nil
+
   defp public_status(status) when is_integer(status) and status in 100..599, do: status
   defp public_status(_status), do: nil
 
@@ -91,17 +109,20 @@ end
 
 defimpl AshLua.Error, for: Aikido.AiReact.Errors.ProviderRequestFailed do
   def to_error(error) do
+    vars = %{
+      status: error.status,
+      timeout_phase: error.timeout_phase,
+      timeout_ms: error.timeout_ms,
+      recovery: Aikido.AiReact.Errors.ProviderRequestFailed.recovery(error)
+    }
+
     %{
       message: Aikido.AiReact.Errors.ProviderRequestFailed.message(error),
       short_message: "Model provider request failed",
       code: Aikido.AiReact.Errors.ProviderRequestFailed.code(error),
       fields: [],
-      vars: %{
-        status: error.status,
-        timeout_phase: error.timeout_phase,
-        timeout_ms: error.timeout_ms,
-        recovery: Aikido.AiReact.Errors.ProviderRequestFailed.recovery(error)
-      }
+      vars:
+        if(is_nil(error.parameter), do: vars, else: Map.put(vars, :parameter, error.parameter))
     }
   end
 end

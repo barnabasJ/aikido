@@ -459,6 +459,15 @@ signal and the worker's error before deciding whether another attempt is useful.
 Bare timeout narration therefore describes that uncertainty without retry advice.
 Typed worker errors retain their own specific public descriptions and guidance.
 
+`Aikido.AiReact.Errors.ProviderRequestFailed.from_reason/1` retains a native
+`ReqLLM.Error.Invalid.Parameter` name as optional `parameter` data, including
+when the error is nested in a ReqLLM error class. Accepted names are ASCII
+identifiers matching `[A-Za-z_][A-Za-z0-9_]*`, limited to 64 bytes through an Ash
+type; atom names become strings. Names are not trimmed. Descriptive messages,
+paths, values, malformed terms and oversized names are omitted. The safe name
+appears in the public error message and, when present, Lua error vars. HTTP and
+timeout classifications and unknown-reason passthrough remain unchanged.
+
 Streaming clients implement `stream_text/3` and return `ReqLLM.StreamResponse`.
 The native response builder assembles tool calls, reasoning and usage. Aikido
 batches text/thinking updates by bytes or elapsed time (`stream_batch_bytes`,
