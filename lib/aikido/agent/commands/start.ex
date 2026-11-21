@@ -74,9 +74,21 @@ defmodule Aikido.Agent.Commands.Start do
   defp public_scope_refusal(refusal) do
     ScopeRefusal.exception(
       operation: scope_refusal_operation(refusal.operation),
-      reason: scope_refusal_reason(refusal.reason)
+      reason: scope_refusal_reason(refusal.reason),
+      vars: preserved_refusal_vars(refusal)
     )
   end
+
+  # The sanitization rebuild keeps only the application-authored render facts
+  # the adapter attached (`ScopeAdapter.Error`'s documented vars contract) —
+  # the bounded denial facts and the request reference they name. Every other
+  # var is dropped here, so an adapter's internal metadata never crosses the
+  # native start boundary.
+  defp preserved_refusal_vars(%{vars: vars}) when is_list(vars) do
+    Keyword.take(vars, [:denial_facts, :request_id])
+  end
+
+  defp preserved_refusal_vars(_refusal), do: []
 
   defp scope_refusal_operation(operation) when operation in [:prepare, :restore, :checkpoint],
     do: operation
