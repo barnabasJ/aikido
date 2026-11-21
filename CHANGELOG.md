@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Allow `team.operation_timeout :infinity` to disable topology-operation timers
+  while preserving task deadlines and lifecycle cleanup. Team startup, restore
+  and topology commands accept a caller wait budget through
+  `context.aikido_runtime_options[:timeout]`; the finite 5,000 ms default remains.
+
 - Retain safe parameter names from native ReqLLM invalid-parameter failures,
   including nested errors, without exposing parameter values or raw messages.
 

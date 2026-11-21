@@ -47,6 +47,34 @@ Run `examples/agent_app` and visit `/examples/nested-teams` and
 `/examples/research-team` for interactive trees and expandable source
 definitions.
 
+### Topology and caller deadlines
+
+Team topology operations have a 5,000 ms deadline by default. Set
+`operation_timeout :infinity` inside `team do` to omit this timer for member
+activation, reconciliation and topology changes. Task deadlines, workflow
+budgets, cancellation and parent-child lifetime bindings still apply.
+
+The external command's wait is a separate bound. Pass its remaining budget in
+native Ash context for team start (including restore) and topology commands:
+
+```elixir
+MyApp.Agents.research_team_start!(attributes,
+  context: %{aikido_runtime_options: [timeout: remaining_budget_ms]}
+)
+
+MyApp.Agents.research_team_ensure_member!(team, %{member: :reviewer},
+  context: %{aikido_runtime_options: [timeout: remaining_budget_ms]}
+)
+```
+
+The caller timeout accepts nonnegative milliseconds or `:infinity`. Without an
+explicit caller timeout, finite topology configurations retain their existing
+wait of the topology deadline plus 1,000 ms. An infinite topology configuration
+uses the existing AgentServer call timeout (5,000 ms) for the caller's wait;
+applications with longer workflow budgets must pass that budget explicitly.
+A caller wait timing out does not establish whether the member started. Fresh
+startup retains its existing cleanup behavior on a failed startup wait.
+
 ### Delegation and result delivery
 
 `assign_task` activates a predefined lazy member before dispatching its work.

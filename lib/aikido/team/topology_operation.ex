@@ -143,6 +143,8 @@ defmodule Aikido.Team.TopologyOperation do
     %{state | operation: operation}
   end
 
+  defp append_operation_deadline(result, _id, :infinity), do: result
+
   defp append_operation_deadline({:ok, state, directives}, id, timeout) do
     timer =
       Directives.schedule(timeout, %Signal{

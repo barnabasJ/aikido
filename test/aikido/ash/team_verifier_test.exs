@@ -17,6 +17,12 @@ defmodule AikidoTest.AshTeamVerifierTest do
     assert "" = compile_team("member :lead, AikidoTest.AshFixtures.Counter")
   end
 
+  test "accepts infinity without accepting zero or arbitrary timeout modes" do
+    assert "" = compile_team("operation_timeout :infinity")
+    assert_raise Spark.Error.DslError, fn -> compile_team("operation_timeout 0") end
+    assert_raise Spark.Error.DslError, fn -> compile_team("operation_timeout :forever") end
+  end
+
   test "requires the agent extension" do
     errors = compile_team("", agent?: false)
     assert_team_error(errors, "requires the Aikido.Agent.Extension extension")

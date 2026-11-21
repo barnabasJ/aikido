@@ -33,7 +33,7 @@ defmodule Aikido.Agent.Commands.Signal do
       with {:ok, {id, pid}} <- CommandRuntime.resolve(input),
            {:ok, signal} <- Aikido.Signal.new(definition.type, payload, source: "/ash"),
            signal = Aikido.Signal.put_ctx(signal, CommandRuntime.command_context(input, context)),
-           {:ok, _} <- dispatch(resource, pid, signal) do
+           {:ok, _} <- dispatch(input, pid, signal) do
         {:ok,
          Map.merge(CommandRuntime.reference(resource, id, pid), %{
            signal_id: signal.id,
@@ -43,10 +43,17 @@ defmodule Aikido.Agent.Commands.Signal do
     end)
   end
 
-  defp dispatch(resource, pid, signal) do
+  defp dispatch(input, pid, signal) do
+    resource = input.resource
+
     if !is_nil(Aikido.Agent.Info.team_config(resource)) &&
          signal.type in ~w(aikido.ash.team.start aikido.ash.team.reconcile aikido.ash.team.reconcile_inherited aikido.ash.team.add_member aikido.ash.team.remove_member aikido.ash.team.ensure_member aikido.ash.team.stop_member) do
-      Aikido.Team.Extension.dispatch_and_await_operation(resource, pid, signal)
+      Aikido.Team.Extension.dispatch_and_await_operation(
+        resource,
+        pid,
+        signal,
+        Keyword.take(Map.get(input.context, :aikido_runtime_options, []), [:timeout])
+      )
     else
       Aikido.AgentServer.call(pid, signal, fn _ -> {:ok, :processed} end)
     end

@@ -336,10 +336,37 @@ defmodule Aikido.TeamMemberAdmissionTest.Coordinator do
   end
 end
 
+defmodule Aikido.TeamMemberAdmissionTest.UnboundedCoordinator do
+  @moduledoc "Team whose topology deadline is controlled by its external caller."
+  use Ash.Resource,
+    domain: Aikido.TeamMemberAdmissionTest.Domain,
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
+
+  agent do
+    name "unbounded_coordinator"
+    instance Aikido.TeamMemberAdmissionTest.Instance
+    persistence :permanent
+
+    schema do
+      attribute :actor_id, :string do
+        description "The application principal inherited by task workers."
+        allow_nil? false
+      end
+    end
+  end
+
+  team do
+    operation_timeout :infinity
+    inherit [:actor_id]
+    worker :worker, Aikido.TeamMemberAdmissionTest.Worker
+  end
+end
+
 defmodule Aikido.TeamMemberAdmissionTest.Domain do
   use Ash.Domain, extensions: [Aikido.Domain.Extension]
 
   agents do
+    agent :unbounded, Aikido.TeamMemberAdmissionTest.UnboundedCoordinator
     agent :coordinator, Aikido.TeamMemberAdmissionTest.Coordinator
     agent :worker, Aikido.TeamMemberAdmissionTest.Worker
     agent :delayed_worker, Aikido.TeamMemberAdmissionTest.DelayedWorker

@@ -74,7 +74,12 @@ defmodule Aikido.Team.Extension do
         doc:
           "Retain membership facts for optional replay consumers; disabled for ordinary notification-only teams."
       ],
-      operation_timeout: [type: :pos_integer, default: 5_000]
+      operation_timeout: [
+        type: {:or, [:pos_integer, {:in, [:infinity]}]},
+        default: 5_000,
+        doc:
+          "Topology-operation deadline in milliseconds; :infinity disables this timer without changing task or caller deadlines."
+      ]
     ]
   }
   use Spark.Dsl.Extension,
@@ -83,29 +88,27 @@ defmodule Aikido.Team.Extension do
     verifiers: [Aikido.Team.Extension.Verifiers.Validate]
 
   @doc false
-  def start(resource, pid, %Aikido.Signal{type: "aikido.ash.team.start"} = signal) do
+  def start(resource, pid, %Aikido.Signal{type: "aikido.ash.team.start"} = signal, opts \\ []) do
     command = fn -> Aikido.AgentServer.start_initial_topology(pid, signal) end
 
-    with {:ok, _} = result <- await_operation(resource, pid, signal, command),
+    with {:ok, _} = result <- await_operation(resource, pid, signal, command, opts),
          :ok <- Aikido.AgentServer.finish_initial_topology(pid, signal.id) do
       result
     end
   end
 
   @doc false
-  def await_restored_topology(resource, pid) do
-    timeout = Aikido.Agent.Info.team_config(resource).timeout + 1_000
+  def await_restored_topology(resource, pid, opts \\ []) do
+    timeout = operation_wait_timeout(resource, opts)
 
-    with :ok <- Aikido.AgentServer.await_ready(pid, timeout: timeout) do
-      Aikido.AgentServer.call_until(
-        pid,
-        fn -> :ok end,
-        "aikido.ash.team.**",
-        &restored_operation_result/1,
-        timeout: timeout,
-        check_current?: true
-      )
-    end
+    Aikido.AgentServer.call_until(
+      pid,
+      fn -> Aikido.AgentServer.await_ready(pid, timeout: timeout) end,
+      "aikido.ash.team.**",
+      &restored_operation_result/1,
+      timeout: timeout,
+      check_current?: true
+    )
     |> expose_operation_failure()
   end
 
@@ -131,10 +134,10 @@ defmodule Aikido.Team.Extension do
   end
 
   @doc false
-  def dispatch_and_await_operation(resource, pid, signal),
-    do: await_operation(resource, pid, signal, signal)
+  def dispatch_and_await_operation(resource, pid, signal, opts \\ []),
+    do: await_operation(resource, pid, signal, signal, opts)
 
-  defp await_operation(resource, pid, signal, command) do
+  defp await_operation(resource, pid, signal, command, opts) do
     selector = fn runtime ->
       operation = runtime.agent.state.team.operation
 
@@ -147,9 +150,20 @@ defmodule Aikido.Team.Extension do
     end
 
     Aikido.AgentServer.call_until(pid, command, "aikido.ash.team.**", selector,
-      timeout: Aikido.Agent.Info.team_config(resource).timeout + 1_000
+      timeout: operation_wait_timeout(resource, opts)
     )
     |> expose_operation_failure()
+  end
+
+  defp operation_wait_timeout(resource, opts) do
+    opts = Spark.Options.validate!(opts, timeout: [type: :timeout])
+
+    Keyword.get_lazy(opts, :timeout, fn ->
+      case Aikido.Agent.Info.team_config(resource).timeout do
+        :infinity -> Aikido.Config.Defaults.agent_server_call_timeout_ms()
+        timeout -> timeout + 1_000
+      end
+    end)
   end
 
   defp expose_operation_failure({:ok, _} = result), do: result
@@ -208,7 +222,7 @@ defmodule Aikido.Team.Extension do
 
   defp operation_failure_message(:timeout),
     do:
-      "Team activation timed out. Inspect the roster before retrying; a member may already have started."
+      "Waiting for the team operation timed out or the operation reported a timeout. Inspect the roster before retrying; a member may already have started. This result does not identify which deadline fired."
 
   defp operation_failure_message(_reason), do: nil
 end

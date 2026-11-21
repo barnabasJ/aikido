@@ -148,7 +148,7 @@ defmodule Aikido.Agent.Commands.Start do
         {:ok, :ready}
 
       restored? ->
-        Aikido.Team.Extension.await_restored_topology(resource, pid)
+        Aikido.Team.Extension.await_restored_topology(resource, pid, topology_wait_options(input))
 
       true ->
         signal =
@@ -157,12 +157,15 @@ defmodule Aikido.Agent.Commands.Start do
           )
           |> Aikido.Signal.capture_tracing()
 
-        case Aikido.Team.Extension.start(resource, pid, signal) do
+        case Aikido.Team.Extension.start(resource, pid, signal, topology_wait_options(input)) do
           {:ok, _} = result -> result
           {:error, error} -> {:error, error, signal.id}
         end
     end
   end
+
+  defp topology_wait_options(input),
+    do: Keyword.take(Map.get(input.context, :aikido_runtime_options, []), [:timeout])
 
   defp initial_state(resource, attributes) do
     {own, slices} =
