@@ -161,6 +161,126 @@ defmodule Aikido.TeamOperationTimeoutTest do
     refute Map.has_key?(team(root).members, :delayed)
   end
 
+  test "lazy activation deadline is distinct from the already-running task budget", ctx do
+    root = Domain.activation_bounded_start!(%{actor_id: ctx.actor.id}, ctx.options)
+
+    Domain.activation_bounded_add_member!(
+      root,
+      %{member: :running, resource: Aikido.TeamMemberAdmissionTest.Worker},
+      ctx.options
+    )
+
+    Domain.activation_bounded_add_member!(
+      root,
+      %{member: :delayed, resource: DelayedWorker, activation: :lazy},
+      ctx.options
+    )
+
+    Domain.activation_bounded_assign_task!(
+      root,
+      %{
+        member: :running,
+        task_id: "running-control",
+        type: "test.member.work",
+        payload: %{result: "control-result", complete?: false},
+        timeout_ms: 60_000
+      },
+      ctx.options
+    )
+
+    root_pid = root.pid
+
+    assert_receive {:armed, ^root_pid,
+                    {:scheduled_signal,
+                     %{type: "aikido.ash.team.task.timeout", data: %{timeout_ms: 60_000}}},
+                    60_000},
+                   5_000
+
+    Process.register(self(), Aikido.TeamMemberAdmissionTest.Observer)
+
+    Domain.activation_bounded_assign_task!(
+      root,
+      %{
+        member: :delayed,
+        task_id: "lazy-assignment",
+        type: "test.member.work",
+        payload: %{result: "not-dispatched"},
+        timeout_ms: 60_000
+      },
+      ctx.options
+    )
+
+    assert_receive {:member_start_held, child}, 5_000
+    on_exit(fn -> send(child, :release_member_start) end)
+    child_monitor = Process.monitor(child)
+    operation_id = team(root).operation.id
+    assert team(root).pending_tasks["lazy-assignment"].timeout_ms == 60_000
+
+    assert_receive {:armed, ^root_pid,
+                    {:scheduled_signal,
+                     %{
+                       type: "aikido.ash.team.timeout",
+                       data: %{operation_id: ^operation_id, timeout_ms: 20_000}
+                     }}, 20_000},
+                   5_000
+
+    :ok = Aikido.AttemptTimingTest.Manual.advance(ctx.clock, 20_001)
+
+    failed =
+      await_state_value(
+        root.pid,
+        fn runtime ->
+          case runtime.agent.state.team.tasks["lazy-assignment"] do
+            %{status: :failed} = task -> task
+            _ -> nil
+          end
+        end,
+        timeout: 5_000
+      )
+
+    assert %Aikido.Team.Errors.DeadlineExceeded{
+             stage: :member_activation,
+             timeout_ms: 20_000,
+             operation_id: ^operation_id,
+             task_id: "lazy-assignment",
+             member: :delayed,
+             attempt: nil
+           } = failed.result
+
+    assert failed.attempt == nil
+    assert team(root).tasks["running-control"].status == :dispatched
+    public = AshLua.Error.to_error(failed.result)
+    assert public.code == "team_deadline_exceeded"
+    assert public.vars.stage == :member_activation
+    assert public.vars.timeout_ms == 20_000
+    assert public.vars.task_id == "lazy-assignment"
+    delivery = Aikido.Team.TaskDelivery.conversation_message_for_task_result(failed)
+    assert delivery.data.text =~ AshAi.ToToolError.to_tool_error(failed.result)
+    assert delivery.data.metadata.task.result == failed.result
+    refute delivery.data.text =~ "workflow budget"
+    send(child, :release_member_start)
+    assert_receive {:DOWN, ^child_monitor, :process, ^child, _}, 5_000
+    running = team(root).members.running
+    assert Process.alive?(running)
+    Domain.worker_finish!(running, %{}, ctx.options)
+
+    completed =
+      await_state_value(
+        root.pid,
+        fn runtime ->
+          case runtime.agent.state.team.tasks["running-control"] do
+            %{status: :completed} = task -> task
+            _ -> nil
+          end
+        end,
+        timeout: 5_000
+      )
+
+    assert completed.result == "control-result"
+    :ok = Aikido.AttemptTimingTest.Manual.advance(ctx.clock, 60_001)
+    assert team(root).tasks["running-control"] == completed
+  end
+
   test "parent stop cancels an unbounded pending activation", ctx do
     root = start(ctx)
 

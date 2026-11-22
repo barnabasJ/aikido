@@ -75,6 +75,29 @@ applications with longer workflow budgets must pass that budget explicitly.
 A caller wait timing out does not establish whether the member started. Fresh
 startup retains its existing cleanup behavior on a failed startup wait.
 
+### Deadline diagnostics
+
+SDK-scheduled topology and assignment deadlines return
+`Aikido.Team.Errors.DeadlineExceeded`. Its `stage` distinguishes
+`:member_activation`, `:member_stop`, `:member_inheritance`,
+`:topology_operation` and `:assigned_task`. The error retains the scheduled
+`timeout_ms` plus the relevant `operation_id`, `task_id`, `member` and
+`attempt`. A pending task failed by activation carries the operation's actual
+limit, even when its assignment budget was longer. Its nil attempt means it
+was not dispatched.
+
+The same error flows through the operation result, task ledger, result
+notification, Ash AI tool message and AshLua error projection. AshLua returns
+code `team_deadline_exceeded` and the available facts in `vars`. The error does
+not claim that the worker died or cancellation finished. A legacy timeout
+signal without a retained duration leaves `timeout_ms` unset; an opaque
+worker-supplied `:timeout` remains unclassified.
+
+Applications whose workflow budget owns activation lifetime should opt out of
+a separate topology limit with `operation_timeout :infinity` and pass their
+remaining budget to external topology waits as shown above. Raising the task
+budget does not override an explicitly configured topology-operation deadline.
+
 ### Delegation and result delivery
 
 `assign_task` activates a predefined lazy member before dispatching its work.

@@ -6,6 +6,11 @@ defmodule Aikido.Team.Signals.Timeout do
     type "aikido.ash.team.timeout"
 
     schema do
+      attribute :timeout_ms, :integer do
+        description "Effective deadline duration retained when the timer was scheduled."
+        constraints min: 1
+      end
+
       attribute :operation_id, :string do
         description "Lifecycle operation whose deadline expired."
       end

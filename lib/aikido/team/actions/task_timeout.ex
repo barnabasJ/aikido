@@ -18,7 +18,16 @@ defmodule Aikido.Team.Actions.TaskTimeout do
   defp expire_task_and_request_cancellation(data, state, context, _config) do
     case Map.get(state.tasks, data.task_id) do
       %{status: :dispatched, attempt: attempt} = task when attempt == data.attempt ->
-        task = %{task | status: :failed, result: :timeout}
+        error =
+          Aikido.Team.Errors.DeadlineExceeded.exception(
+            stage: :assigned_task,
+            timeout_ms: data[:timeout_ms],
+            task_id: task.id,
+            member: task.member,
+            attempt: attempt
+          )
+
+        task = %{task | status: :failed, result: error}
         state = put_in(state.tasks[data.task_id], task)
 
         cancel =

@@ -156,7 +156,7 @@ defmodule Aikido.Team.Actions.AssignTask do
       Directives.schedule(timeout, %Signal{
         id: nil,
         type: "aikido.ash.team.task.timeout",
-        data: %{task_id: task.id, attempt: task.attempt},
+        data: %{task_id: task.id, attempt: task.attempt, timeout_ms: timeout},
         source: "/aikido"
       })
 

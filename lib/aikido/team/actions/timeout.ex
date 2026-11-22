@@ -7,7 +7,14 @@ defmodule Aikido.Team.Actions.Timeout do
   def run(input, _opts, _context) do
     {signal, state, context, _config} = ActionAdapter.unpack_team_action(input)
 
-    %{operation_id: signal.data.operation_id, reason: :timeout}
+    %{
+      operation_id: signal.data.operation_id,
+      reason:
+        Aikido.Team.Errors.DeadlineExceeded.for_operation(
+          state.operation,
+          signal.data[:timeout_ms]
+        )
+    }
     |> TopologyOperation.fail_operation_and_pending_tasks(state, context)
     |> ActionAdapter.to_action_result(state, context)
   end

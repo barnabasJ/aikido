@@ -188,7 +188,7 @@ defmodule Aikido.TerminalTaskDeliveryDeadlineTest do
 
       text = messages |> Enum.flat_map(& &1.content) |> Enum.map_join("\n", &(&1.text || ""))
       assert text =~ "Task expired-worker from worker failed"
-      assert text =~ "remaining deadline expired"
+      assert text =~ "does not specify which timer fired"
       assert_receive {:DOWN, ^model_down, :process, ^model, _}, 5_000
 
       assert {:ok, _receipt} = Domain.terminal_stop(parent)

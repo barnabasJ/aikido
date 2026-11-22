@@ -382,8 +382,9 @@ defmodule Aikido.TeamDeliveryTest do
     assert_receive {:DOWN, ^monitor, :process, ^slow, _}, 2_000
     assert_receive {:team_model, next, _}, 2_000
     assert_receive {:aikido_subscription, ^delivered, %{result: {:ok, message}}}, 2_000
-    assert message =~ "reported a timeout"
-    assert message =~ "does not specify which timer fired"
+    assert message =~ "stage assigned_task"
+    assert message =~ "after 250ms"
+    assert message =~ ~s(task_id="slow")
 
     send(
       next,

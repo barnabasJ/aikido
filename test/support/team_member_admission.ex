@@ -362,10 +362,37 @@ defmodule Aikido.TeamMemberAdmissionTest.UnboundedCoordinator do
   end
 end
 
+defmodule Aikido.TeamMemberAdmissionTest.ActivationBoundedCoordinator do
+  @moduledoc "Team with the application-authored twenty-second activation deadline."
+  use Ash.Resource,
+    domain: Aikido.TeamMemberAdmissionTest.Domain,
+    extensions: [Aikido.Agent.Extension, Aikido.Team.Extension]
+
+  agent do
+    name "activation_bounded_coordinator"
+    instance Aikido.TeamMemberAdmissionTest.Instance
+    persistence :permanent
+
+    schema do
+      attribute :actor_id, :string do
+        description "The application principal inherited by task workers."
+        allow_nil? false
+      end
+    end
+  end
+
+  team do
+    operation_timeout 20_000
+    inherit [:actor_id]
+    worker :worker, Aikido.TeamMemberAdmissionTest.Worker
+  end
+end
+
 defmodule Aikido.TeamMemberAdmissionTest.Domain do
   use Ash.Domain, extensions: [Aikido.Domain.Extension]
 
   agents do
+    agent :activation_bounded, Aikido.TeamMemberAdmissionTest.ActivationBoundedCoordinator
     agent :unbounded, Aikido.TeamMemberAdmissionTest.UnboundedCoordinator
     agent :coordinator, Aikido.TeamMemberAdmissionTest.Coordinator
     agent :worker, Aikido.TeamMemberAdmissionTest.Worker

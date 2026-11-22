@@ -150,7 +150,7 @@ defmodule Aikido.Team.TopologyOperation do
       Directives.schedule(timeout, %Signal{
         id: nil,
         type: "aikido.ash.team.timeout",
-        data: %{operation_id: id},
+        data: %{operation_id: id, timeout_ms: timeout},
         source: "/aikido"
       })
 
@@ -380,7 +380,7 @@ defmodule Aikido.Team.TopologyOperation do
            id: id,
            member: data.member,
            status: :failed,
-           result: reason,
+           result: Aikido.Team.Errors.DeadlineExceeded.for_pending_task(reason, id, data.member),
            attempt: nil,
            notify: Aikido.Team.TaskDelivery.notification_recipient(data),
            requester: data[:requester],
@@ -424,6 +424,9 @@ defmodule Aikido.Team.TopologyOperation do
         {put_in(state.operation, Map.delete(state.operation, :inheritance_reply)), [effect]}
     end
   end
+
+  defp inheritance_error(%Aikido.Team.Errors.DeadlineExceeded{} = error),
+    do: Exception.message(error)
 
   defp inheritance_error(:timeout),
     do:

@@ -275,7 +275,7 @@ defmodule Aikido.TopologyFailureContractTest do
   @tag fixture:
          {Aikido.TopologyFailureContractTest.Fixture.Instance,
           Aikido.TopologyFailureContractTest.Fixture.Domain}
-  test "actual operation timeout keeps the existing ambiguous-activation warning", ctx do
+  test "actual operation timeout preserves its activation stage and limit", ctx do
     assert_runtime_retires(ctx, fn ->
       token = make_ref()
       caller = add_in_background(ctx, %{mode: :hold, observer: self(), token: token})
@@ -283,13 +283,22 @@ defmodule Aikido.TopologyFailureContractTest do
       _activation_monitor = register_join(activation)
 
       assert_activation_retires(caller, activation, token, fn ->
-        assert {:error, %{errors: [%Ash.Error.Action.InvalidArgument{} = timeout]}} =
+        assert {:error, %{errors: [%Aikido.Team.Errors.DeadlineExceeded{} = timeout]}} =
                  Task.await(caller, 8_000)
 
-        assert timeout.message ==
-                 "Team activation timed out. Inspect the roster before retrying; a member may already have started."
+        assert timeout.stage == :member_activation
+        assert is_integer(timeout.timeout_ms)
+        assert is_binary(timeout.operation_id)
+        assert Exception.message(timeout) =~ "does not establish a process exit"
+        projected = timeout |> Ash.Error.to_error_class() |> AshLua.Encoder.encode_error()
+        assert %{"errors" => [%{"code" => "team_deadline_exceeded", "vars" => vars}]} = projected
+        assert vars["timeout_ms"] == timeout.timeout_ms
+        assert vars["operation_id"] == timeout.operation_id
 
-        assert ctx.domain.topology_inspect!(ctx.team).team.operation.error == :timeout
+        assert Aikido.Team.Errors.DeadlineExceeded.details(
+                 ctx.domain.topology_inspect!(ctx.team).team.operation.error
+               ) == Aikido.Team.Errors.DeadlineExceeded.details(timeout)
+
         assert_no_subscriptions(ctx.team.pid)
       end)
 

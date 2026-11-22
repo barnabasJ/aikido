@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Distinguish Team activation/topology deadlines from assigned-task deadlines
+  with one public `Aikido.Team.Errors.DeadlineExceeded` contract. Retain the
+  scheduled limit and operation/task/member correlation through native results,
+  notifications, Ash AI and AshLua instead of returning an ambiguous atom.
+  Worker-supplied opaque timeout reasons retain their existing contract.
+
 - Remove the unused reviewer definition from the research-team source panels
   and align example descriptions and AI startup documentation with dynamic teams.
 

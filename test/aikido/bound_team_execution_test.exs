@@ -442,7 +442,18 @@ defmodule Aikido.BoundTeamExecutionTest do
     :ok = Aikido.AttemptTimingTest.Manual.advance(clock, budget)
 
     assert_receive {:aikido_subscription, ^timeout_ref,
-                    %{result: {:ok, {%{status: :failed, result: :timeout}, inherited}}}},
+                    %{
+                      result:
+                        {:ok,
+                         {%{
+                            status: :failed,
+                            result: %Aikido.Team.Errors.DeadlineExceeded{
+                              stage: :assigned_task,
+                              timeout_ms: ^budget,
+                              task_id: "long-budget"
+                            }
+                          }, inherited}}
+                    }},
                    5_000
 
     assert inherited.actor == scope.actor
@@ -493,7 +504,18 @@ defmodule Aikido.BoundTeamExecutionTest do
     :ok = Aikido.AttemptTimingTest.Manual.advance(clock, 100)
 
     assert_receive {:aikido_subscription, ^timeout_ref,
-                    %{result: {:ok, {%{status: :failed, result: :timeout}, inherited}}}},
+                    %{
+                      result:
+                        {:ok,
+                         {%{
+                            status: :failed,
+                            result: %Aikido.Team.Errors.DeadlineExceeded{
+                              stage: :assigned_task,
+                              timeout_ms: 100,
+                              task_id: "timed"
+                            }
+                          }, inherited}}
+                    }},
                    5_000
 
     assert inherited.actor == scope.actor
@@ -623,7 +645,9 @@ defmodule Aikido.BoundTeamExecutionTest do
         timeout: 5_000
       )
 
-    assert state.team.tasks["expires"].result == :timeout
+    assert %Aikido.Team.Errors.DeadlineExceeded{stage: :assigned_task, task_id: "expires"} =
+             state.team.tasks["expires"].result
+
     assert_receive {:DOWN, ^monitor, :process, ^child_work, _}, 5_000
     worker = state.team.members.worker
 
