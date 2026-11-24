@@ -193,7 +193,7 @@ defmodule Aikido.Agent.Extension.Transformers.Build do
       entities
       |> Enum.filter(&match?(%Aikido.Agent.Route{}, &1))
       |> Enum.map(&%{&1 | action: resolve_local_target(&1.action, aliases, resource)})
-      |> Enum.reject(&mounted_signal?(&1, mounts))
+      |> Enum.reject(&(is_nil(&1.mount) && mounted_signal?(&1, mounts)))
 
     fields = for attribute <- attributes, attribute.name != :id, do: attribute.name
 

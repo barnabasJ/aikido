@@ -55,7 +55,7 @@ defmodule Aikido.Agent.Extension.Transformers.WalkExtensions do
 
     own =
       for route <- Transformer.get_persisted(dsl, :aikido_agent_routes, []),
-          do: {route.action, own_path}
+          do: {route.action, route.mount || own_path}
 
     paths =
       Enum.group_by(pairs ++ own, &elem(&1, 0), &elem(&1, 1))

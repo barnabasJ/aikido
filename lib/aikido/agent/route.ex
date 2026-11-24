@@ -6,6 +6,7 @@ defmodule Aikido.Agent.Route do
     :type,
     :action,
     :match,
+    :mount,
     :signal_module,
     :implementation,
     public?: nil,

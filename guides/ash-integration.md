@@ -884,3 +884,43 @@ or closure is stored in the model-preparation configuration.
 The playground's Adaptive tools example configures both native preparation
 actions: tools are prepared per run, and a transient output-token limit default is
 applied per model attempt. Its original saved options remain unchanged.
+
+## Composing an action at an existing mount
+
+An application can add a routed action to a mounted SDK slice without replacing
+its resource or its normal routes:
+
+```elixir
+agent do
+  name "researcher"
+  slice :thread, Aikido.Thread.Slice
+
+  route MyApp.Signals.MessageAccepted, MyApp.Actions.RecordAcceptedMessages,
+    mount: :thread,
+    public?: false,
+    priority: -20
+end
+```
+
+`RecordAcceptedMessages` is a normal `Ash.Resource.Actions.Implementation`. Its
+`input.arguments.state` is the current `%Aikido.Thread.Slice{}`. It returns sparse
+Thread attribute changes and directives. Aikido validates and adopts those
+changes through the mounted resource's native update action; it cannot change
+another mount or the agent's own attributes through that return value. The
+ordinary Thread append, clear and follower routes remain installed.
+
+When consuming a producer on the same exact signal, give this route an explicitly
+lower priority than the producer (ordinary slice routes default to `-10`). Read
+only the producer's exact `{{resource, action}, mount_path}` key from
+`input.context.aikido.staged_outputs`. The producer's state has already been
+adopted in the staged transaction. An empty accepted batch means there is nothing
+to append. A later action failure discards all staged state and directives from
+the signal. Outputs are not persisted or carried to a later signal.
+
+Omit `mount` to keep ordinary route ownership. A mount binding must name an
+existing, unambiguous mount. Each explicitly bound action reference must have
+only that owner: use distinct action names to target two mounts of the same
+resource. A native `{Resource, :action}` reference must declare `:state` as the
+mounted resource type or as `:struct` with `instance_of: MountedResource`.
+Implementation-module routes generate that constrained struct argument for you.
+Binding does not bypass the external command or internal reducer Ash policies.

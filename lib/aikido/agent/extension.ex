@@ -46,6 +46,11 @@ defmodule Aikido.Agent.Extension do
         doc:
           "Expose a domain command; defaults to true for concrete signals and false for patterns."
       ],
+      mount: [
+        type: :atom,
+        doc:
+          "Bind this reducer to an existing slice mount instead of the agent own state path. The action must have one unambiguous owner."
+      ],
       priority: [type: :integer, default: 0],
       match: [type: {:fun, 1}]
     ]
@@ -91,6 +96,7 @@ defmodule Aikido.Agent.Extension do
     transformers: [
       Aikido.Agent.Extension.Transformers.Build,
       Aikido.Agent.Extension.Transformers.WalkExtensions,
+      Aikido.Agent.Extension.Transformers.BindRouteMounts,
       Aikido.Agent.Extension.Transformers.ExpandRoutes,
       Aikido.Agent.Extension.Transformers.AddInitialization
     ],

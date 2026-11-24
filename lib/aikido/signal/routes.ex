@@ -73,7 +73,8 @@ defmodule Aikido.Signal.Routes do
                  definitions,
                  entity.action,
                  public?(entity),
-                 entity.name
+                 entity.name,
+                 Map.get(entity, :mount)
                ) do
           entries =
             Enum.map(definitions, fn module ->
@@ -103,7 +104,8 @@ defmodule Aikido.Signal.Routes do
              definition,
              entity.action,
              public?(entity),
-             entity.name
+             entity.name,
+             Map.get(entity, :mount)
            ) do
       name = entity.name || route_name(definition, target)
 
@@ -159,9 +161,17 @@ defmodule Aikido.Signal.Routes do
         "Expected a signal definition module or string pattern, got #{inspect(value)}"
       )
 
-  defp resolve_or_generate_action_reference(dsl, section, definition, target, public?, name) do
+  defp resolve_or_generate_action_reference(
+         dsl,
+         section,
+         definition,
+         target,
+         public?,
+         name,
+         mount
+       ) do
     if implementation_reference?(target) do
-      with {:ok, dsl, action} <- generate(dsl, section, definition, target, public?, name) do
+      with {:ok, dsl, action} <- generate(dsl, section, definition, target, public?, name, mount) do
         {:ok, dsl, {Transformer.get_persisted(dsl, :module), action}, target}
       end
     else
@@ -174,15 +184,16 @@ defmodule Aikido.Signal.Routes do
 
   defp implementation_reference?(_), do: false
 
-  defp generate(dsl, section, definition, implementation, public?, name) do
+  defp generate(dsl, section, definition, implementation, public?, name, mount) do
     name =
       if(public?, do: nil, else: name) ||
         handler_name(
           if is_list(definition), do: implementation, else: definition || implementation
         )
 
-    with {:ok, payload} <- payload_arguments(definition, section) do
-      generate_action(dsl, section, definition, implementation, name, payload, public?)
+    with {:ok, payload} <- payload_arguments(definition, section),
+         {:ok, state} <- route_state_argument(dsl, section, mount) do
+      generate_action(dsl, section, definition, implementation, name, payload, public?, state)
     end
   end
 
@@ -203,7 +214,7 @@ defmodule Aikido.Signal.Routes do
   defp payload_arguments(nil, _section), do: {:ok, [argument!(:data, :term, [])]}
   defp payload_arguments(definition, _section), do: {:ok, payload_action_arguments(definition)}
 
-  defp generate_action(dsl, section, definition, implementation, name, payload, public?) do
+  defp generate_action(dsl, section, definition, implementation, name, payload, public?, state) do
     if Enum.any?(payload, &(&1.name == :state)) do
       error(section, "Signal payload field :state conflicts with the reducer state argument")
     else
@@ -217,7 +228,7 @@ defmodule Aikido.Signal.Routes do
 
       options = [
         returns: Aikido.Types.ActionResult,
-        arguments: [state_argument(dsl, section) | payload],
+        arguments: [state | payload],
         run: {implementation, []},
         public?: public? && section == :slice
       ]
@@ -272,6 +283,27 @@ defmodule Aikido.Signal.Routes do
             "Generated handler #{inspect(generated.name)} conflicts with an existing native action"
           )
         end
+    end
+  end
+
+  defp route_state_argument(dsl, section, nil), do: {:ok, state_argument(dsl, section)}
+
+  defp route_state_argument(dsl, :agent, path) do
+    mounts =
+      dsl
+      |> Transformer.get_entities([:agent])
+      |> Enum.filter(&match?(%Aikido.Agent.SliceMount{path: ^path}, &1))
+
+    case mounts do
+      [%{module: resource}] ->
+        {:ok,
+         argument!(:state, :struct,
+           allow_nil?: false,
+           constraints: [instance_of: resource]
+         )}
+
+      _ ->
+        error(:agent, "Route mount #{inspect(path)} must identify one declared slice mount")
     end
   end
 

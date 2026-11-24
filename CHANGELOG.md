@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Allow an agent route to declare `mount: :thread` (or another existing slice
+  path). Generated reducer inputs use that mount's native resource struct, and
+  returned changes are adopted through its normal update action. Explicit native
+  actions must declare a matching resource state argument. Missing mounts and
+  action references with ambiguous ownership fail compilation. Existing routes
+  and their default ownership are unchanged.
+
 - Expose transition-local producer outputs to same-signal consumers through
   `Aikido.Types.ActionResult.outputs`. After adoption the runtime folds outputs
   onto the staged context under the exact namespace
