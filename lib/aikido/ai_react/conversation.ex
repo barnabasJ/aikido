@@ -41,7 +41,11 @@ defmodule Aikido.AiReact.Conversation do
       context: context,
       estimated_tokens: if(context, do: estimate_tokens(context), else: 0),
       last_input_tokens: nil,
-      last_input_shape: nil
+      last_input_shape: nil,
+      # The replaced history no longer exists in the context; the accepted
+      # window (messages appended since the consuming side last observed the
+      # run state) restarts with this replacement.
+      appended_messages: []
     })
   end
 
@@ -55,7 +59,11 @@ defmodule Aikido.AiReact.Conversation do
 
     Map.merge(state, %{
       context: Context.append(state.context, message),
-      estimated_tokens: tokens + estimate_message_tokens(message)
+      estimated_tokens: tokens + estimate_message_tokens(message),
+      # Producer-exposed accepted-message window: every append records itself
+      # here IN ORDER, so a consumer can journal exactly the accepted complete
+      # entries without diffing or re-walking retained history.
+      appended_messages: Map.get(state, :appended_messages, []) ++ [message]
     })
   end
 
@@ -166,4 +174,26 @@ defmodule Aikido.AiReact.Conversation do
   end
 
   defp data_value(data, key), do: Map.get(data, key, Map.get(data, to_string(key)))
+
+@doc """
+  Extract the accepted-message window from the run state, leaving the state
+  clean. The window collects the messages each append accepted (in order);
+  the caller turns it into its transition-local output and never persists it.
+  """
+  def take_appended(state) do
+    accepted = Map.get(state, :appended_messages, [])
+    {accepted, Map.delete(state, :appended_messages)}
+  end
+
+  @doc """
+  The transition-local output for an action that appended through this
+  module: `%{accepted_messages: [...]}` when the window is non-empty, `{}`
+  otherwise (stale/no-op transitions stay silent).
+  """
+  def accepted_output(state) do
+    case take_appended(state) do
+      {[], _clean} -> %{}
+      {accepted, _clean} -> %{accepted_messages: accepted}
+    end
+  end
 end

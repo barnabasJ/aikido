@@ -11,7 +11,11 @@ defmodule Aikido.AiReact.Actions.Ask do
           do: %{},
           else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
 
-      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+      Aikido.Types.ActionResult.new(
+        changes: changes,
+        directives: directives,
+        outputs: Aikido.AiReact.Conversation.accepted_output(state)
+      )
     end
   end
 

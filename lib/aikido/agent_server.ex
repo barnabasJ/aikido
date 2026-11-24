@@ -1943,25 +1943,45 @@ defmodule Aikido.AgentServer do
 
   defp stage_actions!(signal, ctx, targets) do
     targets
-    |> Enum.reduce_while({:ok, ctx, [], []}, fn target, accumulated ->
+    |> Enum.reduce_while({:ok, ctx, %{}, [], []}, fn target, accumulated ->
       case apply_action_at_mounted_paths(target, signal, accumulated) do
-        {:ok, _, _, _} = result -> {:cont, result}
+        {:ok, _, _, _, _} = result -> {:cont, result}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
     |> case do
-      {:ok, proposed, notifications, directives} -> {proposed, notifications, directives}
+      # STRIP POINT (final): the staged accumulator is DROPPED here — the
+      # adopted context and effects returned to the caller never carry it.
+      {:ok, proposed, _staged, notifications, directives} ->
+        {proposed, notifications, directives}
+
       {:error, reason} -> raise Ash.Error.to_error_class(reason)
     end
   end
 
-  defp apply_action_at_mounted_paths({reference, params}, signal, {:ok, ctx, _, _} = accumulated) do
+  defp apply_action_at_mounted_paths(
+         {reference, params},
+         signal,
+         {:ok, ctx, staged, notifications, effects}
+       ) do
     ctx.agent_module
     |> action_mount_paths(reference)
-    |> Enum.reduce_while(accumulated, fn path, {:ok, current, notifications, effects} ->
-      with {:ok, result} <- run_action(reference, params, signal, current, path),
-           {:ok, current, notices} <- adopt_action_result(current, result, path, signal) do
-        {:cont, {:ok, current, notifications ++ notices, effects ++ result.directives}}
+    |> Enum.reduce_while({:ok, ctx, staged, notifications, effects}, fn path,
+                                                                       {:ok, current, staged,
+                                                                        notifications, effects} ->
+      # STRIP POINT (private input): the staged outputs are visible ONLY to
+      # this action's private stage context; the reducer's runtime carries
+      # them under :staged_outputs for this call alone.
+      stage_ctx = Map.put(current, :staged_outputs, staged)
+
+      with {:ok, result} <- run_action(reference, params, signal, stage_ctx, path),
+           # STRIP POINT (adoption): adopt_action_result embeds the context as
+           # :aikido for StateChanges notifications — it receives the CLEAN
+           # context, so the staged outputs never ride into notifications.
+           {:ok, adopted, notices} <- adopt_action_result(current, result, path, signal) do
+        staged = Map.put(staged, {reference, path}, result.outputs || %{})
+
+        {:cont, {:ok, adopted, staged, notifications ++ notices, effects ++ result.directives}}
       else
         {:error, _} = error -> {:halt, error}
       end

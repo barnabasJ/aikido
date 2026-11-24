@@ -191,4 +191,49 @@ defmodule Aikido.AiReact.ConversationTest do
     assert List.last(repaired.messages).tool_call_id == "second"
     assert Conversation.append_interrupted_tool_results(repaired) == repaired
   end
+
+describe "accepted-message window" do
+  # The journal consumer journals exactly the accepted complete entries at the
+  # append boundary. The window must expose appends IN ORDER, survive repeated
+  # appends, and restart on context replacement — never by diffing contexts.
+  test "append_message records each accepted message in order" do
+    state = %{context: Context.new([]), estimated_tokens: 0}
+
+    first = Context.user("first accepted")
+    second = Context.assistant("second accepted")
+
+    state = Conversation.append_message(state, first)
+    assert state.appended_messages == [first]
+
+    state = Conversation.append_message(state, second)
+    assert state.appended_messages == [first, second]
+
+    # The window mirrors the context tail exactly — no inferred additions.
+    assert Enum.map(state.appended_messages, & &1.content) ==
+             state.context.messages |> Enum.reject(&(&1.role == :system)) |> Enum.map(& &1.content)
+  end
+
+  test "append_messages records the whole accepted batch in order" do
+    state = %{context: Context.new([]), estimated_tokens: 0}
+    messages = [Context.user("one"), Context.tool_result("t", "tool", "result"), Context.user("two")]
+
+    state = Conversation.append_messages(state, messages)
+    assert state.appended_messages == messages
+  end
+
+  test "replace_context restarts the window" do
+    state =
+      %{context: Context.new([]), estimated_tokens: 0}
+      |> Conversation.append_message(Context.user("before replacement"))
+      |> Conversation.replace_context(Context.new([Context.system("fresh"), Context.user("takeover")]))
+
+    assert state.appended_messages == []
+  end
+
+  test "a state without the window key starts accumulating from empty" do
+    state = %{context: Context.new([]), estimated_tokens: 0}
+    message = Context.user("only")
+    assert Conversation.append_message(state, message).appended_messages == [message]
+  end
+end
 end

@@ -315,4 +315,30 @@ defmodule Aikido.AiReact.LLMTurnTest do
       end
     end
   end
+
+  test "the completed turn exposes its accepted complete messages as a transition-local output" do
+    {:ok, %Aikido.Types.ActionResult{changes: changes, outputs: outputs}} =
+      then(signal("req_1", final_turn("42")), fn signal ->
+        Aikido.AiReact.Slice
+        |> Ash.ActionInput.for_action(
+          :llm_turn,
+          Map.put(signal.data || %{}, :state, running_slice()),
+          context: %{aikido: Map.put(%{}, :signal, signal)},
+          skip_unknown_inputs: [:*]
+        )
+        |> Ash.run_action()
+      end)
+
+    assert %{accepted_messages: accepted} = outputs
+    assert length(accepted) >= 1
+
+    assert Enum.map(accepted, & &1.role) ==
+             changes.context.messages
+             |> Enum.reject(&(&1.role == :system))
+             |> Enum.take(-length(accepted))
+             |> Enum.map(& &1.role)
+
+    refute Map.has_key?(changes, :accepted_messages)
+    refute Map.has_key?(changes, :appended_messages)
+  end
 end

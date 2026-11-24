@@ -9,12 +9,20 @@ defmodule Aikido.AiReact.Actions.ToolResult do
   @impl true
   def run(input, _opts, _context) do
     with {:ok, state, directives} <- process_tool_response(input) do
+      # Transition-local output: the accepted complete messages this result
+      # appended (tool message + any cycle-warning entry + hook-injected
+      # entries), for a composed consumer staged on the same signal. Never
+      # persisted into slice state.
       changes =
         if state == input.arguments.state,
           do: %{},
           else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
 
-      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+      Aikido.Types.ActionResult.new(
+        changes: changes,
+        directives: directives,
+        outputs: Conversation.accepted_output(state)
+      )
     end
   end
 
