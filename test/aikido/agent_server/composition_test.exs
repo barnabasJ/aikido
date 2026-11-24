@@ -260,30 +260,7 @@ defmodule R368CompTest.CompositionTest do
   end
 
   test "the typed output rejects non-map values" do
-    outcome =
-      try do
-        r = Aikido.Types.ActionResult.new(changes: %{}, directives: [], outputs: "not a map")
-        {:ok, r.outputs}
-      rescue
-        e -> {:raised, Exception.message(e)}
-      end
-
-    # The invalid value never lands verbatim in the result.
-    refute match?({:ok, "not a map"}, outcome)
-
-    assert match?({:raised, _}, outcome) or match?({:error, _}, outcome) or
-             match?({:ok, nil}, outcome) or match?({:ok, %{}}, outcome)
-  end
-
-  test "probe: typed outputs cast behavior" do
-    outcome =
-      try do
-        r = Aikido.Types.ActionResult.new(changes: %{}, directives: [], outputs: "not a map")
-        {:accepted, r.outputs}
-      rescue
-        e -> {:raised, Exception.message(e)}
-      end
-
-    IO.inspect(outcome, label: "PROBE_TYPED_OUTPUTS")
+    assert {:error, _invalid} =
+             Aikido.Types.ActionResult.new(changes: %{}, directives: [], outputs: "not a map")
   end
 end
