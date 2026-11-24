@@ -12,6 +12,48 @@ defmodule Aikido.Types.ActionResult do
   Supply nested attribute maps for embedded edits, using normal Ash embedded
   update/replacement semantics. Existing embedded structs retain Ash's native
   trusted-value behavior.
+
+  ## Transition-local outputs (`outputs`) and `staged_outputs`
+
+  A producer action may return `outputs`: a map folded onto the staged context
+  for the subsequent actions of the SAME signal. A consumer action on the same
+  signal type declares an explicitly LOWER route priority (so it runs after the
+  producer) and reads the producer's exact namespaced key from its private
+  stage context:
+
+      # Producer (slice route at its default -10 priority)
+      Aikido.Types.ActionResult.new(
+        changes: %{log: batch},
+        outputs: %{accepted_messages: batch}
+      )
+
+      # Consumer (agent route on the SAME signal type, explicitly lower
+      # priority, e.g. -20)
+      producer_key = {{MyApp.SourceSlice, :emit}, :src}
+
+      accepted =
+        input.context.aikido[:staged_outputs]
+        |> Map.get(producer_key, %{})
+        |> Map.get(:accepted_messages, [])
+
+  Contract:
+
+  - **Exact namespace.** Every output is stored under
+    `{{producer_resource, producer_action}, mount_path}`. Read that named key;
+    never enumerate the whole staged map — map iteration order is not part of
+    the contract.
+  - **Explicit route priority.** One signal type may match several routes;
+    targets run in router precedence order (path class, then declared
+    `priority:`, then declaration order). Declare the consumer's priority
+    explicitly lower than the producer's.
+  - **Same-transition lifetime.** The fold lives in the staged accumulator
+    only: it is stripped before state adoption (notifications and checkpoints
+    never carry it) and dies at the staged transaction boundary. No residue
+    survives into a later signal.
+  - **The application owns durable writes.** Outputs are a handoff to the
+    application's subsequent actions; nothing is persisted on their behalf.
+    Writing the application's Thread (or any other durable record) remains the
+    consumer action's own responsibility.
   """
   use Ash.TypedStruct
 

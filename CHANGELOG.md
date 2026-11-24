@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Expose transition-local producer outputs to same-signal consumers through
+  `Aikido.Types.ActionResult.outputs`. After adoption the runtime folds outputs
+  onto the staged context under the exact namespace
+  `{{producer_resource, producer_action}, mount_path}`; a consumer route on the
+  same signal type reads that named key from `context.aikido[:staged_outputs]`
+  and must declare an explicitly lower route priority than the producer. The
+  fold lives only for that same transition — it is stripped before state
+  adoption and dies with the staged transaction, so notifications, checkpoints,
+  telemetry and later signals never observe it. The staged map has no
+  enumeration-order contract: consumers read named keys. Durable writes (such
+  as an application's Thread) remain the consuming action's own responsibility.
+
 - Distinguish Team activation/topology deadlines from assigned-task deadlines
   with one public `Aikido.Team.Errors.DeadlineExceeded` contract. Retain the
   scheduled limit and operation/task/member correlation through native results,

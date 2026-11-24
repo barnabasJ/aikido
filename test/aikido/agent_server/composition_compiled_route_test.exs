@@ -129,19 +129,59 @@ defmodule R374CompTest.NotificationLog do
   @moduledoc false
   use Agent
 
-  def start_link(_arg), do: Agent.start_link(fn -> [] end, name: __MODULE__)
+  def start_link(_arg), do: Agent.start_link(fn -> {[], :none} end, name: __MODULE__)
 
-  def record(notification), do: Agent.cast(__MODULE__, fn log -> [notification | log] end)
+  def record(notification),
+    do: Agent.cast(__MODULE__, fn {log, awaiter} -> {[notification | log], awaiter} end)
 
-  def take, do: Agent.get(__MODULE__, &Enum.reverse/1)
+  # Event control: the awaiting test process registers itself BEFORE the emit;
+  # the notifier's tagged acknowledgement is then delivered as a message — no
+  # polling sleep.
+  def register_awaiter do
+    me = self()
+    Agent.cast(__MODULE__, fn {log, _awaiter} -> {log, me} end)
+  end
+
+  # Forward the notifier's tagged acknowledgement to the registered awaiter.
+  # Unacknowledged notifications (no awaiter registered yet) are only logged.
+  def acknowledge(notification) do
+    Agent.cast(__MODULE__, fn
+      {log, :none} ->
+        {log, :none}
+
+      {log, pid} ->
+        send(pid, {:r374_adopted_change, notification})
+        {log, :none}
+    end)
+  end
+
+  def take, do: Agent.get(__MODULE__, fn {log, _awaiter} -> Enum.reverse(log) end)
 end
 
 defmodule R374CompTest.ChangeNotifier do
   @moduledoc false
   use Ash.Notifier
 
+  # The acknowledgement TAG is the TESTED ADOPTED CHANGE: the emitted batch the
+  # assertions pin on the domain resource. Only a notification whose record
+  # carries that batch acknowledges — startup and init notifications (empty
+  # `received`) can never acknowledge.
+  @tested_adopted_batch "r374 accepted two"
+
   @impl true
-  def notify(notification), do: R374CompTest.NotificationLog.record(notification)
+  def notify(notification) do
+    R374CompTest.NotificationLog.record(notification)
+
+    case notification.data do
+      %{received: received} when is_list(received) ->
+        if @tested_adopted_batch in received do
+          R374CompTest.NotificationLog.acknowledge(notification)
+        end
+
+      _ ->
+        :ok
+    end
+  end
 end
 
 defmodule R374CompTest.CompiledAgent do
@@ -292,6 +332,11 @@ defmodule R374CompTest.CompiledRouteTest do
     start_supervised!(R374CompTest.NotificationLog)
     pid = start_server(ctx, R374CompTest.CompiledAgent)
 
+    # Registered BEFORE the emit: the acknowledgement is event-controlled and
+    # TAGGED to the tested adopted change — an init notification can never
+    # acknowledge it.
+    R374CompTest.NotificationLog.register_awaiter()
+
     assert {:ok, _} = emit(pid, %{emit: true}, fn runtime -> {:ok, runtime.agent.state} end)
 
     # Diagnostic boundaries: the observed snapshot and the raw server state.
@@ -303,23 +348,25 @@ defmodule R374CompTest.CompiledRouteTest do
     wrapper = :sys.get_state(pid).user_state
     refute inspect(Aikido.Durable.AgentServer.dump_state(wrapper)) =~ @canary
 
-    # Notification boundary: the adopted changes DID reach the resource
-    # notifier (positive control) and carried no staged output.
-    notifications = await_notifications()
+    # Notification boundary: the notifier acknowledges the notification that
+    # carries the TESTED ADOPTED CHANGE (the emitted batch on `received`), and
+    # that sampled notification carried no staged output.
+    assert {:r374_adopted_change, notification} = adopted_change_ack()
+    assert notification.data.received == ["r374 accepted one", "r374 accepted two"]
+    refute inspect(notification) =~ @canary
+
+    notifications = R374CompTest.NotificationLog.take()
     assert notifications != []
     refute Enum.any?(notifications, &(inspect(&1) =~ @canary))
   end
 
-  defp await_notifications do
-    Enum.reduce_while(1..30, [], fn _, _ ->
-      case R374CompTest.NotificationLog.take() do
-        [] ->
-          Process.sleep(100)
-          {:cont, []}
-
-        log ->
-          {:halt, log}
-      end
-    end)
+  # Bounded event wait: the message is sent by the notifier's tagged
+  # acknowledgement; the timeout only guards against a lost notification.
+  defp adopted_change_ack(timeout \\ 2_000) do
+    receive do
+      {:r374_adopted_change, notification} -> {:r374_adopted_change, notification}
+    after
+      timeout -> flunk("no notifier acknowledgement tagged to the adopted change")
+    end
   end
 end
