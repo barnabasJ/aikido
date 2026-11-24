@@ -4,6 +4,32 @@ Ordinary notification subscriptions and a storage agent that buffers and bulk
 upserts notifications do not require replay. Replay is an explicit source and
 consumer choice for retained history and missed-subscriber catch-up.
 
+## Exact accepted batches in composed actions
+
+An application action that owns a Thread mount can append once and use the exact
+newly accepted entries without reading a suffix of retained history:
+
+```elixir
+with {:ok, updated, accepted} <-
+       Aikido.Thread.Journal.append_with_entries(thread, incoming, signal) do
+  changes = Aikido.Thread.Journal.changes(thread, updated)
+  # Return the Thread changes and prepare app-owned publication directives
+  # from accepted, with the application's masking and scope checks.
+end
+```
+
+The third result contains the already cast `%Aikido.Thread.Types.Entry{}` values
+in accepted order, with their final IDs, sequences, timestamps and references.
+It contains the entire accepted batch without a size cap or retained-history
+prefix. Replay-enabled journals exclude identical retries and reject identity
+conflicts; ordinary journals keep their existing non-deduplicating policy.
+`append/3` remains available with its original `{:ok, updated}` contract.
+
+An empty batch requires no app publication. This pure helper performs no writes
+or broadcasts. Return sparse changes and directives from the owning action so
+normal native adoption and later actions can fail before effects execute.
+Post-adoption publication is not an exactly-once or durable outbox guarantee.
+
 ## Source opt-in and retention
 
 Start a source through its native domain with the embedded Thread setting:

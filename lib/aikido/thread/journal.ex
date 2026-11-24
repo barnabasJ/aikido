@@ -7,7 +7,24 @@ defmodule Aikido.Thread.Journal do
                       end)
 
   @doc "Append new immutable IDs, ignore identical retries and reject conflicting reuse atomically."
-  def append(%{replay?: false} = thread, entries, signal) do
+  def append(thread, entries, signal) do
+    with {:ok, updated, _accepted} <- append_with_entries(thread, entries, signal) do
+      {:ok, updated}
+    end
+  end
+
+  @doc """
+  Append once and return the updated journal and exact newly accepted typed entries.
+
+  The accepted entries retain input order and the IDs, sequences, timestamps and
+  references assigned by the journal's native Ash entry type. Replay-enabled
+  journals omit identical retries, including entries whose receipts survive
+  pruning. Ordinary journals retain their existing non-deduplicating behavior.
+  Errors return no successful partial batch. This pure operation stages no I/O.
+  """
+  @spec append_with_entries(map(), map() | [map()] | nil, Aikido.Signal.t()) ::
+          {:ok, map(), [Entry.t()]} | {:error, term()}
+  def append_with_entries(%{replay?: false} = thread, entries, signal) do
     now = Aikido.Signal.timestamp(signal)
 
     entries =
@@ -31,18 +48,18 @@ defmodule Aikido.Thread.Journal do
            rev: thread.rev + count,
            updated_at: now,
            stats: %{thread.stats | entry_count: thread.stats.entry_count + count}
-       }}
+       }, entries}
     end
   end
 
-  def append(thread, entries, signal) do
+  def append_with_entries(thread, entries, signal) do
     now = Aikido.Signal.timestamp(signal)
 
     with {:ok, appended, receipts} <- cast_new_entries(thread, List.wrap(entries), signal, now) do
       thread = %{thread | entry_receipts: receipts}
 
       if appended == [] do
-        {:ok, thread}
+        {:ok, thread, []}
       else
         {:ok,
          Map.merge(thread, %{
@@ -51,7 +68,7 @@ defmodule Aikido.Thread.Journal do
            rev: thread.rev + length(appended),
            updated_at: now,
            stats: %{thread.stats | entry_count: thread.stats.entry_count + length(appended)}
-         })}
+         }), appended}
       end
     end
   end

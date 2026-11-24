@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add `Aikido.Thread.Journal.append_with_entries/3`, returning the updated
+  journal and the exact newly accepted typed entries in order. Replay retries
+  contribute no duplicate entries, including after pruning. Existing `append/3`
+  keeps its two-element success tuple and both modes' state/error semantics.
+
 - Allow an agent route to declare `mount: :thread` (or another existing slice
   path). Generated reducer inputs use that mount's native resource struct, and
   returned changes are adopted through its normal update action. Explicit native
