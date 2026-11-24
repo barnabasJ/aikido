@@ -11,7 +11,14 @@ defmodule Aikido.AiReact.Actions.TodoChanged do
           do: %{},
           else: Map.take(state, Enum.map(Ash.Resource.Info.attributes(input.resource), & &1.name))
 
-      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
+      Aikido.Types.ActionResult.new(
+        changes: changes,
+        directives: directives,
+        # The waiting-continuation path appends run plumbing (the internal
+        # nudge — marker-excluded) and may flush REAL queued/hook text into
+        # the conversation; the window reports exactly the genuine entries.
+        outputs: Aikido.AiReact.Conversation.accepted_output(state)
+      )
     end
   end
 
