@@ -205,6 +205,17 @@ defmodule Aikido.ExplicitMountTest.ModelAgent do
   end
 end
 
+defmodule Aikido.ExplicitMountTest.NativeThreadAgent do
+  use Aikido.Agent
+
+  agent do
+    name "native_thread_alias"
+    slice :thread, Aikido.Thread.Slice
+
+    route Aikido.Thread.Signals.Append, {Aikido.Thread.Slice, :append}, name: :append_entry
+  end
+end
+
 defmodule Aikido.ExplicitRouteMountTest do
   use AikidoTest.Case, async: true
   alias Aikido.AgentServer
@@ -214,6 +225,21 @@ defmodule Aikido.ExplicitRouteMountTest do
     do: AgentServer.call(pid, signal("mount.accept", data), &{:ok, &1.agent.state})
 
   defp state(pid), do: AgentServer.state(pid, &{:ok, &1.agent.state})
+
+  test "one native Thread mount and its public alias invoke append exactly once", ctx do
+    pid = start_server(ctx, Fixtures.NativeThreadAgent)
+    assert Ash.Resource.Info.action(Fixtures.NativeThreadAgent, :append_entry)
+
+    event = signal("aikido.thread.append", %{entry: %{kind: :note, payload: %{text: "once"}}})
+    assert {:ok, result} = AgentServer.call(pid, event, &{:ok, &1.agent.state})
+
+    # Ordinary Thread appends have no replay de-duplication: two reducer
+    # invocations would append two entries and advance the revision twice.
+    assert result.thread.replay? == false
+    assert result.thread.rev == 1
+    assert [entry] = result.thread.entries
+    assert entry.payload == %{text: "once"}
+  end
 
   test "real ReAct completion is adopted by Thread in the same compiled transition", ctx do
     pid =

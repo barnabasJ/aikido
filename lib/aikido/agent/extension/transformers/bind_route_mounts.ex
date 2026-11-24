@@ -24,12 +24,36 @@ defmodule Aikido.Agent.Extension.Transformers.BindRouteMounts do
   defp validate_routes(dsl, routes, mounts) do
     Enum.reduce_while(routes, :ok, fn route, :ok ->
       with :ok <- validate_mount(dsl, route, mounts),
-           :ok <- validate_owner(dsl, route) do
+           :ok <- validate_owner(dsl, route),
+           :ok <- validate_distinct_route(dsl, route, mounts) do
         {:cont, :ok}
       else
         error -> {:halt, error}
       end
     end)
+  end
+
+  defp validate_distinct_route(_dsl, %{mount: nil}, _mounts), do: :ok
+
+  defp validate_distinct_route(dsl, route, mounts) do
+    mount = Enum.find(mounts, &(&1.path == route.mount))
+
+    duplicate? =
+      mount.module
+      |> Spark.Dsl.Extension.get_entities([:slice])
+      |> Enum.any?(fn native ->
+        native.type == route.type &&
+          Aikido.Slice.Info.action_reference(mount.module, native.action) == route.action
+      end)
+
+    if duplicate? do
+      error(
+        dsl,
+        "Route #{inspect(route.type)} duplicates the mounted slice route for #{inspect(route.action)} at #{inspect(route.mount)}; omit the redundant binding to retain the native route"
+      )
+    else
+      :ok
+    end
   end
 
   defp validate_owner(_dsl, %{mount: nil}), do: :ok

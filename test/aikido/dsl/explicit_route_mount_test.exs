@@ -9,7 +9,11 @@ end
 defmodule Aikido.Dsl.ExplicitRouteMountTest do
   use ExUnit.Case, async: true
 
-  defp compile_agent(routes, actions \\ "") do
+  defp compile_agent(
+         routes,
+         actions \\ "",
+         extra_mounts \\ "slice :other_thread, Aikido.Thread.Slice"
+       ) do
     module = Module.concat(__MODULE__, "Agent#{System.unique_integer([:positive])}")
 
     Code.compile_string("""
@@ -18,7 +22,7 @@ defmodule Aikido.Dsl.ExplicitRouteMountTest do
       agent do
         name "bound_route"
         slice :thread, Aikido.Thread.Slice
-        slice :other_thread, Aikido.Thread.Slice
+        #{extra_mounts}
         #{routes}
       end
       #{actions}
@@ -26,6 +30,19 @@ defmodule Aikido.Dsl.ExplicitRouteMountTest do
     """)
 
     module
+  end
+
+  test "one native Thread mount rejects a redundant same-signal action binding" do
+    assert_raise Spark.Error.DslError, ~r/duplicates the mounted slice route/, fn ->
+      compile_agent(
+        """
+        route Aikido.Thread.Signals.Append, {Aikido.Thread.Slice, :append},
+          mount: :thread, public?: false
+        """,
+        "",
+        ""
+      )
+    end
   end
 
   test "unknown mount is rejected for a generated implementation route" do

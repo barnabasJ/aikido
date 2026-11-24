@@ -923,4 +923,9 @@ only that owner: use distinct action names to target two mounts of the same
 resource. A native `{Resource, :action}` reference must declare `:state` as the
 mounted resource type or as `:struct` with `instance_of: MountedResource`.
 Implementation-module routes generate that constrained struct argument for you.
+An explicit binding that repeats a slice's existing signal/action route is
+rejected: the native route is already installed. Omit that binding, or use an
+ordinary unbound route declaration to name its public command alias. This avoids
+invoking the same reducer twice for one signal.
+
 Binding does not bypass the external command or internal reducer Ash policies.

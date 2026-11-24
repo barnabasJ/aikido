@@ -6,7 +6,8 @@
   path). Generated reducer inputs use that mount's native resource struct, and
   returned changes are adopted through its normal update action. Explicit native
   actions must declare a matching resource state argument. Missing mounts and
-  action references with ambiguous ownership fail compilation. Existing routes
+  action references with ambiguous ownership or redundant native route bindings
+  fail compilation. Existing routes
   and their default ownership are unchanged.
 
 - Expose transition-local producer outputs to same-signal consumers through
