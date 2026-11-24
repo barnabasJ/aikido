@@ -60,12 +60,28 @@ defmodule Aikido.AiReact.Conversation do
     Map.merge(state, %{
       context: Context.append(state.context, message),
       estimated_tokens: tokens + estimate_message_tokens(message),
-      # Producer-exposed accepted-message window: every append records itself
-      # here IN ORDER, so a consumer can journal exactly the accepted complete
-      # entries without diffing or re-walking retained history.
-      appended_messages: Map.get(state, :appended_messages, []) ++ [message]
+      # Producer-exposed accepted-message window: every TRANSCRIPT append
+      # records itself here IN ORDER, so a consumer can journal exactly the
+      # accepted complete entries without diffing or re-walking retained
+      # history. INTERNAL prompts (run plumbing, marked metadata) reach the
+      # context but never the window — they are not conversation transcript.
+      appended_messages: accepted_window_entry(state, message)
     })
   end
+
+  defp accepted_window_entry(state, message) do
+    window = Map.get(state, :appended_messages, [])
+    if internal_prompt?(message), do: window, else: window ++ [message]
+  end
+
+  # Internal run plumbing (todo continuation requests and similar nudges) is
+  # model-visible but is not conversation transcript: mark the metadata and
+  # the accepted window excludes it.
+  defp internal_prompt?(%Message{metadata: %{aikido_internal_prompt: true}}), do: true
+
+  defp internal_prompt?(%Message{metadata: %{"aikido_internal_prompt" => true}}), do: true
+
+  defp internal_prompt?(_message), do: false
 
   @doc "Append messages in order, updating the estimate for each new message."
   def append_messages(state, messages),
@@ -175,7 +191,7 @@ defmodule Aikido.AiReact.Conversation do
 
   defp data_value(data, key), do: Map.get(data, key, Map.get(data, to_string(key)))
 
-@doc """
+  @doc """
   Extract the accepted-message window from the run state, leaving the state
   clean. The window collects the messages each append accepted (in order);
   the caller turns it into its transition-local output and never persists it.

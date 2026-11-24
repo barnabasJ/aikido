@@ -1955,7 +1955,8 @@ defmodule Aikido.AgentServer do
       {:ok, proposed, _staged, notifications, directives} ->
         {proposed, notifications, directives}
 
-      {:error, reason} -> raise Ash.Error.to_error_class(reason)
+      {:error, reason} ->
+        raise Ash.Error.to_error_class(reason)
     end
   end
 
@@ -1967,8 +1968,8 @@ defmodule Aikido.AgentServer do
     ctx.agent_module
     |> action_mount_paths(reference)
     |> Enum.reduce_while({:ok, ctx, staged, notifications, effects}, fn path,
-                                                                       {:ok, current, staged,
-                                                                        notifications, effects} ->
+                                                                        {:ok, current, staged,
+                                                                         notifications, effects} ->
       # STRIP POINT (private input): the staged outputs are visible ONLY to
       # this action's private stage context; the reducer's runtime carries
       # them under :staged_outputs for this call alone.

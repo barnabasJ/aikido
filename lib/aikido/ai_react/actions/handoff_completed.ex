@@ -108,24 +108,25 @@ defmodule Aikido.AiReact.Actions.HandoffCompleted do
   defp replace_conversation(state, document) do
     system = Enum.filter(state.context.messages, &(&1.role == :system))
 
-    context =
-      system
-      |> ReqLLM.Context.new()
-      |> ReqLLM.Context.append(
-        ReqLLM.Context.user("""
-        You are taking over mid-run. Your predecessor left this handoff:
+    # The takeover is an EXPLICIT accepted entry (never a context construction
+    # outside the seam): the window after the replacement restart is
+    # [takeover, carried replay...] — including the EMPTY-carry case, where
+    # the window is exactly [takeover]. Replayed carry is genuine transcript;
+    # internal todo prompts are excluded by their marker upstream.
+    takeover =
+      ReqLLM.Context.user("""
+      You are taking over mid-run. Your predecessor left this handoff:
 
-        #{document}
+      #{document}
 
-        Continue from the next action.\
-        """)
-      )
+      Continue from the next action.\
+      """)
 
     carry = state.opening_messages ++ state.queued_messages
 
     state
-    |> Conversation.replace_context(context)
-    |> Conversation.append_messages(Enum.map(carry, &ReqLLM.Context.user/1))
+    |> Conversation.replace_context(ReqLLM.Context.new(system))
+    |> Conversation.append_messages([takeover] ++ Enum.map(carry, &ReqLLM.Context.user/1))
   end
 
   defp check_context_capacity(state) do

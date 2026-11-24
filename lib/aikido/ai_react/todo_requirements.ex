@@ -149,9 +149,12 @@ defmodule Aikido.AiReact.TodoRequirements do
       "Continue the remaining work and use tools to provide completion evidence:\n" <>
         Enum.map_join(remaining, "\n", &"- #{&1.id}: #{&1.text}")
 
+    # INTERNAL run plumbing: model-visible continuation nudge, never transcript.
     state =
       state
-      |> Aikido.AiReact.Conversation.append_message(ReqLLM.Context.user(text))
+      |> Aikido.AiReact.Conversation.append_message(
+        ReqLLM.Context.user(text, %{aikido_internal_prompt: true})
+      )
       |> Map.merge(%{
         status: :running,
         result: nil,

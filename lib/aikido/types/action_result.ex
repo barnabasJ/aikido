@@ -27,13 +27,11 @@ defmodule Aikido.Types.ActionResult do
     end
 
     field :outputs, :map do
-      description(
-        "Transition-local reducer outputs folded onto the staged context for " <>
-          "subsequent actions of the SAME signal, namespaced by producer action " <>
-          "reference and mount path. Never persisted: the fold lives in the " <>
-          "staged accumulator only, is stripped before state adoption, and dies " <>
-          "with the staged transaction."
-      )
+      description "Transition-local reducer outputs folded onto the staged context for " <>
+                    "subsequent actions of the SAME signal, namespaced by producer action " <>
+                    "reference and mount path. Never persisted: the fold lives in the " <>
+                    "staged accumulator only, is stripped before state adoption, and dies " <>
+                    "with the staged transaction."
 
       allow_nil? false
       default %{}
