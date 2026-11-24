@@ -45,13 +45,15 @@ defmodule R368CompTest.ConsumerRecord do
       raise "poisoned consumer"
     end
 
-    # Generic consumption: the fold is namespaced by {reference, path}; a
-    # consumer reading ALL staged outputs sees every producer's batch, in
-    # staged order.
+    # Generic consumption: the fold is namespaced by {reference, path}; the
+    # consumer reads the producer's EXACT keys for its declared mount paths,
+    # in staged order — never an enumeration of the whole accumulator.
     batch =
-      (input.context[:aikido][:staged_outputs] || %{})
-      |> Enum.flat_map(fn {_key, output} ->
-        Map.get(output || %{}, :accepted_messages, [])
+      input.arguments.paths
+      |> Enum.flat_map(fn path ->
+        (input.context[:aikido][:staged_outputs] || %{})
+        |> Map.get({{R368CompTest.SourceSlice, :emit}, path}, %{})
+        |> Map.get(:accepted_messages, [])
       end)
       |> Enum.map(fn message ->
         if is_list(message.content),
@@ -104,6 +106,7 @@ defmodule R368CompTest.ConsumerSlice do
     action :record, Aikido.Types.ActionResult do
       argument :state, :term
       argument :poison, :boolean
+      argument :paths, {:array, :atom}, default: [:src]
       run R368CompTest.ConsumerRecord
     end
   end
@@ -203,11 +206,13 @@ defmodule R368CompTest.CompositionTest do
     signal = %Aikido.Signal{id: nil, type: "r368/emit", data: %{}, source: "/test"}
 
     # ONE source target: its action runs at EACH mounted path (:src_a, then
-    # :src_b) — the fold namespaces the two batches separately.
+    # :src_b) — the consumer reads the two DISTINCT EXACT keys
+    # {{SourceSlice, :emit}, :src_a} and {{SourceSlice, :emit}, :src_b},
+    # never an enumeration of the accumulator.
     {:ok, %{agent: adopted}, _} =
       AgentServer.apply_actions(signal, build_ctx(R368CompTest.TwoMountsAgent, agent, signal), [
         {{R368CompTest.SourceSlice, :emit}, %{}},
-        {{R368CompTest.ConsumerSlice, :record}, %{poison: false}}
+        {{R368CompTest.ConsumerSlice, :record}, %{poison: false, paths: [:src_a, :src_b]}}
       ])
 
     # Each mount contributed its own full batch; the consumer received both,
