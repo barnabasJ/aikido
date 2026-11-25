@@ -371,7 +371,7 @@ defmodule Aikido.TerminalTaskDeliveryDeadlineTest do
       assert_receive {:aikido_subscription, ^terminal, %{result: {:ok, failed}}}, 5_000
       assert failed.request_id == request
       assert failed.deadline_at == deadline
-      assert failed.error == :timeout
+      assert %Aikido.AiReact.Errors.ProviderRequestFailed{timeout_phase: :deadline} = failed.error
       assert_receive {:DOWN, ^original_down, :process, ^original_model, _reason}, 5_000
     end)
   end

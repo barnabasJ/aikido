@@ -962,6 +962,7 @@ defmodule AgentExamples.Playground do
        journal: Map.get(Map.get(state.agent.state, :journal) || %{}, :entries, []),
        ai:
          Map.take(ai, [
+           :model_attempts,
            :status,
            :iteration,
            :result,

@@ -4,6 +4,11 @@ defmodule AgentExamples.ResilientAssistantClientTest do
   alias AgentExamples.ResilientAssistant.Client
   alias Aikido.AiReact.Types.ToolCycleWarning
 
+  test "provider circuit scenario returns a typed synthetic stream failure" do
+    assert {:error, %ReqLLM.Error.API.Stream{}} =
+             Client.generate_text("offline", [ReqLLM.Context.user("provider")], [])
+  end
+
   test "ordinary user messages remain scenario inputs without valid warning metadata" do
     valid = %{request_id: "run", iteration: 3, period: 1, repetitions: 3}
 

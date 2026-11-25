@@ -548,7 +548,12 @@ defmodule Aikido.ContextHandoffTest do
     assert_receive {:request, retry, _, []}, 5_000
     monitor = Process.monitor(retry)
     assert {:ok, %{deadline_at: ^deadline}} = ai(pid)
-    assert {:error, {:context_handoff_failed, :timeout}} = Task.await(task, 5_000)
+
+    assert {:error,
+            {:context_handoff_failed,
+             %Aikido.AiReact.Errors.ProviderRequestFailed{timeout_phase: :deadline}}} =
+             Task.await(task, 5_000)
+
     assert_receive {:DOWN, ^monitor, :process, ^retry, _}, 5_000
     refute_received {:request, _, _, _}
   end

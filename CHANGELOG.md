@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Bound prepared model requests by the remaining attempt and inherited run
+  deadline, forwarding that budget to ReqLLM's whole-call and transport options.
+  Model timer failures carry a typed timeout phase, including nonstreaming
+  context-handoff failure receipts. Record bounded, payload-free attempt lifecycle
+  and wire-progress facts through a native slice action and telemetry. Add a
+  configurable same-signature provider backoff within the existing retry loop,
+  and a deterministic resilience example. Per-inner-transport deadline
+  recomputation remains a separate ReqLLM dependency change. Require ReqLLM
+  1.29 or newer for its native whole-call timeout contract.
+
 - Project selector failures defensively across calls, state reads, subscriptions
   and inspector projections. `:selector_raised` now contains the exception's
   module and argument-free `{module, function, arity}` frames, replacing the raw

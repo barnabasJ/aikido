@@ -448,6 +448,50 @@ streaming cancellation also closes
 the ReqLLM stream. A custom client can wrap provider-specific concurrency limits.
 Applications still own cancellation and deadlines inside actions exposed to Lua.
 
+Seed `metadata: %{aikido_deadline_at: deadline_at}` when starting the run, where
+`deadline_at` is calculated once at the caller's I/O boundary in Unix milliseconds.
+The AI slice retains that exact deadline through ordinary turns, retries and
+nonstreaming context handoffs. A model attempt also captures its own deadline
+before model preparation; preparation consumes that budget. Immediately before
+provider I/O, Aikido bounds ReqLLM's `total_timeout`, `receive_timeout`,
+Finch `pool_timeout` and `request_timeout` (under `req_http_options[:finch]`)
+by the remaining time, retaining shorter
+caller limits. Global ReqLLM defaults are unchanged. The cancellable attempt loop
+remains the sole owner of model retries. With the currently locked ReqLLM,
+`total_timeout` bounds the whole native call, including its transport retries;
+recomputing every inner transport wait requires the separate ReqLLM deadline
+propagation change. This does not turn a caller's wait timeout into a run deadline.
+
+Model timer failures use `Aikido.AiReact.Errors.ModelTimeout`, projected at the
+public boundary to `ProviderRequestFailed` with `timeout_phase: :attempt`,
+`:stream_idle` or `:deadline`. Native provider failures retain their known HTTP
+status or timeout phase. Known transport classes and enum reasons such as
+`:timeout` are retained separately; a transport timeout does not establish which
+phase expired. Unknown status and underlying cause remain unknown;
+request bodies, headers and raw provider messages are not attempt facts.
+
+`provider_failure_threshold` defaults to three consecutive failures with the
+same safe class/status/timeout signature. While retries and time remain, the
+existing retry loop enters `:provider_backoff` for at least `provider_backoff_ms`
+(30 seconds by default), clamped to the inherited deadline. The normal exponential
+retry delay still applies if longer. Set the threshold to `nil` to disable this
+per-model-call circuit. It neither adds retries nor shares breaker state between
+agents or model calls. Cancellation and owner termination interrupt its wait.
+
+The slice's public `model_attempts` contains at most 32 attempts for the current
+run. Each record identifies the request, mode, handoff, turn and zero-based SDK
+attempt. It accumulates start/end/cleanup/terminal-enqueue times, duration,
+backoff, stream opening and first-chunk facts, plus parsed-wire progress,
+non-progress and rendered chunk counts. A returned stream handle does not prove
+an HTTP response status. Qualifying content parts can refresh progress without
+rendering text; they never extend the fixed attempt or inherited deadline.
+Terminal enqueue is not an acknowledgement of reducer adoption or storage.
+The same safe facts are emitted on `[:aikido, :ai, :model_attempt, phase]` telemetry
+and adopted through the ordinary `ai.react.model_attempt` signal. Runtime clocks,
+observer callbacks and stream cleanup functions remain transient I/O values.
+The playground's resilience example has a deterministic `provider` scenario and
+an attempt table for inspecting the circuit without provider credentials.
+
 Team assignments retain their supplied `timeout_ms` through lazy member activation.
 That assignment limit is separate from model/tool attempt timeouts and the
 application's workflow budget. A worker may report `:timeout` through

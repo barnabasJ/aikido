@@ -188,6 +188,7 @@ defmodule Aikido.AiReact.RunState do
       streaming_text: "",
       streaming_thinking: "",
       stream_attempt: 0,
+      model_attempts: [],
       usage: %{},
       iteration: 0,
       result: nil,

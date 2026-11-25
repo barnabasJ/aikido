@@ -84,8 +84,8 @@ defmodule Aikido.AiReact.Directives.LLMCall do
   end
 
   alias Aikido.AgentServer
-  alias Aikido.Signal
   alias Aikido.AiReact.Directives.LLMCall
+  alias Aikido.Signal
   alias ReqLLM.Context
 
   @impl true
@@ -154,13 +154,24 @@ defmodule Aikido.AiReact.Directives.LLMCall do
       d.request_id,
       supervisor,
       fn notify, attempt ->
+        timing =
+          Aikido.AiReact.AttemptTiming.resolve(get_in(scope, [:context, :aikido_attempt_timing]))
+
+        budget =
+          Aikido.AiReact.ModelRequestBudget.deadline(
+            timing,
+            d.deadline_at,
+            d.options.model_timeout_ms
+          )
+
         emit = fn text, thinking ->
           dispatch_stream_delta(d, text, thinking, attempt, agent_pid, source, scope)
         end
 
-        prepare_and_request(d, messages, llm_opts, notify, emit, preparation)
+        prepare_and_request(d, messages, llm_opts, notify, emit, preparation, {timing, budget})
       end,
-      execution_options(d, scope)
+      execution_options(d, scope) ++
+        [observe: Aikido.AiReact.ModelAttemptObservation.observer(d, agent_pid, source, scope)]
     )
   end
 
@@ -178,23 +189,34 @@ defmodule Aikido.AiReact.Directives.LLMCall do
       progress_timeout:
         if(streaming?(d), do: d.options.progress_timeout_ms, else: d.options.model_timeout_ms),
       retries: d.options.model_max_retries,
-      backoff: d.options.retry_backoff_ms
+      backoff: d.options.retry_backoff_ms,
+      circuit_threshold: d.options.provider_failure_threshold,
+      circuit_backoff: d.options.provider_backoff_ms,
+      timeout_error: fn phase, timeout ->
+        Aikido.AiReact.Errors.ModelTimeout.exception(kind: phase, timeout: timeout)
+      end
     ]
   end
 
   defp streaming?(d), do: d.options.streaming && d.mode != :handoff
 
-  defp prepare_and_request(d, messages, options, notify, emit, nil),
-    do: request_model_response(d, d.model, messages, options, notify, emit)
+  defp prepare_and_request(d, messages, options, notify, emit, nil, budget),
+    do: request_model_response(d, d.model, messages, options, notify, emit, budget)
 
-  defp prepare_and_request(d, messages, options, notify, emit, {action, scope}) do
+  defp prepare_and_request(d, messages, options, notify, emit, {action, scope}, budget) do
     with {:ok, prepared} <-
            Aikido.AiReact.ModelPreparation.prepare(action, d.model, options, scope) do
-      request_model_response(d, prepared.model, messages, prepared.options, notify, emit)
+      request_model_response(d, prepared.model, messages, prepared.options, notify, emit, budget)
     end
   end
 
-  defp request_model_response(d, model, messages, options, notify, emit) do
+  defp request_model_response(d, model, messages, options, notify, emit, {timing, deadline}) do
+    with {:ok, options} <- Aikido.AiReact.ModelRequestBudget.options(options, timing, deadline) do
+      perform_model_request(d, model, messages, options, notify, emit, timing)
+    end
+  end
+
+  defp perform_model_request(d, model, messages, options, notify, emit, timing) do
     if streaming?(d) do
       Aikido.AiReact.ModelStream.call(
         d.client,
@@ -204,7 +226,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
         emit,
         notify,
         d.options.stream_batch_bytes,
-        d.options.stream_batch_ms
+        {d.options.stream_batch_ms, timing}
       )
     else
       d.client.generate_text(model, messages, options)
@@ -232,6 +254,16 @@ defmodule Aikido.AiReact.Directives.LLMCall do
   defp send_model_result_to_agent(result, d, pid, source, scope) do
     signal = result |> model_result_signal(d, source) |> Aikido.Signal.put_ctx(scope)
     AgentServer.cast(pid, signal)
+    observe = Aikido.AiReact.ModelAttemptObservation.observer(d, pid, source, scope)
+
+    outcome =
+      case result do
+        {:ok, _} -> :completed
+        {:error, :cancelled} -> :cancelled
+        _ -> :failed
+      end
+
+    observe.(nil, :terminal, %{terminal_outcome: outcome})
   end
 
   defp model_result_signal({:ok, response}, d, source) do

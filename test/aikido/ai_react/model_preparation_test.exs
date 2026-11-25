@@ -2,9 +2,9 @@ defmodule Aikido.AiReact.ModelPreparationTest do
   use AikidoTest.Case, async: true
   @moduletag aikido_instance: Aikido.ModelPreparationTest.Instance
   @moduletag aikido_scope_adapter: Aikido.ModelPreparationTest.Authority
-  alias Aikido.ModelPreparationTest.{Authority, Domain, Preparation}
   alias Aikido.AI.Test.ResponseFixtures, as: Responses
   alias Aikido.AttemptTimingTest.Manual
+  alias Aikido.ModelPreparationTest.{Authority, Domain, Preparation}
 
   setup do
     receiver = %{id: unique_id("receiver"), allowed: true, can_prepare?: true, observer: self()}
@@ -269,7 +269,10 @@ defmodule Aikido.AiReact.ModelPreparationTest do
     monitor = Process.monitor(attempt)
     assert_receive {:armed, _, _, 50}, 5_000
     :ok = Manual.advance(clock, 50)
-    assert await_terminal(worker, "deadline").error == :timeout
+
+    assert %Aikido.AiReact.Errors.ProviderRequestFailed{timeout_phase: :attempt} =
+             await_terminal(worker, "deadline").error
+
     assert_receive {:DOWN, ^monitor, :process, ^attempt, _}, 5_000
     refute_receive {:provider_called, _, _, _, _}
   end

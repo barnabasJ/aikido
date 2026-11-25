@@ -150,7 +150,7 @@ defmodule Aikido.MixProject do
       {:simple_sat, "~> 0.1"},
       {:deep_merge, "~> 1.0"},
       {:jason, "~> 1.4"},
-      {:req_llm, "~> 1.24"},
+      {:req_llm, "~> 1.29"},
       {:spark, "~> 2.2"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},

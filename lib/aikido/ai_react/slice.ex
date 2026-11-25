@@ -29,6 +29,13 @@ defmodule Aikido.AiReact.Slice do
     description "Embedded ReAct conversation state and native signal reducers."
 
     schema do
+      attribute :model_attempts, {:array, Aikido.AiReact.Types.ModelAttempt} do
+        description "Latest 32 model attempts for this run, including wire counts, retry delays and cleanup facts; no provider content."
+        default []
+        allow_nil? false
+        public? true
+      end
+
       attribute :tool_error_streak, :integer do
         description "Consecutive completed tool batches containing execution errors."
         default 0
@@ -475,6 +482,8 @@ defmodule Aikido.AiReact.Slice do
     route Aikido.Todo.Signals.TodoChanged, Aikido.AiReact.Actions.TodoChanged, public?: false
 
     route Aikido.AiReact.Signals.Stream, Aikido.AiReact.Actions.Stream, public?: false
+
+    route Aikido.AiReact.Signals.ModelAttempt, Aikido.AiReact.Actions.ModelAttempt, public?: false
 
     route Aikido.AiReact.Signals.LlmTurn, Aikido.AiReact.Actions.LlmTurn, public?: false
 

@@ -109,4 +109,34 @@ defmodule Aikido.ProviderRequestFailedTest do
       assert ProviderRequestFailed.from_reason(reason) === reason
     end
   end
+
+  test "known transport causes are typed without exposing raw errors or inventing a timeout phase" do
+    cause = Req.TransportError.exception(reason: :timeout)
+
+    raw =
+      ReqLLM.Error.API.Request.exception(
+        cause: cause,
+        reason: "PRIVATE-TRANSPORT-TEXT",
+        request_body: "PRIVATE-REQUEST"
+      )
+
+    for original <- [cause, raw] do
+      error = ProviderRequestFailed.from_reason(original)
+      assert error.transport_type == Req.TransportError
+      assert error.transport_reason == :timeout
+      assert error.timeout_phase == nil
+      assert error.status == nil
+      refute inspect(error) =~ "PRIVATE-"
+      assert AshLua.Error.to_error(error).vars.transport_reason == :timeout
+    end
+
+    unknown =
+      ReqLLM.Error.API.Stream.exception(reason: "PRIVATE-UNKNOWN")
+      |> ProviderRequestFailed.from_reason()
+
+    assert unknown.cause_type == ReqLLM.Error.API.Stream
+    assert unknown.transport_type == nil
+    assert unknown.transport_reason == nil
+    assert unknown.status == nil
+  end
 end

@@ -109,6 +109,19 @@ defmodule Aikido.AiReact.Options do
       constraints min: 0
     end
 
+    field :provider_failure_threshold, :integer do
+      description "Consecutive same-signature model failures opening a longer provider backoff, while retries and deadline remain. Nil disables the circuit."
+      default 3
+      constraints min: 1
+    end
+
+    field :provider_backoff_ms, :integer do
+      description "Minimum circuit-open delay before the existing model retry owner may try again. Clamped to the inherited deadline."
+      default 30_000
+      allow_nil? false
+      constraints min: 1
+    end
+
     field :tool_max_retries, :integer do
       description "Number of additional attempts allowed after a retryable tool failure."
       default 0

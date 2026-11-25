@@ -225,7 +225,7 @@ defmodule Aikido.AiReact.NudgeOnceNativeTest do
     assert_receive {:atl47_model, held, :lead, _, _}, 5_000
     monitor = Process.monitor(held)
     failed = await_ai(owner, &(&1.status == :failed))
-    assert failed.error == :timeout
+    assert %Aikido.AiReact.Errors.ProviderRequestFailed{timeout_phase: :deadline} = failed.error
     assert failed.deadline_at == deadline
     assert_receive {:DOWN, ^monitor, :process, ^held, _}, 5_000
     refute_received {:atl47_model, _, :lead, _, _}

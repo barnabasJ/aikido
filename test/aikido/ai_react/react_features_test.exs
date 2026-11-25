@@ -59,8 +59,8 @@ end
 
 defmodule Aikido.ReactFeaturesTest do
   use AikidoTest.Case, async: false
-  alias Aikido.ReactFeaturesTest.{Agent, Client}
   alias Aikido.AI.Test.ResponseFixtures, as: Responses
+  alias Aikido.ReactFeaturesTest.{Agent, Client}
 
   defp options(extra \\ []),
     do:
@@ -114,7 +114,10 @@ defmodule Aikido.ReactFeaturesTest do
     task = Task.async(fn -> Aikido.AI.ask_sync(pid, "timeout", opts) end)
     assert_receive {:model, worker, _}, 2_000
     monitor = Process.monitor(worker)
-    assert {:error, :timeout} = Task.await(task)
+
+    assert {:error, %Aikido.AiReact.Errors.ProviderRequestFailed{timeout_phase: :attempt}} =
+             Task.await(task)
+
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
 
     opts = options(options: %{model_max_retries: 1, retry_backoff_ms: 0})

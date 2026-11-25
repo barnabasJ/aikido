@@ -27,6 +27,9 @@ defmodule AgentExamples.ResilientAssistant.Client do
       query == "retry" ->
         {:error, :timeout}
 
+      query == "provider" ->
+        {:error, ReqLLM.Error.API.Stream.exception(reason: "Synthetic unavailable provider")}
+
       query == "cycle" ->
         Responses.call(if(rem(results, 2) == 0, do: "text_stats", else: "stamp"), %{
           text: "same input"

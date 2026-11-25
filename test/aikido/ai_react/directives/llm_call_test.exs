@@ -76,6 +76,12 @@ defmodule Aikido.AiReact.Directives.LLMCallTest.Agent do
     persistence :temporary
 
     schema do
+      attribute :model_attempts, {:array, Aikido.AiReact.Types.ModelAttempt} do
+        description "Typed attempt facts emitted by this actual model directive."
+        default []
+        allow_nil? false
+      end
+
       attribute :request_id, :string do
         description "Correlation of the current model attempt."
       end
@@ -99,6 +105,8 @@ defmodule Aikido.AiReact.Directives.LLMCallTest.Agent do
 
     route Aikido.AiReact.Signals.Failed,
           Aikido.AiReact.Directives.LLMCallTest.Actions.RecordFailure, public?: false
+
+    route Aikido.AiReact.Signals.ModelAttempt, Aikido.AiReact.Actions.ModelAttempt, public?: false
 
     route Aikido.AiReact.Signals.HandoffCompleted,
           Aikido.AiReact.Directives.LLMCallTest.Actions.RecordHandoff, public?: false

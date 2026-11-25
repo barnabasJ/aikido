@@ -1206,6 +1206,25 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert Playground.get(owner, "resilience").snapshot.ai.error == :cancelled
   end
 
+  test "provider scenario shows its circuit and model attempts without credentials", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/resilience")
+    owner = start(view, "resilience")
+    assert has_element?(view, "#model-attempts")
+    view |> element("#scenario-provider") |> render_click()
+
+    await(owner, "resilience", fn run ->
+      run.status == :failed &&
+        match?(
+          %Aikido.AiReact.Errors.ProviderRequestFailed{cause_type: ReqLLM.Error.API.Stream},
+          run.snapshot.ai.error
+        )
+    end)
+
+    assert has_element?(view, "#model-attempts td", "provider_backoff")
+    assert has_element?(view, "#model-attempts td", "terminal")
+    assert has_element?(view, "#model-attempts td", "Unknown")
+  end
+
   test "stopping and starting a permanent example restores its history under the same identity",
        %{conn: conn} do
     {:ok, view, _} = live(conn, "/examples/recovery")
