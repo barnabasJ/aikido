@@ -480,6 +480,15 @@ through a transient observer created by the I/O executor. It feeds the same
 coalesced attempt observations as wire facts and does not refresh semantic
 progress. No observer callback is added to agent state, emitted Aikido directives
 or checkpoints.
+For buffered HTTP calls, the executor captures the current Ash tracer context
+through `Ash.ProcessHelpers` and composes a transient Req plugin into
+`req_http_options[:plugins]`. Its request step reinstates that selected context
+in the process executing HTTP I/O, including ReqLLM's finite request task.
+Existing application plugins and adapters are preserved. Applications with their
+own process-local transport context can use the same Req plugin/request-step API
+to transfer explicitly selected values. Aikido does not copy the process dictionary
+or persist these instrumentation closures.
+
 Requests with no HTTP response retain unknown status. Attempt facts also retain
 `absolute_deadline_at`, the effective cutoff captured before scheduling.
 

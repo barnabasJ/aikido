@@ -161,7 +161,15 @@ defmodule Aikido.AiReact.Directives.LLMCall do
           dispatch_stream_delta(d, text, thinking, attempt, agent_pid, source, scope)
         end
 
-        prepare_and_request(d, messages, llm_opts, notify, emit, preparation, {timing, budget})
+        prepare_and_request(
+          d,
+          messages,
+          llm_opts,
+          notify,
+          emit,
+          preparation,
+          {timing, budget, scope[:tracer]}
+        )
       end,
       execution_options(d, scope) ++
         [observe: Aikido.AiReact.ModelAttemptObservation.observer(d, agent_pid, source, scope)]
@@ -203,10 +211,20 @@ defmodule Aikido.AiReact.Directives.LLMCall do
     end
   end
 
-  defp request_model_response(d, model, messages, options, notify, emit, {timing, deadline}) do
+  defp request_model_response(
+         d,
+         model,
+         messages,
+         options,
+         notify,
+         emit,
+         {timing, deadline, tracers}
+       ) do
     with {:ok, options} <- Aikido.AiReact.ModelRequestBudget.options(options, timing, deadline) do
       options =
-        Keyword.put(options, :on_response_status, fn %{status: status} ->
+        options
+        |> Aikido.AiReact.ModelRequestTracing.options(tracers)
+        |> Keyword.put(:on_response_status, fn %{status: status} ->
           notify.({:observation, %{status: status}})
         end)
 

@@ -12,7 +12,9 @@
   into the reviewed ReqLLM fork so native inner requests, retry waits and caller
   cleanup share that budget. Observe actual HTTP status through a transient
   I/O callback; no function is retained in state or checkpoints. Native ReqLLM
-  owns transport clamping, preserving shorter caller limits.
+  owns transport clamping, preserving shorter caller limits. Preserve native Ash
+  tracing across buffered HTTP tasks through composable transient Req plugins,
+  retaining application-owned plugins and adapters.
   Coalesce wire observations before state adoption and telemetry, retaining
   exact final counts without per-chunk publication. Scheduling and preparation
   share the supervisor's single immutable attempt cutoff.

@@ -622,6 +622,7 @@ defmodule Aikido.ModelRetryTest do
     assert state.ai.result == "observed native response"
     assert [%{status: 200, absolute_deadline_at: ^deadline}] = state.ai.model_attempts
     refute Keyword.has_key?(state.ai.llm_opts, :on_response_status)
+    refute get_in(state.ai.llm_opts, [:req_http_options, :plugins])
     pool = Aikido.durable_supervisor_name(ctx.aikido)
     {:ok, id} = Aikido.AgentServer.state(ctx.owner, &{:ok, &1.id})
     assert :ok = Aikido.Durable.stop(pool, ctx.owner, scope: %{actor: ctx.actor})
@@ -629,6 +630,7 @@ defmodule Aikido.ModelRetryTest do
     assert {:ok, persisted} = Aikido.AgentServer.state(restored, &{:ok, &1.agent.state.ai})
     assert persisted.model_attempts == state.ai.model_attempts
     refute Keyword.has_key?(persisted.llm_opts, :on_response_status)
+    refute get_in(persisted.llm_opts, [:req_http_options, :plugins])
   end
 
   test "stream response status is coalesced without refreshing semantic progress", ctx do

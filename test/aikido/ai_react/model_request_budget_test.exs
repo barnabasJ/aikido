@@ -64,15 +64,35 @@ defmodule Aikido.ModelRequestBudgetTest do
     assert Keyword.delete(opts, :total_deadline_at) == caller
   end
 
+  defp budget(ctx, monotonic, timeout, inherited \\ nil) do
+    absolute = Manual.system_ms(ctx.clock) + monotonic - Manual.monotonic_ms(ctx.clock)
+
+    AttemptBudget.new!(
+      monotonic_deadline: monotonic,
+      timeout_ms: timeout,
+      absolute_deadline_at: min(absolute, inherited || absolute),
+      deadline_at: inherited
+    )
+  end
+end
+
+defmodule Aikido.NativeModelRequestBudgetTest do
+  use ExUnit.Case, async: false
+  alias Aikido.AiReact.{AttemptBudget, ModelRequestBudget}
+
   test "the native provider and adapter enforce the carried absolute cutoff" do
     observer = self()
 
     adapter = fn request ->
       send(
         observer,
-        {:native_adapter_options, request.options,
+        {:native_adapter_options, self(), request.options,
          Req.Request.get_private(request, :req_llm_timeout_deadline)}
       )
+
+      receive do
+        :respond -> :ok
+      end
 
       body = %{
         id: "synthetic",
@@ -116,25 +136,14 @@ defmodule Aikido.ModelRequestBudgetTest do
 
     assert options[:total_deadline_at] == absolute
 
-    assert {:ok, %ReqLLM.Response{} = response} =
-             ReqLLM.Generation.generate_text(model, "hi", options)
-
+    request = Task.async(fn -> ReqLLM.Generation.generate_text(model, "hi", options) end)
+    assert_receive {:native_adapter_options, adapter_pid, options, native_deadline}, 5_000
+    send(adapter_pid, :respond)
+    assert {:ok, %ReqLLM.Response{} = response} = Task.await(request, 5_000)
     assert ReqLLM.Response.text(response) == "done"
-    assert_receive {:native_adapter_options, options, native_deadline}, 5_000
     assert options.receive_timeout in 1..10_000
     assert options.finch[:pool_timeout] == options.receive_timeout
     assert options.finch[:request_timeout] == options.receive_timeout
     assert native_deadline.expires_at <= monotonic
-  end
-
-  defp budget(ctx, monotonic, timeout, inherited \\ nil) do
-    absolute = Manual.system_ms(ctx.clock) + monotonic - Manual.monotonic_ms(ctx.clock)
-
-    AttemptBudget.new!(
-      monotonic_deadline: monotonic,
-      timeout_ms: timeout,
-      absolute_deadline_at: min(absolute, inherited || absolute),
-      deadline_at: inherited
-    )
   end
 end

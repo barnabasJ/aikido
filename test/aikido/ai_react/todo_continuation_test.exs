@@ -388,7 +388,7 @@ defmodule Aikido.TodoContinuationTest do
       hook_message = String.trim("[Hook context: delivery gate]\n" <> hook_text)
       assert Enum.count(texts, &(&1 == hook_message)) == 1
 
-        assert Enum.find_index(texts, &(&1 == delivered)) <
+      assert Enum.find_index(texts, &(&1 == delivered)) <
                Enum.find_index(texts, &(&1 == hook_message))
 
       if unquote(handoff?) do
