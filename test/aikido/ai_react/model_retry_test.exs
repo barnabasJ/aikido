@@ -275,10 +275,8 @@ defmodule Aikido.ModelRetryTest do
     for {time, count} <- [{30, 1}, {60, 2}, {90, 3}] do
       :ok = Manual.advance(ctx.clock, time)
 
-      send(
-        worker,
-        {:chunk, %ReqLLM.StreamChunk{type: :content_part, content_part: %{kind: :opaque}}}
-      )
+      part = ReqLLM.Message.ContentPart.image_url("https://example.invalid/generated.png")
+      send(worker, {:chunk, ReqLLM.StreamChunk.content_part(part)})
 
       assert_receive {:wire_wait, ^worker}, 5_000
       expected = min(time + 40, 100)
