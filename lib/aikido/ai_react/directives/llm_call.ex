@@ -205,6 +205,11 @@ defmodule Aikido.AiReact.Directives.LLMCall do
 
   defp request_model_response(d, model, messages, options, notify, emit, {timing, deadline}) do
     with {:ok, options} <- Aikido.AiReact.ModelRequestBudget.options(options, timing, deadline) do
+      options =
+        Keyword.put(options, :on_response_status, fn %{status: status} ->
+          notify.({:observation, %{status: status}})
+        end)
+
       perform_model_request(d, model, messages, options, notify, emit, timing)
     end
   end

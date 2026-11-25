@@ -9,6 +9,10 @@ defmodule AgentExamples.MixProject do
       consolidate_protocols: Mix.env() != :test,
       deps: [
         {:aikido, path: "../.."},
+        {:req_llm, "~> 1.29",
+         git: "https://github.com/barnabasJ/req_llm.git",
+         ref: "c202c20c8eafc2a438969d4295d0b0ba2543c125",
+         override: true},
         {:ekv,
          git: "https://github.com/barnabasJ/ekv.git",
          ref: "648a3db4e1f788acde88a75a3f59c4f55213e58c",

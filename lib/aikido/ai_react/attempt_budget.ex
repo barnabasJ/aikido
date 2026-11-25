@@ -14,6 +14,12 @@ defmodule Aikido.AiReact.AttemptBudget do
       constraints min: 1
     end
 
+    field :absolute_deadline_at, :integer do
+      description "Effective Unix-millisecond attempt cutoff, captured before scheduling and capped by the inherited deadline."
+      allow_nil? false
+      constraints min: 1
+    end
+
     field :deadline_at, :integer do
       description "Inherited absolute Unix-millisecond deadline, when supplied by the caller."
       constraints min: 1

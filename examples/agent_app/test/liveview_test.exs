@@ -1220,6 +1220,7 @@ defmodule AgentExamplesWeb.LiveViewTest do
         )
     end)
 
+    assert has_element?(view, "#model-attempts tr[data-absolute-deadline]")
     assert has_element?(view, "#model-attempts td", "provider_backoff")
     assert has_element?(view, "#model-attempts td", "terminal")
     assert has_element?(view, "#model-attempts td", "Unknown")

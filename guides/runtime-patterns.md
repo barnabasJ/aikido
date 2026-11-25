@@ -451,19 +451,22 @@ Applications still own cancellation and deadlines inside actions exposed to Lua.
 Seed `metadata: %{aikido_deadline_at: deadline_at}` when starting the run, where
 `deadline_at` is calculated once at the caller's I/O boundary in Unix milliseconds.
 The AI slice retains that exact deadline through ordinary turns, retries and
-nonstreaming context handoffs. The supervising attempt establishes one monotonic
-cutoff before observation or task scheduling. Its immutable `AttemptBudget` is
-passed into model preparation and provider-option calculation, and the worker
-checks it before invoking work. Scheduling and preparation consume that same
-budget. Immediately before
-provider I/O, Aikido bounds ReqLLM's `total_timeout`, `receive_timeout`,
-Finch `pool_timeout` and `request_timeout` (under `req_http_options[:finch]`)
-by the remaining time, retaining shorter
-caller limits. Global ReqLLM defaults are unchanged. The cancellable attempt loop
-remains the sole owner of model retries. With the currently locked ReqLLM,
-`total_timeout` bounds the whole native call, including its transport retries;
-recomputing every inner transport wait requires the separate ReqLLM deadline
-propagation change. This does not turn a caller's wait timeout into a run deadline.
+nonstreaming context handoffs. The supervising attempt captures monotonic and
+absolute Unix-millisecond cutoffs before observation or task scheduling. Its
+immutable `AttemptBudget` carries that cutoff through preparation, and the worker
+checks it before invoking work. Aikido forwards the same absolute value as native
+ReqLLM `total_deadline_at`; it does not restart a relative provider budget after
+scheduling or preparation. ReqLLM owns clamping each transport wait and inner
+retry to that cutoff, retaining shorter caller limits and its configured defaults.
+The cancellable attempt loop remains the sole SDK retry owner. A caller's wait
+timeout does not become a run deadline.
+
+The dependency currently resolves the reviewed `barnabasJ/req_llm` Git commit
+`c202c20c8eafc2a438969d4295d0b0ba2543c125`, which provides the absolute cutoff,
+caller-death cleanup and response-status observer. Hex ReqLLM 1.29's relative
+whole-call timeout alone does not provide that contract. Applications declaring
+a top-level ReqLLM override must resolve the same Git identity and verify their
+lock and checked-out dependency; the version string alone is insufficient.
 
 Model timer failures use `Aikido.AiReact.Errors.ModelTimeout`, projected at the
 public boundary to `ProviderRequestFailed` with `timeout_phase: :attempt`,
@@ -472,8 +475,13 @@ status or timeout phase. Known transport classes and enum reasons such as
 `:timeout` are retained separately; a transport timeout does not establish which
 phase expired. Unknown status and underlying cause remain unknown;
 request bodies, headers and raw provider messages are not attempt facts.
-The high-level client contract does not expose successful HTTP response status;
-collecting that status remains a separate ReqLLM request-observer requirement.
+Native HTTP responses, including successful ones, report their actual status
+through a transient observer created by the I/O executor. It feeds the same
+coalesced attempt observations as wire facts and does not refresh semantic
+progress. No observer callback is added to agent state, emitted Aikido directives
+or checkpoints.
+Requests with no HTTP response retain unknown status. Attempt facts also retain
+`absolute_deadline_at`, the effective cutoff captured before scheduling.
 
 `provider_failure_threshold` defaults to three consecutive failures with the
 same safe class/status/timeout signature. While retries and time remain, the

@@ -46,11 +46,11 @@ defmodule AgentExamplesWeb.Components.Resilience do
           <tr><th>Turn / attempt</th><th>Mode</th><th>Phase</th><th>Budget</th><th>Wire / progress / rendered</th><th>HTTP</th></tr>
         </thead>
         <tbody>
-          <tr :for={attempt <- @attempts}>
+          <tr :for={attempt <- @attempts} data-absolute-deadline={Map.get(attempt, :absolute_deadline_at)}>
             <td>{attempt.iteration} / {attempt.attempt}</td>
             <td>{attempt.mode}</td>
             <td>{attempt.phase}</td>
-            <td>{Map.get(attempt, :timeout_ms, 0)} ms</td>
+            <td title={"Absolute cutoff (Unix ms): #{Map.get(attempt, :absolute_deadline_at, "Unknown")}"}>{Map.get(attempt, :timeout_ms, 0)} ms</td>
             <td>{Map.get(attempt, :wire_chunks, 0)} / {Map.get(attempt, :qualifying_chunks, 0)} / {Map.get(attempt, :rendered_chunks, 0)}</td>
             <td>{Map.get(attempt, :status, "Unknown")}</td>
           </tr>

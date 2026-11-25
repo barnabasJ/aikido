@@ -16,10 +16,27 @@ defmodule Aikido.ModelRetryTest.PrepareProvider do
 
   @impl true
   def run(input, _options, context) do
-    Aikido.AiReact.Types.ModelRequest.new(
-      model: input.arguments.model,
-      options: Keyword.put(input.arguments.options, :observer, context.actor.observer)
-    )
+    if context.actor.native_http do
+      model =
+        ReqLLM.model!(%{
+          provider: :openai,
+          id: "native-status",
+          extra: %{"wire" => %{"protocol" => "openai_chat"}}
+        })
+
+      Aikido.AiReact.Types.ModelRequest.new(
+        model: model,
+        options:
+          input.arguments.options
+          |> Keyword.put(:api_key, "synthetic-test-only")
+          |> Keyword.put(:req_http_options, adapter: Aikido.ModelRetryTest.NativeAdapter)
+      )
+    else
+      Aikido.AiReact.Types.ModelRequest.new(
+        model: input.arguments.model,
+        options: Keyword.put(input.arguments.options, :observer, context.actor.observer)
+      )
+    end
   end
 end
 
@@ -89,6 +106,29 @@ defmodule Aikido.ModelRetryTest.Agent do
   end
 end
 
+defmodule Aikido.ModelRetryTest.NativeAdapter do
+  def run(request) do
+    body = %{
+      id: "native-status",
+      model: "native-status",
+      choices: [
+        %{
+          index: 0,
+          message: %{role: "assistant", content: "observed native response"},
+          finish_reason: "stop"
+        }
+      ]
+    }
+
+    {request,
+     Req.Response.new(
+       status: 200,
+       headers: [{"content-type", "application/json"}],
+       body: Jason.encode!(body)
+     )}
+  end
+end
+
 defmodule Aikido.ModelRetryTest.Client do
   def generate_text(_model, _messages, options) do
     send(options[:observer], {:provider_wait, self(), options})
@@ -112,9 +152,18 @@ defmodule Aikido.ModelRetryTest.Client do
           send(observer, {:wire_wait, self()})
 
           receive do
-            {:chunk, chunk} -> {[chunk], state}
-            {:chunks, chunks} -> {chunks, state}
-            :finish -> {:halt, state}
+            {:chunk, chunk} ->
+              {[chunk], state}
+
+            {:chunks, chunks} ->
+              {chunks, state}
+
+            {:response_status, status} ->
+              ReqLLM.ResponseStatus.notify(options[:on_response_status], status)
+              {[], state}
+
+            :finish ->
+              {:halt, state}
           end
         end,
         fn _ -> :ok end
@@ -142,7 +191,13 @@ defmodule Aikido.ModelRetryTest do
 
   setup ctx do
     clock = start_supervised!({Manual, self()})
-    actor = %{id: unique_id("model-owner"), observer: self()}
+
+    actor = %{
+      id: unique_id("model-owner"),
+      observer: self(),
+      native_http: Map.get(ctx, :native_http, false)
+    }
+
     owner = start_server(ctx, Aikido.ModelRetryTest.Agent, initialization_options: [actor: actor])
     %{clock: clock, owner: owner, actor: actor}
   end
@@ -189,9 +244,8 @@ defmodule Aikido.ModelRetryTest do
       ask(ctx, deadline, options: %{context_max_tokens: 5_000, handoff_buffer_tokens: 1_000})
 
     assert_receive {:provider_wait, first, first_options}, 5_000
-    assert first_options[:total_timeout] == 100
-    assert first_options[:receive_timeout] == 100
-    assert first_options[:req_http_options][:finch][:pool_timeout] == 100
+    assert first_options[:total_deadline_at] == deadline - 50
+    refute Keyword.has_key?(first_options, :total_timeout)
     first_monitor = Process.monitor(first)
     await_attempt(ctx.owner, &(&1.mode == :handoff && &1.phase == :started))
     :ok = Manual.advance(ctx.clock, 100)
@@ -203,9 +257,8 @@ defmodule Aikido.ModelRetryTest do
     :ok = Manual.advance(ctx.clock, 120)
     assert_receive {:provider_wait, second, second_options}, 5_000
     assert second != first
-    assert second_options[:total_timeout] == 30
-    assert second_options[:receive_timeout] == 30
-    assert second_options[:req_http_options][:finch][:pool_timeout] == 30
+    assert second_options[:total_deadline_at] == deadline
+    refute Keyword.has_key?(second_options, :total_timeout)
     :ok = Manual.advance(ctx.clock, 150)
 
     state = await_state(ctx.owner, &(&1.ai.status == :failed && terminal?(&1.ai)))
@@ -253,7 +306,7 @@ defmodule Aikido.ModelRetryTest do
     assert_receive {:stream_closed, _}, 5_000
     :ok = Manual.advance(ctx.clock, 60)
     assert_receive {:stream_open, second, options}, 5_000
-    assert options[:total_timeout] == 40
+    assert options[:total_deadline_at] == deadline
     assert_receive {:wire_wait, ^second}, 5_000
     :ok = Manual.advance(ctx.clock, 100)
     state = await_state(ctx.owner, &(&1.ai.status == :failed && terminal?(&1.ai)))
@@ -555,6 +608,52 @@ defmodule Aikido.ModelRetryTest do
     assert [count, count] = counts
   end
 
+  @tag native_http: true
+  test "native buffered HTTP status is adopted and survives restore without the observer", ctx do
+    deadline = Manual.system_ms(ctx.clock) + 10_000
+
+    {:ok, _} =
+      ask(ctx, deadline,
+        client: ReqLLM.Generation,
+        options: %{model_timeout_ms: 10_000, model_max_retries: 0}
+      )
+
+    state = await_state(ctx.owner, &(&1.ai.status == :completed && terminal?(&1.ai)))
+    assert state.ai.result == "observed native response"
+    assert [%{status: 200, absolute_deadline_at: ^deadline}] = state.ai.model_attempts
+    refute Keyword.has_key?(state.ai.llm_opts, :on_response_status)
+    pool = Aikido.durable_supervisor_name(ctx.aikido)
+    {:ok, id} = Aikido.AgentServer.state(ctx.owner, &{:ok, &1.id})
+    assert :ok = Aikido.Durable.stop(pool, ctx.owner, scope: %{actor: ctx.actor})
+    restored = start_server(ctx, Aikido.ModelRetryTest.Agent, id: id)
+    assert {:ok, persisted} = Aikido.AgentServer.state(restored, &{:ok, &1.agent.state.ai})
+    assert persisted.model_attempts == state.ai.model_attempts
+    refute Keyword.has_key?(persisted.llm_opts, :on_response_status)
+  end
+
+  test "stream response status is coalesced without refreshing semantic progress", ctx do
+    deadline = Manual.system_ms(ctx.clock) + 100
+
+    {:ok, _} =
+      ask(ctx, deadline,
+        options: %{streaming: true, progress_timeout_ms: 40, model_max_retries: 0}
+      )
+
+    assert_receive {:stream_open, worker, options}, 5_000
+    assert is_function(options[:on_response_status], 1)
+    assert_receive {:wire_wait, ^worker}, 5_000
+    await_attempt(ctx.owner, &Map.get(&1, :opened, false))
+    :ok = Manual.advance(ctx.clock, 30)
+    send(worker, {:response_status, 206})
+    assert_receive {:wire_wait, ^worker}, 5_000
+    :ok = Manual.advance(ctx.clock, 40)
+    state = await_state(ctx.owner, &(&1.ai.status == :failed && terminal?(&1.ai)))
+    assert [%{status: 206, timeout_phase: :stream_idle} = attempt] = state.ai.model_attempts
+    refute Map.has_key?(attempt, :first_progress_at)
+    assert attempt.wire_chunks == 0
+    refute Keyword.has_key?(state.ai.llm_opts, :on_response_status)
+  end
+
   defp burst_chunks(0), do: []
 
   defp burst_chunks(size) do
@@ -598,7 +697,7 @@ defmodule Aikido.ModelRetryTest do
     Aikido.AI.ask(ctx.owner, "continue",
       model: "offline",
       actor: ctx.actor,
-      client: Aikido.ModelRetryTest.Client,
+      client: Keyword.get(overrides, :client, Aikido.ModelRetryTest.Client),
       tools: [],
       llm_opts: [],
       options: options,

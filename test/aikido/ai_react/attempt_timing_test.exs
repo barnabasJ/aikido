@@ -172,7 +172,7 @@ defmodule Aikido.AttemptTimingTest do
         case Aikido.AiReact.ModelRequestBudget.options([], {Manual, ctx.clock}, budget) do
           {:ok, options} ->
             send(observer, {:provider_entered, budget, options})
-            {:ok, options[:total_timeout]}
+            {:ok, options[:total_deadline_at]}
 
           error ->
             error
@@ -202,9 +202,15 @@ defmodule Aikido.AttemptTimingTest do
       :ok = Manual.release_worker_read(ctx.clock)
 
       if unquote(elapsed) < 100 do
-        assert {:ok, 30} = Task.await(task, 5_000)
-        assert_receive {:provider_entered, %{monotonic_deadline: 100}, options}, 5_000
-        assert options[:receive_timeout] == 30
+        assert {:ok, absolute} = Task.await(task, 5_000)
+
+        assert_receive {:provider_entered,
+                        %{monotonic_deadline: 100, absolute_deadline_at: ^absolute}, options},
+                       5_000
+
+        assert options[:total_deadline_at] == absolute
+        assert absolute == Manual.system_ms(ctx.clock) + 30
+        refute Keyword.has_key?(options, :total_timeout)
       else
         assert {:error, :timeout} = Task.await(task, 5_000)
         refute_receive {:provider_entered, _, _}

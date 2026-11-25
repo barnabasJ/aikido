@@ -142,12 +142,15 @@ defmodule Aikido.AiReact.CancellableTask do
          {number, previous, streak}
        ) do
     opts = Keyword.put(opts, :attempt_timeout, timeout)
+    absolute_deadline = AttemptTiming.system_ms(opts[:timing]) + timeout
     deadline = now(opts) + timeout
+    absolute_deadline = min(absolute_deadline, opts[:deadline_at] || absolute_deadline)
     opts = Keyword.put(opts, :attempt_deadline, deadline)
 
     budget =
       Aikido.AiReact.AttemptBudget.new!(
         monotonic_deadline: deadline,
+        absolute_deadline_at: absolute_deadline,
         timeout_ms: timeout,
         deadline_at: opts[:deadline_at]
       )
@@ -157,7 +160,10 @@ defmodule Aikido.AiReact.CancellableTask do
 
     transfer = Ash.ProcessHelpers.get_context_for_transfer(tracer: opts[:tracer])
 
-    observe(opts, number, :started, %{timeout_ms: timeout})
+    observe(opts, number, :started, %{
+      timeout_ms: timeout,
+      absolute_deadline_at: absolute_deadline
+    })
 
     result =
       case start_attempt(supervisor, work, opts, transfer, parent, key, {number, budget}) do

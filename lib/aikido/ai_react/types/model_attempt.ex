@@ -13,6 +13,7 @@ defmodule Aikido.AiReact.Types.ModelAttempt do
         handoff_id: [type: :integer],
         phase: [type: Aikido.AiReact.Types.ModelAttemptPhase],
         deadline_at: [type: :integer],
+        absolute_deadline_at: [type: :integer, constraints: [min: 1]],
         timeout_ms: [type: :integer],
         duration_ms: [type: :integer, constraints: [min: 0]],
         started_at: [type: :integer],

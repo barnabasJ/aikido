@@ -2,15 +2,17 @@
 
 ## Unreleased
 
-- Bound prepared model requests by the remaining attempt and inherited run
-  deadline, forwarding that budget to ReqLLM's whole-call and transport options.
+- Bound prepared model requests by the original absolute attempt cutoff,
+  capped by the inherited run deadline and forwarded to native ReqLLM.
   Model timer failures carry a typed timeout phase, including nonstreaming
   context-handoff failure receipts. Record bounded, payload-free attempt lifecycle
   and wire-progress facts through a native slice action and telemetry. Add a
   configurable same-signature provider backoff within the existing retry loop,
-  and a deterministic resilience example. Per-inner-transport deadline
-  recomputation remains a separate ReqLLM dependency change. Require ReqLLM
-  1.29 or newer for its native whole-call timeout contract.
+  and a deterministic resilience example. Carry the original absolute cutoff
+  into the reviewed ReqLLM fork so native inner requests, retry waits and caller
+  cleanup share that budget. Observe actual HTTP status through a transient
+  I/O callback; no function is retained in state or checkpoints. Native ReqLLM
+  owns transport clamping, preserving shorter caller limits.
   Coalesce wire observations before state adoption and telemetry, retaining
   exact final counts without per-chunk publication. Scheduling and preparation
   share the supervisor's single immutable attempt cutoff.
