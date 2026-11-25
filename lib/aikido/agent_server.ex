@@ -26,6 +26,7 @@ defmodule Aikido.AgentServer do
   runtime coordination primitives:
 
   - `call/4` - Synchronous signal processing with selector projection
+  - `send_request/3` - Asynchronous call with a native OTP request ID and selector reply
   - `cast/2` - Asynchronous signal processing
   - `state/3` - Synchronous selector-driven state read (no signal pipeline)
 
@@ -287,6 +288,36 @@ defmodule Aikido.AgentServer do
         {:signal_with_selector, signal, selector},
         timeout
       )
+    end
+  end
+
+  @doc """
+  Send a signal without waiting, returning `{:ok, request_id}` for native OTP reply matching.
+
+  Uses exactly the same signal pipeline and post-directive selector as `call/4`.
+  The sending process can handle other messages and use
+  `:gen_server.check_response(message, request_id)` in its mailbox loop, or
+  explicitly wait with `:gen_server.receive_response(request_id, timeout)`.
+  A successful native response is `{:reply, selector_result}`; server termination
+  produces the native `{:error, {reason, server}}` response. Only the sending
+  process may consume the request ID. The reply is one-shot by construction;
+  there is no subscription registry entry or extra task to remove. For a distinct
+  future signal, use `subscribe/4` with `once: true` instead.
+
+  Native `receive_response/2` timeout abandons the reply, not the running signal.
+  Do not retry an effect whose adoption is unknown. Use `wait_response/2` instead
+  when retaining the request ID after a bounded wait is intentional.
+
+      {:ok, request_id} = AgentServer.send_request(pid, signal, selector)
+      :gen_server.receive_response(request_id, 5_000)
+  """
+  @spec send_request(server(), Signal.t(), call_selector()) ::
+          {:ok, :gen_server.request_id()} | {:error, term()}
+  def send_request(server, %Signal{} = signal, selector) when is_function(selector, 1) do
+    with {:ok, pid} <- resolve(server) do
+      signal = Aikido.Signal.capture_tracing(signal)
+      emit_signal_dispatch(signal, pid, :call)
+      {:ok, :gen_server.send_request(pid, {:signal_with_selector, signal, selector})}
     end
   end
 

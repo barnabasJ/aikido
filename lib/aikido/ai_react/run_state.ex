@@ -53,6 +53,7 @@ defmodule Aikido.AiReact.RunState do
   def clear_tools_and_handoff(%{status: status} = state) when status in [:completed, :failed] do
     Map.merge(state, %{
       prepared_tools: nil,
+      stream_receipt: nil,
       todo_verification_pending: false,
       handoff_pending: nil,
       tools_resume: nil,

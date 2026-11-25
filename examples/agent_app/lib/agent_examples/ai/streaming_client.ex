@@ -6,20 +6,34 @@ defmodule AgentExamples.AI.StreamingClient do
   def stream_text(_model, messages, _opts) do
     user_messages = Enum.filter(messages, &(&1.role == :user))
     latest = user_messages |> List.last() |> Map.fetch!(:content) |> Enum.map_join(& &1.text)
-    text = "I remember #{length(user_messages)} user messages. Latest: #{latest}"
+    burst? = latest == "burst"
+
+    text =
+      if burst? do
+        "## Buffered stream\n\n" <>
+          String.duplicate(
+            "The producer keeps one batch in flight and buffers one more while it waits.\n\n",
+            16
+          )
+      else
+        "I remember #{length(user_messages)} user messages. Latest: #{latest}"
+      end
 
     chunks =
       [ReqLLM.StreamChunk.thinking("Reviewing conversation history. ")] ++
         Enum.map(String.graphemes(text), &ReqLLM.StreamChunk.text/1)
 
     stream =
-      Stream.map(chunks, fn chunk ->
-        # A paced local stream makes incremental rendering visible in the demo.
-        receive do
-        after
-          10 -> chunk
-        end
-      end)
+      if burst? do
+        Stream.map(chunks, & &1)
+      else
+        Stream.map(chunks, fn chunk ->
+          receive do
+          after
+            10 -> chunk
+          end
+        end)
+      end
 
     {:ok, metadata} =
       ReqLLM.StreamResponse.MetadataHandle.start_link(fn ->

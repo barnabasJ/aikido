@@ -214,6 +214,10 @@ defmodule Aikido.AiReact.Slice do
         constraints allow_empty?: true, trim?: false
       end
 
+      attribute :stream_receipt, Aikido.AiReact.Types.StreamReceipt do
+        description "Latest adopted streaming batch identity for producer backpressure; cleared on checkpoint and terminal model response."
+      end
+
       attribute :stream_attempt, :integer do
         description "Latest accepted streaming attempt, used to discard stale retry deltas."
         default 0
@@ -515,6 +519,7 @@ defmodule Aikido.AiReact.Slice do
         hooks_pending: %{},
         hook_terminal: nil,
         run_scope: %{},
+        stream_receipt: nil,
         streaming_text: "",
         streaming_thinking: ""
       })
@@ -555,6 +560,7 @@ defmodule Aikido.AiReact.Slice do
       run_scope: %{},
       pending_tool_calls: [],
       tool_results_received: [],
+      stream_receipt: nil,
       streaming_text: "",
       streaming_thinking: ""
     })

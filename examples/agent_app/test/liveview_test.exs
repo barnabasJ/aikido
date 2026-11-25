@@ -1177,6 +1177,17 @@ defmodule AgentExamplesWeb.LiveViewTest do
     assert has_element?(view, "#verified-answer", "Verified evidence")
   end
 
+  test "the offline burst uses acknowledged stream batches before its final answer", %{conn: conn} do
+    {:ok, view, _} = live(conn, "/examples/conversation")
+    owner = start(view, "conversation")
+    view |> element("#stream-burst") |> render_click()
+    await(owner, "conversation", &(&1.status == :completed))
+    run = Playground.get(owner, "conversation")
+    assert run.snapshot.ai.result =~ "The producer keeps one batch in flight"
+    refute Map.has_key?(run.snapshot.ai, :stream_receipt)
+    assert Enum.any?(run.events, &(&1.type == "ai.react.stream"))
+  end
+
   test "real Ash AI errors and alternating calls trigger their optional guards", %{conn: conn} do
     {:ok, view, _} = live(conn, "/examples/resilience")
     owner = start(view, "resilience")

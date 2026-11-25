@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Expose native one-shot asynchronous signal receipts through
+  `Aikido.AgentServer.send_request/3`, using OTP request IDs and the existing
+  selector pipeline without server-side waiters. ReAct streaming keeps one
+  batch in flight and one pending buffer, checks exact adopted sequence receipts,
+  and drains both before completing. Unconfirmed effects suppress retries even
+  when the supervising timer wins the acknowledgement race. Receipts are cleared
+  from checkpoints. Add an offline burst scenario to the conversation example.
+
 - Bound prepared model requests by the original absolute attempt cutoff,
   capped by the inherited run deadline and forwarded to native ReqLLM.
   Model timer failures carry a typed timeout phase, including nonstreaming

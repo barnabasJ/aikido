@@ -1,41 +1,43 @@
 defmodule Aikido.AiReact.Actions.Stream do
-  @moduledoc "Accumulates streaming text and thinking while rejecting obsolete turns and attempts."
+  @moduledoc "Adopts ordered streaming batches while rejecting obsolete turns and attempts."
   use Ash.Resource.Actions.Implementation
 
   @impl true
   def run(input, _opts, _context) do
-    with {:ok, state, directives} <- append_stream_chunk(input) do
-      changes =
-        if state == input.arguments.state,
-          do: %{},
-          else: Map.take(state, [:stream_attempt, :streaming_text, :streaming_thinking])
-
-      Aikido.Types.ActionResult.new(changes: changes, directives: directives)
-    end
-  end
-
-  defp append_stream_chunk(input) do
+    state = input.arguments.state
     data = input.arguments
-    state = data.state
 
-    if state.status == :running && is_nil(Map.get(state, :handoff_pending)) &&
-         state.request_id == data.request_id &&
-         state.iteration + 1 == data.iteration &&
-         data.attempt >= Map.get(state, :stream_attempt, 0) do
-      reset? = data.attempt > Map.get(state, :stream_attempt, 0)
+    changes =
+      if Aikido.AiReact.StreamDelivery.active?(state, data) && accepts_sequence?(state, data) do
+        reset? = data.attempt > state.stream_attempt
 
-      state =
-        Map.merge(state, %{
+        %{
           stream_attempt: data.attempt,
-          streaming_text:
-            if(reset?, do: "", else: Map.get(state, :streaming_text, "")) <> data.text,
+          stream_receipt: receipt(data),
+          streaming_text: if(reset?, do: data.text, else: state.streaming_text <> data.text),
           streaming_thinking:
-            if(reset?, do: "", else: Map.get(state, :streaming_thinking, "")) <> data.thinking
-        })
+            if(reset?, do: data.thinking, else: state.streaming_thinking <> data.thinking)
+        }
+      else
+        %{}
+      end
 
-      {:ok, state, []}
-    else
-      {:ok, state, []}
+    Aikido.Types.ActionResult.new(changes: changes)
+  end
+
+  defp accepts_sequence?(_state, %{sequence: nil}), do: true
+
+  defp accepts_sequence?(state, data) do
+    case state.stream_receipt do
+      %{request_id: request, iteration: iteration, attempt: attempt, sequence: sequence}
+      when request == data.request_id and iteration == data.iteration and attempt == data.attempt ->
+        data.sequence == sequence + 1
+
+      _ ->
+        data.sequence == 1
     end
   end
+
+  defp receipt(%{sequence: nil}), do: nil
+  defp receipt(data), do: Map.take(data, [:request_id, :iteration, :attempt, :sequence])
 end

@@ -984,3 +984,66 @@ explicit `{:error, reason}` returns pass through unchanged; subscriptions can
 still return `:skip`. These caller-authored projections remain responsible for
 the data they intentionally expose. The safe failure projection does not redact
 successful results, explicitly returned errors or ordinary reducer errors.
+
+## Async signal receipts and stream backpressure
+
+`Aikido.AgentServer.send_request/3` resolves the agent, captures the signal's
+native tracing context, and submits the same selector-bearing request as
+`call/4`. It returns immediately without waiting for the signal pipeline:
+
+```elixir
+{:ok, request} = Aikido.AgentServer.send_request(pid, signal, selector)
+
+receive do
+  message ->
+    case :gen_server.check_response(message, request) do
+      {:reply, result} -> result
+      {:error, {reason, server}} -> {:error, {reason, server}}
+      :no_reply -> handle_other_message(message)
+    end
+end
+```
+
+The sending process owns this OTP request ID. Use `wait_response(request, 0)`
+for a non-abandoning poll, or `receive_response(request, timeout)` when explicitly
+draining and abandoning a late reply on timeout. A timeout does not roll back the
+signal. This is one-shot by construction: there is no AgentServer subscriber or
+per-request task to remove, and native OTP removes the monitor/alias when the
+response is consumed or abandoned or the requester dies. For a distinct future
+signal, use the existing `subscribe/4` with `once: true` and an exact selector
+instead of stacking two waiters. See the [OTP request API](https://www.erlang.org/doc/apps/stdlib/gen_server.html#send_request/2).
+
+ReAct's separate stream producer uses this API with a receipt keyed by request,
+iteration, attempt and batch sequence. It may consume/coalesce one pending batch
+while one native request is outstanding. It polls between chunks without
+abandoning that request, and stops pulling when the pending window reaches
+`stream_batch_bytes`. Only an exact adopted receipt grants another submission.
+EOF drains the outstanding receipt and any final pending batch before the
+completed-model signal is sent. Old or out-of-order batches are ignored;
+repeating the latest already-adopted batch does not append text twice.
+
+`stream_batch_bytes` is a flush threshold, not a hard limit on an individual
+provider delta: a pending buffer can exceed it by the last native chunk. There
+are at most two output batches held for delivery, not an unbounded mailbox queue.
+The native ReqLLM StreamServer then applies its own chunk watermark upstream
+(default 500 decoded public chunks, plus one atomically decoded transport event).
+Custom push clients that ignore demand do not acquire that guarantee. The native
+final response still materializes the completed output; this is not a cap on
+final response size or all provider/parser memory.
+
+The normal stream reducer returns no directives. Native notifications dispatch
+in supervised work, so this receipt does not wait for browser or SQL delivery.
+Applications can compose extra actions/middleware/directives that increase
+receipt latency; all waiting still uses the supervising attempt cutoff.
+
+An outstanding effect is marked privately in the ReAct attempt owner from
+submission until exact acknowledgement. Timeout, producer failure or owner
+cleanup during that interval returns a nonretryable `EffectReceiptLost` with
+safe failure classification only. No automatic replay is attempted when adoption
+is unknown. Cancellation retains its ordinary result. The slice retains only
+the latest fixed-size receipt; checkpoint/restore and terminal transitions clear
+it. Native request IDs, callbacks and pending buffers are never slice state.
+
+The playground's **Conversation and work tracking** example has an **Offline stream burst** control
+using an offline lazy stream. Its inspector exposes ordered `ai.react.stream`
+sequences; the final answer is adopted after the final batch receipt.

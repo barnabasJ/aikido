@@ -32,38 +32,103 @@ defmodule Aikido.AiReact.ModelStream do
         Stream.transform(
           response.stream,
           fn ->
-            {"", "", AttemptTiming.monotonic_ms(timing),
-             %{wire_chunks: 0, qualifying_chunks: 0, nonqualifying_chunks: 0, rendered_chunks: 0}}
+            %{
+              text: "",
+              thinking: "",
+              sequence: 0,
+              in_flight: nil,
+              last_emit: AttemptTiming.monotonic_ms(timing),
+              counts: %{
+                wire_chunks: 0,
+                qualifying_chunks: 0,
+                nonqualifying_chunks: 0,
+                rendered_chunks: 0
+              }
+            }
           end,
-          fn chunk, {text, thinking, last_emit, counts} ->
-            counts = count_chunk(counts, chunk, timing)
+          fn chunk, pending ->
+            counts = count_chunk(pending.counts, chunk, timing)
             progress_at = if generation_progress?(chunk), do: AttemptTiming.monotonic_ms(timing)
             notify.({:wire, counts, progress_at})
-            text = if chunk.type == :content, do: text <> (chunk.text || ""), else: text
-
-            thinking =
-              if chunk.type == :thinking, do: thinking <> (chunk.text || ""), else: thinking
-
-            pending =
-              if byte_size(text) + byte_size(thinking) >= batch_bytes ||
-                   AttemptTiming.monotonic_ms(timing) - last_emit >= batch_ms do
-                emit.(text, thinking)
-                {"", "", AttemptTiming.monotonic_ms(timing), counts}
-              else
-                {text, thinking, last_emit, counts}
-              end
-
+            pending = poll_receipt(%{pending | counts: counts}, emit)
+            pending = append_delta(pending, chunk)
+            pending = flush_at_capacity(pending, emit, batch_bytes, batch_ms, timing)
             {[chunk], pending}
           end,
-          fn {text, thinking, _last_emit, counts} = pending ->
-            if text != "" || thinking != "", do: emit.(text, thinking)
-            notify.({:observation, counts})
+          fn pending ->
+            pending = await_receipt(pending, emit)
+
+            pending =
+              if buffered?(pending), do: submit_batch(pending, emit, timing), else: pending
+
+            pending = await_receipt(pending, emit)
+            notify.({:observation, pending.counts})
             {[], pending}
           end,
           fn _ -> :ok end
         )
 
       ReqLLM.StreamResponse.to_response(%{response | stream: stream})
+    end
+  end
+
+  defp append_delta(pending, %{type: :content, text: text}),
+    do: %{pending | text: pending.text <> (text || "")}
+
+  defp append_delta(pending, %{type: :thinking, text: text}),
+    do: %{pending | thinking: pending.thinking <> (text || "")}
+
+  defp append_delta(pending, _chunk), do: pending
+
+  defp flush_at_capacity(pending, delivery, bytes, milliseconds, timing) do
+    full? = byte_size(pending.text) + byte_size(pending.thinking) >= bytes
+
+    due? =
+      is_nil(pending.in_flight) &&
+        AttemptTiming.monotonic_ms(timing) - pending.last_emit >= milliseconds
+
+    if buffered?(pending) && (full? || due?) do
+      pending |> await_receipt(delivery) |> submit_batch(delivery, timing)
+    else
+      pending
+    end
+  end
+
+  defp buffered?(pending), do: pending.text != "" || pending.thinking != ""
+
+  defp submit_batch(pending, delivery, timing) do
+    case delivery.submit.(pending.text, pending.thinking, pending.sequence + 1) do
+      {:ok, request} ->
+        %{
+          pending
+          | in_flight: request,
+            sequence: pending.sequence + 1,
+            text: "",
+            thinking: "",
+            last_emit: AttemptTiming.monotonic_ms(timing)
+        }
+
+      {:error, error} ->
+        raise error
+    end
+  end
+
+  defp poll_receipt(%{in_flight: nil} = pending, _delivery), do: pending
+
+  defp poll_receipt(pending, delivery) do
+    case delivery.poll.(pending.in_flight) do
+      :pending -> pending
+      :ok -> %{pending | in_flight: nil}
+      {:error, error} -> raise error
+    end
+  end
+
+  defp await_receipt(%{in_flight: nil} = pending, _delivery), do: pending
+
+  defp await_receipt(pending, delivery) do
+    case delivery.await.(pending.in_flight) do
+      :ok -> %{pending | in_flight: nil}
+      {:error, error} -> raise error
     end
   end
 

@@ -21,6 +21,11 @@ defmodule Aikido.AiReact.Signals.Stream do
         default 0
       end
 
+      attribute :sequence, :integer do
+        description "Ordered batch number within this request, iteration and attempt; absent on legacy unacknowledged deltas."
+        constraints min: 1
+      end
+
       attribute :text, :string do
         description "Incremental assistant text produced by this streaming model response."
         default ""

@@ -72,7 +72,8 @@ defmodule Aikido.AiReact.Actions.LlmTurn do
     Map.merge(state, %{
       streaming_text: turn.text,
       streaming_thinking: turn.thinking,
-      stream_attempt: 0
+      stream_attempt: 0,
+      stream_receipt: nil
     })
   end
 

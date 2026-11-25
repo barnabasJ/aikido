@@ -176,7 +176,7 @@ defmodule Aikido.AiReact.CancellableTask do
             deadline,
             progress_deadline(opts),
             opts,
-            %{cleanups: [], observations: AttemptObservations.new()}
+            %{cleanups: [], observations: AttemptObservations.new(), effect_pending?: false}
           )
 
         {:error, reason} ->
@@ -322,6 +322,9 @@ defmodule Aikido.AiReact.CancellableTask do
               {^key, :progress} ->
                 {:continue, progress_deadline(opts), resources}
 
+              {^key, {:effect_pending, pending?}} when is_boolean(pending?) ->
+                {:continue, progress, %{resources | effect_pending?: pending?}}
+
               {^key, {:cleanup, cleanup}} ->
                 {:continue, progress, %{resources | cleanups: [cleanup | resources.cleanups]}}
 
@@ -367,11 +370,24 @@ defmodule Aikido.AiReact.CancellableTask do
         await_attempt_result(task, attempt, sub, monitor, deadline, progress, opts, resources)
 
       result ->
-        release_attempt_resources(task, key, resources, opts, number)
+        resources = release_attempt_resources(task, key, resources, opts, number)
         observe(opts, number, :cleanup, %{})
-        result
+        resolve_effect_receipt(result, resources.effect_pending?)
     end
   end
+
+  defp resolve_effect_receipt({:error, :cancelled} = result, _pending?), do: result
+
+  defp resolve_effect_receipt({:error, cause}, true),
+    do:
+      {:error,
+       Aikido.AiReact.Errors.EffectReceiptLost.exception(
+         cause
+         |> Aikido.AiReact.ModelAttemptObservation.failure()
+         |> Map.to_list()
+       )}
+
+  defp resolve_effect_receipt(result, _pending?), do: result
 
   defp record_observation(resources, facts, opts, number) do
     time = now(opts)
@@ -446,6 +462,8 @@ defmodule Aikido.AiReact.CancellableTask do
 
     if publication = AttemptObservations.flush(resources.observations),
       do: observe(opts, number, :wire, publication)
+
+    resources
   end
 
   defp run_cleanup(cleanup) do
@@ -464,6 +482,9 @@ defmodule Aikido.AiReact.CancellableTask do
 
   defp drain_cleanups(key, resources) do
     receive do
+      {^key, {:effect_pending, pending?}} when is_boolean(pending?) ->
+        drain_cleanups(key, %{resources | effect_pending?: pending?})
+
       {^key, {:cleanup, cleanup}} ->
         drain_cleanups(key, %{resources | cleanups: [cleanup | resources.cleanups]})
 

@@ -12,7 +12,21 @@ defmodule AgentExamplesWeb.ConversationLive do
   def render(assigns) do
     ~H"""
     <.page {assigns}>
-      <.conversation run={@run} queue_messages />
+      <.conversation run={@run} queue_messages>
+        <button
+          :if={!@run || @run.mode == "offline"}
+          id="stream-burst"
+          class="button secondary"
+          disabled={!active?(@run) || busy?(@run)}
+          phx-click="ask"
+          phx-value-query="burst"
+        >
+          Offline stream burst
+        </button>
+        <p>
+          Inspect ordered ai.react.stream sequences. The producer keeps one batch in flight and one pending buffer, then drains both before completing.
+        </p>
+      </.conversation>
       <.todos run={@run} />
     </.page>
     """

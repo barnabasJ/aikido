@@ -157,9 +157,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
         timing =
           Aikido.AiReact.AttemptTiming.resolve(get_in(scope, [:context, :aikido_attempt_timing]))
 
-        emit = fn text, thinking ->
-          dispatch_stream_delta(d, text, thinking, attempt, agent_pid, source, scope)
-        end
+        emit = stream_delivery(d, attempt, agent_pid, source, scope, notify, timing, budget)
 
         prepare_and_request(
           d,
@@ -249,7 +247,44 @@ defmodule Aikido.AiReact.Directives.LLMCall do
     end
   end
 
-  defp dispatch_stream_delta(d, text, thinking, attempt, pid, source, scope) do
+  defp stream_delivery(d, attempt, pid, source, scope, notify, timing, budget) do
+    confirmed = fn result ->
+      if result == :ok, do: notify.({:effect_pending, false})
+      result
+    end
+
+    %{
+      submit: fn text, thinking, sequence ->
+        notify.({:effect_pending, true})
+
+        dispatch_stream_delta(
+          d,
+          {text, thinking, sequence},
+          attempt,
+          pid,
+          source,
+          scope,
+          {timing, budget}
+        )
+      end,
+      poll: fn request ->
+        confirmed.(Aikido.AiReact.StreamDelivery.poll(request, timing, budget))
+      end,
+      await: fn request ->
+        confirmed.(Aikido.AiReact.StreamDelivery.await(request, timing, budget))
+      end
+    }
+  end
+
+  defp dispatch_stream_delta(
+         d,
+         {text, thinking, sequence},
+         attempt,
+         pid,
+         source,
+         scope,
+         {timing, budget}
+       ) do
     signal =
       Signal.new!(
         "ai.react.stream",
@@ -257,6 +292,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
           request_id: d.request_id,
           iteration: d.iteration,
           attempt: attempt,
+          sequence: sequence,
           text: text,
           thinking: thinking
         },
@@ -264,7 +300,7 @@ defmodule Aikido.AiReact.Directives.LLMCall do
       )
       |> Aikido.Signal.put_ctx(scope)
 
-    AgentServer.cast(pid, signal)
+    Aikido.AiReact.StreamDelivery.submit(pid, signal, timing, budget)
   end
 
   defp send_model_result_to_agent(result, d, pid, source, scope) do
