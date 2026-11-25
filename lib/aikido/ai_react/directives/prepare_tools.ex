@@ -74,6 +74,7 @@ defmodule Aikido.AiReact.Directives.PrepareTools do
              supervisor,
              fn _, _ -> build_native_tools_and_registry(directive, scope) end,
              tracer: scope[:tracer],
+             timing: get_in(scope, [:context, :aikido_attempt_timing]),
              generation: directive.generation,
              timeout: directive.options.model_timeout_ms,
              deadline_at: directive.deadline_at

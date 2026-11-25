@@ -44,7 +44,19 @@ defmodule Aikido.AiReact.ModelAttemptObservation do
         |> Aikido.Signal.put_ctx(scope)
 
       Aikido.AgentServer.cast(owner, signal)
-      :telemetry.execute([:aikido, :ai, :model_attempt, phase], %{system_time: time}, observation)
+      measurements = %{system_time: System.convert_time_unit(time, :millisecond, :native)}
+
+      measurements =
+        if duration = facts[:duration_ms],
+          do:
+            Map.put(
+              measurements,
+              :duration,
+              System.convert_time_unit(duration, :millisecond, :native)
+            ),
+          else: measurements
+
+      :telemetry.execute([:aikido, :ai, :model_attempt, phase], measurements, observation)
     end
   end
 

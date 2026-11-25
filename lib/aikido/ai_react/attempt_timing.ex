@@ -3,7 +3,7 @@ defmodule Aikido.AiReact.AttemptTiming do
   Timing backend for cancellable I/O attempts and runtime scheduled directives.
 
   A trusted application can supply `{backend, private_context}` in the native
-  call's `scope.context[:aikido_attempt_timing]`. LLMCall forwards it only to the
+  call's `scope.context[:aikido_attempt_timing]`. Model calls and tool preparation forward it to the
   transient attempt options. It is never an AI option, state attribute, provider
   option or checkpoint field. The default backend uses System and Process.
 

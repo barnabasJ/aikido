@@ -1,3 +1,16 @@
+defmodule Aikido.ModelRetryTest.HoldTools do
+  use Ash.Resource.Actions.Implementation
+
+  @impl true
+  def run(input, _options, context) do
+    send(context.actor.observer, {:tools_preparing, self()})
+
+    receive do
+      :release -> {:ok, input.arguments.options}
+    end
+  end
+end
+
 defmodule Aikido.ModelRetryTest.PrepareProvider do
   use Ash.Resource.Actions.Implementation
 
@@ -53,6 +66,17 @@ defmodule Aikido.ModelRetryTest.Agent do
   end
 
   actions do
+    action :hold_tools, {:array, :tuple} do
+      constraints items: [fields: [key: [type: :atom], value: [type: :term]]]
+
+      argument :options, {:array, :tuple},
+        allow_nil?: false,
+        constraints: [items: [fields: [key: [type: :atom], value: [type: :term]]]]
+
+      argument :metadata, :map, default: %{}
+      run Aikido.ModelRetryTest.HoldTools
+    end
+
     action :prepare_provider, Aikido.AiReact.Types.ModelRequest do
       argument :model, :term, allow_nil?: false
 
@@ -116,6 +140,28 @@ defmodule Aikido.ModelRetryTest do
     actor = %{id: unique_id("model-owner"), observer: self()}
     owner = start_server(ctx, Aikido.ModelRetryTest.Agent, initialization_options: [actor: actor])
     %{clock: clock, owner: owner, actor: actor}
+  end
+
+  test "tool preparation uses the same supplied clock before the first model attempt", ctx do
+    deadline = Manual.system_ms(ctx.clock) + 100
+
+    {:ok, _} =
+      ask(ctx, deadline,
+        options: %{
+          model_timeout_ms: 50,
+          tool_preparation: {Aikido.ModelRetryTest.Agent, :hold_tools}
+        }
+      )
+
+    assert_receive {:tools_preparing, worker}, 5_000
+    monitor = Process.monitor(worker)
+    assert_receive {:armed, _, _, 50}, 5_000
+    :ok = Manual.advance(ctx.clock, 50)
+    state = await_state(ctx.owner, &(&1.ai.status == :failed))
+    assert state.ai.error == :timeout
+    assert state.ai.model_attempts == []
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 5_000
+    refute_receive {:provider_wait, _, _}
   end
 
   test "silent nonstreaming handoff retries spend one deadline and persist a typed journal receipt",
@@ -224,6 +270,7 @@ defmodule Aikido.ModelRetryTest do
 
     assert_receive {:stream_open, worker, _}, 5_000
     assert_receive {:wire_wait, ^worker}, 5_000
+    assert_receive {:armed, caller, _, 40}, 5_000
 
     for {time, count} <- [{30, 1}, {60, 2}, {90, 3}] do
       :ok = Manual.advance(ctx.clock, time)
@@ -235,7 +282,7 @@ defmodule Aikido.ModelRetryTest do
 
       assert_receive {:wire_wait, ^worker}, 5_000
       expected = min(time + 40, 100)
-      assert_receive {:armed, _, _, ^expected}, 5_000
+      assert_receive {:armed, ^caller, _, ^expected}, 5_000
       attempt = await_attempt(ctx.owner, &(Map.get(&1, :wire_chunks) == count))
       assert attempt.qualifying_chunks == count
       assert attempt.nonqualifying_chunks == 0
