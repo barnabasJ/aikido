@@ -451,8 +451,11 @@ Applications still own cancellation and deadlines inside actions exposed to Lua.
 Seed `metadata: %{aikido_deadline_at: deadline_at}` when starting the run, where
 `deadline_at` is calculated once at the caller's I/O boundary in Unix milliseconds.
 The AI slice retains that exact deadline through ordinary turns, retries and
-nonstreaming context handoffs. A model attempt also captures its own deadline
-before model preparation; preparation consumes that budget. Immediately before
+nonstreaming context handoffs. The supervising attempt establishes one monotonic
+cutoff before observation or task scheduling. Its immutable `AttemptBudget` is
+passed into model preparation and provider-option calculation, and the worker
+checks it before invoking work. Scheduling and preparation consume that same
+budget. Immediately before
 provider I/O, Aikido bounds ReqLLM's `total_timeout`, `receive_timeout`,
 Finch `pool_timeout` and `request_timeout` (under `req_http_options[:finch]`)
 by the remaining time, retaining shorter
@@ -469,6 +472,8 @@ status or timeout phase. Known transport classes and enum reasons such as
 `:timeout` are retained separately; a transport timeout does not establish which
 phase expired. Unknown status and underlying cause remain unknown;
 request bodies, headers and raw provider messages are not attempt facts.
+The high-level client contract does not expose successful HTTP response status;
+collecting that status remains a separate ReqLLM request-observer requirement.
 
 `provider_failure_threshold` defaults to three consecutive failures with the
 same safe class/status/timeout signature. While retries and time remain, the
@@ -481,13 +486,18 @@ agents or model calls. Cancellation and owner termination interrupt its wait.
 The slice's public `model_attempts` contains at most 32 attempts for the current
 run. Each record identifies the request, mode, handoff, turn and zero-based SDK
 attempt. It accumulates start/end/cleanup/terminal-enqueue times, duration,
-backoff, stream opening and first-chunk facts, plus parsed-wire progress,
+backoff, stream opening, first-chunk and first-progress facts, plus parsed-wire progress,
 non-progress and rendered chunk counts. A returned stream handle does not prove
 an HTTP response status. Qualifying content parts can refresh progress without
 rendering text; they never extend the fixed attempt or inherited deadline.
 Terminal enqueue is not an acknowledgement of reducer adoption or storage.
 The same safe facts are emitted on `[:aikido, :ai, :model_attempt, phase]` telemetry
-and adopted through the ordinary `ai.react.model_attempt` signal. Runtime clocks,
+and adopted through the ordinary `ai.react.model_attempt` signal. The I/O
+controller accumulates chunk counters privately. It publishes changed wire
+observations at most once per 100 milliseconds, with additional stream-open,
+first-chunk, first-progress and final cleanup checkpoints. Cleanup folds queued
+notices into one final snapshot. Generation-progress timestamps and idle-window
+accounting do not depend on that publication cadence. Runtime clocks,
 observer callbacks and stream cleanup functions remain transient I/O values.
 The playground's resilience example has a deterministic `provider` scenario and
 an attempt table for inspecting the circuit without provider credentials.

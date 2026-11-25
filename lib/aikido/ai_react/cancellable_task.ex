@@ -8,9 +8,17 @@ defmodule Aikido.AiReact.CancellableTask do
   """
   require Ash.Tracer
   require Logger
+  alias Aikido.AiReact.AttemptObservations
   alias Aikido.AiReact.AttemptTiming
 
-  @doc "Run bounded I/O attempts, retry eligible failures, and cancel when the owning run ends."
+  @doc """
+  Run bounded I/O attempts, retry eligible failures, and cancel when the owning run ends.
+
+  Work accepts `(notify, attempt)` or `(notify, attempt, budget)`. The third
+  argument is the supervisor's immutable `AttemptBudget`, established before
+  task scheduling and checked again on worker entry. Preparation and provider
+  adapters can re-evaluate that same cutoff without opening another window.
+  """
   def run_cancellable_attempts(owner, request_id, supervisor, work, opts) do
     opts = Keyword.put(opts, :timing, AttemptTiming.resolve(opts[:timing]))
     run_subscribed_attempts(owner, request_id, supervisor, work, opts)
@@ -135,6 +143,15 @@ defmodule Aikido.AiReact.CancellableTask do
        ) do
     opts = Keyword.put(opts, :attempt_timeout, timeout)
     deadline = now(opts) + timeout
+    opts = Keyword.put(opts, :attempt_deadline, deadline)
+
+    budget =
+      Aikido.AiReact.AttemptBudget.new!(
+        monotonic_deadline: deadline,
+        timeout_ms: timeout,
+        deadline_at: opts[:deadline_at]
+      )
+
     parent = self()
     key = make_ref()
 
@@ -143,7 +160,7 @@ defmodule Aikido.AiReact.CancellableTask do
     observe(opts, number, :started, %{timeout_ms: timeout})
 
     result =
-      case start_attempt(supervisor, work, opts, transfer, parent, key, number) do
+      case start_attempt(supervisor, work, opts, transfer, parent, key, {number, budget}) do
         {:ok, task} ->
           await_attempt_result(
             task,
@@ -153,7 +170,7 @@ defmodule Aikido.AiReact.CancellableTask do
             deadline,
             progress_deadline(opts),
             opts,
-            []
+            %{cleanups: [], observations: AttemptObservations.new()}
           )
 
         {:error, reason} ->
@@ -234,7 +251,7 @@ defmodule Aikido.AiReact.CancellableTask do
     min(backoff, 30_000)
   end
 
-  defp start_attempt(supervisor, work, opts, transfer, parent, key, number) do
+  defp start_attempt(supervisor, work, opts, transfer, parent, key, {number, budget}) do
     task =
       Task.Supervisor.async_nolink(supervisor, fn ->
         Ash.ProcessHelpers.transfer_context(transfer)
@@ -242,7 +259,7 @@ defmodule Aikido.AiReact.CancellableTask do
 
         try do
           Ash.Tracer.span {:custom, :aikido_attempt}, "aikido.attempt.#{number}", opts[:tracer] do
-            work.(notify, number)
+            invoke_work(work, notify, number, budget, opts)
           end
         rescue
           error -> {:error, error}
@@ -258,6 +275,14 @@ defmodule Aikido.AiReact.CancellableTask do
     :exit, reason -> {:error, reason}
   end
 
+  defp invoke_work(work, notify, number, budget, opts) do
+    if now(opts) >= budget.monotonic_deadline || remaining_budget(opts) == 0 do
+      timeout_result(opts, budget.monotonic_deadline, budget.monotonic_deadline)
+    else
+      if is_function(work, 3), do: work.(notify, number, budget), else: work.(notify, number)
+    end
+  end
+
   defp await_attempt_result(
          %Task{ref: task_ref} = task,
          {key, number} = attempt,
@@ -266,7 +291,7 @@ defmodule Aikido.AiReact.CancellableTask do
          deadline,
          progress,
          opts,
-         cleanups
+         resources
        ) do
     result =
       try do
@@ -289,22 +314,25 @@ defmodule Aikido.AiReact.CancellableTask do
                 {:error, reason}
 
               {^key, :progress} ->
-                {:continue, progress_deadline(opts), cleanups}
+                {:continue, progress_deadline(opts), resources}
 
               {^key, {:cleanup, cleanup}} ->
-                {:continue, progress, [cleanup | cleanups]}
+                {:continue, progress, %{resources | cleanups: [cleanup | resources.cleanups]}}
 
               {^key, {:observation, observation}} ->
-                observe(opts, number, :wire, observation)
-                {:continue, progress, cleanups}
+                {:continue, progress, record_observation(resources, observation, opts, number)}
 
-              {^key, {:wire, observation, progressing?}} ->
-                observe(opts, number, :wire, observation)
-
+              {^key, {:wire, observation, progress_at}} ->
                 progress =
-                  if progressing?, do: progress_deadline(opts), else: progress
+                  if is_integer(progress_at),
+                    do:
+                      max(
+                        progress,
+                        progress_at + Keyword.get(opts, :progress_timeout, opts[:timeout])
+                      ),
+                    else: progress
 
-                {:continue, progress, cleanups}
+                {:continue, progress, record_observation(resources, observation, opts, number)}
 
               {:aikido_subscription, ^sub, _} ->
                 {:error, :cancelled}
@@ -316,7 +344,7 @@ defmodule Aikido.AiReact.CancellableTask do
                 timeout_result(opts, deadline, progress)
 
               {^key, _retired_generation, :aikido_attempt_timeout} ->
-                {:continue, progress, cleanups}
+                {:continue, progress, resources}
             end
           after
             retire_timer(opts[:timing], timer, tag)
@@ -329,13 +357,27 @@ defmodule Aikido.AiReact.CancellableTask do
       end
 
     case result do
-      {:continue, progress, cleanups} ->
-        await_attempt_result(task, attempt, sub, monitor, deadline, progress, opts, cleanups)
+      {:continue, progress, resources} ->
+        await_attempt_result(task, attempt, sub, monitor, deadline, progress, opts, resources)
 
       result ->
-        release_attempt_resources(task, key, cleanups, opts, number)
+        release_attempt_resources(task, key, resources, opts, number)
         observe(opts, number, :cleanup, %{})
         result
+    end
+  end
+
+  defp record_observation(resources, facts, opts, number) do
+    time = now(opts)
+
+    if time >= opts[:attempt_deadline] do
+      %{resources | observations: AttemptObservations.collect(resources.observations, facts)}
+    else
+      {observations, publication} =
+        AttemptObservations.record(resources.observations, facts, time)
+
+      if publication, do: observe(opts, number, :wire, publication)
+      %{resources | observations: observations}
     end
   end
 
@@ -391,9 +433,13 @@ defmodule Aikido.AiReact.CancellableTask do
 
   defp failure_signature(_), do: nil
 
-  defp release_attempt_resources(task, key, cleanups, opts, number) do
+  defp release_attempt_resources(task, key, resources, opts, number) do
     Task.shutdown(task, :brutal_kill)
-    key |> drain_cleanups(cleanups, opts, number) |> Enum.each(&run_cleanup/1)
+    resources = drain_cleanups(key, resources)
+    Enum.each(resources.cleanups, &run_cleanup/1)
+
+    if publication = AttemptObservations.flush(resources.observations),
+      do: observe(opts, number, :wire, publication)
   end
 
   defp run_cleanup(cleanup) do
@@ -410,23 +456,23 @@ defmodule Aikido.AiReact.CancellableTask do
       )
   end
 
-  defp drain_cleanups(key, cleanups, opts, number) do
+  defp drain_cleanups(key, resources) do
     receive do
       {^key, {:cleanup, cleanup}} ->
-        drain_cleanups(key, [cleanup | cleanups], opts, number)
+        drain_cleanups(key, %{resources | cleanups: [cleanup | resources.cleanups]})
 
       {^key, {:observation, observation}} ->
-        observe(opts, number, :wire, observation)
-        drain_cleanups(key, cleanups, opts, number)
+        observations = AttemptObservations.collect(resources.observations, observation)
+        drain_cleanups(key, %{resources | observations: observations})
 
-      {^key, {:wire, observation, _progressing?}} ->
-        observe(opts, number, :wire, observation)
-        drain_cleanups(key, cleanups, opts, number)
+      {^key, {:wire, observation, _progress_at}} ->
+        observations = AttemptObservations.collect(resources.observations, observation)
+        drain_cleanups(key, %{resources | observations: observations})
 
       {^key, _} ->
-        drain_cleanups(key, cleanups, opts, number)
+        drain_cleanups(key, resources)
     after
-      0 -> cleanups
+      0 -> resources
     end
   end
 

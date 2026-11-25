@@ -20,6 +20,7 @@ defmodule Aikido.AiReact.Types.ModelAttempt do
         cleanup_at: [type: :integer],
         delivered_at: [type: :integer],
         first_chunk_at: [type: :integer],
+        first_progress_at: [type: :integer],
         opened: [type: :boolean],
         wire_chunks: [type: :integer],
         qualifying_chunks: [type: :integer],

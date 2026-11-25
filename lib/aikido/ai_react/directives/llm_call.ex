@@ -153,16 +153,9 @@ defmodule Aikido.AiReact.Directives.LLMCall do
       agent_pid,
       d.request_id,
       supervisor,
-      fn notify, attempt ->
+      fn notify, attempt, budget ->
         timing =
           Aikido.AiReact.AttemptTiming.resolve(get_in(scope, [:context, :aikido_attempt_timing]))
-
-        budget =
-          Aikido.AiReact.ModelRequestBudget.deadline(
-            timing,
-            d.deadline_at,
-            d.options.model_timeout_ms
-          )
 
         emit = fn text, thinking ->
           dispatch_stream_delta(d, text, thinking, attempt, agent_pid, source, scope)

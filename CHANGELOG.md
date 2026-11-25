@@ -11,6 +11,9 @@
   and a deterministic resilience example. Per-inner-transport deadline
   recomputation remains a separate ReqLLM dependency change. Require ReqLLM
   1.29 or newer for its native whole-call timeout contract.
+  Coalesce wire observations before state adoption and telemetry, retaining
+  exact final counts without per-chunk publication. Scheduling and preparation
+  share the supervisor's single immutable attempt cutoff.
 
 - Project selector failures defensively across calls, state reads, subscriptions
   and inspector projections. `:selector_raised` now contains the exception's

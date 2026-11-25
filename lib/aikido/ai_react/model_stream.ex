@@ -36,14 +36,9 @@ defmodule Aikido.AiReact.ModelStream do
              %{wire_chunks: 0, qualifying_chunks: 0, nonqualifying_chunks: 0, rendered_chunks: 0}}
           end,
           fn chunk, {text, thinking, last_emit, counts} ->
-            counts = count_chunk(counts, chunk)
-
-            observation =
-              if counts.wire_chunks == 1,
-                do: Map.put(counts, :first_chunk_at, AttemptTiming.system_ms(timing)),
-                else: counts
-
-            notify.({:wire, observation, generation_progress?(chunk)})
+            counts = count_chunk(counts, chunk, timing)
+            progress_at = if generation_progress?(chunk), do: AttemptTiming.monotonic_ms(timing)
+            notify.({:wire, counts, progress_at})
             text = if chunk.type == :content, do: text <> (chunk.text || ""), else: text
 
             thinking =
@@ -72,16 +67,26 @@ defmodule Aikido.AiReact.ModelStream do
     end
   end
 
-  defp count_chunk(counts, chunk) do
+  defp count_chunk(counts, chunk, timing) do
     progress_key =
       if generation_progress?(chunk), do: :qualifying_chunks, else: :nonqualifying_chunks
 
     rendered? = chunk.type in [:content, :thinking] && is_binary(chunk.text) && chunk.text != ""
 
-    counts
-    |> Map.update!(:wire_chunks, &(&1 + 1))
-    |> Map.update!(progress_key, &(&1 + 1))
-    |> Map.update!(:rendered_chunks, &(&1 + if(rendered?, do: 1, else: 0)))
+    updated =
+      counts
+      |> Map.update!(:wire_chunks, &(&1 + 1))
+      |> Map.update!(progress_key, &(&1 + 1))
+      |> Map.update!(:rendered_chunks, &(&1 + if(rendered?, do: 1, else: 0)))
+
+    updated =
+      if counts.wire_chunks == 0,
+        do: Map.put(updated, :first_chunk_at, AttemptTiming.system_ms(timing)),
+        else: updated
+
+    if counts.qualifying_chunks == 0 && generation_progress?(chunk),
+      do: Map.put(updated, :first_progress_at, AttemptTiming.system_ms(timing)),
+      else: updated
   end
 
   @doc "Whether a parsed chunk contains generation content rather than an empty heartbeat."

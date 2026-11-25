@@ -2,24 +2,19 @@ defmodule Aikido.AiReact.ModelRequestBudget do
   @moduledoc "Bounds a prepared provider call by the current attempt and inherited run deadline."
   alias Aikido.AiReact.AttemptTiming
 
-  @doc "Capture the sooner deadline once, before attempt preparation starts."
-  def deadline(timing, inherited, timeout) do
-    now = AttemptTiming.system_ms(timing)
-    attempt = now + timeout
-
-    if inherited && inherited <= attempt,
-      do: %{expires_at: inherited, kind: :deadline, timeout: max(inherited - now, 0)},
-      else: %{expires_at: attempt, kind: :attempt, timeout: timeout}
-  end
-
   @doc "Re-evaluate the remaining budget after preparation, before provider I/O."
-  def options(options, timing, deadline) do
+  def options(options, timing, %Aikido.AiReact.AttemptBudget{} = budget) do
     options =
       options
       |> Keyword.put_new(:total_timeout, Application.get_env(:req_llm, :total_timeout, :infinity))
       |> preserve_receive_default()
 
-    case deadline.expires_at - AttemptTiming.system_ms(timing) do
+    inherited =
+      if budget.deadline_at,
+        do: budget.deadline_at - AttemptTiming.system_ms(timing),
+        else: :infinity
+
+    case min(budget.monotonic_deadline - AttemptTiming.monotonic_ms(timing), inherited) do
       remaining when remaining > 0 ->
         options =
           Enum.reduce([:total_timeout, :receive_timeout], options, fn key, opts ->
@@ -37,8 +32,8 @@ defmodule Aikido.AiReact.ModelRequestBudget do
       _ ->
         {:error,
          Aikido.AiReact.Errors.ModelTimeout.exception(
-           kind: deadline.kind,
-           timeout: deadline.timeout
+           kind: if(budget.deadline_at && inherited <= 0, do: :deadline, else: :attempt),
+           timeout: budget.timeout_ms
          )}
     end
   end

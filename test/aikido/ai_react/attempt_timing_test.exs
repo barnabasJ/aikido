@@ -48,8 +48,8 @@ end
 
 defmodule Aikido.AttemptTimingTest do
   use AikidoTest.Case, async: true
-  alias Aikido.AttemptTimingTest.Manual
   alias Aikido.AiReact.CancellableTask
+  alias Aikido.AttemptTimingTest.Manual
 
   setup context do
     owner = start_server(context, Aikido.AttemptTimingTest.Owner)
@@ -160,6 +160,56 @@ defmodule Aikido.AttemptTimingTest do
     :ok = Manual.advance(ctx.clock, 10)
     assert {:error, :timeout} = Task.await(task, 5_000)
     refute_received {:absolute_attempt, 1}
+  end
+
+  for inherited? <- [false, true], elapsed <- [70, 150] do
+    test "worker entry after #{elapsed}ms retains the supervising cutoff (inherited=#{inherited?})",
+         ctx do
+      observer = self()
+      inherited = if unquote(inherited?), do: Manual.system_ms(ctx.clock) + 1_000
+
+      work = fn _notify, _number, budget ->
+        case Aikido.AiReact.ModelRequestBudget.options([], {Manual, ctx.clock}, budget) do
+          {:ok, options} ->
+            send(observer, {:provider_entered, budget, options})
+            {:ok, options[:total_timeout]}
+
+          error ->
+            error
+        end
+      end
+
+      task =
+        Task.async(fn ->
+          receive do
+            :begin ->
+              CancellableTask.run_cancellable_attempts(
+                ctx.owner,
+                "clock-run",
+                ctx.supervisor,
+                work,
+                timeout: 100,
+                timing: {Manual, ctx.clock},
+                deadline_at: inherited
+              )
+          end
+        end)
+
+      :ok = Manual.hold_worker_read(ctx.clock, task.pid)
+      send(task.pid, :begin)
+      assert_receive {:worker_clock_read, _worker}, 5_000
+      :ok = Manual.advance_without_delivery(ctx.clock, unquote(elapsed))
+      :ok = Manual.release_worker_read(ctx.clock)
+
+      if unquote(elapsed) < 100 do
+        assert {:ok, 30} = Task.await(task, 5_000)
+        assert_receive {:provider_entered, %{monotonic_deadline: 100}, options}, 5_000
+        assert options[:receive_timeout] == 30
+      else
+        assert {:error, :timeout} = Task.await(task, 5_000)
+        refute_receive {:provider_entered, _, _}
+      end
+    end
   end
 
   defp chunks(notify, received) do

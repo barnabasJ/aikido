@@ -5,9 +5,21 @@ defmodule Aikido.AttemptTimingTest.Manual do
 
   def start_link(observer), do: GenServer.start_link(__MODULE__, observer)
   def advance(clock, time), do: GenServer.call(clock, {:advance, time})
+  def advance_without_delivery(clock, time), do: GenServer.call(clock, {:set_time, time})
+  def hold_worker_read(clock, controller), do: GenServer.call(clock, {:hold_worker, controller})
+  def release_worker_read(clock), do: GenServer.call(clock, :release_worker)
   @impl true
   def init(observer),
-    do: {:ok, %{now: 0, base: System.system_time(:millisecond), timers: %{}, observer: observer}}
+    do:
+      {:ok,
+       %{
+         now: 0,
+         base: System.system_time(:millisecond),
+         timers: %{},
+         observer: observer,
+         controller: nil,
+         held: nil
+       }}
 
   @impl true
   def monotonic_ms(clock), do: GenServer.call(clock, :monotonic)
@@ -23,8 +35,25 @@ defmodule Aikido.AttemptTimingTest.Manual do
   def control_timeout(_clock, _remaining), do: 5_000
 
   @impl true
+  def handle_call(:monotonic, {caller, _} = from, %{controller: controller, held: nil} = state)
+      when not is_nil(controller) and caller != controller do
+    send(state.observer, {:worker_clock_read, caller})
+    {:noreply, %{state | held: from}}
+  end
+
   def handle_call(:monotonic, _from, state), do: {:reply, state.now, state}
   def handle_call(:system, _from, state), do: {:reply, state.base + state.now, state}
+
+  def handle_call({:hold_worker, controller}, _from, state),
+    do: {:reply, :ok, %{state | controller: controller}}
+
+  def handle_call(:release_worker, _from, state) do
+    GenServer.reply(state.held, state.now)
+    {:reply, :ok, %{state | controller: nil, held: nil}}
+  end
+
+  def handle_call({:set_time, time}, _from, state) when time >= state.now,
+    do: {:reply, :ok, %{state | now: time}}
 
   def handle_call({:cancel, reference}, _from, state),
     do: {:reply, :ok, %{state | timers: Map.delete(state.timers, reference)}}

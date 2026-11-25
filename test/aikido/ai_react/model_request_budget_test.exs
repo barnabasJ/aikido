@@ -1,6 +1,6 @@
 defmodule Aikido.ModelRequestBudgetTest do
   use ExUnit.Case, async: true
-  alias Aikido.AiReact.ModelRequestBudget
+  alias Aikido.AiReact.{AttemptBudget, ModelRequestBudget}
   alias Aikido.AttemptTimingTest.Manual
 
   setup do
@@ -9,7 +9,7 @@ defmodule Aikido.ModelRequestBudgetTest do
   end
 
   test "preparation consumes the captured attempt budget and caller limits remain shorter", ctx do
-    budget = ModelRequestBudget.deadline(ctx.timing, nil, 100)
+    budget = AttemptBudget.new!(monotonic_deadline: 100, timeout_ms: 100)
     :ok = Manual.advance(ctx.clock, 35)
 
     assert {:ok, opts} =
@@ -36,11 +36,11 @@ defmodule Aikido.ModelRequestBudgetTest do
 
   test "each outer attempt re-evaluates the same inherited deadline", ctx do
     deadline = Manual.system_ms(ctx.clock) + 150
-    first = ModelRequestBudget.deadline(ctx.timing, deadline, 100)
+    first = AttemptBudget.new!(monotonic_deadline: 100, timeout_ms: 100, deadline_at: deadline)
     assert {:ok, opts} = ModelRequestBudget.options([], ctx.timing, first)
     assert opts[:total_timeout] == 100
     :ok = Manual.advance(ctx.clock, 120)
-    next = ModelRequestBudget.deadline(ctx.timing, deadline, 100)
+    next = AttemptBudget.new!(monotonic_deadline: 150, timeout_ms: 30, deadline_at: deadline)
     assert {:ok, opts} = ModelRequestBudget.options([], ctx.timing, next)
     assert opts[:total_timeout] == 30
     :ok = Manual.advance(ctx.clock, 150)
@@ -50,7 +50,7 @@ defmodule Aikido.ModelRequestBudgetTest do
   end
 
   test "invalid caller options remain subject to native provider validation", ctx do
-    budget = ModelRequestBudget.deadline(ctx.timing, nil, 100)
+    budget = AttemptBudget.new!(monotonic_deadline: 100, timeout_ms: 100)
 
     assert {:ok, opts} =
              ModelRequestBudget.options(
@@ -84,7 +84,7 @@ defmodule Aikido.ModelRequestBudgetTest do
       {request, Req.Response.new(status: 200, body: body)}
     end
 
-    budget = ModelRequestBudget.deadline(ctx.timing, nil, 100)
+    budget = AttemptBudget.new!(monotonic_deadline: 100, timeout_ms: 100)
 
     assert {:ok, options} =
              ModelRequestBudget.options(

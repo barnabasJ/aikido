@@ -101,7 +101,9 @@ defmodule Aikido.ModelRetryTest.Client do
   def stream_text(_model, _messages, options) do
     observer = options[:observer]
     send(observer, {:stream_open, self(), options})
-    {:ok, metadata} = ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> %{} end)
+
+    {:ok, metadata} =
+      ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> %{finish_reason: :stop} end)
 
     stream =
       Stream.resource(
@@ -111,6 +113,8 @@ defmodule Aikido.ModelRetryTest.Client do
 
           receive do
             {:chunk, chunk} -> {[chunk], state}
+            {:chunks, chunks} -> {chunks, state}
+            :finish -> {:halt, state}
           end
         end,
         fn _ -> :ok end
@@ -124,14 +128,15 @@ defmodule Aikido.ModelRetryTest.Client do
          send(observer, {:stream_closed, self()})
          :ok
        end,
-       model: nil,
+       model: %LLMDB.Model{provider: :openai, id: "gpt-4o-mini"},
        context: ReqLLM.Context.new()
      }}
   end
 end
 
 defmodule Aikido.ModelRetryTest do
-  use AikidoTest.Case, async: true
+  # Burst latency assertions and global telemetry capture need an isolated test window.
+  use AikidoTest.Case, async: false
   alias Aikido.AiReact.Errors.ProviderRequestFailed
   alias Aikido.AttemptTimingTest.Manual
 
@@ -281,10 +286,12 @@ defmodule Aikido.ModelRetryTest do
       assert_receive {:wire_wait, ^worker}, 5_000
       expected = min(time + 40, 100)
       assert_receive {:armed, ^caller, _, ^expected}, 5_000
-      attempt = await_attempt(ctx.owner, &(Map.get(&1, :wire_chunks) == count))
-      assert attempt.qualifying_chunks == count
-      assert attempt.nonqualifying_chunks == 0
-      assert attempt.rendered_chunks == 0
+
+      if count == 1 do
+        attempt = await_attempt(ctx.owner, &(Map.get(&1, :qualifying_chunks) == 1))
+        assert is_integer(attempt.first_progress_at)
+        assert attempt.rendered_chunks == 0
+      end
     end
 
     :ok = Manual.advance(ctx.clock, 100)
@@ -388,6 +395,193 @@ defmodule Aikido.ModelRetryTest do
   @doc false
   def attempt_event(event, measurements, metadata, observer),
     do: send(observer, {:attempt_event, event, measurements, metadata})
+
+  test "fast wire bursts coalesce state and telemetry while timeout delivery retains exact counts",
+       ctx do
+    handler = {__MODULE__, make_ref()}
+    phases = [:started, :wire, :cleanup, :ended, :terminal]
+    events = Enum.map(phases, &[:aikido, :ai, :model_attempt, &1])
+    :ok = :telemetry.attach_many(handler, events, &__MODULE__.attempt_event/4, self())
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    counts =
+      for size <- [0, 12, 12_000] do
+        {:ok, signals} =
+          Aikido.AgentServer.subscribe(ctx.owner, "ai.react.model_attempt", fn runtime ->
+            {:ok, hd(runtime.agent.state.ai.model_attempts).phase}
+          end)
+
+        {:ok, terminal} =
+          Aikido.AgentServer.subscribe(
+            ctx.owner,
+            "ai.react.model_attempt",
+            fn runtime ->
+              case runtime.agent.state.ai.model_attempts do
+                [%{phase: :terminal} = attempt | _] -> {:ok, attempt}
+                _ -> :skip
+              end
+            end,
+            once: true
+          )
+
+        start = Manual.monotonic_ms(ctx.clock)
+        deadline = Manual.system_ms(ctx.clock) + 150
+
+        {:ok, request_id} =
+          ask(ctx, deadline,
+            options: %{
+              streaming: true,
+              model_timeout_ms: 150,
+              progress_timeout_ms: 100_000,
+              stream_batch_bytes: 1_000_000,
+              stream_batch_ms: 100_000,
+              model_max_retries: 0
+            }
+          )
+
+        assert_receive {:stream_open, worker, _}, 5_000
+        assert_receive {:wire_wait, ^worker}, 5_000
+        chunks = burst_chunks(size)
+
+        if size > 0 do
+          send(worker, {:chunks, Enum.take(chunks, 3)})
+          assert_receive {:wire_wait, ^worker}, 5_000
+          await_attempt(ctx.owner, &Map.has_key?(&1, :first_progress_at))
+        end
+
+        send(worker, {:chunks, Enum.drop(chunks, 3)})
+        assert_receive {:wire_wait, ^worker}, 5_000
+
+        # The agent remains available while the I/O controller consumes private notices.
+        assert {:ok, :responsive} =
+                 Aikido.AgentServer.state(ctx.owner, fn _ -> {:ok, :responsive} end,
+                   timeout: 1_000
+                 )
+
+        :ok = Manual.advance(ctx.clock, start + 150)
+        assert_receive {:aikido_subscription, ^terminal, %{result: {:ok, attempt}}}, 2_000
+
+        assert_receive {:attempt_event, [:aikido, :ai, :model_attempt, :terminal], _,
+                        %{request_id: ^request_id}},
+                       2_000
+
+        assert attempt.wire_chunks == size
+        assert attempt.rendered_chunks == div(size, 3)
+        assert attempt.qualifying_chunks == div(size, 3) * 2
+        assert attempt.nonqualifying_chunks == div(size, 3)
+        assert attempt.terminal_outcome == :failed
+
+        if size == 0 do
+          refute Map.has_key?(attempt, :first_chunk_at)
+          refute Map.has_key?(attempt, :first_progress_at)
+        else
+          assert is_integer(attempt.first_chunk_at)
+          assert is_integer(attempt.first_progress_at)
+        end
+
+        # A call after the terminal transition is also a barrier for subscription delivery.
+        assert {:ok, _} = Aikido.AgentServer.state(ctx.owner, &{:ok, &1.agent.state.ai.status})
+        Aikido.AgentServer.unsubscribe(ctx.owner, signals)
+        {signal_count, telemetry_count} = drain_publications(signals, request_id, 0, 1)
+        assert signal_count == telemetry_count
+        assert signal_count <= 8
+        {size, signal_count}
+      end
+
+    assert [{0, _}, {12, count}, {12_000, count}] = counts
+  end
+
+  test "completed rendered bursts publish their final counts without a diagnostic backlog", ctx do
+    handler = {__MODULE__, make_ref()}
+
+    events =
+      Enum.map(
+        [:started, :wire, :cleanup, :ended, :terminal],
+        &[:aikido, :ai, :model_attempt, &1]
+      )
+
+    :ok = :telemetry.attach_many(handler, events, &__MODULE__.attempt_event/4, self())
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    counts =
+      for size <- [12, 12_000] do
+        {:ok, signals} =
+          Aikido.AgentServer.subscribe(ctx.owner, "ai.react.model_attempt", fn runtime ->
+            {:ok, hd(runtime.agent.state.ai.model_attempts).phase}
+          end)
+
+        deadline = Manual.system_ms(ctx.clock) + 150
+
+        {:ok, request_id} =
+          ask(ctx, deadline,
+            options: %{
+              streaming: true,
+              model_timeout_ms: 150,
+              progress_timeout_ms: 100_000,
+              stream_batch_bytes: 1_000_000,
+              stream_batch_ms: 100_000,
+              model_max_retries: 0
+            }
+          )
+
+        assert_receive {:stream_open, worker, _}, 5_000
+        assert_receive {:wire_wait, ^worker}, 5_000
+        send(worker, {:chunk, ReqLLM.StreamChunk.text("x")})
+        assert_receive {:wire_wait, ^worker}, 5_000
+        await_attempt(ctx.owner, &Map.has_key?(&1, :first_progress_at))
+        send(worker, {:chunks, List.duplicate(ReqLLM.StreamChunk.text("x"), size - 1)})
+        assert_receive {:wire_wait, ^worker}, 5_000
+        send(worker, :finish)
+
+        assert_receive {:attempt_event, [:aikido, :ai, :model_attempt, :terminal], _,
+                        %{request_id: ^request_id}},
+                       2_000
+
+        state = await_state(ctx.owner, &(&1.ai.status == :completed && terminal?(&1.ai)))
+        [attempt] = state.ai.model_attempts
+        assert attempt.wire_chunks == size
+        assert attempt.qualifying_chunks == size
+        assert attempt.rendered_chunks == size
+        assert attempt.nonqualifying_chunks == 0
+        assert attempt.terminal_outcome == :completed
+        assert byte_size(state.ai.result) == size
+        Aikido.AgentServer.unsubscribe(ctx.owner, signals)
+        {signal_count, telemetry_count} = drain_publications(signals, request_id, 0, 1)
+        assert signal_count == telemetry_count
+        assert signal_count <= 7
+        signal_count
+      end
+
+    assert [count, count] = counts
+  end
+
+  defp burst_chunks(0), do: []
+
+  defp burst_chunks(size) do
+    part = ReqLLM.Message.ContentPart.image_url("https://example.invalid/generated.png")
+
+    List.duplicate(
+      [
+        ReqLLM.StreamChunk.meta(%{}),
+        ReqLLM.StreamChunk.text("x"),
+        ReqLLM.StreamChunk.content_part(part)
+      ],
+      div(size, 3)
+    )
+    |> List.flatten()
+  end
+
+  defp drain_publications(reference, request_id, signals, telemetry) do
+    receive do
+      {:aikido_subscription, ^reference, _} ->
+        drain_publications(reference, request_id, signals + 1, telemetry)
+
+      {:attempt_event, [:aikido, :ai, :model_attempt, _], _, %{request_id: ^request_id}} ->
+        drain_publications(reference, request_id, signals, telemetry + 1)
+    after
+      0 -> {signals, telemetry}
+    end
+  end
 
   defp ask(ctx, deadline, overrides) do
     options =
