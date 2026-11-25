@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Project selector failures defensively across calls, state reads, subscriptions
+  and inspector projections. `:selector_raised` now contains the exception's
+  module and argument-free `{module, function, arity}` frames, replacing the raw
+  exception and stacktrace. Throws and exits are contained as `:selector_failed`
+  with the failure kind and the same safe frames, without their reason values.
+  Successful values, explicit selector errors and subscription skips retain
+  their existing behavior.
+
 - Add `Aikido.Thread.Journal.append_with_entries/3`, returning the updated
   journal and the exact newly accepted typed entries in order. Replay retries
   contribute no duplicate entries, including after pruning. Existing `append/3`

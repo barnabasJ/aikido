@@ -220,7 +220,10 @@ defmodule Aikido.AgentServer do
 
   Selectors run synchronously in the agent process. A raising selector is
   caught and surfaces to the caller as
-  `{:error, {:selector_raised, exception, stacktrace}}`.
+  `{:error, {:selector_raised, exception_class, mfas}}`. The class is a module
+  atom and each frame is `{module, function, arity}`; no exception payload,
+  arguments or frame metadata are returned. Throws and exits return
+  `{:error, {:selector_failed, kind, mfas}}` without their reason values.
 
   No `:skip` return — the caller is blocking, so "skip" has no meaning.
   Use `subscribe/4` for the ambient pattern that supports `:skip`.
@@ -257,7 +260,8 @@ defmodule Aikido.AgentServer do
 
   - `{:ok, value}` / `{:error, reason}` — selector return passed through verbatim
   - `{:error, reason}` — chain error from the action / middleware (selector skipped)
-  - `{:error, {:selector_raised, exception, stacktrace}}` — selector raised
+  - `{:error, {:selector_raised, exception_class, mfas}}` — selector raised (class and argument-free MFAs only)
+  - `{:error, {:selector_failed, kind, mfas}}` — selector threw or exited (reason omitted)
   - `{:error, :not_found}` / `{:error, :invalid_server}` — server lookup failed
   - Exits with `{:noproc, ...}` / `{:timeout, ...}` if the agent dies or the
     GenServer.call times out
@@ -479,7 +483,8 @@ defmodule Aikido.AgentServer do
   ## Returns
 
   - `{:ok, value}` / `{:error, reason}` — selector return passed through verbatim
-  - `{:error, {:selector_raised, exception, stacktrace}}` — selector raised
+  - `{:error, {:selector_raised, exception_class, mfas}}` — selector raised (class and argument-free MFAs only)
+  - `{:error, {:selector_failed, kind, mfas}}` — selector threw or exited (reason omitted)
   - `{:error, :not_found}` / `{:error, :invalid_server}` — server lookup failed
 
   ## Examples
@@ -1597,14 +1602,16 @@ defmodule Aikido.AgentServer do
 
   # Invokes a call, state or subscription selector in a try/rescue so a raising
   # selector doesn't crash the agent. Returns the selector's tagged tuple
-  # on success or `{:error, {:selector_raised, exception, stacktrace}}` on
-  # rescue.
+  # on success or `{:error, {:selector_raised, exception_class, mfas}}` on
+  # rescue. Throw and exit values are omitted from :selector_failed diagnostics.
   @spec invoke_selector(subscribe_selector(), State.t()) ::
           {:ok, term()} | {:error, term()} | :skip
   defp invoke_selector(selector, %State{} = state) when is_function(selector, 1) do
     selector.(state)
   rescue
-    exception -> {:error, {:selector_raised, exception, __STACKTRACE__}}
+    exception -> Aikido.Selector.Failure.raised(exception, __STACKTRACE__)
+  catch
+    kind, _reason -> Aikido.Selector.Failure.failed(kind, __STACKTRACE__)
   end
 
   # Middleware chain → routing → native Ash actions. The outermost middleware wraps the
@@ -1803,7 +1810,9 @@ defmodule Aikido.AgentServer do
   defp invoke_subscription_selector(selector, state, event) do
     selector.(state, event)
   rescue
-    exception -> {:error, {:selector_raised, exception, __STACKTRACE__}}
+    exception -> Aikido.Selector.Failure.raised(exception, __STACKTRACE__)
+  catch
+    kind, _reason -> Aikido.Selector.Failure.failed(kind, __STACKTRACE__)
   end
 
   defp deliver_subscription_result(acc_state, sub_ref, entry, signal, fire) do

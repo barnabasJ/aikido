@@ -9,7 +9,11 @@ defmodule Aikido.Inspector do
   The two-argument projection receives runtime state and the execution event,
   synchronously after signal processing and directive dispatch. Return `{:ok,
   value}`, `{:error, reason}` or `:skip`. Project and redact private data here;
-  the inspector never needs to retain raw agent state.
+  the inspector never needs to retain raw agent state. Raised projections become
+  `{:error, {:selector_raised, exception_class, mfas}}`; thrown or exited
+  projections become `{:error, {:selector_failed, kind, mfas}}`. Frames contain
+  only `{module, function, arity}`. Exception payloads, reason values, arguments
+  and frame metadata are omitted.
 
   The target receives `{:aikido_inspection, ref, %{sequence: count, entries:
   entries}}` batches, ordered by sequence within each batch. Concurrent producers
@@ -225,9 +229,9 @@ defmodule Aikido.Inspector do
   defp project(selector, runtime, event) do
     selector.(runtime, event)
   rescue
-    exception -> {:error, {:selector_raised, exception, __STACKTRACE__}}
+    exception -> Aikido.Selector.Failure.raised(exception, __STACKTRACE__)
   catch
-    kind, reason -> {:error, {:selector_failed, kind, reason}}
+    kind, _reason -> Aikido.Selector.Failure.failed(kind, __STACKTRACE__)
   end
 
   defp flush(ref, delivered) do

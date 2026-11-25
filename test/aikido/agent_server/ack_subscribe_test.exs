@@ -100,7 +100,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
              )
 
     assert_receive {:aikido_subscription, ^raising,
-                    %{result: {:error, {:selector_raised, %RuntimeError{}, _}}}}
+                    %{result: {:error, {:selector_raised, RuntimeError, _}}}}
 
     assert Process.alive?(pid)
   end
@@ -295,7 +295,7 @@ defmodule AikidoTest.AgentServer.AckSubscribeTest do
           timeout: 1000
         )
 
-      assert {:error, {:selector_raised, %RuntimeError{message: "selector boom"}, _stacktrace}} =
+      assert {:error, {:selector_raised, RuntimeError, _stacktrace}} =
                result
 
       assert Process.alive?(pid)

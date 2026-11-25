@@ -82,7 +82,7 @@ defmodule AikidoTest.ObserverSafetyTest do
       end
 
       assert_receive {:aikido_subscription, ^ref,
-                      %{result: {:error, {:selector_raised, %RuntimeError{}, _stack}}}}
+                      %{result: {:error, {:selector_raised, RuntimeError, _stack}}}}
 
       assert_receive {:signal, %{type: "observer.effect", data: %{label: :first}}}
       assert_receive {:signal, %{type: "observer.effect", data: %{label: :second}}}

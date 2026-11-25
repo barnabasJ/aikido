@@ -889,3 +889,27 @@ then advance it and await the agent's resulting signal or state transition.
 The timing capability stays in the live supervisor configuration and is omitted
 from activation options, agent scope and checkpoints. DurableServer's storage
 and heartbeat timers continue to use their configured production intervals.
+
+## Selector failure diagnostics
+
+`AgentServer.call/4`, `state/3`, subscription selectors of either arity and
+`Inspector.attach/3` projections contain raised, thrown and exited failures.
+A raised selector returns:
+
+```elixir
+{:error, {:selector_raised, UndefinedFunctionError, [{MyApp.Selector, :project, 1}]}}
+```
+
+The second element is an exception module, not an exception struct. Frames keep
+only module, function and arity; exception messages and fields, stack arguments,
+file metadata, agent state and signal payloads are not included. A throw or exit
+returns `{:error, {:selector_failed, kind, mfas}}`, with its reason omitted.
+All boundaries use `Aikido.Selector.Failure` for this projection. This deliberately
+changes the diagnostic content of the existing tagged failure tuples.
+
+Selector failure does not undo an adopted signal or its effects. The agent stays
+available for subsequent reads and commands. Successful selector results and
+explicit `{:error, reason}` returns pass through unchanged; subscriptions can
+still return `:skip`. These caller-authored projections remain responsible for
+the data they intentionally expose. The safe failure projection does not redact
+successful results, explicitly returned errors or ordinary reducer errors.
