@@ -353,6 +353,13 @@ defmodule Aikido.StreamBackpressureTest do
     send(pid, :release_batch)
     assert {:error, %Aikido.AiReact.Errors.EffectReceiptLost{} = error} = Task.await(task)
     refute Aikido.Error.retryable?(error)
+    assert error.timeout_phase == :attempt
+    assert error.cause_type == Aikido.AiReact.Errors.ModelTimeout
+
+    assert {:ok, attempts} =
+             Aikido.AgentServer.state(pid, &{:ok, &1.agent.state.ai.model_attempts})
+
+    assert [%{timeout_phase: :attempt, cause_type: Aikido.AiReact.Errors.ModelTimeout}] = attempts
     assert_receive :stream_closed
     refute_received {:stream_open, _}
     refute_received {:pulled, 129}

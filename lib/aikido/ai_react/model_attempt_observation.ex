@@ -4,11 +4,12 @@ defmodule Aikido.AiReact.ModelAttemptObservation do
   alias Aikido.AiReact.{AttemptTiming, Errors.ProviderRequestFailed}
 
   @doc "Project only the failure class, HTTP status and timeout phase."
+  def failure(%Aikido.AiReact.Errors.EffectReceiptLost{} = error), do: failure_fields(error)
+
   def failure(reason) do
     case ProviderRequestFailed.from_reason(reason) do
       %ProviderRequestFailed{} = error ->
-        Map.take(error, [:cause_type, :status, :timeout_phase, :transport_type, :transport_reason])
-        |> Map.reject(fn {_key, value} -> is_nil(value) end)
+        failure_fields(error)
 
       %{__struct__: module} ->
         %{cause_type: module}
@@ -16,6 +17,11 @@ defmodule Aikido.AiReact.ModelAttemptObservation do
       _ ->
         %{}
     end
+  end
+
+  defp failure_fields(error) do
+    Map.take(error, [:cause_type, :status, :timeout_phase, :transport_type, :transport_reason])
+    |> Map.reject(fn {_key, value} -> is_nil(value) end)
   end
 
   @doc "Create a transient observer that emits a typed, scoped signal and safe telemetry."
