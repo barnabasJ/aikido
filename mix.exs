@@ -164,6 +164,10 @@ defmodule Aikido.MixProject do
       {:makeup_json, "~> 1.0"},
 
       # Development & Test Dependencies
+      {:ash_quint,
+       git: "https://github.com/Torkan/ash_quint.git",
+       ref: "fc45501f011621bb461b981cd3bdca427b3f7b07",
+       only: [:dev, :test]},
       {:benchee, "~> 1.5", only: :dev, runtime: false},
       {:sourceror, "~> 1.12", only: [:dev, :test], runtime: false},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},

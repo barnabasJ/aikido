@@ -49,3 +49,5 @@ config :aikido,
     Aikido.BoundTeamExecutionTest.Domain,
     Aikido.DurableScopeRefusalRenderTest.Domain
   ]
+
+config :ash_quint, enabled: true

@@ -1,0 +1,804 @@
+{
+  "ash_quint": 3,
+  "backend": "typescript",
+  "interface": {
+    "actions": [
+      {
+        "name": "Init",
+        "picks": "unit"
+      },
+      {
+        "fields": [
+          {
+            "name": "current",
+            "type": "bool"
+          },
+          {
+            "name": "turn",
+            "type": "int"
+          },
+          {
+            "name": "attempt",
+            "type": "int"
+          },
+          {
+            "name": "sequence",
+            "type": "int"
+          }
+        ],
+        "name": "Stream",
+        "picks": "record"
+      },
+      {
+        "name": "Cancel",
+        "picks": "unit"
+      },
+      {
+        "name": "Complete",
+        "picks": "unit"
+      },
+      {
+        "name": "Begin",
+        "picks": "unit"
+      },
+      {
+        "fields": [
+          {
+            "name": "current",
+            "type": "bool"
+          },
+          {
+            "name": "fresh",
+            "type": "bool"
+          }
+        ],
+        "name": "Ready",
+        "picks": "record"
+      }
+    ],
+    "results": [
+      "Accepted",
+      "Rejected"
+    ],
+    "vars": [
+      {
+        "name": "generation",
+        "type": "int"
+      },
+      {
+        "name": "status",
+        "type": "str"
+      },
+      {
+        "name": "attempt",
+        "type": "int"
+      },
+      {
+        "name": "sequence",
+        "type": "int"
+      },
+      {
+        "name": "text",
+        "type": "List[str]"
+      },
+      {
+        "name": "effects",
+        "type": "List[str]"
+      },
+      {
+        "name": "iteration",
+        "type": "int"
+      }
+    ]
+  },
+  "models": {
+    "test/quint/react_stream/model-tests.qnt": "sha256:6af4b5d3a01ebb304375f4ad39130b3ddeeaf79b96acb6afdf09eeaf1762a8c3",
+    "test/quint/react_stream/model.qnt": "sha256:7154516f9f0207c9eef45b883f800f931e9b973fe375e135cc726d59e5259bda"
+  },
+  "quint": "0.34.0",
+  "seed": 20261126,
+  "traces": [
+    {
+      "actions": {
+        "Begin": 3,
+        "Cancel": 2,
+        "Complete": 5,
+        "Ready": 4,
+        "Stream": 6
+      },
+      "file": "random_0.itf.json",
+      "name": "0",
+      "outcomes": {
+        "Begin": {
+          "accepted": 3
+        },
+        "Cancel": {
+          "accepted": 2
+        },
+        "Complete": {
+          "accepted": 5
+        },
+        "Ready": {
+          "accepted": 4
+        },
+        "Stream": {
+          "accepted": 6
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 3,
+        "Cancel": 6,
+        "Complete": 4,
+        "Ready": 3,
+        "Stream": 4
+      },
+      "file": "random_1.itf.json",
+      "name": "1",
+      "outcomes": {
+        "Begin": {
+          "accepted": 3
+        },
+        "Cancel": {
+          "accepted": 6
+        },
+        "Complete": {
+          "accepted": 4
+        },
+        "Ready": {
+          "accepted": 3
+        },
+        "Stream": {
+          "accepted": 4
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 4,
+        "Cancel": 5,
+        "Complete": 4,
+        "Ready": 2,
+        "Stream": 5
+      },
+      "file": "random_10.itf.json",
+      "name": "10",
+      "outcomes": {
+        "Begin": {
+          "accepted": 4
+        },
+        "Cancel": {
+          "accepted": 5
+        },
+        "Complete": {
+          "accepted": 4
+        },
+        "Ready": {
+          "accepted": 2
+        },
+        "Stream": {
+          "accepted": 5
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 2,
+        "Cancel": 3,
+        "Complete": 7,
+        "Ready": 4,
+        "Stream": 4
+      },
+      "file": "random_11.itf.json",
+      "name": "11",
+      "outcomes": {
+        "Begin": {
+          "accepted": 2
+        },
+        "Cancel": {
+          "accepted": 3
+        },
+        "Complete": {
+          "accepted": 7
+        },
+        "Ready": {
+          "accepted": 4
+        },
+        "Stream": {
+          "accepted": 4
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 1,
+        "Cancel": 7,
+        "Complete": 5,
+        "Ready": 4,
+        "Stream": 3
+      },
+      "file": "random_12.itf.json",
+      "name": "12",
+      "outcomes": {
+        "Begin": {
+          "accepted": 1
+        },
+        "Cancel": {
+          "accepted": 7
+        },
+        "Complete": {
+          "accepted": 5
+        },
+        "Ready": {
+          "accepted": 4
+        },
+        "Stream": {
+          "accepted": 3
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 3,
+        "Cancel": 5,
+        "Complete": 3,
+        "Ready": 6,
+        "Stream": 3
+      },
+      "file": "random_13.itf.json",
+      "name": "13",
+      "outcomes": {
+        "Begin": {
+          "accepted": 3
+        },
+        "Cancel": {
+          "accepted": 5
+        },
+        "Complete": {
+          "accepted": 3
+        },
+        "Ready": {
+          "accepted": 6
+        },
+        "Stream": {
+          "accepted": 3
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 2,
+        "Cancel": 6,
+        "Complete": 3,
+        "Ready": 5,
+        "Stream": 4
+      },
+      "file": "random_14.itf.json",
+      "name": "14",
+      "outcomes": {
+        "Begin": {
+          "accepted": 2
+        },
+        "Cancel": {
+          "accepted": 6
+        },
+        "Complete": {
+          "accepted": 3
+        },
+        "Ready": {
+          "accepted": 5
+        },
+        "Stream": {
+          "accepted": 4
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 4,
+        "Cancel": 3,
+        "Complete": 6,
+        "Ready": 7
+      },
+      "file": "random_15.itf.json",
+      "name": "15",
+      "outcomes": {
+        "Begin": {
+          "accepted": 4
+        },
+        "Cancel": {
+          "accepted": 3
+        },
+        "Complete": {
+          "accepted": 6
+        },
+        "Ready": {
+          "accepted": 7
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 4,
+        "Cancel": 5,
+        "Complete": 4,
+        "Ready": 5,
+        "Stream": 2
+      },
+      "file": "random_16.itf.json",
+      "name": "16",
+      "outcomes": {
+        "Begin": {
+          "accepted": 4
+        },
+        "Cancel": {
+          "accepted": 5
+        },
+        "Complete": {
+          "accepted": 4
+        },
+        "Ready": {
+          "accepted": 5
+        },
+        "Stream": {
+          "accepted": 2
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 4,
+        "Cancel": 4,
+        "Complete": 3,
+        "Ready": 4,
+        "Stream": 5
+      },
+      "file": "random_17.itf.json",
+      "name": "17",
+      "outcomes": {
+        "Begin": {
+          "accepted": 4
+        },
+        "Cancel": {
+          "accepted": 4
+        },
+        "Complete": {
+          "accepted": 3
+        },
+        "Ready": {
+          "accepted": 4
+        },
+        "Stream": {
+          "accepted": 5
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 2,
+        "Cancel": 2,
+        "Complete": 5,
+        "Ready": 6,
+        "Stream": 5
+      },
+      "file": "random_18.itf.json",
+      "name": "18",
+      "outcomes": {
+        "Begin": {
+          "accepted": 2
+        },
+        "Cancel": {
+          "accepted": 2
+        },
+        "Complete": {
+          "accepted": 5
+        },
+        "Ready": {
+          "accepted": 6
+        },
+        "Stream": {
+          "accepted": 5
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 2,
+        "Cancel": 2,
+        "Complete": 4,
+        "Ready": 8,
+        "Stream": 4
+      },
+      "file": "random_19.itf.json",
+      "name": "19",
+      "outcomes": {
+        "Begin": {
+          "accepted": 2
+        },
+        "Cancel": {
+          "accepted": 2
+        },
+        "Complete": {
+          "accepted": 4
+        },
+        "Ready": {
+          "accepted": 8
+        },
+        "Stream": {
+          "accepted": 4
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 4,
+        "Cancel": 5,
+        "Ready": 7,
+        "Stream": 4
+      },
+      "file": "random_2.itf.json",
+      "name": "2",
+      "outcomes": {
+        "Begin": {
+          "accepted": 4
+        },
+        "Cancel": {
+          "accepted": 5
+        },
+        "Ready": {
+          "accepted": 7
+        },
+        "Stream": {
+          "accepted": 4
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 2,
+        "Complete": 6,
+        "Ready": 5,
+        "Stream": 7
+      },
+      "file": "random_3.itf.json",
+      "name": "3",
+      "outcomes": {
+        "Begin": {
+          "accepted": 2
+        },
+        "Complete": {
+          "accepted": 6
+        },
+        "Ready": {
+          "accepted": 5
+        },
+        "Stream": {
+          "accepted": 7
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 4,
+        "Cancel": 4,
+        "Complete": 4,
+        "Ready": 4,
+        "Stream": 4
+      },
+      "file": "random_4.itf.json",
+      "name": "4",
+      "outcomes": {
+        "Begin": {
+          "accepted": 4
+        },
+        "Cancel": {
+          "accepted": 4
+        },
+        "Complete": {
+          "accepted": 4
+        },
+        "Ready": {
+          "accepted": 4
+        },
+        "Stream": {
+          "accepted": 4
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 2,
+        "Cancel": 5,
+        "Complete": 3,
+        "Ready": 6,
+        "Stream": 4
+      },
+      "file": "random_5.itf.json",
+      "name": "5",
+      "outcomes": {
+        "Begin": {
+          "accepted": 2
+        },
+        "Cancel": {
+          "accepted": 5
+        },
+        "Complete": {
+          "accepted": 3
+        },
+        "Ready": {
+          "accepted": 6
+        },
+        "Stream": {
+          "accepted": 4
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 1,
+        "Cancel": 4,
+        "Complete": 5,
+        "Ready": 4,
+        "Stream": 6
+      },
+      "file": "random_6.itf.json",
+      "name": "6",
+      "outcomes": {
+        "Begin": {
+          "accepted": 1
+        },
+        "Cancel": {
+          "accepted": 4
+        },
+        "Complete": {
+          "accepted": 5
+        },
+        "Ready": {
+          "accepted": 4
+        },
+        "Stream": {
+          "accepted": 6
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 3,
+        "Cancel": 5,
+        "Complete": 7,
+        "Ready": 1,
+        "Stream": 4
+      },
+      "file": "random_7.itf.json",
+      "name": "7",
+      "outcomes": {
+        "Begin": {
+          "accepted": 3
+        },
+        "Cancel": {
+          "accepted": 5
+        },
+        "Complete": {
+          "accepted": 7
+        },
+        "Ready": {
+          "accepted": 1
+        },
+        "Stream": {
+          "accepted": 4
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 2,
+        "Cancel": 2,
+        "Complete": 7,
+        "Ready": 4,
+        "Stream": 5
+      },
+      "file": "random_8.itf.json",
+      "name": "8",
+      "outcomes": {
+        "Begin": {
+          "accepted": 2
+        },
+        "Cancel": {
+          "accepted": 2
+        },
+        "Complete": {
+          "accepted": 7
+        },
+        "Ready": {
+          "accepted": 4
+        },
+        "Stream": {
+          "accepted": 5
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 3,
+        "Cancel": 4,
+        "Complete": 6,
+        "Ready": 3,
+        "Stream": 4
+      },
+      "file": "random_9.itf.json",
+      "name": "9",
+      "outcomes": {
+        "Begin": {
+          "accepted": 3
+        },
+        "Cancel": {
+          "accepted": 4
+        },
+        "Complete": {
+          "accepted": 6
+        },
+        "Ready": {
+          "accepted": 3
+        },
+        "Stream": {
+          "accepted": 4
+        }
+      },
+      "source": "random",
+      "steps": 20
+    },
+    {
+      "actions": {
+        "Begin": 1,
+        "Cancel": 1,
+        "Ready": 1,
+        "Stream": 2
+      },
+      "file": "scenario_cancelLateBatchTest.itf.json",
+      "name": "cancelLateBatchTest",
+      "outcomes": {
+        "Begin": {
+          "accepted": 1
+        },
+        "Cancel": {
+          "accepted": 1
+        },
+        "Ready": {
+          "accepted": 1
+        },
+        "Stream": {
+          "accepted": 2
+        }
+      },
+      "source": "scenario",
+      "steps": 5
+    },
+    {
+      "actions": {
+        "Begin": 2,
+        "Complete": 1,
+        "Ready": 2,
+        "Stream": 2
+      },
+      "file": "scenario_completeRestartTest.itf.json",
+      "name": "completeRestartTest",
+      "outcomes": {
+        "Begin": {
+          "accepted": 2
+        },
+        "Complete": {
+          "accepted": 1
+        },
+        "Ready": {
+          "accepted": 2
+        },
+        "Stream": {
+          "accepted": 2
+        }
+      },
+      "source": "scenario",
+      "steps": 7
+    },
+    {
+      "actions": {
+        "Begin": 1,
+        "Ready": 1,
+        "Stream": 3
+      },
+      "file": "scenario_orderedAndDuplicateTest.itf.json",
+      "name": "orderedAndDuplicateTest",
+      "outcomes": {
+        "Begin": {
+          "accepted": 1
+        },
+        "Ready": {
+          "accepted": 1
+        },
+        "Stream": {
+          "accepted": 3
+        }
+      },
+      "source": "scenario",
+      "steps": 5
+    },
+    {
+      "actions": {
+        "Begin": 1,
+        "Ready": 1,
+        "Stream": 3
+      },
+      "file": "scenario_retryAndStaleTest.itf.json",
+      "name": "retryAndStaleTest",
+      "outcomes": {
+        "Begin": {
+          "accepted": 1
+        },
+        "Ready": {
+          "accepted": 1
+        },
+        "Stream": {
+          "accepted": 3
+        }
+      },
+      "source": "scenario",
+      "steps": 5
+    },
+    {
+      "actions": {
+        "Begin": 1,
+        "Ready": 2
+      },
+      "file": "scenario_staleReadinessTest.itf.json",
+      "name": "staleReadinessTest",
+      "outcomes": {
+        "Begin": {
+          "accepted": 1
+        },
+        "Ready": {
+          "accepted": 2
+        }
+      },
+      "source": "scenario",
+      "steps": 3
+    }
+  ]
+}

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add development/test-only AshQuint model replays for the pure ReAct transition
+  core. Generated traces check setup/readiness correlation, stream ordering and
+  retry supersession, cancellation, completion and restart, comparing adopted
+  state and returned effect descriptors without executing them.
+
 - Expose native one-shot asynchronous signal receipts through
   `Aikido.AgentServer.send_request/3`, using OTP request IDs and the existing
   selector pipeline without server-side waiters. ReAct streaming keeps one
