@@ -92,7 +92,7 @@
     ]
   },
   "models": {
-    "test/quint/react_stream/model-tests.qnt": "sha256:6af4b5d3a01ebb304375f4ad39130b3ddeeaf79b96acb6afdf09eeaf1762a8c3",
+    "test/quint/react_stream/model-tests.qnt": "sha256:a1d9adfb41a9f3dc30f092be553bb199042e0b38f04cb647d1cd06cc6a363b02",
     "test/quint/react_stream/model.qnt": "sha256:7154516f9f0207c9eef45b883f800f931e9b973fe375e135cc726d59e5259bda"
   },
   "quint": "0.34.0",

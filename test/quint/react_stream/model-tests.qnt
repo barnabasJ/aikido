@@ -6,4 +6,3 @@ module tests {
   run completeRestartTest = init.then(begin).then(ready(true, true)).then(complete).then(begin).then(ready(true, true)).then(stream(false, 1, 0, 1)).then(stream(true, 2, 0, 1)).expect(status == "running" and text == List() and sequence == 0)
   run staleReadinessTest = init.then(begin).then(ready(false, true)).then(ready(true, false)).expect(status == "setup" and effects == List())
 }
-
